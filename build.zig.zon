@@ -1,0 +1,12 @@
+.{
+    .name = "wio",
+    .version = "0.0.0",
+    .dependencies = .{
+        .win32 = .{
+            .url = "https://github.com/ypsvlq/win32/archive/51f96ae94b2e23f8fbb77e28c2fc91a33aa0f049.tar.gz",
+            .hash = "1220f847a1dc2a3571165ec2854e203de663c654a369fe9c980c1fdc4255c71b33be",
+            .lazy = true,
+        },
+    },
+    .paths = .{ "build.zig", "build.zig.zon", "src", "examples" },
+}
