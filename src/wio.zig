@@ -125,9 +125,7 @@ pub const JoystickInfo = struct {
 };
 
 pub fn openJoystick(id: []const u8) !?Joystick {
-    if (try Backend.openJoystick(id)) |backend| {
-        return .{ .backend = backend };
-    } else return null;
+    return if (try Backend.openJoystick(id)) |backend| .{ .backend = backend } else null;
 }
 
 pub const Joystick = struct {
