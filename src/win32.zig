@@ -675,9 +675,9 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
 }
 
 fn buttonFromScancode(scancode: u9) ?wio.Button {
-    comptime var table: [0x15D]u8 = undefined;
+    comptime var table: [0x15D]wio.Button = undefined;
     comptime for (&table, 1..) |*ptr, i| {
-        const key: wio.Button = switch (i) {
+        ptr.* = switch (i) {
             0x1 => .escape,
             0x2 => .@"1",
             0x3 => .@"2",
@@ -802,12 +802,8 @@ fn buttonFromScancode(scancode: u9) ?wio.Button {
             0x15B => .left_gui,
             0x15C => .right_gui,
             0x15D => .application,
-            else => {
-                ptr.* = 0xFF;
-                continue;
-            },
+            else => .mouse_left,
         };
-        ptr.* = @intFromEnum(key);
     };
-    return if (scancode > 0 and scancode <= table.len and table[scancode - 1] != 0xFF) @enumFromInt(table[scancode - 1]) else null;
+    return if (scancode > 0 and scancode <= table.len and table[scancode - 1] != .mouse_left) table[scancode - 1] else null;
 }
