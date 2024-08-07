@@ -1,6 +1,7 @@
 const std = @import("std");
 const Backend = switch (@import("builtin").target.os.tag) {
     .windows => @import("win32.zig"),
+    .linux, .openbsd, .macos => @import("glfw.zig"),
     else => @compileError("unsupported platform"),
 };
 
