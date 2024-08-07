@@ -136,14 +136,7 @@ pub fn createWindow(self: *@This(), options: wio.CreateWindowOptions) !void {
     const scale = dpi / w.USER_DEFAULT_SCREEN_DPI;
     self.pushEvent(.{ .scale = scale });
 
-    const size_scaled: wio.Size = blk: {
-        const width: f32 = @floatFromInt(options.size.width);
-        const height: f32 = @floatFromInt(options.size.height);
-        break :blk .{
-            .width = @intFromFloat(width * scale / options.scale),
-            .height = @intFromFloat(height * scale / options.scale),
-        };
-    };
+    const size_scaled = options.size.multiply(scale / options.scale);
     self.setSize(size_scaled);
 
     if (options.display_mode == .borderless and scale / options.scale == 1) {
