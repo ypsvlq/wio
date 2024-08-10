@@ -7,7 +7,7 @@
     </head>
     <body>
         <canvas id="canvas" width="640" height="480" tabindex="1"></canvas>
-        <script src="wasm.js"></script>
+        <script src="../src/wasm.js"></script>
         <script>WebAssembly.instantiateStreaming(fetch("../zig-out/bin/wio.wasm"), { wio: wio }).then(result => wio.run(result.instance, document.getElementById("canvas")));</script>
     </body>
 </html>
