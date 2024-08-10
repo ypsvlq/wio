@@ -175,8 +175,8 @@ pub fn getClipboardText(ally: std.mem.Allocator) ?[]u8 {
     return Backend.getClipboardText(ally);
 }
 
-pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
-    return Backend.glGetProcAddress(name);
+pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const fn () void {
+    return @alignCast(@ptrCast(Backend.glGetProcAddress(name)));
 }
 
 pub fn swapInterval(interval: i32) void {
