@@ -44,22 +44,20 @@ pub fn build(b: *std.Build) void {
         module.addWin32ResourceFile(.{ .file = b.path("src/win32.rc") });
     }
 
-    inline for (.{ "events", "joystick" }) |name| {
-        const exe = b.addExecutable(.{
-            .name = name,
-            .root_source_file = b.path("examples/" ++ name ++ ".zig"),
-            .target = target,
-            .optimize = optimize,
-        });
-        exe.root_module.addImport("wio", module);
-        b.installArtifact(exe);
+    const exe = b.addExecutable(.{
+        .name = "wio",
+        .root_source_file = b.path("example/main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    exe.root_module.addImport("wio", module);
+    b.installArtifact(exe);
 
-        const run_cmd = b.addRunArtifact(exe);
-        run_cmd.step.dependOn(b.getInstallStep());
+    const run_cmd = b.addRunArtifact(exe);
+    run_cmd.step.dependOn(b.getInstallStep());
 
-        const run_step = b.step("run-" ++ name, "Run " ++ name);
-        run_step.dependOn(&run_cmd.step);
-    }
+    const run_step = b.step("run", "Run the app");
+    run_step.dependOn(&run_cmd.step);
 }
 
 const glfw_files: []const []const u8 = &.{

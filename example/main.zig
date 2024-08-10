@@ -12,10 +12,18 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    try wio.init(allocator, .{ .opengl = true });
+    try wio.init(allocator, .{ .joystick = true, .opengl = true });
     window = try wio.createWindow(.{ .title = "wio example", .opengl = .{} });
     window.makeContextCurrent();
-    return wio.run(loop, .{ .wait = true });
+
+    const joysticks = try wio.getJoysticks(allocator);
+    defer joysticks.deinit();
+    if (joysticks.items.len > 0) {
+        const info = joysticks.items[0];
+        std.log.scoped(.joystick).info("{s} / {s}", .{ info.name, info.id });
+    }
+
+    return wio.run(loop, .{});
 }
 
 fn loop() !bool {
