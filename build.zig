@@ -37,7 +37,11 @@ pub fn build(b: *std.Build) void {
             module.linkFramework("Cocoa", .{});
             module.linkFramework("IOKit", .{});
         },
-        else => {},
+        else => {
+            if (target.result.isWasm()) {
+                module.export_symbol_names = &.{"wioLoop"};
+            }
+        },
     }
 
     if (b.option(bool, "win32_manifest", "Embed application manifest (default: true)") orelse true) {

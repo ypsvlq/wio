@@ -1,11 +1,14 @@
 const std = @import("std");
-const Backend = switch (@import("builtin").target.os.tag) {
+const builtin = @import("builtin");
+const Backend = switch (builtin.os.tag) {
     .windows => @import("win32.zig"),
     .linux, .openbsd, .macos => @import("glfw.zig"),
-    else => @compileError("unsupported platform"),
+    else => if (builtin.target.isWasm()) @import("wasm.zig") else @compileError("unsupported platform"),
 };
 
 pub var allocator: std.mem.Allocator = undefined;
+
+pub const logFn = if (@hasDecl(Backend, "logFn")) Backend.logFn else std.log.defaultLog;
 
 pub const InitOptions = struct {
     joystick: bool = false,
@@ -347,6 +350,12 @@ pub const Button = enum {
     f24,
     kp_comma,
     international1,
+    international2,
+    international3,
+    international4,
+    international5,
+    lang1,
+    lang2,
     left_control,
     left_shift,
     left_alt,

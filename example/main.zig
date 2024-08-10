@@ -3,6 +3,7 @@ const wio = @import("wio");
 
 pub const std_options = std.Options{
     .log_level = .info,
+    .logFn = wio.logFn,
 };
 
 var window: wio.Window = undefined;
