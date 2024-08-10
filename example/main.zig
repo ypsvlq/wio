@@ -6,6 +6,8 @@ pub const std_options = std.Options{
 };
 
 var window: wio.Window = undefined;
+var active_joystick: ?wio.Joystick = null;
+var last_joystick_state: u32 = 0;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -20,21 +22,43 @@ pub fn main() !void {
     defer joysticks.deinit();
     if (joysticks.items.len > 0) {
         const info = joysticks.items[0];
-        std.log.scoped(.joystick).info("{s} / {s}", .{ info.name, info.id });
+        std.log.scoped(.joystick).info("using {s} / {s}", .{ info.name, info.id });
+        active_joystick = try wio.openJoystick(info.id);
     }
 
     return wio.run(loop, .{});
 }
 
 fn loop() !bool {
+    if (active_joystick) |*joystick| blk: {
+        const state = try joystick.poll() orelse {
+            std.log.scoped(.joystick).info("lost", .{});
+            joystick.close();
+            active_joystick = null;
+            break :blk;
+        };
+        var xxh = std.hash.XxHash32.init(0);
+        xxh.update(std.mem.sliceAsBytes(state.axes));
+        xxh.update(std.mem.sliceAsBytes(state.hats));
+        xxh.update(std.mem.sliceAsBytes(state.buttons));
+        const hash = xxh.final();
+        if (hash != last_joystick_state) {
+            std.log.scoped(.joystick).info("axes {any}", .{state.axes});
+            std.log.scoped(.joystick).info("hats {any}", .{state.hats});
+            std.log.scoped(.joystick).info("buttons {any}", .{state.buttons});
+            last_joystick_state = hash;
+        }
+    }
+
     while (window.getEvent()) |event| switch (event) {
         .close => {
+            if (active_joystick) |*joystick| joystick.close();
             window.destroy();
             wio.deinit();
             return false;
         },
         .size, .maximized, .framebuffer => |size| std.log.info("{s} {}x{}", .{ @tagName(event), size.width, size.height }),
-        .scale => |scale| std.log.info("scale: {d}", .{scale}),
+        .scale => |scale| std.log.info("scale {d}", .{scale}),
         .char => |char| std.log.info("char: {u}", .{char}),
         .button_press => |button| std.log.info("+{s}", .{@tagName(button)}),
         .button_repeat => |button| std.log.info("*{s}", .{@tagName(button)}),
@@ -43,6 +67,7 @@ fn loop() !bool {
         .scroll_vertical, .scroll_horizontal => |value| std.log.info("{s} {d}", .{ @tagName(event), value }),
         else => std.log.info("{s}", .{@tagName(event)}),
     };
+
     window.swapBuffers();
     return true;
 }
