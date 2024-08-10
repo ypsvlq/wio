@@ -9,6 +9,12 @@ pub fn init(options: wio.InitOptions) !void {
 
 pub fn deinit() void {}
 
+pub fn run(func: fn () anyerror!bool, options: wio.RunOptions) !void {
+    _ = func;
+    _ = options;
+    unreachable;
+}
+
 pub fn createWindow(self: *@This(), options: wio.CreateWindowOptions) !void {
     _ = self;
     _ = options;
@@ -20,19 +26,7 @@ pub fn destroy(self: *@This()) void {
     unreachable;
 }
 
-pub fn pollEvents(self: *@This()) EventIterator {
-    _ = self;
-    unreachable;
-}
-
-pub const EventIterator = struct {
-    pub fn next(self: *EventIterator) ?wio.Event {
-        _ = self;
-        unreachable;
-    }
-};
-
-pub fn waitEvent(self: *@This()) wio.Event {
+pub fn getEvent(self: *@This()) ?wio.Event {
     _ = self;
     unreachable;
 }

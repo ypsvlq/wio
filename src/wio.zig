@@ -21,6 +21,14 @@ pub fn deinit() void {
     Backend.deinit();
 }
 
+pub const RunOptions = struct {
+    wait: bool = false,
+};
+
+pub fn run(func: fn () anyerror!bool, options: RunOptions) !void {
+    return Backend.run(func, options);
+}
+
 pub const Size = struct {
     width: u16,
     height: u16,
@@ -66,12 +74,8 @@ pub const Window = struct {
         Backend.messageBox(self.backend, style, title, message);
     }
 
-    pub fn pollEvents(self: Window) EventIterator {
-        return .{ .child = self.backend.pollEvents() };
-    }
-
-    pub fn waitEvent(self: Window) Event {
-        return self.backend.waitEvent();
+    pub fn getEvent(self: Window) ?Event {
+        return self.backend.getEvent();
     }
 
     pub fn setTitle(self: Window, title: []const u8) void {
@@ -175,14 +179,6 @@ pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
 pub fn swapInterval(interval: i32) void {
     Backend.swapInterval(interval);
 }
-
-pub const EventIterator = struct {
-    child: Backend.EventIterator,
-
-    pub fn next(self: *EventIterator) ?Event {
-        return self.child.next();
-    }
-};
 
 pub const Event = union(enum) {
     close: void,

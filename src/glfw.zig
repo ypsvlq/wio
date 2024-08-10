@@ -18,6 +18,17 @@ pub fn deinit() void {
     _ = c.glfwTerminate();
 }
 
+pub fn run(func: fn () anyerror!bool, options: wio.RunOptions) !void {
+    while (true) {
+        if (options.wait) {
+            c.glfwWaitEvents();
+        } else {
+            c.glfwPollEvents();
+        }
+        if (!try func()) return;
+    }
+}
+
 window: *c.GLFWwindow,
 events: EventQueue,
 
@@ -64,24 +75,8 @@ pub fn destroy(self: *@This()) void {
     c.glfwDestroyWindow(self.window);
 }
 
-pub fn pollEvents(self: *@This()) EventIterator {
-    c.glfwPollEvents();
-    return .{ .queue = &self.events };
-}
-
-pub const EventIterator = struct {
-    queue: *EventQueue,
-
-    pub fn next(self: *EventIterator) ?wio.Event {
-        return self.queue.readItem();
-    }
-};
-
-pub fn waitEvent(self: *@This()) wio.Event {
-    while (true) {
-        if (self.events.readItem()) |event| return event;
-        c.glfwWaitEvents();
-    }
+pub fn getEvent(self: *@This()) ?wio.Event {
+    return self.events.readItem();
 }
 
 pub fn setTitle(self: *@This(), title: []const u8) void {

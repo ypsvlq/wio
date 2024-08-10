@@ -83,6 +83,23 @@ pub fn deinit() void {
     }
 }
 
+pub fn run(func: fn () anyerror!bool, options: wio.RunOptions) !void {
+    var msg: w.MSG = undefined;
+    while (true) {
+        if (options.wait) {
+            _ = w.GetMessageW(&msg, null, 0, 0);
+            _ = w.TranslateMessage(&msg);
+            _ = w.DispatchMessageW(&msg);
+        } else {
+            while (w.PeekMessageW(&msg, null, 0, 0, w.PM_REMOVE) != 0) {
+                _ = w.TranslateMessage(&msg);
+                _ = w.DispatchMessageW(&msg);
+            }
+        }
+        if (!try func()) return;
+    }
+}
+
 events: EventQueue,
 window: w.HWND,
 cursor: w.HCURSOR,
@@ -159,33 +176,8 @@ pub fn destroy(self: *@This()) void {
     self.events.deinit();
 }
 
-pub fn pollEvents(self: *@This()) EventIterator {
-    var msg: w.MSG = undefined;
-    while (w.PeekMessageW(&msg, null, 0, 0, w.PM_REMOVE) != 0) {
-        _ = w.TranslateMessage(&msg);
-        _ = w.DispatchMessageW(&msg);
-    }
-    return .{ .queue = &self.events };
-}
-
-pub const EventIterator = struct {
-    queue: *EventQueue,
-
-    pub fn next(self: *EventIterator) ?wio.Event {
-        return self.queue.readItem();
-    }
-};
-
-pub fn waitEvent(self: *@This()) wio.Event {
-    var msg: w.MSG = undefined;
-    while (true) {
-        if (self.events.readItem()) |event| {
-            return event;
-        }
-        _ = w.GetMessageW(&msg, null, 0, 0);
-        _ = w.TranslateMessage(&msg);
-        _ = w.DispatchMessageW(&msg);
-    }
+pub fn getEvent(self: *@This()) ?wio.Event {
+    return self.events.readItem();
 }
 
 pub fn setTitle(self: *@This(), title: []const u8) void {
