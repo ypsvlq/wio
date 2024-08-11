@@ -12,16 +12,22 @@ const wio = {
         module.exports._start();
         requestAnimationFrame(wio.loop);
 
+        canvas.style.width = `${canvas.width}px`;
+        canvas.style.height = `${canvas.height}px`;
+        canvas.width *= devicePixelRatio;
+        canvas.height *= devicePixelRatio;
+
         wio.events.push(
-            5, canvas.width, canvas.height,
+            5, parseInt(canvas.style.width), parseInt(canvas.style.height),
             7, canvas.width, canvas.height,
-            8, 1,
+            8, devicePixelRatio,
             1,
         );
 
         new ResizeObserver(() => wio.events.push(
-            5, canvas.width, canvas.height,
-            7, canvas.width, canvas.height
+            5, parseInt(canvas.style.width), parseInt(canvas.style.height),
+            7, canvas.width, canvas.height,
+            8, devicePixelRatio,
         )).observe(canvas);
 
         canvas.addEventListener("contextmenu", event => event.preventDefault());
