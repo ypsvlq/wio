@@ -4,6 +4,8 @@ const wio = {
     log: "",
     events: [],
     cursor: undefined,
+    gamepads: undefined,
+    gamepad_ids: undefined,
 
     run(module, canvas) {
         wio.module = module;
@@ -52,6 +54,9 @@ const wio = {
         canvas.addEventListener("mousemove", event => {
             wio.events.push(13, event.offsetX, event.offsetY);
         });
+
+        addEventListener("gamepadconnected", () => wio.events.push(16));
+        addEventListener("gamepaddisconnected", () => wio.events.push(16));
     },
 
     loop() {
@@ -107,6 +112,46 @@ const wio = {
         }
     },
 
+    getJoysticks() {
+        wio.gamepads = navigator.getGamepads();
+        wio.gamepad_ids = [];
+        const encoder = new TextEncoder();
+        for (let i = 0; i < wio.gamepads.length; i++) {
+            if (wio.gamepads[i] != null) {
+                wio.gamepad_ids[i] = encoder.encode(wio.gamepads[i].id);
+            } else {
+                wio.gamepad_ids[i] = {length: 0};
+            }
+        }
+        return wio.gamepads.length;
+    },
+
+    getJoystickIdLen(i) {
+        return wio.gamepad_ids[i].length;
+    },
+
+    getJoystickId(i, ptr) {
+        wio.setString(ptr, wio.gamepad_ids[i]);
+    },
+
+    isJoystickConnected(i) {
+        return wio.gamepads[i] != null && wio.gamepads[i].connected;
+    },
+
+    openJoystick(i, ptr) {
+        const result = new Uint32Array(wio.module.exports.memory.buffer, ptr, 2);
+        result[0] = wio.gamepads[i].axes.length;
+        result[1] = wio.gamepads[i].buttons.length;
+    },
+
+    getJoystickAxis(i, axis) {
+        return wio.gamepads[i].axes[axis];
+    },
+
+    getJoystickButton(i, button) {
+        return wio.gamepads[i].buttons[button].pressed;
+    },
+
     messageBox(ptr, len) {
         alert(wio.getString(ptr, len));
     },
@@ -117,6 +162,14 @@ const wio = {
 
     getString(ptr, len) {
         return new TextDecoder().decode(new Uint8Array(wio.module.exports.memory.buffer, ptr, len));
+    },
+
+    setString(ptr, buffer) {
+        if (buffer.length == 0) return;
+        const output = new Uint8Array(wio.module.exports.memory.buffer, ptr, buffer.length);
+        for (let i = 0; i < buffer.length; i++) {
+            output[i] = buffer[i];
+        }
     },
 
     keys: {
