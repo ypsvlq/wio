@@ -77,7 +77,7 @@ const wio = {
         return wio.events.shift();
     },
 
-    jsCursor(cursor) {
+    setCursor(cursor) {
         wio.cursor = {
             0: "default",
             1: "progress",
@@ -95,7 +95,7 @@ const wio = {
         wio.canvas.style.cursor = wio.cursor;
     },
 
-    jsCursorMode(mode) {
+    setCursorMode(mode) {
         switch (mode) {
             case 0:
                 wio.canvas.style.cursor = wio.cursor;
@@ -107,11 +107,11 @@ const wio = {
         }
     },
 
-    jsMessageBox(ptr, len) {
+    messageBox(ptr, len) {
         alert(wio.getString(ptr, len));
     },
 
-    jsSetClipboard(ptr, len) {
+    setClipboardText(ptr, len) {
         navigator.clipboard.writeText(wio.getString(ptr, len));
     },
 

@@ -1,18 +1,10 @@
 const std = @import("std");
 const wio = @import("wio.zig");
+const js = @import("wasm/js.zig");
 const log = std.log.scoped(.wio);
 
-extern "wio" fn write([*]const u8, usize) void;
-extern "wio" fn flush() void;
-extern "wio" fn shift() u32;
-extern "wio" fn shiftFloat() f32;
-extern "wio" fn jsCursor(u8) void;
-extern "wio" fn jsCursorMode(u8) void;
-extern "wio" fn jsMessageBox([*]const u8, usize) void;
-extern "wio" fn jsSetClipboard([*]const u8, usize) void;
-
 fn writeFn(_: void, bytes: []const u8) !usize {
-    write(bytes.ptr, bytes.len);
+    js.write(bytes.ptr, bytes.len);
     return bytes.len;
 }
 
@@ -20,7 +12,7 @@ pub fn logFn(comptime level: std.log.Level, comptime scope: @TypeOf(.enum_litera
     const writer = std.io.GenericWriter(void, error{}, writeFn){ .context = {} };
     const prefix = if (scope == .default) ": " else "(" ++ @tagName(scope) ++ "): ";
     writer.print(level.asText() ++ prefix ++ format ++ "\n", args) catch {};
-    flush();
+    js.flush();
 }
 
 pub fn init(_: wio.InitOptions) !void {}
@@ -48,15 +40,15 @@ pub fn createWindow(self: *@This(), options: wio.CreateWindowOptions) !void {
 pub fn destroy(_: *@This()) void {}
 
 pub fn getEvent(_: *@This()) ?wio.Event {
-    const event: wio.EventType = @enumFromInt(shift());
+    const event: wio.EventType = @enumFromInt(js.shift());
     switch (event) {
         .close => return null, // never sent, EventType 0 is reused to indicate empty queue
         .create => return .create,
-        .scale => return .{ .scale = shiftFloat() },
-        .char => return .{ .char = @intCast(shift()) },
-        .mouse => return .{ .mouse = .{ .x = @intCast(shift()), .y = @intCast(shift()) } },
-        inline .size, .maximized, .framebuffer => |tag| return @unionInit(wio.Event, @tagName(tag), .{ .width = @intCast(shift()), .height = @intCast(shift()) }),
-        inline .button_press, .button_repeat, .button_release => |tag| return @unionInit(wio.Event, @tagName(tag), @enumFromInt(shift())),
+        .scale => return .{ .scale = js.shiftFloat() },
+        .char => return .{ .char = @intCast(js.shift()) },
+        .mouse => return .{ .mouse = .{ .x = @intCast(js.shift()), .y = @intCast(js.shift()) } },
+        inline .size, .maximized, .framebuffer => |tag| return @unionInit(wio.Event, @tagName(tag), .{ .width = @intCast(js.shift()), .height = @intCast(js.shift()) }),
+        inline .button_press, .button_repeat, .button_release => |tag| return @unionInit(wio.Event, @tagName(tag), @enumFromInt(js.shift())),
         else => unreachable,
     }
 }
@@ -68,11 +60,11 @@ pub fn setSize(_: *@This(), _: wio.Size) void {}
 pub fn setDisplayMode(_: *@This(), _: wio.DisplayMode) void {}
 
 pub fn setCursor(_: *@This(), shape: wio.Cursor) void {
-    jsCursor(@intFromEnum(shape));
+    js.setCursor(@intFromEnum(shape));
 }
 
 pub fn setCursorMode(_: *@This(), mode: wio.CursorMode) void {
-    jsCursorMode(@intFromEnum(mode));
+    js.setCursorMode(@intFromEnum(mode));
 }
 
 pub fn makeContextCurrent(_: *@This()) void {}
@@ -101,11 +93,11 @@ pub const Joystick = struct {
 };
 
 pub fn messageBox(_: ?*@This(), _: wio.MessageBoxStyle, _: []const u8, message: []const u8) void {
-    jsMessageBox(message.ptr, message.len);
+    js.messageBox(message.ptr, message.len);
 }
 
 pub fn setClipboardText(text: []const u8) void {
-    jsSetClipboard(text.ptr, text.len);
+    js.setClipboardText(text.ptr, text.len);
 }
 
 pub fn getClipboardText(_: std.mem.Allocator) ?[]u8 {
