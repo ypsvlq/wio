@@ -6,27 +6,17 @@ pub const std_options = std.Options{
     .logFn = wio.logFn,
 };
 
+var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+const allocator = gpa.allocator();
 var window: wio.Window = undefined;
 var active_joystick: ?wio.Joystick = null;
 var last_joystick_state: u32 = 0;
 
 pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
-
     try wio.init(allocator, .{ .joystick = true, .opengl = true });
     window = try wio.createWindow(.{ .title = "wio example", .opengl = .{} });
     window.makeContextCurrent();
-
-    const joysticks = try wio.getJoysticks(allocator);
-    defer joysticks.deinit();
-    if (joysticks.items.len > 0) {
-        const info = joysticks.items[0];
-        std.log.scoped(.joystick).info("using {s} / {s}", .{ info.name, info.id });
-        active_joystick = try wio.openJoystick(info.id);
-    }
-
+    try scanJoysticks();
     return wio.run(loop, .{});
 }
 
@@ -56,6 +46,7 @@ fn loop() !bool {
             if (active_joystick) |*joystick| joystick.close();
             window.destroy();
             wio.deinit();
+            _ = gpa.deinit();
             return false;
         },
         .size, .maximized, .framebuffer => |size| std.log.info("{s} {}x{}", .{ @tagName(event), size.width, size.height }),
@@ -66,9 +57,23 @@ fn loop() !bool {
         .button_release => |button| std.log.info("-{s}", .{@tagName(button)}),
         .mouse => |mouse| std.log.info("({},{})", .{ mouse.x, mouse.y }),
         .scroll_vertical, .scroll_horizontal => |value| std.log.info("{s} {d}", .{ @tagName(event), value }),
+        .joystick => {
+            std.log.info("joystick", .{});
+            if (active_joystick == null) try scanJoysticks();
+        },
         else => std.log.info("{s}", .{@tagName(event)}),
     };
 
     window.swapBuffers();
     return true;
+}
+
+fn scanJoysticks() !void {
+    const joysticks = try wio.getJoysticks(allocator);
+    defer joysticks.deinit();
+    if (joysticks.items.len > 0) {
+        const info = joysticks.items[0];
+        std.log.scoped(.joystick).info("using {s} / {s}", .{ info.name, info.id });
+        active_joystick = try wio.openJoystick(info.id);
+    }
 }
