@@ -124,13 +124,8 @@ pub const Joystick = struct {
 
     pub fn poll(self: *Joystick) !?wio.JoystickState {
         if (!js.isJoystickConnected(self.index)) return null;
-        for (self.axes, 0..) |*axis, i| {
-            const value = js.getJoystickAxis(self.index, i);
-            axis.* = @intFromFloat((value + 1) * (0xFFFF.0 / 2.0));
-        }
-        for (self.buttons, 0..) |*button, i| {
-            button.* = js.getJoystickButton(self.index, i);
-        }
+        js.getJoystickAxes(self.index, self.axes.ptr, self.axes.len);
+        js.getJoystickButtons(self.index, self.buttons.ptr, self.buttons.len);
         return .{
             .axes = self.axes,
             .hats = &.{},

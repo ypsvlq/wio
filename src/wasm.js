@@ -144,12 +144,18 @@ const wio = {
         result[1] = wio.gamepads[i].buttons.length;
     },
 
-    getJoystickAxis(i, axis) {
-        return wio.gamepads[i].axes[axis];
+    getJoystickAxes(index, ptr, len) {
+        const array = new Uint16Array(wio.module.exports.memory.buffer, ptr, len);
+        for (let i = 0; i < len; i++) {
+            array[i] = (wio.gamepads[index].axes[i] + 1) * 32767.5;
+        }
     },
 
-    getJoystickButton(i, button) {
-        return wio.gamepads[i].buttons[button].pressed;
+    getJoystickButtons(index, ptr, len) {
+        const array = new Uint8Array(wio.module.exports.memory.buffer, ptr, len);
+        for (let i = 0; i < len; i++) {
+            array[i] = wio.gamepads[index].buttons[i].pressed;
+        }
     },
 
     messageBox(ptr, len) {
