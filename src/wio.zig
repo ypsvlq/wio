@@ -59,53 +59,49 @@ pub const CreateWindowOptions = struct {
 };
 
 pub fn createWindow(options: CreateWindowOptions) !Window {
-    const backend = try allocator.create(Backend);
-    errdefer allocator.destroy(backend);
-    try Backend.createWindow(backend, options);
-    return .{ .backend = backend };
+    return .{ .backend = try Backend.createWindow(options) };
 }
 
 pub const Window = struct {
-    backend: *Backend,
+    backend: @typeInfo(@typeInfo(@TypeOf(Backend.createWindow)).Fn.return_type.?).ErrorUnion.payload,
 
-    pub fn destroy(self: Window) void {
+    pub fn destroy(self: *Window) void {
         self.backend.destroy();
-        allocator.destroy(self.backend);
     }
 
-    pub fn messageBox(self: Window, style: MessageBoxStyle, title: []const u8, message: []const u8) void {
+    pub fn messageBox(self: *Window, style: MessageBoxStyle, title: []const u8, message: []const u8) void {
         Backend.messageBox(self.backend, style, title, message);
     }
 
-    pub fn getEvent(self: Window) ?Event {
+    pub fn getEvent(self: *Window) ?Event {
         return self.backend.getEvent();
     }
 
-    pub fn setTitle(self: Window, title: []const u8) void {
+    pub fn setTitle(self: *Window, title: []const u8) void {
         self.backend.setTitle(title);
     }
 
-    pub fn setSize(self: Window, size: Size) void {
+    pub fn setSize(self: *Window, size: Size) void {
         self.backend.setSize(size);
     }
 
-    pub fn setDisplayMode(self: Window, mode: DisplayMode) void {
+    pub fn setDisplayMode(self: *Window, mode: DisplayMode) void {
         self.backend.setDisplayMode(mode);
     }
 
-    pub fn setCursor(self: Window, cursor: Cursor) void {
+    pub fn setCursor(self: *Window, cursor: Cursor) void {
         self.backend.setCursor(cursor);
     }
 
-    pub fn setCursorMode(self: Window, mode: CursorMode) void {
+    pub fn setCursorMode(self: *Window, mode: CursorMode) void {
         self.backend.setCursorMode(mode);
     }
 
-    pub fn makeContextCurrent(self: Window) void {
+    pub fn makeContextCurrent(self: *Window) void {
         self.backend.makeContextCurrent();
     }
 
-    pub fn swapBuffers(self: Window) void {
+    pub fn swapBuffers(self: *Window) void {
         self.backend.swapBuffers();
     }
 };

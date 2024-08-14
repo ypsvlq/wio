@@ -13,9 +13,9 @@ pub fn run(func: fn () anyerror!bool, options: wio.RunOptions) !void {
     _ = options;
 }
 
-pub fn createWindow(self: *@This(), options: wio.CreateWindowOptions) !void {
-    _ = self;
+pub fn createWindow(options: wio.CreateWindowOptions) !@This() {
     _ = options;
+    return .{};
 }
 
 pub fn destroy(self: *@This()) void {

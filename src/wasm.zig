@@ -32,9 +32,11 @@ export fn wioLoop() bool {
     };
 }
 
-pub fn createWindow(self: *@This(), options: wio.CreateWindowOptions) !void {
+pub fn createWindow(options: wio.CreateWindowOptions) !@This() {
+    var self = @This(){};
     self.setCursor(options.cursor);
     self.setCursorMode(options.cursor_mode);
+    return self;
 }
 
 pub fn destroy(_: *@This()) void {}

@@ -108,7 +108,10 @@ surrogate: u16 = 0,
 dc: w.HDC = null,
 rc: w.HGLRC = null,
 
-pub fn createWindow(self: *@This(), options: wio.CreateWindowOptions) !void {
+pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
+    const self = try wio.allocator.create(@This());
+    errdefer wio.allocator.destroy(self);
+
     const title = try std.unicode.utf8ToUtf16LeAllocZ(wio.allocator, options.title);
     defer wio.allocator.free(title);
     const style: u32 = if (options.display_mode == .borderless) w.WS_POPUP else w.WS_OVERLAPPEDWINDOW;
@@ -165,6 +168,7 @@ pub fn createWindow(self: *@This(), options: wio.CreateWindowOptions) !void {
     if (options.cursor != .arrow) self.setCursor(options.cursor);
 
     self.pushEvent(.create);
+    return self;
 }
 
 pub fn destroy(self: *@This()) void {
@@ -174,6 +178,7 @@ pub fn destroy(self: *@This()) void {
     }
     _ = w.DestroyWindow(self.window);
     self.events.deinit();
+    wio.allocator.destroy(self);
 }
 
 pub fn getEvent(self: *@This()) ?wio.Event {
