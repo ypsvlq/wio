@@ -23,12 +23,12 @@ pub fn close() void {
 }
 
 pub fn update() !void {
-    if (active) |*joystick| blk: {
+    if (active) |*joystick| {
         const state = try joystick.poll() orelse {
             log.info("lost", .{});
             joystick.close();
             active = null;
-            break :blk;
+            return;
         };
         var xxh = std.hash.XxHash32.init(0);
         xxh.update(std.mem.sliceAsBytes(state.axes));
