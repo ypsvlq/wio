@@ -13,13 +13,14 @@ pub fn run(func: fn () anyerror!bool, options: wio.RunOptions) !void {
     _ = options;
 }
 
-pub fn createWindow(options: wio.CreateWindowOptions) !@This() {
+pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
+    const self = try wio.allocator.create(@This());
     _ = options;
-    return .{};
+    return self;
 }
 
 pub fn destroy(self: *@This()) void {
-    _ = self;
+    wio.allocator.destroy(self);
 }
 
 pub fn getEvent(self: *@This()) ?wio.Event {
