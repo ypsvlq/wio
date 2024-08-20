@@ -1,7 +1,24 @@
 const std = @import("std");
 const wio = @import("wio.zig");
-const js = @import("wasm/js.zig");
 const log = std.log.scoped(.wio);
+
+const js = struct {
+    pub extern "wio" fn write([*]const u8, usize) void;
+    pub extern "wio" fn flush() void;
+    pub extern "wio" fn shift() u32;
+    pub extern "wio" fn shiftFloat() f32;
+    pub extern "wio" fn setCursor(u8) void;
+    pub extern "wio" fn setCursorMode(u8) void;
+    pub extern "wio" fn getJoysticks() u32;
+    pub extern "wio" fn getJoystickIdLen(u32) u32;
+    pub extern "wio" fn getJoystickId(u32, [*]u8) void;
+    pub extern "wio" fn isJoystickConnected(u32) bool;
+    pub extern "wio" fn getJoystickAxes(u32, [*]u16, usize) void;
+    pub extern "wio" fn getJoystickButtons(u32, [*]bool, usize) void;
+    pub extern "wio" fn openJoystick(u32, *[2]u32) void;
+    pub extern "wio" fn messageBox([*]const u8, usize) void;
+    pub extern "wio" fn setClipboardText([*]const u8, usize) void;
+};
 
 fn writeFn(_: void, bytes: []const u8) !usize {
     js.write(bytes.ptr, bytes.len);
