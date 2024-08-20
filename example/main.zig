@@ -32,9 +32,15 @@ fn loop() !bool {
         .size, .maximized, .framebuffer => |size| std.log.info("{s} {}x{}", .{ @tagName(event), size.width, size.height }),
         .scale => |scale| std.log.info("scale {d}", .{scale}),
         .char => |char| std.log.info("char: {u}", .{char}),
-        .button_press => |button| std.log.info("+{s}", .{@tagName(button)}),
+        .button_press => |button| {
+            handlePress(button);
+            std.log.info("+{s}", .{@tagName(button)});
+        },
+        .button_release => |button| {
+            handleRelease(button);
+            std.log.info("-{s}", .{@tagName(button)});
+        },
         .button_repeat => |button| std.log.info("*{s}", .{@tagName(button)}),
-        .button_release => |button| std.log.info("-{s}", .{@tagName(button)}),
         .mouse => |mouse| std.log.info("({},{})", .{ mouse.x, mouse.y }),
         .scroll_vertical, .scroll_horizontal => |value| std.log.info("{s} {d}", .{ @tagName(event), value }),
         .joystick => {
@@ -45,4 +51,44 @@ fn loop() !bool {
     };
     window.swapBuffers();
     return true;
+}
+
+var control: bool = false;
+var cursor: u8 = 0;
+
+fn handlePress(button: wio.Button) void {
+    switch (button) {
+        .left_control, .right_control => control = true,
+        else => if (!control) return,
+    }
+
+    switch (button) {
+        .t => window.setTitle("retitled wio example"),
+        .s => window.setSize(.{ .width = 320, .height = 240 }),
+        .w => window.setDisplayMode(.windowed),
+        .m => window.setDisplayMode(.maximized),
+        .b => window.setDisplayMode(.borderless),
+        .h => window.setDisplayMode(.hidden),
+        .p => {
+            const cursors = std.enums.values(wio.Cursor);
+            cursor +%= 1;
+            window.setCursor(cursors[cursor % cursors.len]);
+        },
+        .n => window.setCursorMode(.normal),
+        .i => window.setCursorMode(.hidden),
+        .c => wio.setClipboardText("wio example"),
+        .v => {
+            const text = wio.getClipboardText(allocator) orelse return;
+            defer wio.allocator.free(text);
+            std.log.scoped(.clipboard).info("{s}", .{text});
+        },
+        else => {},
+    }
+}
+
+fn handleRelease(button: wio.Button) void {
+    switch (button) {
+        .left_control, .right_control => control = false,
+        else => {},
+    }
 }
