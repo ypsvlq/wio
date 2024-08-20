@@ -115,7 +115,6 @@ pub const JoystickList = struct {
     allocator: std.mem.Allocator,
 
     pub fn deinit(self: JoystickList) void {
-        if (@hasDecl(Backend, "freeJoystickList")) return Backend.freeJoystickList(self.allocator, self.items);
         for (self.items) |info| {
             self.allocator.free(info.id);
             self.allocator.free(info.name);

@@ -12,10 +12,8 @@ const js = struct {
     pub extern "wio" fn getJoysticks() u32;
     pub extern "wio" fn getJoystickIdLen(u32) u32;
     pub extern "wio" fn getJoystickId(u32, [*]u8) void;
-    pub extern "wio" fn isJoystickConnected(u32) bool;
-    pub extern "wio" fn getJoystickAxes(u32, [*]u16, usize) void;
-    pub extern "wio" fn getJoystickButtons(u32, [*]bool, usize) void;
-    pub extern "wio" fn openJoystick(u32, *[2]u32) void;
+    pub extern "wio" fn openJoystick(u32, *[2]u32) bool;
+    pub extern "wio" fn getJoystickState(u32, [*]u16, usize, [*]bool, usize) bool;
     pub extern "wio" fn messageBox([*]const u8, usize) void;
     pub extern "wio" fn setClipboardText([*]const u8, usize) void;
 };
@@ -94,17 +92,17 @@ pub fn swapBuffers(_: *@This()) void {}
 pub fn getJoysticks(allocator: std.mem.Allocator) ![]wio.JoystickInfo {
     var list = try std.ArrayList(wio.JoystickInfo).initCapacity(allocator, js.getJoysticks());
     errdefer {
-        for (list.items) |info| allocator.free(info.id);
+        for (list.items) |info| {
+            allocator.free(info.id);
+            allocator.free(info.name);
+        }
         list.deinit();
     }
     for (0..js.getJoysticks()) |index| {
         const len = js.getJoystickIdLen(index);
         if (len > 0) {
-            const prefix = if (index > 0) std.math.log10(index) + 2 else 2;
-            const id = try allocator.alloc(u8, prefix + len);
-            errdefer allocator.free(id);
-            _ = try std.fmt.bufPrint(id, "{} ", .{index});
-            const name = id[prefix..];
+            const id = try std.fmt.allocPrint(allocator, "{}", .{index});
+            const name = try allocator.alloc(u8, len);
             js.getJoystickId(index, name.ptr);
             list.appendAssumeCapacity(.{ .id = id, .name = name });
         }
@@ -112,16 +110,10 @@ pub fn getJoysticks(allocator: std.mem.Allocator) ![]wio.JoystickInfo {
     return list.toOwnedSlice();
 }
 
-pub fn freeJoystickList(allocator: std.mem.Allocator, items: []wio.JoystickInfo) void {
-    for (items) |info| allocator.free(info.id);
-    allocator.free(items);
-}
-
 pub fn openJoystick(id: []const u8) !?Joystick {
-    const index = std.fmt.parseInt(u32, std.mem.sliceTo(id, ' '), 10) catch return null;
-    if (!js.isJoystickConnected(index)) return null;
+    const index = std.fmt.parseInt(u32, id, 10) catch return null;
     var lengths: [2]u32 = undefined;
-    js.openJoystick(index, &lengths);
+    if (!js.openJoystick(index, &lengths)) return null;
     const axes = try wio.allocator.alloc(u16, lengths[0]);
     errdefer wio.allocator.free(axes);
     const buttons = try wio.allocator.alloc(bool, lengths[1]);
@@ -140,9 +132,7 @@ pub const Joystick = struct {
     }
 
     pub fn poll(self: *Joystick) !?wio.JoystickState {
-        if (!js.isJoystickConnected(self.index)) return null;
-        js.getJoystickAxes(self.index, self.axes.ptr, self.axes.len);
-        js.getJoystickButtons(self.index, self.buttons.ptr, self.buttons.len);
+        if (!js.getJoystickState(self.index, self.axes.ptr, self.axes.len, self.buttons.ptr, self.buttons.len)) return null;
         return .{
             .axes = self.axes,
             .hats = &.{},

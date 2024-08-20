@@ -120,7 +120,7 @@ const wio = {
             if (wio.gamepads[i] != null) {
                 wio.gamepad_ids[i] = encoder.encode(wio.gamepads[i].id);
             } else {
-                wio.gamepad_ids[i] = {length: 0};
+                wio.gamepad_ids[i] = { length: 0 };
             }
         }
         return wio.gamepads.length;
@@ -134,28 +134,25 @@ const wio = {
         wio.setString(ptr, wio.gamepad_ids[i]);
     },
 
-    isJoystickConnected(i) {
-        return wio.gamepads[i] != null && wio.gamepads[i].connected;
-    },
-
     openJoystick(i, ptr) {
-        const result = new Uint32Array(wio.module.exports.memory.buffer, ptr, 2);
-        result[0] = wio.gamepads[i].axes.length;
-        result[1] = wio.gamepads[i].buttons.length;
+        if (wio.gamepads[i] == null || !wio.gamepads[i].connected) return false;
+        const lengths = new Uint32Array(wio.module.exports.memory.buffer, ptr, 2);
+        lengths[0] = wio.gamepads[i].axes.length;
+        lengths[1] = wio.gamepads[i].buttons.length;
+        return true;
     },
 
-    getJoystickAxes(index, ptr, len) {
-        const array = new Uint16Array(wio.module.exports.memory.buffer, ptr, len);
-        for (let i = 0; i < len; i++) {
-            array[i] = (wio.gamepads[index].axes[i] + 1) * 32767.5;
+    getJoystickState(index, axes_ptr, axes_len, buttons_ptr, buttons_len) {
+        if (wio.gamepads[index] == null || !wio.gamepads[index].connected) return false;
+        const axes = new Uint16Array(wio.module.exports.memory.buffer, axes_ptr, axes_len);
+        const buttons = new Uint8Array(wio.module.exports.memory.buffer, buttons_ptr, buttons_len);
+        for (let i = 0; i < axes_len; i++) {
+            axes[i] = (wio.gamepads[index].axes[i] + 1) * 32767.5;
         }
-    },
-
-    getJoystickButtons(index, ptr, len) {
-        const array = new Uint8Array(wio.module.exports.memory.buffer, ptr, len);
-        for (let i = 0; i < len; i++) {
-            array[i] = wio.gamepads[index].buttons[i].pressed;
+        for (let i = 0; i < buttons_len; i++) {
+            buttons[i] = wio.gamepads[index].buttons[i].pressed;
         }
+        return true;
     },
 
     messageBox(ptr, len) {
