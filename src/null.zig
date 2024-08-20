@@ -62,8 +62,7 @@ pub fn swapBuffers(self: *@This()) void {
 }
 
 pub fn getJoysticks(allocator: std.mem.Allocator) ![]wio.JoystickInfo {
-    _ = allocator;
-    return &.{};
+    return allocator.alloc(wio.JoystickInfo, 0);
 }
 
 pub fn openJoystick(id: []const u8) !?Joystick {
