@@ -29,15 +29,17 @@ pub fn run(func: fn () anyerror!bool, options: wio.RunOptions) !void {
     }
 }
 
-window: *c.GLFWwindow,
 events: EventQueue,
+window: *c.GLFWwindow,
 
-pub fn createWindow(options: wio.CreateWindowOptions) !@This() {
+pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     const title = try wio.allocator.dupeZ(u8, options.title);
     defer wio.allocator.free(title);
-    var self = @This(){
-        .window = c.glfwCreateWindow(options.size.width, options.size.height, title, null, null) orelse return error.Unexpected,
+    const self = try wio.allocator.create(@This());
+    errdefer wio.allocator.destroy(self);
+    self.* = .{
         .events = EventQueue.init(wio.allocator),
+        .window = c.glfwCreateWindow(options.size.width, options.size.height, title, null, null) orelse return error.Unexpected,
     };
     errdefer self.destroy();
     c.glfwSetWindowUserPointer(self.window, &self.events);
@@ -73,8 +75,9 @@ pub fn createWindow(options: wio.CreateWindowOptions) !@This() {
 }
 
 pub fn destroy(self: *@This()) void {
-    self.events.deinit();
     c.glfwDestroyWindow(self.window);
+    self.events.deinit();
+    wio.allocator.destroy(self);
 }
 
 pub fn getEvent(self: *@This()) ?wio.Event {
