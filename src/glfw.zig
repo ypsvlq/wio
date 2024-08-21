@@ -8,13 +8,18 @@ const log = std.log.scoped(.wio);
 
 const EventQueue = std.fifo.LinearFifo(wio.Event, .Dynamic);
 
+var windows: std.ArrayList(*@This()) = undefined;
+
 pub fn init(options: wio.InitOptions) !void {
     _ = c.glfwSetErrorCallback(errorCallback);
+    _ = c.glfwInitHint(c.GLFW_JOYSTICK_HAT_BUTTONS, c.GLFW_FALSE);
     if (c.glfwInit() == 0) return error.Unexpected;
-    _ = options;
+    if (options.joystick) _ = c.glfwSetJoystickCallback(joystickCallback);
+    windows = std.ArrayList(*@This()).init(wio.allocator);
 }
 
 pub fn deinit() void {
+    windows.deinit();
     _ = c.glfwTerminate();
 }
 
@@ -43,6 +48,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     };
     errdefer self.destroy();
     c.glfwSetWindowUserPointer(self.window, &self.events);
+    try windows.append(self);
 
     self.setDisplayMode(options.display_mode);
     self.setCursor(options.cursor);
@@ -75,6 +81,12 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
 }
 
 pub fn destroy(self: *@This()) void {
+    for (windows.items, 0..) |window, i| {
+        if (window == self) {
+            _ = windows.swapRemove(i);
+            break;
+        }
+    }
     c.glfwDestroyWindow(self.window);
     self.events.deinit();
     wio.allocator.destroy(self);
@@ -136,22 +148,84 @@ pub fn swapBuffers(self: *@This()) void {
 }
 
 pub fn getJoysticks(allocator: std.mem.Allocator) ![]wio.JoystickInfo {
-    return allocator.alloc(wio.JoystickInfo, 0);
+    var list = try std.ArrayList(wio.JoystickInfo).initCapacity(allocator, c.GLFW_JOYSTICK_LAST + 1);
+    errdefer {
+        for (list.items) |item| {
+            allocator.free(item.id);
+            allocator.free(item.name);
+        }
+        list.deinit();
+    }
+    var index: u8 = 0;
+    while (index <= c.GLFW_JOYSTICK_LAST) : (index += 1) {
+        const guid = c.glfwGetJoystickGUID(index) orelse continue;
+        const name_z = c.glfwGetJoystickName(index) orelse continue;
+        const id = try std.fmt.allocPrint(allocator, "{x}{s}", .{ index, guid });
+        errdefer allocator.free(id);
+        const name = try allocator.dupe(u8, std.mem.sliceTo(name_z, 0));
+        errdefer allocator.free(name);
+        list.appendAssumeCapacity(.{ .id = id, .name = name });
+    }
+    return list.toOwnedSlice();
 }
 
+var joysticks = std.StaticBitSet(c.GLFW_JOYSTICK_LAST + 1).initEmpty();
+
 pub fn openJoystick(id: []const u8) !?Joystick {
-    _ = id;
-    return null;
+    const index: u8 = blk: {
+        var index = std.fmt.charToDigit(id[0], 16) catch return null;
+        if (c.glfwGetJoystickGUID(index)) |guid| {
+            if (!joysticks.isSet(index) and std.mem.eql(u8, std.mem.sliceTo(guid, 0), id[1..])) {
+                joysticks.set(index);
+                break :blk index;
+            }
+        }
+
+        index = 0;
+        while (index <= c.GLFW_JOYSTICK_LAST) : (index += 1) {
+            if (c.glfwGetJoystickGUID(index)) |guid| {
+                if (!joysticks.isSet(index) and std.mem.eql(u8, std.mem.sliceTo(guid, 0), id[1..])) {
+                    joysticks.set(index);
+                    break :blk index;
+                }
+            }
+        }
+
+        return null;
+    };
+
+    var axes_count: c_int = undefined;
+    _ = c.glfwGetJoystickAxes(index, &axes_count) orelse return null;
+    return .{
+        .id = index,
+        .axes = try wio.allocator.alloc(u16, @intCast(axes_count)),
+    };
 }
 
 pub const Joystick = struct {
+    id: u8,
+    axes: []u16,
+
     pub fn close(self: *Joystick) void {
-        _ = self;
+        joysticks.unset(self.id);
+        wio.allocator.free(self.axes);
     }
 
     pub fn poll(self: *Joystick) !?wio.JoystickState {
-        _ = self;
-        return null;
+        var axes_count: c_int = undefined;
+        var hats_count: c_int = undefined;
+        var buttons_count: c_int = undefined;
+        const axes = c.glfwGetJoystickAxes(self.id, &axes_count) orelse return null;
+        const hats = c.glfwGetJoystickHats(self.id, &hats_count) orelse return null;
+        const buttons = c.glfwGetJoystickButtons(self.id, &buttons_count) orelse return null;
+        for (self.axes, 0..) |*axis, i| {
+            axis.* = if (i < axes_count) @intFromFloat((axes[i] + 1) * 0xFFFF.0 / 2) else 0;
+        }
+        return .{
+            .axes = self.axes,
+            .hats = @constCast(@ptrCast(hats[0..@intCast(hats_count)])),
+            .buttons = @constCast(@ptrCast(buttons[0..@intCast(buttons_count)])),
+        };
     }
 };
 
@@ -186,6 +260,12 @@ pub fn swapInterval(interval: i32) void {
 
 fn errorCallback(_: c_int, description: [*c]const u8) callconv(.C) void {
     log.err("{s}", .{description});
+}
+
+fn joystickCallback(_: c_int, _: c_int) callconv(.C) void {
+    for (windows.items) |window| {
+        window.events.writeItem(.joystick) catch {};
+    }
 }
 
 fn pushEvent(window: ?*c.GLFWwindow, event: wio.Event) void {
