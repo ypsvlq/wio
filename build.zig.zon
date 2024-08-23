@@ -12,14 +12,14 @@
             .hash = "1220c46ebcac607065f942193b82a21b87213fca4b0d50c83461f8f5e22955fcb88f",
             .lazy = true,
         },
-        .x11_headers = .{
-            .url = "https://pkg.machengine.org/x11-headers/22bb51a939722a819bf52aba100ac6c25acfbaff.tar.gz",
-            .hash = "1220ddf168c855cf69b4f8c5284403106a3c681913e34453df10cc5a588d9bd1d005",
-            .lazy = true,
-        },
         .xcode_frameworks = .{
             .url = "https://pkg.machengine.org/xcode-frameworks/122b43323db27b2082a2d44ed2121de21c9ccf75.tar.gz",
             .hash = "12205d131983601cdb3500f38e9d8adaed5574fb0211b8b39291d2e9b90c6555ce59",
+            .lazy = true,
+        },
+        .x11_headers = .{
+            .url = "https://github.com/ypsvlq/x11-headers/archive/ffb2fa18f09cec73379e05afc8e4d7d86cfc1894.tar.gz",
+            .hash = "12204b06c65ab3abf5349ef027f27efd83c4eea8a94e76a08d6dcd51ecc8e5decea7",
             .lazy = true,
         },
     },
