@@ -21,34 +21,32 @@ pub fn main() !void {
 
 fn loop() !bool {
     try joystick.update();
-    while (window.getEvent()) |event| switch (event) {
-        .close => {
-            joystick.close();
-            window.destroy();
-            wio.deinit();
-            _ = gpa.deinit();
-            return false;
-        },
-        .size, .maximized, .framebuffer => |size| std.log.info("{s} {}x{}", .{ @tagName(event), size.width, size.height }),
-        .scale => |scale| std.log.info("scale {d}", .{scale}),
-        .char => |char| std.log.info("char: {u}", .{char}),
-        .button_press => |button| {
-            handlePress(button);
-            std.log.info("+{s}", .{@tagName(button)});
-        },
-        .button_release => |button| {
-            handleRelease(button);
-            std.log.info("-{s}", .{@tagName(button)});
-        },
-        .button_repeat => |button| std.log.info("*{s}", .{@tagName(button)}),
-        .mouse => |mouse| std.log.info("({},{})", .{ mouse.x, mouse.y }),
-        .scroll_vertical, .scroll_horizontal => |value| std.log.info("{s} {d}", .{ @tagName(event), value }),
-        .joystick => {
-            std.log.info("joystick", .{});
-            try joystick.open();
-        },
-        else => std.log.info("{s}", .{@tagName(event)}),
-    };
+    while (window.getEvent()) |event| {
+        switch (event) {
+            .size, .maximized, .framebuffer => |size| std.log.info("{s} {}x{}", .{ @tagName(event), size.width, size.height }),
+            .scale => |scale| std.log.info("scale {d}", .{scale}),
+            .char => |char| std.log.info("char: {u}", .{char}),
+            .button_press => |button| std.log.info("+{s}", .{@tagName(button)}),
+            .button_repeat => |button| std.log.info("*{s}", .{@tagName(button)}),
+            .button_release => |button| std.log.info("-{s}", .{@tagName(button)}),
+            .mouse => |mouse| std.log.info("({},{})", .{ mouse.x, mouse.y }),
+            .scroll_vertical, .scroll_horizontal => |value| std.log.info("{s} {d}", .{ @tagName(event), value }),
+            else => std.log.info("{s}", .{@tagName(event)}),
+        }
+        switch (event) {
+            .close => {
+                joystick.close();
+                window.destroy();
+                wio.deinit();
+                _ = gpa.deinit();
+                return false;
+            },
+            .button_press => |button| handlePress(button),
+            .button_release => |button| handleRelease(button),
+            .joystick => try joystick.open(),
+            else => {},
+        }
+    }
     window.swapBuffers();
     return true;
 }
