@@ -27,7 +27,7 @@ pub fn build(b: *std.Build) void {
             module.linkFramework("Cocoa", .{});
             module.linkFramework("IOKit", .{});
         },
-        .linux, .openbsd => {
+        .linux, .openbsd, .netbsd, .freebsd => {
             module.link_libc = true;
             if (b.lazyDependency("x11_headers", .{})) |x11_headers| {
                 module.addIncludePath(x11_headers.path("."));

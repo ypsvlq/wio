@@ -74,14 +74,15 @@ var scale: f32 = 1;
 pub fn init(options: wio.InitOptions) !void {
     if (builtin.os.tag == .linux and builtin.output_mode == .Exe and builtin.link_mode == .static) @compileError("dynamic link required");
 
-    libX11 = try std.DynLib.open(if (builtin.os.tag == .openbsd) "libX11.so" else "libX11.so.6");
+    const sonames = if (builtin.os.tag == .openbsd or builtin.os.tag == .netbsd) false else true;
+    libX11 = try std.DynLib.open(if (sonames) "libX11.so.6" else "libX11.so");
     errdefer libX11.close();
-    libXcursor = try std.DynLib.open(if (builtin.os.tag == .openbsd) "libXcursor.so" else "libXcursor.so.1");
+    libXcursor = try std.DynLib.open(if (sonames) "libXcursor.so.1" else "libXcursor.so");
     errdefer libXcursor.close();
-    libXfixes = try std.DynLib.open(if (builtin.os.tag == .openbsd) "libXfixes.so" else "libXfixes.so.3");
+    libXfixes = try std.DynLib.open(if (sonames) "libXfixes.so.3" else "libXfixes.so");
     errdefer libXfixes.close();
     if (options.opengl) {
-        libGL = try std.DynLib.open(if (builtin.os.tag == .openbsd) "libGL.so" else "libGL.so.1");
+        libGL = try std.DynLib.open(if (sonames) "libGL.so.1" else "libGL.so");
         errdefer libGL.close();
     }
 
