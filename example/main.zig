@@ -1,6 +1,7 @@
 const std = @import("std");
 const wio = @import("wio");
 const joystick = @import("joystick.zig");
+const renderer = @import("renderer.zig");
 
 pub const std_options = std.Options{
     .log_level = .info,
@@ -15,6 +16,7 @@ pub fn main() !void {
     try wio.init(allocator, .{ .joystick = true, .opengl = true });
     window = try wio.createWindow(.{ .title = "wio example", .opengl = .{} });
     window.makeContextCurrent();
+    renderer.init();
     try joystick.open();
     return wio.run(loop, .{});
 }
@@ -41,12 +43,14 @@ fn loop() !bool {
                 _ = gpa.deinit();
                 return false;
             },
+            .framebuffer => |size| renderer.resize(size),
             .button_press => |button| handlePress(button),
             .button_release => |button| handleRelease(button),
             .joystick => try joystick.open(),
             else => {},
         }
     }
+    renderer.draw();
     window.swapBuffers();
     return true;
 }
