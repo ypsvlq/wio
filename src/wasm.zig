@@ -154,8 +154,27 @@ pub fn getClipboardText(_: std.mem.Allocator) ?[]u8 {
 }
 
 pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
-    _ = name;
-    return null;
+    return if (@hasDecl(gl, name)) @field(gl, name) else null;
 }
 
 pub fn swapInterval(_: i32) void {}
+
+const gl = struct {
+    extern "wio" fn glAttachShader(u32, u32) void;
+    extern "wio" fn glBindBuffer(u32, u32) void;
+    extern "wio" fn glBufferData(u32, isize, ?*const anyopaque, u32) void;
+    extern "wio" fn glClear(u32) void;
+    extern "wio" fn glClearColor(f32, f32, f32, f32) void;
+    extern "wio" fn glCompileShader(u32) void;
+    extern "wio" fn glCreateProgram() u32;
+    extern "wio" fn glCreateShader(u32) u32;
+    extern "wio" fn glDrawArrays(u32, i32, i32) void;
+    extern "wio" fn glEnableVertexAttribArray(u32) void;
+    extern "wio" fn glGenBuffers(i32, [*c]u32) void;
+    extern "wio" fn glGetAttribLocation(u32, [*c]const u8) i32;
+    extern "wio" fn glLinkProgram(u32) void;
+    extern "wio" fn glShaderSource(u32, i32, [*c]const [*c]const u8, [*c]const i32) void;
+    extern "wio" fn glUseProgram(u32) void;
+    extern "wio" fn glVertexAttribPointer(u32, i32, u32, u8, i32, ?*const anyopaque) void;
+    extern "wio" fn glViewport(i32, i32, i32, i32) void;
+};

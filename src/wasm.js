@@ -6,10 +6,13 @@ const wio = {
     cursor: undefined,
     gamepads: undefined,
     gamepad_ids: undefined,
+    gl: undefined,
+    objects: [],
 
     run(module, canvas) {
         wio.module = module;
         wio.canvas = canvas;
+        wio.gl = canvas.getContext("webgl");
 
         module.exports._start();
         requestAnimationFrame(wio.loop);
@@ -310,5 +313,91 @@ const wio = {
         2: 1,
         3: 3,
         4: 4,
+    },
+
+    getStringZ(ptr) {
+        const array = new Uint8Array(wio.module.exports.memory.buffer, ptr);
+        let len = 0;
+        while (array[len]) len++;
+        return wio.getString(ptr, len);
+    },
+
+    glAttachShader(program, shader) {
+        wio.gl.attachShader(wio.objects[program], wio.objects[shader]);
+    },
+
+    glBindBuffer(target, buffer) {
+        wio.gl.bindBuffer(target, wio.objects[buffer]);
+    },
+
+    glBufferData(target, size, ptr, usage) {
+        wio.gl.bufferData(target, new Uint8Array(wio.module.exports.memory.buffer, ptr, size), usage);
+    },
+
+    glClear(mask) {
+        wio.gl.clear(mask);
+    },
+
+    glClearColor(red, green, blue, alpha) {
+        wio.gl.clearColor(red, green, blue, alpha);
+    },
+
+    glCompileShader(shader) {
+        wio.gl.compileShader(wio.objects[shader]);
+    },
+
+    glCreateProgram() {
+        const program = wio.gl.createProgram();
+        return wio.objects.push(program) - 1;
+    },
+
+    glCreateShader(type) {
+        const shader = wio.gl.createShader(type);
+        return wio.objects.push(shader) - 1;
+    },
+
+    glDrawArrays(mode, first, count) {
+        wio.gl.drawArrays(mode, first, count);
+    },
+
+    glEnableVertexAttribArray(index) {
+        wio.gl.enableVertexAttribArray(index);
+    },
+
+    glGenBuffers(n, ptr) {
+        const buffers = new Uint32Array(wio.module.exports.memory.buffer, ptr, n);
+        for (let i = 0; i < n; i++) {
+            buffers[i] = wio.objects.push(wio.gl.createBuffer()) - 1;
+        }
+    },
+
+    glGetAttribLocation(index, name) {
+        return wio.gl.getAttribLocation(wio.objects[index], wio.getStringZ(name));
+    },
+
+    glLinkProgram(program) {
+        wio.gl.linkProgram(wio.objects[program]);
+    },
+
+    glShaderSource(shader, count, strings_ptr, lengths_ptr) {
+        const strings = new Uint32Array(wio.module.exports.memory.buffer, strings_ptr, count);
+        const lengths = new Int32Array(wio.module.exports.memory.buffer, lengths_ptr, count);
+        var string = "";
+        for (let i = 0; i < count; i++) {
+            string += (lengths_ptr != 0 && lengths[i] >= 0) ? wio.getString(strings[i], lengths[i]) : wio.getStringZ(strings[i]);
+        }
+        wio.gl.shaderSource(wio.objects[shader], string);
+    },
+
+    glUseProgram(program) {
+        wio.gl.useProgram(wio.objects[program]);
+    },
+
+    glVertexAttribPointer(index, size, type, normalized, stride, offset) {
+        wio.gl.vertexAttribPointer(index, size, type, normalized, stride, offset);
+    },
+
+    glViewport(x, y, width, height) {
+        wio.gl.viewport(x, y, width, height);
     },
 };
