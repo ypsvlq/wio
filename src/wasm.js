@@ -17,23 +17,11 @@ const wio = {
         module.exports._start();
         requestAnimationFrame(wio.loop);
 
-        canvas.style.width = `${canvas.width}px`;
-        canvas.style.height = `${canvas.height}px`;
-        canvas.width *= devicePixelRatio;
-        canvas.height *= devicePixelRatio;
-
-        wio.events.push(
-            5, parseInt(canvas.style.width), parseInt(canvas.style.height),
-            7, canvas.width, canvas.height,
-            8, devicePixelRatio,
-            1,
-        );
-
-        new ResizeObserver(() => wio.events.push(
-            5, parseInt(canvas.style.width), parseInt(canvas.style.height),
-            7, canvas.width, canvas.height,
-            8, devicePixelRatio,
-        )).observe(canvas);
+        if (canvas.style.width == "") canvas.style.width = `${canvas.scrollWidth}px`;
+        if (canvas.style.height == "") canvas.style.height = `${canvas.scrollHeight}px`;
+        new ResizeObserver(() => wio.resize()).observe(canvas);
+        wio.resize();
+        wio.events.push(1);
 
         canvas.addEventListener("contextmenu", event => event.preventDefault());
         canvas.addEventListener("focus", () => wio.events.push(2));
@@ -68,6 +56,18 @@ const wio = {
         if (wio.module.exports.wioLoop()) {
             requestAnimationFrame(wio.loop);
         }
+    },
+
+    resize() {
+        const width = parseInt(canvas.style.width);
+        const height = parseInt(canvas.style.height);
+        canvas.width = width * devicePixelRatio;
+        canvas.height = height * devicePixelRatio;
+        wio.events.push(
+            5, width, height,
+            7, canvas.width, canvas.height,
+            8, devicePixelRatio,
+        );
     },
 
     write(ptr, len) {

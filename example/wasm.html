@@ -4,9 +4,15 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width,initial-scale=1">
         <title>wio</title>
+        <style>
+            #canvas {
+                width: 640px;
+                height: 480px;
+            }
+        </style>
     </head>
     <body>
-        <canvas id="canvas" width="640" height="480" tabindex="1"></canvas>
+        <canvas id="canvas" tabindex="-1"></canvas>
         <script src="../src/wasm.js"></script>
         <script>WebAssembly.instantiateStreaming(fetch("../zig-out/bin/wio.wasm"), { wio: wio }).then(result => wio.run(result.instance, document.getElementById("canvas")));</script>
     </body>
