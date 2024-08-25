@@ -61,6 +61,8 @@ pub fn getEvent(_: *@This()) ?wio.Event {
     switch (event) {
         .close => return null, // never sent, EventType 0 is reused to indicate empty queue
         .create => return .create,
+        .focused => return .focused,
+        .unfocused => return .unfocused,
         .scale => return .{ .scale = js.shiftFloat() },
         .char => return .{ .char = @intCast(js.shift()) },
         .mouse => return .{ .mouse = .{ .x = @intCast(js.shift()), .y = @intCast(js.shift()) } },

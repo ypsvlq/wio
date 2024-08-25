@@ -36,6 +36,8 @@ const wio = {
         )).observe(canvas);
 
         canvas.addEventListener("contextmenu", event => event.preventDefault());
+        canvas.addEventListener("focus", () => wio.events.push(2));
+        canvas.addEventListener("blur", () => wio.events.push(3));
         canvas.addEventListener("keydown", event => {
             event.preventDefault();
             const key = wio.keys[event.code];
