@@ -58,19 +58,24 @@ pub fn destroy(_: *@This()) void {}
 
 pub fn getEvent(_: *@This()) ?wio.Event {
     const event: wio.EventType = @enumFromInt(js.shift());
-    switch (event) {
-        .close => return null, // never sent, EventType 0 is reused to indicate empty queue
-        .create => return .create,
-        .focused => return .focused,
-        .unfocused => return .unfocused,
-        .scale => return .{ .scale = js.shiftFloat() },
-        .char => return .{ .char = @intCast(js.shift()) },
-        .mouse => return .{ .mouse = .{ .x = @intCast(js.shift()), .y = @intCast(js.shift()) } },
-        .joystick => return .joystick,
-        inline .size, .maximized, .framebuffer => |tag| return @unionInit(wio.Event, @tagName(tag), .{ .width = @intCast(js.shift()), .height = @intCast(js.shift()) }),
-        inline .button_press, .button_repeat, .button_release => |tag| return @unionInit(wio.Event, @tagName(tag), @enumFromInt(js.shift())),
+    return switch (event) {
+        .close => null, // never sent, EventType 0 is reused to indicate empty queue
+        .create => .create,
+        .focused => .focused,
+        .unfocused => .unfocused,
+        .size => .{ .size = .{ .width = @intCast(js.shift()), .height = @intCast(js.shift()) } },
+        .framebuffer => .{ .framebuffer = .{ .width = @intCast(js.shift()), .height = @intCast(js.shift()) } },
+        .scale => .{ .scale = js.shiftFloat() },
+        .char => .{ .char = @intCast(js.shift()) },
+        .button_press => .{ .button_press = @enumFromInt(js.shift()) },
+        .button_repeat => .{ .button_repeat = @enumFromInt(js.shift()) },
+        .button_release => .{ .button_release = @enumFromInt(js.shift()) },
+        .mouse => .{ .mouse = .{ .x = @intCast(js.shift()), .y = @intCast(js.shift()) } },
+        .scroll_vertical => .{ .scroll_vertical = js.shiftFloat() },
+        .scroll_horizontal => .{ .scroll_horizontal = js.shiftFloat() },
+        .joystick => .joystick,
         else => unreachable,
-    }
+    };
 }
 
 pub fn setTitle(_: *@This(), _: []const u8) void {}
