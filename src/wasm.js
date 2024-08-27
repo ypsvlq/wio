@@ -7,7 +7,7 @@ const wio = {
     gamepads: undefined,
     gamepad_ids: undefined,
     gl: undefined,
-    objects: [],
+    objects: [,],
 
     run(module, canvas) {
         wio.module = module;
@@ -328,16 +328,74 @@ const wio = {
         return wio.getString(ptr, len);
     },
 
+    pushObject(object) {
+        const index = wio.objects.indexOf(null);
+        if (index != -1) {
+            wio.objects[index] = object;
+            return index;
+        } else {
+            return wio.objects.push(object) - 1;
+        }
+    },
+
+    glActiveTexture(texture) {
+        wio.gl.activeTexture(texture);
+    },
+
     glAttachShader(program, shader) {
         wio.gl.attachShader(wio.objects[program], wio.objects[shader]);
+    },
+
+    glBindAttribLocation(program, index, name) {
+        wio.gl.bindAttribLocation(wio.objects[program], index, wio.getStringZ(name));
     },
 
     glBindBuffer(target, buffer) {
         wio.gl.bindBuffer(target, wio.objects[buffer]);
     },
 
-    glBufferData(target, size, ptr, usage) {
-        wio.gl.bufferData(target, new Uint8Array(wio.module.exports.memory.buffer, ptr, size), usage);
+    glBindFramebuffer(target, framebuffer) {
+        wio.gl.bindFramebuffer(target, framebuffer ? wio.objects[framebuffer] : null);
+    },
+
+    glBindRenderbuffer(target, renderbuffer) {
+        wio.gl.bindRenderbuffer(target, wio.objects[renderbuffer]);
+    },
+
+    glBindTexture(target, texture) {
+        wio.gl.bindTexture(target, wio.objects[texture]);
+    },
+
+    glBlendColor(red, green, blue, alpha) {
+        wio.gl.blendColor(red, green, blue, alpha);
+    },
+
+    glBlendEquation(mode) {
+        wio.gl.blendEquation(mode);
+    },
+
+    glBlendEquationSeparate(modeRGB, modeAlpha) {
+        wio.gl.blendEquationSeparate(modeRGB, modeAlpha);
+    },
+
+    glBlendFunc(sfactor, dfactor) {
+        wio.gl.blendFunc(sfactor, dfactor);
+    },
+
+    glBlendFuncSeparate(srcRGB, dstRGB, srcAlpha, dstAlpha) {
+        wio.gl.blendFuncSeparate(srcRGB, dstRGB, srcAlpha, dstAlpha);
+    },
+
+    glBufferData(target, size, data, usage) {
+        wio.gl.bufferData(target, new Uint8Array(wio.module.exports.memory.buffer, data, size), usage);
+    },
+
+    glBufferSubData(target, offset, size, data) {
+        wio.gl.bufferSubData(target, offset, new Uint8Array(wio.module.exports.memory.buffer, data, size));
+    },
+
+    glCheckFramebufferStatus(target) {
+        return wio.gl.checkFramebufferStatus(target);
     },
 
     glClear(mask) {
@@ -348,41 +406,291 @@ const wio = {
         wio.gl.clearColor(red, green, blue, alpha);
     },
 
+    glClearDepthf(depth) {
+        wio.gl.clearDepth(depth);
+    },
+
+    glClearStencil(s) {
+        wio.gl.clearStencil(s);
+    },
+
+    glColorMask(red, green, blue, alpha) {
+        wio.gl.colorMask(red, green, blue, alpha);
+    },
+
     glCompileShader(shader) {
         wio.gl.compileShader(wio.objects[shader]);
     },
 
+    glCompressedTexImage2D(target, level, internalformat, width, height, border, imageSize, data) {
+        wio.gl.compressedTexImage2D(target, level, internalformat, width, height, border, new Uint8Array(wio.module.exports.memory.buffer, data, imageSize));
+    },
+
+    glCompressedTexSubImage2D(target, level, xoffset, yoffset, width, height, format, imageSize, data) {
+        wio.gl.compressedTexSubImage2D(target, level, xoffset, yoffset, width, height, format, new Uint8Array(wio.module.exports.memory.buffer, data, imageSize));
+    },
+
+    glCopyTexImage2D(target, level, internalformat, x, y, width, height, border) {
+        wio.gl.copyTexImage2D(target, level, internalformat, x, y, width, height, border);
+    },
+
+    glCopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height) {
+        wio.gl.copyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height);
+    },
+
     glCreateProgram() {
         const program = wio.gl.createProgram();
-        return wio.objects.push(program) - 1;
+        return wio.pushObject(program);
     },
 
     glCreateShader(type) {
         const shader = wio.gl.createShader(type);
-        return wio.objects.push(shader) - 1;
+        return wio.pushObject(shader);
+    },
+
+    glCullFace(mode) {
+        wio.gl.cullFace(mode);
+    },
+
+    glDeleteBuffers(n, ptr) {
+        const buffers = new Uint32Array(wio.module.exports.memory.buffer, ptr, n);
+        for (let i = 0; i < n; i++) {
+            wio.objects[buffers[i]] = null;
+        }
+    },
+
+    glDeleteFramebuffers(n, framebuffers) {
+        wio.glDeleteBuffers(n, framebuffers);
+    },
+
+    glDeleteProgram(program) {
+        wio.objects[program] = null;
+    },
+
+    glDeleteRenderbuffers(n, renderbuffers) {
+        wio.glDeleteBuffers(n, renderbuffers);
+    },
+
+    glDeleteShader(shader) {
+        wio.objects[shader] = null;
+    },
+
+    glDeleteTextures(n, textures) {
+        wio.glDeleteBuffers(n, textures);
+    },
+
+    glDepthFunc(func) {
+        wio.gl.depthFunc(func);
+    },
+
+    glDepthMask(flag) {
+        wio.gl.depthMask(flag);
+    },
+
+    glDepthRangef(n, f) {
+        wio.gl.depthRange(n, f);
+    },
+
+    glDetachShader(program, shader) {
+        wio.gl.detachShader(wio.objects[program], wio.objects[shader]);
+    },
+
+    glDisable(cap) {
+        wio.gl.disable(cap);
+    },
+
+    glDisableVertexAttribArray(index) {
+        wio.gl.disableVertexAttribArray(index);
     },
 
     glDrawArrays(mode, first, count) {
         wio.gl.drawArrays(mode, first, count);
     },
 
+    glDrawElements(mode, count, type, offset) {
+        wio.gl.drawElements(mode, count, type, offset);
+    },
+
+    glEnable(cap) {
+        wio.gl.enable(cap);
+    },
+
     glEnableVertexAttribArray(index) {
         wio.gl.enableVertexAttribArray(index);
+    },
+
+    glFinish() {
+        wio.gl.finish();
+    },
+
+    glFlush() {
+        wio.gl.flush();
+    },
+
+    glFramebufferRenderbuffer(target, attachment, renderbuffertarget, renderbuffer) {
+        wio.gl.framebufferRenderbuffer(target, attachment, renderbuffertarget, wio.objects[renderbuffer]);
+    },
+
+    glFramebufferTexture2D(target, attachment, textarget, texture, level) {
+        wio.gl.framebufferTexture2D(target, attachment, textarget, wio.objects[texture], level);
+    },
+
+    glFrontFace(mode) {
+        wio.gl.frontFace(mode);
     },
 
     glGenBuffers(n, ptr) {
         const buffers = new Uint32Array(wio.module.exports.memory.buffer, ptr, n);
         for (let i = 0; i < n; i++) {
-            buffers[i] = wio.objects.push(wio.gl.createBuffer()) - 1;
+            buffers[i] = wio.pushObject(wio.gl.createBuffer());
         }
     },
 
-    glGetAttribLocation(index, name) {
-        return wio.gl.getAttribLocation(wio.objects[index], wio.getStringZ(name));
+    glGenerateMipmap(target) {
+        wio.gl.generateMipmap(target);
+    },
+
+    glGenFramebuffers(n, ptr) {
+        const framebuffers = new Uint32Array(wio.module.exports.memory.buffer, ptr, n);
+        for (let i = 0; i < n; i++) {
+            framebuffers[i] = wio.pushObject(wio.gl.createFramebuffer());
+        }
+    },
+
+    glGenRenderbuffers(n, ptr) {
+        const renderbuffers = new Uint32Array(wio.module.exports.memory.buffer, ptr, n);
+        for (let i = 0; i < n; i++) {
+            renderbuffers[i] = wio.pushObject(wio.gl.createRenderbuffer());
+        }
+    },
+
+    glGenTextures(n, ptr) {
+        const textures = new Uint32Array(wio.module.exports.memory.buffer, ptr, n);
+        for (let i = 0; i < n; i++) {
+            textures[i] = wio.pushObject(wio.gl.createTexture());
+        }
+    },
+
+    glGetActiveAttrib() { },
+
+    glGetActiveUniform() { },
+
+    glGetAttachedShaders() { },
+
+    glGetAttribLocation(program, name) {
+        return wio.gl.getAttribLocation(wio.objects[program], wio.getStringZ(name));
+    },
+
+    glGetBooleanv() { },
+
+    glGetBufferParameteriv() { },
+
+    glGetError() {
+        return wio.gl.getError();
+    },
+
+    glGetFloatv() { },
+
+    glGetFramebufferAttachmentParameteriv() { },
+
+    glGetIntegerv() { },
+
+    glGetProgramiv() { },
+
+    glGetProgramInfoLog() { },
+
+    glGetRenderbufferParameteriv() { },
+
+    glGetShaderiv() { },
+
+    glGetShaderInfoLog() { },
+
+    glGetShaderPrecisionFormat() { },
+
+    glGetShaderSource() { },
+
+    glGetString() { },
+
+    glGetTexParameterfv() { },
+
+    glGetTexParameteriv() { },
+
+    glGetUniformfv() { },
+
+    glGetUniformiv() { },
+
+    glGetUniformLocation(program, name) {
+        return wio.gl.getUniformLocation(wio.objects[program], wio.getStringZ(name));
+    },
+
+    glGetVertexAttribfv() { },
+
+    glGetVertexAttribiv() { },
+
+    glGetVertexAttribPointerv() { },
+
+    glHint(target, mode) {
+        wio.gl.hint(target, mode);
+    },
+
+    glIsBuffer(buffer) {
+        return wio.gl.isBuffer(wio.objects[buffer]);
+    },
+
+    glIsEnabled(cap) {
+        return wio.gl.isEnabled(cap);
+    },
+
+    glIsFramebuffer(framebuffer) {
+        return wio.gl.isFramebuffer(wio.objects[framebuffer]);
+    },
+
+    glIsProgram(program) {
+        return wio.gl.isProgram(wio.objects[program]);
+    },
+
+    glIsRenderbuffer(renderbuffer) {
+        return wio.gl.isRenderbuffer(wio.objects[renderbuffer]);
+    },
+
+    glIsShader(shader) {
+        return wio.gl.isShader(wio.objects[shader]);
+    },
+
+    glIsTexture(texture) {
+        return wio.gl.isTexture(wio.objects[texture]);
+    },
+
+    glLineWidth(width) {
+        wio.gl.lineWidth(width);
     },
 
     glLinkProgram(program) {
         wio.gl.linkProgram(wio.objects[program]);
+    },
+
+    glPixelStorei(pname, param) {
+        wio.gl.pixelStorei(pname, param);
+    },
+
+    glPolygonOffset(factor, units) {
+        wio.gl.polygonOffset(factor, units);
+    },
+
+    glReadPixels(x, y, width, height, format, type, pixels) {
+        wio.gl.readPixels(x, y, width, height, format, type, new Uint8Array(wio.module.exports.memory.buffer, pixels));
+    },
+
+    glRenderbufferStorage(target, internalformat, width, height) {
+        wio.gl.renderbufferStorage(target, internalformat, width, height);
+    },
+
+    glSampleCoverage(value, invert) {
+        wio.gl.sampleCoverage(value, invert);
+    },
+
+    glScissor(x, y, width, height) {
+        wio.gl.scissor(x, y, width, height);
     },
 
     glShaderSource(shader, count, strings_ptr, lengths_ptr) {
@@ -395,8 +703,160 @@ const wio = {
         wio.gl.shaderSource(wio.objects[shader], string);
     },
 
+    glStencilFunc(func, ref, mask) {
+        wio.gl.stencilFunc(func, ref, mask);
+    },
+
+    glStencilFuncSeparate(face, func, ref, mask) {
+        wio.gl.stencilFuncSeparate(face, func, ref, mask);
+    },
+
+    glStencilMask(mask) {
+        wio.gl.stencilMask(mask);
+    },
+
+    glStencilMaskSeparate(face, mask) {
+        wio.gl.stencilMaskSeparate(face, mask);
+    },
+
+    glStencilOp(fail, zfail, zpass) {
+        wio.gl.stencilOp(fail, zfail, zpass);
+    },
+
+    glStencilOpSeparate(face, sfail, dpfail, dppass) {
+        wio.gl.stencilOpSeparate(face, sfail, dpfail, dppass);
+    },
+
+    glTexImage2D(target, level, internalformat, width, height, border, format, type, pixels) {
+        wio.gl.texImage2D(target, level, internalformat, width, height, border, format, type, new Uint8Array(wio.module.exports.memory.buffer, pixels));
+    },
+
+    glTexParameterf(target, pname, param) {
+        wio.gl.texParameterf(target, pname, param);
+    },
+
+    glTexParameteri(target, pname, param) {
+        wio.gl.texParameteri(target, pname, param);
+    },
+
+    glTexSubImage2D(target, level, xoffset, yoffset, width, height, format, type, pixels) {
+        wio.gl.texSubImage2D(target, level, xoffset, yoffset, width, height, format, type, new Uint8Array(wio.module.exports.memory.buffer, pixels));
+    },
+
+    glUniform1f(location, v0) {
+        wio.gl.uniform1f(location, v0);
+    },
+
+    glUniform1fv(location, count, value) {
+        wio.gl.uniform1fv(location, new Float32Array(wio.module.exports.memory.buffer, value, count));
+    },
+
+    glUniform1i(location, v0) {
+        wio.gl.uniform1i(location, v0);
+    },
+
+    glUniform1iv(location, count, value) {
+        wio.gl.uniform1iv(location, new Int32Array(wio.module.exports.memory.buffer, value, count));
+    },
+
+    glUniform2f(location, v0, v1) {
+        wio.gl.uniform2f(location, v0, v1);
+    },
+
+    glUniform2fv(location, count, value) {
+        wio.gl.uniform2fv(location, new Float32Array(wio.module.exports.memory.buffer, value, count));
+    },
+
+    glUniform2i(location, v0, v1) {
+        wio.gl.uniform2i(location, v0, v1);
+    },
+
+    glUniform2iv(location, count, value) {
+        wio.gl.uniform2iv(location, new Int32Array(wio.module.exports.memory.buffer, value, count));
+    },
+
+    glUniform3f(location, v0, v1, v2) {
+        wio.gl.uniform3f(location, v0, v1, v2);
+    },
+
+    glUniform3fv(location, count, value) {
+        wio.gl.uniform3fv(location, new Float32Array(wio.module.exports.memory.buffer, value, count));
+    },
+
+    glUniform3i(location, v0, v1, v2) {
+        wio.gl.uniformif(location, v0, v1, v2);
+    },
+
+    glUniform3iv(location, count, value) {
+        wio.gl.uniform3iv(location, new Int32Array(wio.module.exports.memory.buffer, value, count));
+    },
+
+    glUniform4f(location, v0, v1, v2, v3) {
+        wio.gl.uniform4f(location, v0, v1, v2, v3);
+    },
+
+    glUniform4fv(location, count, value) {
+        wio.gl.uniform4fv(location, new Float32Array(wio.module.exports.memory.buffer, value, count));
+    },
+
+    glUniform4i(location, v0, v1, v2, v3) {
+        wio.gl.uniform4i(location, v0, v1, v2, v3);
+    },
+
+    glUniform4iv(location, count, value) {
+        wio.gl.uniform4iv(location, new Int32Array(wio.module.exports.memory.buffer, value, count));
+    },
+
+    glUniformMatrix2fv(location, count, transpose, value) {
+        wio.gl.uniformMatrix2fv(location, transpose, new Float32Array(wio.module.exports.memory.buffer, value, count));
+    },
+
+    glUniformMatrix3fv(location, count, transpose, value) {
+        wio.gl.uniformMatrix3fv(location, transpose, new Float32Array(wio.module.exports.memory.buffer, value, count));
+    },
+
+    glUniformMatrix4fv(location, count, transpose, value) {
+        wio.gl.uniformMatrix4fv(location, transpose, new Float32Array(wio.module.exports.memory.buffer, value, count));
+    },
+
     glUseProgram(program) {
         wio.gl.useProgram(wio.objects[program]);
+    },
+
+    glValidateProgram(program) {
+        wio.gl.validateProgram(wio.objects[program]);
+    },
+
+    glVertexAttrib1f(index, x) {
+        wio.gl.vertexAttrib1f(index, x);
+    },
+
+    glVertexAttrib1fv(index, v) {
+        wio.gl.vertexAttrib1fv(index, new Float32Array(wio.module.exports.memory.buffer, v));
+    },
+
+    glVertexAttrib2f(index, x, y) {
+        wio.gl.vertexAttrib2f(index, x, y);
+    },
+
+    glVertexAttrib2fv(index, v) {
+        wio.gl.vertexAttrib2fv(index, new Float32Array(wio.module.exports.memory.buffer, v));
+    },
+
+    glVertexAttrib3f(index, x, y, z) {
+        wio.gl.vertexAttrib3f(index, x, y, z);
+    },
+
+    glVertexAttrib3fv(index, v) {
+        wio.gl.vertexAttrib3fv(index, new Float32Array(wio.module.exports.memory.buffer, v));
+    },
+
+    glVertexAttrib4f(index, x, y, z, w) {
+        wio.gl.vertexAttrib4f(index, x, y, z, w);
+    },
+
+    glVertexAttrib4fv(index, v) {
+        wio.gl.vertexAttrib4fv(index, new Float32Array(wio.module.exports.memory.buffer, v));
     },
 
     glVertexAttribPointer(index, size, type, normalized, stride, offset) {
