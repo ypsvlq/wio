@@ -22,10 +22,10 @@ pub fn init(options: wio.InitOptions) !void {
         .hInstance = instance,
         .lpszClassName = class_name,
     });
-    if (w.RegisterClassW(&class) == 0) return error.Unexpected;
+    if (w.RegisterClassW(&class) == 0) return logLastError("RegisterClassW");
 
     if (options.joystick) {
-        if (w.DirectInput8Create(instance, w.DIRECTINPUT_VERSION, &w.IID_IDirectInput8W, @ptrCast(&dinput), null) != w.DI_OK) return error.Unexpected;
+        try SUCCEED(w.DirectInput8Create(instance, w.DIRECTINPUT_VERSION, &w.IID_IDirectInput8W, @ptrCast(&dinput), null), "DirectInput8Create");
         dinput_loaded = true;
     }
 
@@ -129,7 +129,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
         null,
         w.GetModuleHandleW(null),
         null,
-    ) orelse return error.Unexpected;
+    ) orelse return logLastError("CreateWindowExW");
 
     self.* = .{
         .events = EventQueue.init(wio.allocator),
@@ -149,7 +149,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
             .cColorBits = 24,
         });
         _ = w.SetPixelFormat(self.dc, w.ChoosePixelFormat(self.dc, &pfd), &pfd);
-        self.rc = w.wglCreateContext(self.dc);
+        self.rc = w.wglCreateContext(self.dc) orelse return logLastError("wglCreateContext");
     }
 
     const dpi: f32 = @floatFromInt(w.GetDpiForWindow(window));
@@ -266,7 +266,7 @@ pub fn swapBuffers(self: *@This()) void {
 pub fn getJoysticks(allocator: std.mem.Allocator) ![]wio.JoystickInfo {
     var instances = std.ArrayList(w.DIDEVICEINSTANCEW).init(wio.allocator);
     defer instances.deinit();
-    _ = dinput.EnumDevices(w.DI8DEVCLASS_GAMECTRL, enumDevicesCallback, &instances, w.DIEDFL_ATTACHEDONLY);
+    try SUCCEED(dinput.EnumDevices(w.DI8DEVCLASS_GAMECTRL, enumDevicesCallback, &instances, w.DIEDFL_ATTACHEDONLY), "IDirectInput8::EnumDevices");
 
     const list = try allocator.alloc(wio.JoystickInfo, instances.items.len);
     for (list, instances.items) |*info, instance| {
@@ -290,15 +290,14 @@ pub fn openJoystick(id: []const u8) !?Joystick {
     const guid = std.os.windows.GUID.parseNoBraces(id) catch return null;
     var device: *w.IDirectInputDevice8W = undefined;
     switch (dinput.CreateDevice(&guid, @ptrCast(&device), null)) {
-        w.DI_OK => {},
         w.DIERR_DEVICENOTREG => return null,
-        else => return error.Unexpected,
+        else => |hr| try SUCCEED(hr, "IDirectInput8::CreateDevice"),
     }
     errdefer _ = device.Release();
 
     var caps: w.DIDEVCAPS = undefined;
     caps.dwSize = @sizeOf(w.DIDEVCAPS);
-    try SUCCEED(device.GetCapabilities(&caps));
+    try SUCCEED(device.GetCapabilities(&caps), "IDirectInputDevice8W::GetCapabilities");
 
     const objects = try wio.allocator.alloc(w.DIOBJECTDATAFORMAT, caps.dwAxes + caps.dwButtons);
     defer wio.allocator.free(objects);
@@ -327,10 +326,10 @@ pub fn openJoystick(id: []const u8) !?Joystick {
         .dwFlags = w.DIDF_ABSAXIS,
         .dwDataSize = (caps.dwAxes + caps.dwPOVs) * 4 + ((caps.dwButtons + 3) / 4 * 4),
         .dwNumObjs = @intCast(objects.len),
-        .rgodf = @constCast(objects.ptr),
+        .rgodf = objects.ptr,
     };
-    try SUCCEED(device.SetDataFormat(&format));
-    try SUCCEED(device.Acquire());
+    try SUCCEED(device.SetDataFormat(&format), "IDirectInputDevice8W::SetDataFormat");
+    try SUCCEED(device.Acquire(), "IDirectInputDevice8W::Acquire");
 
     const buf = try wio.allocator.alloc(u8, format.dwDataSize);
     errdefer wio.allocator.free(buf);
@@ -367,14 +366,12 @@ pub const Joystick = struct {
 
     pub fn poll(self: *Joystick) !?wio.JoystickState {
         switch (self.device.Poll()) {
-            w.DI_OK, w.DI_NOEFFECT => {},
             w.DIERR_INPUTLOST => return null,
-            else => return error.Unexpected,
+            else => |hr| try SUCCEED(hr, "IDirectInputDevice8::Poll"),
         }
         switch (self.device.GetDeviceState(@intCast(self.buf.len), self.buf.ptr)) {
-            w.DI_OK => {},
             w.DIERR_INPUTLOST => return null,
-            else => return error.Unexpected,
+            else => |hr| try SUCCEED(hr, "IDirectInputDevice8::GetDeviceState"),
         }
 
         var offset: usize = 0;
@@ -478,8 +475,17 @@ fn clientToWindow(size: wio.Size, style: u32) wio.Size {
     return .{ .width = @intCast(rect.right - rect.left), .height = @intCast(rect.bottom - rect.top) };
 }
 
-fn SUCCEED(hr: w.HRESULT) !void {
-    if (hr < 0) return error.Unexpected;
+fn logLastError(name: []const u8) error{Unexpected} {
+    log.err("{s} failed, error {}", .{ name, w.GetLastError() });
+    return error.Unexpected;
+}
+
+fn SUCCEED(hr: w.HRESULT, name: []const u8) !void {
+    if (hr < 0) {
+        const value: u32 = @bitCast(hr);
+        log.err("{s} failed, hr={x:0>8}", .{ name, value });
+        return error.Unexpected;
+    }
 }
 
 fn LOWORD(x: anytype) u16 {
