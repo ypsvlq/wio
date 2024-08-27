@@ -36,9 +36,9 @@ pub fn update() !void {
         xxh.update(std.mem.sliceAsBytes(state.buttons));
         const hash = xxh.final();
         if (hash != last_state) {
-            log.info("axes {any}", .{state.axes});
-            log.info("hats {any}", .{state.hats});
-            log.info("buttons {any}", .{state.buttons});
+            if (state.axes.len > 0) log.info("axes {any}", .{state.axes});
+            if (state.hats.len > 0) log.info("hats {any}", .{state.hats});
+            if (state.buttons.len > 0) log.info("buttons {any}", .{state.buttons});
             last_state = hash;
         }
     }
