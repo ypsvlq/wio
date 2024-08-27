@@ -230,7 +230,14 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
 
     if (options.opengl) |_| {
         var count: c_int = undefined;
-        const configs = c.glXChooseFBConfig(display, h.DefaultScreen(display), &[_]c_int{h.None}, &count);
+        const configs = c.glXChooseFBConfig(display, h.DefaultScreen(display), &[_]c_int{
+            h.GLX_DOUBLEBUFFER, h.True,
+            h.GLX_RED_SIZE,     1,
+            h.GLX_GREEN_SIZE,   1,
+            h.GLX_BLUE_SIZE,    1,
+            h.GLX_ALPHA_SIZE,   1,
+            h.None,
+        }, &count);
         defer _ = c.XFree(@ptrCast(configs));
         if (count == 0) return error.Unexpected;
         self.context = c.glXCreateNewContext(display, configs[0], h.GLX_RGBA_TYPE, null, h.True) orelse return error.Unexpected;
