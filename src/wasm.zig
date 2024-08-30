@@ -97,7 +97,8 @@ pub fn makeContextCurrent(_: *@This()) void {}
 pub fn swapBuffers(_: *@This()) void {}
 
 pub fn getJoysticks(allocator: std.mem.Allocator) ![]wio.JoystickInfo {
-    var list = try std.ArrayList(wio.JoystickInfo).initCapacity(allocator, js.getJoysticks());
+    const count = js.getJoysticks();
+    var list = try std.ArrayList(wio.JoystickInfo).initCapacity(allocator, count);
     errdefer {
         for (list.items) |info| {
             allocator.free(info.id);
@@ -105,7 +106,7 @@ pub fn getJoysticks(allocator: std.mem.Allocator) ![]wio.JoystickInfo {
         }
         list.deinit();
     }
-    for (0..js.getJoysticks()) |index| {
+    for (0..count) |index| {
         const len = js.getJoystickIdLen(index);
         if (len > 0) {
             const id = try std.fmt.allocPrint(allocator, "{}", .{index});

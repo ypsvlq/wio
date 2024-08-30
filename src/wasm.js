@@ -177,7 +177,6 @@ const wio = {
     },
 
     setString(ptr, buffer) {
-        if (buffer.length == 0) return;
         const output = new Uint8Array(wio.module.exports.memory.buffer, ptr, buffer.length);
         for (let i = 0; i < buffer.length; i++) {
             output[i] = buffer[i];
