@@ -327,6 +327,24 @@ const wio = {
         return wio.getString(ptr, len);
     },
 
+    setStringZ(ptr, max, length, string) {
+        const buffer = new Uint8Array(wio.module.exports.memory.buffer, ptr);
+        const result = new TextEncoder().encodeInto(string, buffer.subarray(0, max - 1));
+        buffer[result.written] = 0;
+        if (length != 0) {
+            new Int32Array(wio.module.exports.memory.buffer, length)[0] = result.written;
+        }
+    },
+
+    setParams(Array, ptr, value) {
+        const buffer = new Array(wio.module.exports.memory.buffer, ptr);
+        if (typeof value[Symbol.iterator] == "function") {
+            buffer.set(value);
+        } else {
+            buffer[0] = value;
+        }
+    },
+
     pushObject(object) {
         const index = wio.objects.indexOf(null);
         if (index != -1) {
@@ -570,63 +588,128 @@ const wio = {
         }
     },
 
-    glGetActiveAttrib() { },
+    glGetActiveAttrib(program, index, bufSize, length, size, type, name) {
+        const info = wio.gl.getActiveAttrib(wio.objects[program], index);
+        if (info == null) return;
+        new Int32Array(wio.module.exports.memory.buffer, size)[0] = info.size;
+        new Uint32Array(wio.module.exports.memory.buffer, type)[0] = info.type;
+        wio.setStringZ(name, bufSize, length, info.name);
+    },
 
-    glGetActiveUniform() { },
+    glGetActiveUniform(program, index, bufSize, length, size, type, name) {
+        const info = wio.gl.getActiveUniform(wio.objects[program], index);
+        if (info == null) return;
+        new Int32Array(wio.module.exports.memory.buffer, size)[0] = info.size;
+        new Uint32Array(wio.module.exports.memory.buffer, type)[0] = info.type;
+        wio.setStringZ(name, bufSize, length, info.name);
+    },
 
-    glGetAttachedShaders() { },
+    glGetAttachedShaders(program, maxCount, count, shaders) {
+        const indices = wio.gl.getAttachedShaders(wio.objects[program]).map(shader => wio.objects.indexOf(shader));
+        const buffer = new Uint32Array(wio.module.exports.memory.buffer, shaders);
+        for (var i = 0; i < maxCount && i < indices.length; i++) {
+            buffer[i] = indices[i];
+        }
+        if (count != 0) {
+            new Int32Array(wio.module.exports.memory.buffer, count)[0] = i;
+        }
+    },
 
     glGetAttribLocation(program, name) {
         return wio.gl.getAttribLocation(wio.objects[program], wio.getStringZ(name));
     },
 
-    glGetBooleanv() { },
+    glGetBooleanv(pname, params) {
+        wio.setParams(Uint8Array, params, wio.gl.getParameter(pname));
+    },
 
-    glGetBufferParameteriv() { },
+    glGetBufferParameteriv(target, value, data) {
+        wio.setParams(Int32Array, data, wio.gl.getBufferParameter(target, value));
+    },
 
     glGetError() {
         return wio.gl.getError();
     },
 
-    glGetFloatv() { },
+    glGetFloatv(pname, params) {
+        wio.setParams(Float32Array, params, wio.gl.getParameter(pname));
+    },
 
-    glGetFramebufferAttachmentParameteriv() { },
+    glGetFramebufferAttachmentParameteriv(target, attachment, pname, params) {
+        const value = wio.gl.getFramebufferAttachmentParameter(target, attachment, pname);
+        if (typeof value == "object") {
+            value = wio.objects.indexOf(value);
+        }
+        new Int32Array(wio.module.exports.memory.buffer, params)[0] = value;
+    },
 
-    glGetIntegerv() { },
+    glGetIntegerv(pname, params) {
+        wio.setParams(Int32Array, params, wio.gl.getParameter(pname));
+    },
 
-    glGetProgramiv() { },
+    glGetProgramiv(program, pname, params) {
+        wio.setParams(Int32Array, params, wio.gl.getProgramParameter(wio.objects[program], pname));
+    },
 
-    glGetProgramInfoLog() { },
+    glGetProgramInfoLog(program, maxLength, length, infoLog) {
+        wio.setStringZ(infoLog, maxLength, length, wio.gl.getProgramInfoLog(wio.objects[program]));
+    },
 
-    glGetRenderbufferParameteriv() { },
+    glGetRenderbufferParameteriv(target, pname, params) {
+        wio.setParams(Int32Array, params, wio.gl.getRenderbufferParameter(target, pname));
+    },
 
-    glGetShaderiv() { },
+    glGetShaderiv(shader, pname, params) {
+        wio.setParams(Int32Array, params, wio.gl.getShaderParameter(wio.objects[shader], pname));
+    },
 
-    glGetShaderInfoLog() { },
+    glGetShaderInfoLog(shader, maxLength, length, infoLog) {
+        wio.setStringZ(infoLog, maxLength, length, wio.gl.getShaderInfoLog(wio.objects[shader]));
+    },
 
-    glGetShaderPrecisionFormat() { },
+    glGetShaderPrecisionFormat(shaderType, precisionType, range, precision) {
+        const format = wio.gl.getShaderPrecisionFormat(shaderType, precisionType);
+        new Int32Array(wio.module.exports.memory.buffer, range, 2).set([format.rangeMin, format.rangeMax]);
+        new Int32Array(wio.module.exports.memory.buffer, precision)[0] = format.precision;
+    },
 
-    glGetShaderSource() { },
+    glGetShaderSource(shader, bufSize, length, source) {
+        wio.setStringZ(source, bufSize, length, wio.gl.getShaderSource(wio.objects[shader]));
+    },
 
     glGetString() { },
 
-    glGetTexParameterfv() { },
+    glGetTexParameterfv(target, pname, params) {
+        wio.setParams(Float32Array, params, wio.gl.getTexParameter(target, pname));
+    },
 
-    glGetTexParameteriv() { },
+    glGetTexParameteriv(target, pname, params) {
+        wio.setParams(Int32Array, params, wio.gl.getTexParameter(target, pname));
+    },
 
-    glGetUniformfv() { },
+    glGetUniformfv(program, location, params) {
+        wio.setParams(Float32Array, params, wio.gl.getUniform(wio.objects[program], location));
+    },
 
-    glGetUniformiv() { },
+    glGetUniformiv(program, location, params) {
+        wio.setParams(Int32Array, params, wio.gl.getUniform(wio.objects[program], location));
+    },
 
     glGetUniformLocation(program, name) {
         return wio.gl.getUniformLocation(wio.objects[program], wio.getStringZ(name));
     },
 
-    glGetVertexAttribfv() { },
+    glGetVertexAttribfv(index, pname, params) {
+        wio.setParams(Float32Array, params, wio.gl.getVertexAttrib(index, pname));
+    },
 
-    glGetVertexAttribiv() { },
+    glGetVertexAttribiv(index, pname, params) {
+        wio.setParams(Int32Array, params, wio.gl.getVertexAttrib(index, pname));
+    },
 
-    glGetVertexAttribPointerv() { },
+    glGetVertexAttribPointerv(index, pname, pointer) {
+        new Uint32Array(wio.module.exports.memory.buffer, pointer)[0] = wio.gl.getVertexAttribOffset(index, pname);
+    },
 
     glHint(target, mode) {
         wio.gl.hint(target, mode);
