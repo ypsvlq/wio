@@ -317,7 +317,7 @@ const wio = {
         const array = new Uint8Array(wio.module.exports.memory.buffer, ptr);
         let len = 0;
         while (array[len]) len++;
-        return wio.getString(ptr, len);
+        return new TextDecoder().decode(array.subarray(0, len));
     },
 
     setStringZ(ptr, max, length, string) {
