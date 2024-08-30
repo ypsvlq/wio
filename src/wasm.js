@@ -140,7 +140,7 @@ const wio = {
     },
 
     getJoystickId(i, ptr) {
-        wio.setString(ptr, wio.gamepad_ids[i]);
+        new Uint8Array(wio.module.exports.memory.buffer, ptr).set(wio.gamepad_ids[i]);
     },
 
     openJoystick(i, ptr) {
@@ -174,13 +174,6 @@ const wio = {
 
     getString(ptr, len) {
         return new TextDecoder().decode(new Uint8Array(wio.module.exports.memory.buffer, ptr, len));
-    },
-
-    setString(ptr, buffer) {
-        const output = new Uint8Array(wio.module.exports.memory.buffer, ptr, buffer.length);
-        for (let i = 0; i < buffer.length; i++) {
-            output[i] = buffer[i];
-        }
     },
 
     keys: {
