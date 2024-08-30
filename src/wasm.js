@@ -1,3 +1,5 @@
+"use strict";
+
 const wio = {
     module: undefined,
     canvas: undefined,
