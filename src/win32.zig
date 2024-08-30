@@ -268,15 +268,26 @@ pub fn getJoysticks(allocator: std.mem.Allocator) ![]wio.JoystickInfo {
     defer instances.deinit();
     try SUCCEED(dinput.EnumDevices(w.DI8DEVCLASS_GAMECTRL, enumDevicesCallback, &instances, w.DIEDFL_ATTACHEDONLY), "IDirectInput8::EnumDevices");
 
-    const list = try allocator.alloc(wio.JoystickInfo, instances.items.len);
-    for (list, instances.items) |*info, instance| {
-        const guid = instance.guidInstance;
-        info.* = .{
-            .id = try std.fmt.allocPrint(allocator, "{x:0>8}-{x:0>4}-{x:0>4}-{x:0>2}{x:0>2}-{x:0>2}{x:0>2}{x:0>2}{x:0>2}{x:0>2}{x:0>2}", .{ guid.Data1, guid.Data2, guid.Data3, guid.Data4[0], guid.Data4[1], guid.Data4[2], guid.Data4[3], guid.Data4[4], guid.Data4[5], guid.Data4[6], guid.Data4[7] }),
-            .name = try std.unicode.utf16LeToUtf8Alloc(allocator, &instance.tszInstanceName),
-        };
+    var list = try std.ArrayList(wio.JoystickInfo).initCapacity(allocator, instances.items.len);
+    errdefer {
+        for (list.items) |info| {
+            allocator.free(info.id);
+            allocator.free(info.name);
+        }
+        list.deinit();
     }
-    return list;
+    for (instances.items) |instance| {
+        const guid = instance.guidInstance;
+        const id = try std.fmt.allocPrint(allocator, "{x:0>8}-{x:0>4}-{x:0>4}-{x:0>2}{x:0>2}-{x:0>2}{x:0>2}{x:0>2}{x:0>2}{x:0>2}{x:0>2}", .{ guid.Data1, guid.Data2, guid.Data3, guid.Data4[0], guid.Data4[1], guid.Data4[2], guid.Data4[3], guid.Data4[4], guid.Data4[5], guid.Data4[6], guid.Data4[7] });
+        errdefer allocator.free(id);
+        const name = try std.unicode.utf16LeToUtf8Alloc(allocator, &instance.tszInstanceName);
+        errdefer allocator.free(name);
+        list.appendAssumeCapacity(.{
+            .id = id,
+            .name = name,
+        });
+    }
+    return list.toOwnedSlice();
 }
 
 fn enumDevicesCallback(ddi: [*c]w.DIDEVICEINSTANCEW, ref: ?*anyopaque) callconv(w.WINAPI) i32 {
