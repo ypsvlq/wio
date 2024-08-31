@@ -87,7 +87,7 @@ pub fn init(options: wio.InitOptions) !void {
     }
 
     inline for (@typeInfo(@TypeOf(c)).Struct.fields) |field| {
-        const lib = if (std.mem.startsWith(u8, field.name, "Xcursor"))
+        const lib = comptime if (std.mem.startsWith(u8, field.name, "Xcursor"))
             &libXcursor
         else if (std.mem.startsWith(u8, field.name, "XFixes"))
             &libXfixes
