@@ -16,6 +16,7 @@ pub const InitOptions = struct {
     opengl: bool = false,
 };
 
+/// Unless otherwise noted, all calls to wio functions must be made on the same thread.
 pub fn init(ally: std.mem.Allocator, options: InitOptions) !void {
     allocator = ally;
     try Backend.init(options);
@@ -29,6 +30,10 @@ pub const RunOptions = struct {
     wait: bool = false,
 };
 
+/// Begins the main loop, which continues as long as `func` returns true.
+///
+/// This must be the final call on its thread, and there must be no uses of `defer` in the same scope
+/// (depending on the platform, it may return immediately, never, or when the main loop exits).
 pub fn run(func: fn () anyerror!bool, options: RunOptions) !void {
     return Backend.run(func, options);
 }
@@ -98,6 +103,7 @@ pub const Window = struct {
         self.backend.setCursorMode(mode);
     }
 
+    /// May be called on any thread.
     pub fn makeContextCurrent(self: *Window) void {
         self.backend.makeContextCurrent();
     }
@@ -176,6 +182,7 @@ pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const fn () void {
     return @alignCast(@ptrCast(Backend.glGetProcAddress(name)));
 }
 
+/// May be called on any thread.
 pub fn swapInterval(interval: i32) void {
     Backend.swapInterval(interval);
 }
