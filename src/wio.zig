@@ -1,6 +1,6 @@
 const std = @import("std");
 const builtin = @import("builtin");
-const Backend = switch (builtin.os.tag) {
+pub const Backend = switch (builtin.os.tag) {
     .windows => @import("win32.zig"),
     .macos => @import("glfw.zig"),
     .linux, .openbsd, .netbsd, .freebsd => @import("x11.zig"),
