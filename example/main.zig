@@ -44,6 +44,7 @@ fn loop() !bool {
                 _ = gpa.deinit();
                 return false;
             },
+            .unfocused => control = false,
             .framebuffer => |size| renderer.resize(size),
             .button_press => |button| handlePress(button),
             .button_release => |button| handleRelease(button),
