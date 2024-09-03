@@ -18,9 +18,9 @@ when targeting a given platform:
 
 - `Window.backend.window` is the Win32 `HWND`
 
-### Unix
+### X11
 
-- `wio.Backend.display` is the Xlib display
+- `wio.backend.display` is the Xlib display
 - `Window.backend.window` is the Xlib window
 
 

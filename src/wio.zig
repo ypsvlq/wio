@@ -1,6 +1,6 @@
 const std = @import("std");
 const builtin = @import("builtin");
-pub const Backend = switch (builtin.os.tag) {
+pub const backend = switch (builtin.os.tag) {
     .windows => @import("win32.zig"),
     .macos => @import("glfw.zig"),
     .linux, .openbsd, .netbsd, .freebsd => @import("x11.zig"),
@@ -9,7 +9,7 @@ pub const Backend = switch (builtin.os.tag) {
 
 pub var allocator: std.mem.Allocator = undefined;
 
-pub const logFn = if (@hasDecl(Backend, "logFn")) Backend.logFn else std.log.defaultLog;
+pub const logFn = if (@hasDecl(backend, "logFn")) backend.logFn else std.log.defaultLog;
 
 pub const InitOptions = struct {
     joystick: bool = false,
@@ -19,11 +19,11 @@ pub const InitOptions = struct {
 /// Unless otherwise noted, all calls to wio functions must be made on the same thread.
 pub fn init(ally: std.mem.Allocator, options: InitOptions) !void {
     allocator = ally;
-    try Backend.init(options);
+    try backend.init(options);
 }
 
 pub fn deinit() void {
-    Backend.deinit();
+    backend.deinit();
 }
 
 pub const RunOptions = struct {
@@ -35,7 +35,7 @@ pub const RunOptions = struct {
 /// This must be the final call on its thread, and there must be no uses of `defer` in the same scope
 /// (depending on the platform, it may return immediately, never, or when the main loop exits).
 pub fn run(func: fn () anyerror!bool, options: RunOptions) !void {
-    return Backend.run(func, options);
+    return backend.run(func, options);
 }
 
 pub const Size = struct {
@@ -65,18 +65,18 @@ pub const CreateWindowOptions = struct {
 };
 
 pub fn createWindow(options: CreateWindowOptions) !Window {
-    return .{ .backend = try Backend.createWindow(options) };
+    return .{ .backend = try backend.createWindow(options) };
 }
 
 pub const Window = struct {
-    backend: @typeInfo(@typeInfo(@TypeOf(Backend.createWindow)).Fn.return_type.?).ErrorUnion.payload,
+    backend: @typeInfo(@typeInfo(@TypeOf(backend.createWindow)).Fn.return_type.?).ErrorUnion.payload,
 
     pub fn destroy(self: *Window) void {
         self.backend.destroy();
     }
 
     pub fn messageBox(self: *Window, style: MessageBoxStyle, title: []const u8, message: []const u8) void {
-        Backend.messageBox(self.backend, style, title, message);
+        backend.messageBox(self.backend, style, title, message);
     }
 
     pub fn getEvent(self: *Window) ?Event {
@@ -114,7 +114,7 @@ pub const Window = struct {
 };
 
 pub fn getJoysticks(ally: std.mem.Allocator) !JoystickList {
-    return .{ .items = try Backend.getJoysticks(ally), .allocator = ally };
+    return .{ .items = try backend.getJoysticks(ally), .allocator = ally };
 }
 
 pub const JoystickList = struct {
@@ -136,11 +136,11 @@ pub const JoystickInfo = struct {
 };
 
 pub fn openJoystick(id: []const u8) !?Joystick {
-    return if (try Backend.openJoystick(id)) |backend| .{ .backend = backend } else null;
+    return .{ .backend = try backend.openJoystick(id) orelse return null };
 }
 
 pub const Joystick = struct {
-    backend: Backend.Joystick,
+    backend: backend.Joystick,
 
     pub fn close(self: *Joystick) void {
         self.backend.close();
@@ -167,24 +167,24 @@ pub const Hat = packed struct {
 pub const MessageBoxStyle = enum { info, warn, err };
 
 pub fn messageBox(style: MessageBoxStyle, title: []const u8, message: []const u8) void {
-    Backend.messageBox(null, style, title, message);
+    backend.messageBox(null, style, title, message);
 }
 
 pub fn setClipboardText(text: []const u8) void {
-    Backend.setClipboardText(text);
+    backend.setClipboardText(text);
 }
 
 pub fn getClipboardText(ally: std.mem.Allocator) ?[]u8 {
-    return Backend.getClipboardText(ally);
+    return backend.getClipboardText(ally);
 }
 
 pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const fn () void {
-    return @alignCast(@ptrCast(Backend.glGetProcAddress(name)));
+    return @alignCast(@ptrCast(backend.glGetProcAddress(name)));
 }
 
 /// May be called on any thread.
 pub fn swapInterval(interval: i32) void {
-    Backend.swapInterval(interval);
+    backend.swapInterval(interval);
 }
 
 pub const Event = union(enum) {
