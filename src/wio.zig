@@ -61,7 +61,6 @@ pub const CreateWindowOptions = struct {
     display_mode: DisplayMode = .windowed,
     cursor: Cursor = .arrow,
     cursor_mode: CursorMode = .normal,
-    opengl: ?struct {} = null,
 };
 
 pub fn createWindow(options: CreateWindowOptions) !Window {
@@ -101,6 +100,10 @@ pub const Window = struct {
 
     pub fn setCursorMode(self: *Window, mode: CursorMode) void {
         self.backend.setCursorMode(mode);
+    }
+
+    pub fn createContext(self: *Window, options: CreateContextOptions) !void {
+        return self.backend.createContext(options);
     }
 
     /// May be called on any thread.
@@ -235,6 +238,8 @@ pub const CursorMode = enum {
     normal,
     hidden,
 };
+
+pub const CreateContextOptions = struct {};
 
 pub const Button = enum {
     mouse_left,

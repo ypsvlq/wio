@@ -139,19 +139,6 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     };
     _ = w.SetWindowLongPtrW(window, w.GWLP_USERDATA, @bitCast(@intFromPtr(self)));
 
-    if (options.opengl) |_| {
-        self.dc = w.GetDC(window);
-        var pfd = std.mem.zeroInit(w.PIXELFORMATDESCRIPTOR, .{
-            .nSize = @sizeOf(w.PIXELFORMATDESCRIPTOR),
-            .nVersion = 1,
-            .dwFlags = w.PFD_DRAW_TO_WINDOW | w.PFD_SUPPORT_OPENGL | w.PFD_DOUBLEBUFFER,
-            .iPixelType = w.PFD_TYPE_RGBA,
-            .cColorBits = 24,
-        });
-        _ = w.SetPixelFormat(self.dc, w.ChoosePixelFormat(self.dc, &pfd), &pfd);
-        self.rc = w.wglCreateContext(self.dc) orelse return logLastError("wglCreateContext");
-    }
-
     const dpi: f32 = @floatFromInt(w.GetDpiForWindow(window));
     const scale = dpi / w.USER_DEFAULT_SCREEN_DPI;
     self.pushEvent(.{ .scale = scale });
@@ -253,6 +240,20 @@ pub fn setCursor(self: *@This(), shape: wio.Cursor) void {
 
 pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
     self.cursor_mode = mode;
+}
+
+pub fn createContext(self: *@This(), options: wio.CreateContextOptions) !void {
+    _ = options;
+    self.dc = w.GetDC(self.window);
+    var pfd = std.mem.zeroInit(w.PIXELFORMATDESCRIPTOR, .{
+        .nSize = @sizeOf(w.PIXELFORMATDESCRIPTOR),
+        .nVersion = 1,
+        .dwFlags = w.PFD_DRAW_TO_WINDOW | w.PFD_SUPPORT_OPENGL | w.PFD_DOUBLEBUFFER,
+        .iPixelType = w.PFD_TYPE_RGBA,
+        .cColorBits = 24,
+    });
+    _ = w.SetPixelFormat(self.dc, w.ChoosePixelFormat(self.dc, &pfd), &pfd);
+    self.rc = w.wglCreateContext(self.dc) orelse return logLastError("wglCreateContext");
 }
 
 pub fn makeContextCurrent(self: *@This()) void {

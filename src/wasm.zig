@@ -92,6 +92,8 @@ pub fn setCursorMode(_: *@This(), mode: wio.CursorMode) void {
     js.setCursorMode(@intFromEnum(mode));
 }
 
+pub fn createContext(_: *@This(), _: wio.CreateContextOptions) !void {}
+
 pub fn makeContextCurrent(_: *@This()) void {}
 
 pub fn swapBuffers(_: *@This()) void {}

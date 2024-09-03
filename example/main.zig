@@ -14,7 +14,8 @@ var window: wio.Window = undefined;
 
 pub fn main() !void {
     try wio.init(allocator, .{ .joystick = true, .opengl = true });
-    window = try wio.createWindow(.{ .title = "wio example", .opengl = .{} });
+    window = try wio.createWindow(.{ .title = "wio example" });
+    try window.createContext(.{});
     window.makeContextCurrent();
     renderer.init();
     try joystick.open();

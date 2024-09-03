@@ -53,6 +53,11 @@ pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
     _ = mode;
 }
 
+pub fn createContext(self: *@This(), options: wio.CreateContextOptions) !void {
+    _ = self;
+    _ = options;
+}
+
 pub fn makeContextCurrent(self: *@This()) void {
     _ = self;
 }

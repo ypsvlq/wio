@@ -139,6 +139,11 @@ pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
     }
 }
 
+pub fn createContext(self: *@This(), options: wio.CreateContextOptions) !void {
+    _ = self;
+    _ = options;
+}
+
 pub fn makeContextCurrent(self: *@This()) void {
     c.glfwMakeContextCurrent(self.window);
 }
