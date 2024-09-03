@@ -80,6 +80,11 @@ fn handlePress(button: wio.Button) void {
         .n => window.setCursorMode(.normal),
         .i => window.setCursorMode(.hidden),
         .c => wio.setClipboardText("wio example"),
+        .d => {
+            wio.messageBox(.info, "wio", "info");
+            window.messageBox(.warn, "wio", "warning");
+            window.messageBox(.err, "wio", "error");
+        },
         .v => {
             const text = wio.getClipboardText(allocator) orelse return;
             defer wio.allocator.free(text);
