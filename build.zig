@@ -17,10 +17,7 @@ pub fn build(b: *std.Build) void {
             }
         },
         .macos => {
-            if (b.lazyDependency("glfw", .{})) |glfw| {
-                module.addCSourceFiles(.{ .root = glfw.path("src"), .files = glfw_files, .flags = &.{"-D_GLFW_COCOA"} });
-                module.addIncludePath(glfw.path("include"));
-            }
+            module.addCSourceFile(.{ .file = b.path("src/cocoa.m"), .flags = &.{"-fobjc-arc"} });
             if (b.lazyImport(@This(), "xcode_frameworks")) |xcode_frameworks| {
                 xcode_frameworks.addPaths(module);
             }
@@ -59,27 +56,3 @@ pub fn build(b: *std.Build) void {
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
 }
-
-const glfw_files: []const []const u8 = &.{
-    "cocoa_init.m",
-    "cocoa_joystick.m",
-    "cocoa_monitor.m",
-    "cocoa_time.c",
-    "cocoa_window.m",
-    "context.c",
-    "egl_context.c",
-    "init.c",
-    "input.c",
-    "monitor.c",
-    "nsgl_context.m",
-    "null_init.c",
-    "null_joystick.c",
-    "null_monitor.c",
-    "null_window.c",
-    "osmesa_context.c",
-    "platform.c",
-    "posix_module.c",
-    "posix_thread.c",
-    "vulkan.c",
-    "window.c",
-};

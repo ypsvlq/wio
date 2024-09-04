@@ -7,11 +7,6 @@
             .hash = "1220f847a1dc2a3571165ec2854e203de663c654a369fe9c980c1fdc4255c71b33be",
             .lazy = true,
         },
-        .glfw = .{
-            .url = "https://github.com/glfw/glfw/archive/7b6aead9fb88b3623e3b3725ebb42670cbe4c579.tar.gz",
-            .hash = "1220c46ebcac607065f942193b82a21b87213fca4b0d50c83461f8f5e22955fcb88f",
-            .lazy = true,
-        },
         .xcode_frameworks = .{
             .url = "https://pkg.machengine.org/xcode-frameworks/122b43323db27b2082a2d44ed2121de21c9ccf75.tar.gz",
             .hash = "12205d131983601cdb3500f38e9d8adaed5574fb0211b8b39291d2e9b90c6555ce59",
