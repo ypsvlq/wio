@@ -183,6 +183,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     const self = try wio.allocator.create(@This());
     errdefer wio.allocator.destroy(self);
 
+    const size = options.size.multiply(scale / options.scale);
     var attributes: h.XSetWindowAttributes = undefined;
     attributes.event_mask = h.FocusChangeMask | h.ExposureMask | h.StructureNotifyMask | h.KeyPressMask | h.KeyReleaseMask | h.ButtonPressMask | h.ButtonReleaseMask | h.PointerMotionMask;
     const window = c.XCreateWindow(
@@ -190,8 +191,8 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
         h.DefaultRootWindow(display),
         0,
         0,
-        options.size.width,
-        options.size.height,
+        size.width,
+        size.height,
         0,
         0,
         h.InputOutput,
@@ -223,8 +224,8 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     self.setDisplayMode(options.display_mode);
     if (options.cursor_mode != .normal) self.setCursorMode(options.cursor_mode);
 
-    try self.events.writeItem(.{ .size = options.size });
-    try self.events.writeItem(.{ .framebuffer = options.size });
+    try self.events.writeItem(.{ .size = size });
+    try self.events.writeItem(.{ .framebuffer = size });
     try self.events.writeItem(.{ .scale = scale });
     try self.events.writeItem(.create);
 
