@@ -3,7 +3,7 @@ const builtin = @import("builtin");
 pub const backend = switch (builtin.os.tag) {
     .windows => @import("win32.zig"),
     .macos => @import("cocoa.zig"),
-    .linux, .openbsd, .netbsd, .freebsd => @import("x11.zig"),
+    .linux, .openbsd, .netbsd, .freebsd, .dragonfly => @import("x11.zig"),
     else => if (builtin.target.isWasm()) @import("wasm.zig") else @compileError("unsupported platform"),
 };
 
