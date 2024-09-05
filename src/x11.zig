@@ -49,7 +49,6 @@ var c: struct {
     glXDestroyContext: *const @TypeOf(h.glXDestroyContext),
     glXMakeCurrent: *const @TypeOf(h.glXMakeCurrent),
     glXSwapBuffers: *const @TypeOf(h.glXSwapBuffers),
-    glXGetCurrentDrawable: *const @TypeOf(h.glXGetCurrentDrawable),
 } = undefined;
 
 var glx: struct {
@@ -325,9 +324,9 @@ pub fn swapBuffers(self: *@This()) void {
     c.glXSwapBuffers(display, self.window);
 }
 
-pub fn swapInterval(_: *@This(), interval: i32) void {
+pub fn swapInterval(self: *@This(), interval: i32) void {
     if (glx.swapIntervalEXT) |swapIntervalEXT| {
-        swapIntervalEXT(display, c.glXGetCurrentDrawable(), interval);
+        swapIntervalEXT(display, self.window, interval);
     }
 }
 
