@@ -17,6 +17,7 @@ pub fn main() !void {
     window = try wio.createWindow(.{ .title = "wio example" });
     try window.createContext(.{});
     window.makeContextCurrent();
+    window.swapInterval(1);
     renderer.init();
     try joystick.open();
     return wio.run(loop, .{});
