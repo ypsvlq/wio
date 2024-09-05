@@ -98,6 +98,8 @@ pub fn makeContextCurrent(_: *@This()) void {}
 
 pub fn swapBuffers(_: *@This()) void {}
 
+pub fn swapInterval(_: *@This(), _: i32) void {}
+
 pub fn getJoysticks(allocator: std.mem.Allocator) ![]wio.JoystickInfo {
     const count = js.getJoysticks();
     var list = try std.ArrayList(wio.JoystickInfo).initCapacity(allocator, count);
@@ -151,7 +153,7 @@ pub const Joystick = struct {
     }
 };
 
-pub fn messageBox(_: ?*@This(), _: wio.MessageBoxStyle, _: []const u8, message: []const u8) void {
+pub fn messageBox(_: ?@This(), _: wio.MessageBoxStyle, _: []const u8, message: []const u8) void {
     js.messageBox(message.ptr, message.len);
 }
 
@@ -166,8 +168,6 @@ pub fn getClipboardText(_: std.mem.Allocator) ?[]u8 {
 pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
     return if (@hasDecl(gl, name)) @field(gl, name) else null;
 }
-
-pub fn swapInterval(_: i32) void {}
 
 const gl = struct {
     extern "wio" fn glActiveTexture(u32) void;

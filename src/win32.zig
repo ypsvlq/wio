@@ -264,6 +264,12 @@ pub fn swapBuffers(self: *@This()) void {
     _ = w.SwapBuffers(self.dc);
 }
 
+pub fn swapInterval(_: @This(), interval: i32) void {
+    if (wgl.swapIntervalEXT) |swapIntervalEXT| {
+        _ = swapIntervalEXT(interval);
+    }
+}
+
 pub fn getJoysticks(allocator: std.mem.Allocator) ![]wio.JoystickInfo {
     var instances = std.ArrayList(w.DIDEVICEINSTANCEW).init(wio.allocator);
     defer instances.deinit();
@@ -468,12 +474,6 @@ pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
         return &@field(w, name);
     }
     return w.wglGetProcAddress(name);
-}
-
-pub fn swapInterval(interval: i32) void {
-    if (wgl.swapIntervalEXT) |swapIntervalEXT| {
-        _ = swapIntervalEXT(interval);
-    }
 }
 
 fn clientToWindow(size: wio.Size, style: u32) wio.Size {

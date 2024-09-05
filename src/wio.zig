@@ -114,6 +114,11 @@ pub const Window = struct {
     pub fn swapBuffers(self: *Window) void {
         self.backend.swapBuffers();
     }
+
+    /// Must be called on the thread where the context is current.
+    pub fn swapInterval(self: *Window, interval: i32) void {
+        self.backend.swapInterval(interval);
+    }
 };
 
 pub fn getJoysticks(ally: std.mem.Allocator) !JoystickList {
@@ -183,11 +188,6 @@ pub fn getClipboardText(ally: std.mem.Allocator) ?[]u8 {
 
 pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const fn () void {
     return @alignCast(@ptrCast(backend.glGetProcAddress(name)));
-}
-
-/// May be called on any thread.
-pub fn swapInterval(interval: i32) void {
-    backend.swapInterval(interval);
 }
 
 pub const Event = union(enum) {

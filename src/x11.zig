@@ -325,6 +325,12 @@ pub fn swapBuffers(self: *@This()) void {
     c.glXSwapBuffers(display, self.window);
 }
 
+pub fn swapInterval(_: *@This(), interval: i32) void {
+    if (glx.swapIntervalEXT) |swapIntervalEXT| {
+        swapIntervalEXT(display, c.glXGetCurrentDrawable(), interval);
+    }
+}
+
 pub fn getJoysticks(allocator: std.mem.Allocator) ![]wio.JoystickInfo {
     _ = allocator;
     return &.{};
@@ -364,12 +370,6 @@ pub fn getClipboardText(allocator: std.mem.Allocator) ?[]u8 {
 
 pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
     return c.glXGetProcAddress(name);
-}
-
-pub fn swapInterval(interval: i32) void {
-    if (glx.swapIntervalEXT) |swapIntervalEXT| {
-        swapIntervalEXT(display, c.glXGetCurrentDrawable(), interval);
-    }
 }
 
 fn pushEvent(self: *@This(), event: wio.Event) void {

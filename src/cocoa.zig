@@ -92,6 +92,11 @@ pub fn swapBuffers(self: *@This()) void {
     _ = self;
 }
 
+pub fn swapInterval(self: *@This(), interval: i32) void {
+    _ = self;
+    _ = interval;
+}
+
 pub fn getJoysticks(allocator: std.mem.Allocator) ![]wio.JoystickInfo {
     return allocator.alloc(wio.JoystickInfo, 0);
 }
@@ -139,10 +144,6 @@ export fn wioDupeClipboardText(allocator: *const std.mem.Allocator, bytes: [*:0]
 pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
     _ = name;
     return null;
-}
-
-pub fn swapInterval(interval: i32) void {
-    _ = interval;
 }
 
 fn pushEvent(self: *@This(), event: wio.Event) void {
