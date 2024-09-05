@@ -620,7 +620,7 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
                 }
             }
 
-            if (buttonFromScancode(scancode)) |button| {
+            if (scancodeToButton(scancode)) |button| {
                 if (flags & w.KF_UP == 0) {
                     if (flags & w.KF_REPEAT == 0) {
                         self.pushEvent(.{ .button_press = button });
@@ -682,7 +682,7 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
     }
 }
 
-fn buttonFromScancode(scancode: u9) ?wio.Button {
+fn scancodeToButton(scancode: u9) ?wio.Button {
     comptime var table: [0x15D]wio.Button = undefined;
     comptime for (&table, 1..) |*ptr, i| {
         ptr.* = switch (i) {
