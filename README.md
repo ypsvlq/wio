@@ -18,6 +18,10 @@ when targeting a given platform:
 
 - `Window.backend.window` is the Win32 `HWND`
 
+### macOS
+
+- `Window.backend.window` is the AppKit `NSWindow*`
+
 ### X11
 
 - `wio.backend.display` is the Xlib display
