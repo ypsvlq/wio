@@ -6,14 +6,19 @@ extern fn wioInit() void;
 extern fn wioRun() void;
 extern fn wioLoop() void;
 extern fn wioCreateWindow(*anyopaque, u16, u16) *anyopaque;
-extern fn wioDestroyWindow(*anyopaque) void;
+extern fn wioDestroyWindow(*anyopaque, ?*anyopaque) void;
 extern fn wioSetTitle(*anyopaque, [*]const u8, usize) void;
 extern fn wioSetSize(*anyopaque, u16, u16) void;
 extern fn wioSetDisplayMode(*anyopaque, u8) void;
 extern fn wioSetCursor(*anyopaque, u8) void;
+extern fn wioCreateContext(*anyopaque) ?*anyopaque;
+extern fn wioMakeContextCurrent(?*anyopaque) void;
+extern fn wioSwapBuffers(?*anyopaque) void;
+extern fn wioSwapInterval(?*anyopaque, i32) void;
 extern fn wioMessageBox(u8, [*]const u8, usize) void;
 extern fn wioSetClipboardText([*]const u8, usize) void;
 extern fn wioGetClipboardText(*const anyopaque, *usize) ?[*]u8;
+extern fn wioGetProcAddress([*]const u8, usize) ?*anyopaque;
 
 const EventQueue = std.fifo.LinearFifo(wio.Event, .Dynamic);
 
@@ -34,6 +39,7 @@ pub fn run(func: fn () anyerror!bool, options: wio.RunOptions) !void {
 
 events: EventQueue,
 window: *anyopaque,
+context: ?*anyopaque = null,
 
 pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     const self = try wio.allocator.create(@This());
@@ -49,7 +55,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
 }
 
 pub fn destroy(self: *@This()) void {
-    wioDestroyWindow(self.window);
+    wioDestroyWindow(self.window, self.context);
     self.events.deinit();
     wio.allocator.destroy(self);
 }
@@ -80,21 +86,20 @@ pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
 }
 
 pub fn createContext(self: *@This(), options: wio.CreateContextOptions) !void {
-    _ = self;
     _ = options;
+    self.context = wioCreateContext(self.window);
 }
 
 pub fn makeContextCurrent(self: *@This()) void {
-    _ = self;
+    wioMakeContextCurrent(self.context);
 }
 
 pub fn swapBuffers(self: *@This()) void {
-    _ = self;
+    wioSwapBuffers(self.context);
 }
 
 pub fn swapInterval(self: *@This(), interval: i32) void {
-    _ = self;
-    _ = interval;
+    wioSwapInterval(self.context, interval);
 }
 
 pub fn getJoysticks(allocator: std.mem.Allocator) ![]wio.JoystickInfo {
@@ -142,8 +147,7 @@ export fn wioDupeClipboardText(allocator: *const std.mem.Allocator, bytes: [*:0]
 }
 
 pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
-    _ = name;
-    return null;
+    return wioGetProcAddress("_" ++ name, 0);
 }
 
 fn pushEvent(self: *@This(), event: wio.Event) void {

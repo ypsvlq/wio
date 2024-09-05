@@ -1,4 +1,5 @@
 #import <Cocoa/Cocoa.h>
+#include <mach-o/dyld.h>
 
 extern void wioClose(void *);
 extern void wioCreate(void *);
@@ -34,6 +35,7 @@ static NSString *string(const char *ptr, size_t len) {
 @interface WindowDelegate : NSObject <NSWindowDelegate>
 {
     void *ptr;
+    NSOpenGLContext *context;
 }
 @end
 
@@ -43,6 +45,10 @@ static NSString *string(const char *ptr, size_t len) {
     self = [super init];
     ptr = value;
     return self;
+}
+
+- (void)setContext:value {
+    context = value;
 }
 
 - (BOOL)windowShouldClose:sender {
@@ -64,6 +70,7 @@ static NSString *string(const char *ptr, size_t len) {
     NSRect rect = [view frame];
     NSRect framebuffer = [view convertRectToBacking:rect];
     wioSize(ptr, [window isZoomed], rect.size.width, rect.size.height, framebuffer.size.width, framebuffer.size.height);
+    [context update];
 }
 
 @end
@@ -239,7 +246,8 @@ void *wioCreateWindow(void *ptr, uint16_t width, uint16_t height) {
     return (__bridge_retained void *)window;
 }
 
-void wioDestroyWindow(void *ptr) {
+void wioDestroyWindow(void *ptr, void *context) {
+    CFBridgingRelease(context);
     NSWindow *window = CFBridgingRelease(ptr);
     [window close];
 }
@@ -282,6 +290,28 @@ void wioSetCursor(NSWindow *window, uint8_t shape) {
     [[window contentView] setCursor:cursor];
 }
 
+void *wioCreateContext(NSWindow *window) {
+    NSOpenGLPixelFormatAttribute attributes[] = {NSOpenGLPFADoubleBuffer, 0};
+    NSOpenGLPixelFormat *format = [[NSOpenGLPixelFormat alloc] initWithAttributes:attributes];
+    NSOpenGLContext *context = [[NSOpenGLContext alloc] initWithFormat:format shareContext:nil];
+    [context setView:[window contentView]];
+    WindowDelegate *delegate = [window delegate];
+    [delegate setContext:context];
+    return CFBridgingRetain(context);
+}
+
+void wioMakeContextCurrent(NSOpenGLContext *context) {
+    [context makeCurrentContext];
+}
+
+void wioSwapBuffers(NSOpenGLContext *context) {
+    [context flushBuffer];
+}
+
+void wioSwapInterval(NSOpenGLContext *context, int32_t interval) {
+    [context setValues:&interval forParameter:NSOpenGLCPSwapInterval];
+}
+
 void wioMessageBox(uint8_t style, const char *ptr, size_t len) {
     NSAlertStyle styles[] = {NSAlertStyleInformational, NSAlertStyleWarning, NSAlertStyleCritical};
     NSAlert *alert = [[NSAlert alloc] init];
@@ -300,4 +330,12 @@ char *wioGetClipboardText(const void *ptr, size_t *len) {
     NSString *string = [[NSPasteboard generalPasteboard] stringForType:NSPasteboardTypeString];
     if (!string) return NULL;
     return wioDupeClipboardText(ptr, [string UTF8String], len);
+}
+
+void *wioGetProcAddress(const void *name) {
+    if (NSIsSymbolNameDefined(name)) {
+        NSSymbol symbol = NSLookupAndBindSymbol(name);
+        return symbol ? NSAddressOfSymbol(symbol) : NULL;
+    }
+    return NULL;
 }
