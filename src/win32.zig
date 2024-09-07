@@ -7,12 +7,10 @@ const EventQueue = std.fifo.LinearFifo(wio.Event, .Dynamic);
 const class_name = w.L("wio");
 
 var dinput: *w.IDirectInput8W = undefined;
-var dinput_loaded = false;
 
 var wgl: struct {
     swapIntervalEXT: ?*const fn (i32) callconv(w.WINAPI) w.BOOL = null,
 } = .{};
-var wgl_loaded = false;
 
 pub fn init(options: wio.InitOptions) !void {
     const instance = w.GetModuleHandleW(null);
@@ -26,7 +24,6 @@ pub fn init(options: wio.InitOptions) !void {
 
     if (options.joystick) {
         try SUCCEED(w.DirectInput8Create(instance, w.DIRECTINPUT_VERSION, &w.IID_IDirectInput8W, @ptrCast(&dinput), null), "DirectInput8Create");
-        dinput_loaded = true;
     }
 
     if (options.opengl) {
@@ -72,13 +69,11 @@ pub fn init(options: wio.InitOptions) !void {
                 }
             }
         }
-
-        wgl_loaded = true;
     }
 }
 
 pub fn deinit() void {
-    if (dinput_loaded) {
+    if (wio.init_options.joystick) {
         _ = dinput.Release();
     }
 }
@@ -159,7 +154,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
 }
 
 pub fn destroy(self: *@This()) void {
-    if (wgl_loaded) {
+    if (wio.init_options.opengl) {
         _ = w.wglDeleteContext(self.rc);
         _ = w.ReleaseDC(self.window, self.dc);
     }

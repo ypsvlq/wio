@@ -8,6 +8,7 @@ pub const backend = switch (builtin.os.tag) {
 };
 
 pub var allocator: std.mem.Allocator = undefined;
+pub var init_options: InitOptions = undefined;
 
 pub const logFn = if (@hasDecl(backend, "logFn")) backend.logFn else std.log.defaultLog;
 
@@ -19,6 +20,7 @@ pub const InitOptions = struct {
 /// Unless otherwise noted, all calls to wio functions must be made on the same thread.
 pub fn init(ally: std.mem.Allocator, options: InitOptions) !void {
     allocator = ally;
+    init_options = options;
     try backend.init(options);
 }
 
@@ -103,6 +105,7 @@ pub const Window = struct {
     }
 
     pub fn createContext(self: *Window, options: CreateContextOptions) !void {
+        std.debug.assert(init_options.opengl);
         return self.backend.createContext(options);
     }
 
@@ -122,6 +125,7 @@ pub const Window = struct {
 };
 
 pub fn getJoysticks(ally: std.mem.Allocator) !JoystickList {
+    std.debug.assert(init_options.joystick);
     return .{ .items = try backend.getJoysticks(ally), .allocator = ally };
 }
 
@@ -144,6 +148,7 @@ pub const JoystickInfo = struct {
 };
 
 pub fn openJoystick(id: []const u8) !?Joystick {
+    std.debug.assert(init_options.joystick);
     return .{ .backend = try backend.openJoystick(id) orelse return null };
 }
 
@@ -187,6 +192,7 @@ pub fn getClipboardText(ally: std.mem.Allocator) ?[]u8 {
 }
 
 pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const fn () void {
+    std.debug.assert(init_options.opengl);
     return @alignCast(@ptrCast(backend.glGetProcAddress(name)));
 }
 
