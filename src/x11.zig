@@ -498,7 +498,7 @@ fn handleKeyPress(event: *h.XEvent, repeat: bool) void {
         const view = std.unicode.Utf8View.init(slice) catch return;
         var iter = view.iterator();
         while (iter.nextCodepoint()) |codepoint| {
-            if (codepoint >= ' ') {
+            if (codepoint >= ' ' and codepoint != 0x7F) {
                 window.pushEvent(.{ .char = codepoint });
             }
         }
