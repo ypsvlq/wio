@@ -29,6 +29,16 @@ static NSString *string(const char *ptr, size_t len) {
     [NSApp stop:nil];
 }
 
+- (NSApplicationTerminateReply)applicationShouldTerminate:sender {
+    for (NSWindow *window in [NSApp windows]) {
+        id delegate = [window delegate];
+        if ([delegate respondsToSelector:@selector(windowShouldClose:)]) {
+            [delegate windowShouldClose:nil];
+        }
+    }
+    return NSTerminateCancel;
+}
+
 @end
 
 @interface WindowDelegate : NSObject <NSWindowDelegate>
