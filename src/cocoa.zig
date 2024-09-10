@@ -1,5 +1,6 @@
 const std = @import("std");
 const wio = @import("wio.zig");
+const c = @cImport(@cInclude("mach-o/dyld.h"));
 const log = std.log.scoped(.wio);
 
 extern fn wioInit() void;
@@ -18,7 +19,6 @@ extern fn wioSwapInterval(?*anyopaque, i32) void;
 extern fn wioMessageBox(u8, [*]const u8, usize) void;
 extern fn wioSetClipboardText([*]const u8, usize) void;
 extern fn wioGetClipboardText(*const anyopaque, *usize) ?[*]u8;
-extern fn wioGetProcAddress([*]const u8, usize) ?*anyopaque;
 
 const EventQueue = std.fifo.LinearFifo(wio.Event, .Dynamic);
 
@@ -151,7 +151,7 @@ export fn wioDupeClipboardText(allocator: *const std.mem.Allocator, bytes: [*:0]
 }
 
 pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
-    return wioGetProcAddress("_" ++ name, 0);
+    return if (c.NSLookupAndBindSymbol("_" ++ name)) |symbol| c.NSAddressOfSymbol(symbol) else null;
 }
 
 fn pushEvent(self: *@This(), event: wio.Event) void {

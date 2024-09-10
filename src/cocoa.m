@@ -1,5 +1,4 @@
 #import <Cocoa/Cocoa.h>
-#include <mach-o/dyld.h>
 
 extern void wioClose(void *);
 extern void wioCreate(void *);
@@ -330,12 +329,4 @@ char *wioGetClipboardText(const void *ptr, size_t *len) {
     NSString *string = [[NSPasteboard generalPasteboard] stringForType:NSPasteboardTypeString];
     if (!string) return NULL;
     return wioDupeClipboardText(ptr, [string UTF8String], len);
-}
-
-void *wioGetProcAddress(const void *name) {
-    if (NSIsSymbolNameDefined(name)) {
-        NSSymbol symbol = NSLookupAndBindSymbol(name);
-        return symbol ? NSAddressOfSymbol(symbol) : NULL;
-    }
-    return NULL;
 }
