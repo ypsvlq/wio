@@ -187,7 +187,7 @@ export fn wioChars(self: *@This(), buf: [*:0]const u8) void {
     const view = std.unicode.Utf8View.init(std.mem.sliceTo(buf, 0)) catch return;
     var iter = view.iterator();
     while (iter.nextCodepoint()) |codepoint| {
-        if (codepoint >= ' ') {
+        if (codepoint >= ' ' and (codepoint < 0xF700 or codepoint > 0xF7FF)) {
             self.pushEvent(.{ .char = codepoint });
         }
     }
