@@ -330,29 +330,9 @@ pub fn swapInterval(self: *@This(), interval: i32) void {
     }
 }
 
-pub fn getJoysticks(allocator: std.mem.Allocator) ![]wio.JoystickInfo {
-    _ = allocator;
-    return &.{};
-}
-
-pub fn resolveJoystickId(allocator: std.mem.Allocator, id: []const u8) ![]u8 {
-    return allocator.dupe(u8, id);
-}
-
-pub fn openJoystick(id: []const u8) !?Joystick {
-    _ = id;
-    return null;
-}
-
-pub const Joystick = struct {
-    pub fn close(self: *Joystick) void {
-        _ = self;
-    }
-
-    pub fn poll(self: *Joystick) !?wio.JoystickState {
-        _ = self;
-        return null;
-    }
+pub usingnamespace switch (builtin.os.tag) {
+    .linux => @import("joystick/linux.zig"),
+    else => @import("joystick/null.zig"),
 };
 
 pub fn messageBox(backend: ?*@This(), style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
