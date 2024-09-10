@@ -147,6 +147,11 @@ pub const JoystickInfo = struct {
     name: []const u8,
 };
 
+pub fn resolveJoystickId(ally: std.mem.Allocator, id: []const u8) ![]u8 {
+    return backend.resolveJoystickId(ally, id);
+}
+
+/// `id` must have been obtained from an earlier call to `getJoysticks` or `resolveJoystickId`.
 pub fn openJoystick(id: []const u8) !?Joystick {
     std.debug.assert(init_options.joystick);
     return .{ .backend = try backend.openJoystick(id) orelse return null };

@@ -298,6 +298,10 @@ fn enumDevicesCallback(ddi: [*c]w.DIDEVICEINSTANCEW, ref: ?*anyopaque) callconv(
     return w.DIENUM_CONTINUE;
 }
 
+pub fn resolveJoystickId(allocator: std.mem.Allocator, id: []const u8) ![]u8 {
+    return allocator.dupe(u8, id);
+}
+
 pub fn openJoystick(id: []const u8) !?Joystick {
     if (id.len != 36 or id[8] != '-' or id[13] != '-' or id[18] != '-' or id[23] != '-') return null;
     const guid = std.os.windows.GUID.parseNoBraces(id) catch return null;

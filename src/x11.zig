@@ -335,6 +335,10 @@ pub fn getJoysticks(allocator: std.mem.Allocator) ![]wio.JoystickInfo {
     return &.{};
 }
 
+pub fn resolveJoystickId(allocator: std.mem.Allocator, id: []const u8) ![]u8 {
+    return allocator.dupe(u8, id);
+}
+
 pub fn openJoystick(id: []const u8) !?Joystick {
     _ = id;
     return null;

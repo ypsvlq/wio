@@ -122,6 +122,10 @@ pub fn getJoysticks(allocator: std.mem.Allocator) ![]wio.JoystickInfo {
     return list.toOwnedSlice();
 }
 
+pub fn resolveJoystickId(allocator: std.mem.Allocator, id: []const u8) ![]u8 {
+    return allocator.dupe(u8, id);
+}
+
 pub fn openJoystick(id: []const u8) !?Joystick {
     const index = std.fmt.parseInt(u32, id, 10) catch return null;
     var lengths: [2]u32 = undefined;
