@@ -33,7 +33,7 @@ static NSString *string(const char *ptr, size_t len) {
     for (NSWindow *window in [NSApp windows]) {
         id delegate = [window delegate];
         if ([delegate respondsToSelector:@selector(windowShouldClose:)]) {
-            [delegate windowShouldClose:nil];
+            [delegate windowShouldClose:window];
         }
     }
     return NSTerminateCancel;
