@@ -89,6 +89,8 @@ static NSString *string(const char *ptr, size_t len) {
     void *ptr;
     NSTrackingArea *area;
     NSCursor *cursor;
+    BOOL cursorhidden;
+    BOOL cursorinside;
 }
 @end
 
@@ -105,11 +107,18 @@ static NSString *string(const char *ptr, size_t len) {
     [self updateTrackingAreas];
 }
 
+- (void)setCursorHidden:(BOOL)value {
+    if (value != cursorhidden) {
+        cursorhidden = value;
+        if (cursorinside) value ? [NSCursor hide] : [NSCursor unhide];
+    }
+}
+
 - (void)updateTrackingAreas {
     [self removeTrackingArea:area];
     area = [[NSTrackingArea alloc]
         initWithRect:[self frame]
-        options:NSTrackingActiveInKeyWindow | NSTrackingCursorUpdate
+        options:NSTrackingActiveInKeyWindow | NSTrackingCursorUpdate | NSTrackingMouseEnteredAndExited
         owner:self
         userInfo:nil];
     [self addTrackingArea:area];
@@ -118,6 +127,16 @@ static NSString *string(const char *ptr, size_t len) {
 
 - (void)cursorUpdate:event {
     [cursor set];
+}
+
+- (void)mouseEntered:event {
+    if (cursorhidden) [NSCursor hide];
+    cursorinside = true;
+}
+
+- (void)mouseExited:event {
+    if (cursorhidden) [NSCursor unhide];
+    cursorinside = false;
 }
 
 - (void)keyDown:event {
@@ -297,6 +316,10 @@ void wioSetCursor(NSWindow *window, uint8_t shape) {
         default: cursor = [NSCursor arrowCursor]; break;
     }
     [[window contentView] setCursor:cursor];
+}
+
+void wioSetCursorMode(NSWindow *window, uint8_t mode) {
+    [[window contentView] setCursorHidden:mode];
 }
 
 void *wioCreateContext(NSWindow *window) {

@@ -12,6 +12,7 @@ extern fn wioSetTitle(*anyopaque, [*]const u8, usize) void;
 extern fn wioSetSize(*anyopaque, u16, u16) void;
 extern fn wioSetDisplayMode(*anyopaque, u8) void;
 extern fn wioSetCursor(*anyopaque, u8) void;
+extern fn wioSetCursorMode(*anyopaque, u8) void;
 extern fn wioCreateContext(*anyopaque) ?*anyopaque;
 extern fn wioMakeContextCurrent(?*anyopaque) void;
 extern fn wioSwapBuffers(?*anyopaque) void;
@@ -81,8 +82,7 @@ pub fn setCursor(self: *@This(), shape: wio.Cursor) void {
 }
 
 pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
-    _ = self;
-    _ = mode;
+    wioSetCursorMode(self.window, @intFromEnum(mode));
 }
 
 pub fn createContext(self: *@This(), options: wio.CreateContextOptions) !void {
