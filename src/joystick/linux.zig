@@ -112,6 +112,10 @@ pub fn resolveJoystickId(allocator: std.mem.Allocator, id: []const u8) ![]u8 {
     return allocator.dupe(u8, id);
 }
 
+fn EVIOCGABS(abs: u32) u32 {
+    return 0x80184540 | abs;
+}
+
 pub fn openJoystick(s: []const u8) !?Joystick {
     const id = parseId(s) orelse return null;
 
@@ -151,7 +155,7 @@ pub fn openJoystick(s: []const u8) !?Joystick {
     for (abs_map, 0..) |index, code| {
         if (index != 0) {
             if (code < c.ABS_HAT0X or code > c.ABS_HAT3Y) {
-                if (std.os.linux.ioctl(fd, @intCast(c.EVIOCGABS(code)), @intFromPtr(&axis_info[index - 1])) != 0) return null;
+                if (std.os.linux.ioctl(fd, EVIOCGABS(@intCast(code)), @intFromPtr(&axis_info[index - 1])) != 0) return null;
             }
         }
     }
