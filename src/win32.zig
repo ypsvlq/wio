@@ -100,6 +100,10 @@ window: w.HWND,
 cursor: w.HCURSOR,
 cursor_mode: wio.CursorMode,
 surrogate: u16 = 0,
+left_control: bool = false,
+right_control: bool = false,
+left_alt: bool = false,
+right_alt: bool = false,
 dc: w.HDC = null,
 rc: w.HGLRC = null,
 
@@ -620,13 +624,26 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
             }
 
             if (scancodeToButton(scancode)) |button| {
+                const modifier = switch (button) {
+                    .left_control => &self.left_control,
+                    .right_control => &self.right_control,
+                    .left_alt => &self.left_alt,
+                    .right_alt => &self.right_alt,
+                    else => null,
+                };
                 if (flags & w.KF_UP == 0) {
-                    if (flags & w.KF_REPEAT == 0) {
+                    var repeat = (flags & w.KF_REPEAT != 0);
+                    if (modifier) |ptr| {
+                        repeat = ptr.*;
+                        ptr.* = true;
+                    }
+                    if (!repeat) {
                         self.pushEvent(.{ .button_press = button });
                     } else {
                         self.pushEvent(.{ .button_repeat = button });
                     }
                 } else {
+                    if (modifier) |ptr| ptr.* = false;
                     self.pushEvent(.{ .button_release = button });
                 }
             } else {
