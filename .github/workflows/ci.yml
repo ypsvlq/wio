@@ -1,0 +1,14 @@
+name: CI
+on:
+  push:
+  pull_request:
+jobs:
+  x86-windows:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: mlugg/setup-zig@v1
+      with:
+        version: 2024.5.0-mach
+        mirror: 'https://pkg.machengine.org/zig'
+    - run: zig build -Dtarget=x86-windows
