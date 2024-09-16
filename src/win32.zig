@@ -104,6 +104,8 @@ left_control: bool = false,
 right_control: bool = false,
 left_alt: bool = false,
 right_alt: bool = false,
+left_shift: bool = false,
+right_shift: bool = false,
 dc: w.HDC = null,
 rc: w.HGLRC = null,
 
@@ -560,6 +562,8 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
             self.right_control = false;
             self.left_alt = false;
             self.right_alt = false;
+            self.left_shift = false;
+            self.right_shift = false;
             return 0;
         },
         w.WM_PAINT => {
@@ -633,6 +637,8 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
                     .right_control => &self.right_control,
                     .left_alt => &self.left_alt,
                     .right_alt => &self.right_alt,
+                    .left_shift => &self.left_shift,
+                    .right_shift => &self.right_shift,
                     else => null,
                 };
                 if (flags & w.KF_UP == 0) {
@@ -647,6 +653,15 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
                         self.pushEvent(.{ .button_repeat = button });
                     }
                 } else {
+                    if (self.left_shift and self.right_shift) {
+                        if (button == .left_shift) {
+                            self.pushEvent(.{ .button_release = .right_shift });
+                            self.right_shift = false;
+                        } else if (button == .right_shift) {
+                            self.pushEvent(.{ .button_release = .left_shift });
+                            self.left_shift = false;
+                        }
+                    }
                     if (modifier) |ptr| ptr.* = false;
                     self.pushEvent(.{ .button_release = button });
                 }
