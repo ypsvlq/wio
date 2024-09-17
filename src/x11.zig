@@ -103,7 +103,10 @@ pub fn init(options: wio.InitOptions) !void {
         }
     }
 
-    display = c.XkbOpenDisplay(null, null, null, null, null, null) orelse return error.Unexpected;
+    display = c.XkbOpenDisplay(null, null, null, null, null, null) orelse {
+        log.err("{s} failed", .{"XkbOpenDisplay"});
+        return error.Unexpected;
+    };
     errdefer _ = c.XCloseDisplay(display);
 
     inline for (@typeInfo(@TypeOf(atoms)).Struct.fields) |field| {
@@ -310,9 +313,11 @@ pub fn createContext(self: *@This(), options: wio.CreateContextOptions) !void {
         h.GLX_BLUE_SIZE,    1,
         h.GLX_ALPHA_SIZE,   1,
         h.None,
-    }, &count);
+    }, &count) orelse {
+        log.err("{s} failed", .{"glXChooseFBConfig"});
+        return error.Unexpected;
+    };
     defer _ = c.XFree(@ptrCast(configs));
-    if (count == 0) return error.Unexpected;
     self.context = c.glXCreateNewContext(display, configs[0], h.GLX_RGBA_TYPE, null, h.True) orelse return error.Unexpected;
 }
 
