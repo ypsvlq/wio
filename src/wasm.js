@@ -14,7 +14,6 @@ const wio = {
     run(module, canvas) {
         wio.module = module;
         wio.canvas = canvas;
-        wio.gl = canvas.getContext("webgl");
 
         module.exports._start();
         requestAnimationFrame(wio.loop);
@@ -121,6 +120,10 @@ const wio = {
                 wio.canvas.style.cursor = "none";
                 break;
         }
+    },
+
+    createContext() {
+        wio.gl = wio.canvas.getContext("webgl");
     },
 
     getJoysticks() {

@@ -9,6 +9,7 @@ const js = struct {
     pub extern "wio" fn shiftFloat() f32;
     pub extern "wio" fn setCursor(u8) void;
     pub extern "wio" fn setCursorMode(u8) void;
+    pub extern "wio" fn createContext() void;
     pub extern "wio" fn getJoysticks() u32;
     pub extern "wio" fn getJoystickIdLen(u32) u32;
     pub extern "wio" fn getJoystickId(u32, [*]u8) void;
@@ -92,7 +93,9 @@ pub fn setCursorMode(_: *@This(), mode: wio.CursorMode) void {
     js.setCursorMode(@intFromEnum(mode));
 }
 
-pub fn createContext(_: *@This(), _: wio.CreateContextOptions) !void {}
+pub fn createContext(_: *@This(), _: wio.CreateContextOptions) !void {
+    js.createContext();
+}
 
 pub fn makeContextCurrent(_: *@This()) void {}
 
