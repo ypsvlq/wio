@@ -251,7 +251,16 @@ pub const CursorMode = enum {
     hidden,
 };
 
-pub const CreateContextOptions = struct {};
+pub const CreateContextOptions = struct {
+    doublebuffer: bool = true,
+    red_bits: u8 = 8,
+    green_bits: u8 = 8,
+    blue_bits: u8 = 8,
+    alpha_bits: u8 = 8,
+    depth_bits: u8 = 24,
+    stencil_bits: u8 = 8,
+    samples: u8 = 0,
+};
 
 pub const Button = enum {
     mouse_left,

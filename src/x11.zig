@@ -304,14 +304,17 @@ pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
 }
 
 pub fn createContext(self: *@This(), options: wio.CreateContextOptions) !void {
-    _ = options;
     var count: c_int = undefined;
     const configs = c.glXChooseFBConfig(display, h.DefaultScreen(display), &[_]c_int{
-        h.GLX_DOUBLEBUFFER, h.True,
-        h.GLX_RED_SIZE,     1,
-        h.GLX_GREEN_SIZE,   1,
-        h.GLX_BLUE_SIZE,    1,
-        h.GLX_ALPHA_SIZE,   1,
+        h.GLX_DOUBLEBUFFER,   if (options.doublebuffer) h.True else h.False,
+        h.GLX_RED_SIZE,       options.red_bits,
+        h.GLX_GREEN_SIZE,     options.green_bits,
+        h.GLX_BLUE_SIZE,      options.blue_bits,
+        h.GLX_ALPHA_SIZE,     options.alpha_bits,
+        h.GLX_DEPTH_SIZE,     options.depth_bits,
+        h.GLX_STENCIL_SIZE,   options.stencil_bits,
+        h.GLX_SAMPLE_BUFFERS, if (options.samples != 0) 1 else 0,
+        h.GLX_SAMPLES,        options.samples,
         h.None,
     }, &count) orelse {
         log.err("{s} failed", .{"glXChooseFBConfig"});
