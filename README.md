@@ -22,10 +22,14 @@ when targeting a given platform:
 
 - `Window.backend.window` is the AppKit `NSWindow*`
 
-### X11
+### Unix
 
-- `wio.backend.display` is the Xlib display
-- `Window.backend.window` is the Xlib window
+`wio.backend.active` is an enum describing the backend in use:
+
+#### `.x11`
+
+- `wio.backend.x11.display` is the Xlib display
+- `Window.backend.x11.window` is the Xlib window
 
 
 [1]: https://machengine.org/docs/nominated-zig/

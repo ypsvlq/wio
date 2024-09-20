@@ -1,6 +1,6 @@
 const std = @import("std");
 const builtin = @import("builtin");
-const wio = @import("wio.zig");
+const wio = @import("../wio.zig");
 const h = @cImport({
     @cInclude("X11/Xlib.h");
     @cInclude("X11/Xatom.h");
@@ -103,10 +103,7 @@ pub fn init(options: wio.InitOptions) !void {
         }
     }
 
-    display = c.XkbOpenDisplay(null, null, null, null, null, null) orelse {
-        log.err("{s} failed", .{"XkbOpenDisplay"});
-        return error.Unexpected;
-    };
+    display = c.XkbOpenDisplay(null, null, null, null, null, null) orelse return error.Unavailable;
     errdefer _ = c.XCloseDisplay(display);
 
     inline for (@typeInfo(@TypeOf(atoms)).Struct.fields) |field| {
@@ -337,11 +334,6 @@ pub fn swapInterval(self: *@This(), interval: i32) void {
         swapIntervalEXT(display, self.window, interval);
     }
 }
-
-pub usingnamespace switch (builtin.os.tag) {
-    .linux => @import("joystick/linux.zig"),
-    else => @import("joystick/null.zig"),
-};
 
 pub fn messageBox(backend: ?*@This(), style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
     _ = backend;

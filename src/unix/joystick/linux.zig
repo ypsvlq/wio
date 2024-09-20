@@ -1,5 +1,5 @@
 const std = @import("std");
-const wio = @import("../wio.zig");
+const wio = @import("../../wio.zig");
 const c = @cImport(@cInclude("linux/input.h"));
 const log = std.log.scoped(.wio);
 
