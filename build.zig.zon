@@ -12,9 +12,9 @@
             .hash = "12205d131983601cdb3500f38e9d8adaed5574fb0211b8b39291d2e9b90c6555ce59",
             .lazy = true,
         },
-        .x11_headers = .{
-            .url = "https://github.com/ypsvlq/x11-headers/archive/ffb2fa18f09cec73379e05afc8e4d7d86cfc1894.tar.gz",
-            .hash = "12204b06c65ab3abf5349ef027f27efd83c4eea8a94e76a08d6dcd51ecc8e5decea7",
+        .unix_headers = .{
+            .url = "https://github.com/ypsvlq/wio-unix-headers/archive/257a2a6b01ea2d880b80967da0c205bf3eb22acf.tar.gz",
+            .hash = "122096d5587d419dc502aa63dec1f98d40d3f5717f3fcf2ed3b8a682025a3b86666e",
             .lazy = true,
         },
     },
