@@ -24,6 +24,7 @@ pub fn init(ally: std.mem.Allocator, options: InitOptions) !void {
     try backend.init(options);
 }
 
+/// All windows must be closed before deinit is called.
 pub fn deinit() void {
     backend.deinit();
 }
