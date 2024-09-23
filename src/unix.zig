@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const wio = @import("wio.zig");
 pub const x11 = @import("unix/x11.zig");
 const log = std.log.scoped(.wio);
@@ -8,7 +9,11 @@ pub var active: enum {
 } = undefined;
 
 pub fn init(options: wio.InitOptions) !void {
-    if (x11.init(options)) {
+    if (builtin.os.tag == .linux and builtin.output_mode == .Exe and builtin.link_mode == .static) @compileError("dynamic link required");
+
+    const sonames = if (builtin.os.tag == .openbsd or builtin.os.tag == .netbsd) false else true;
+
+    if (x11.init(options, sonames)) {
         active = .x11;
     } else |err| switch (err) {
         error.Unavailable => {
@@ -19,7 +24,7 @@ pub fn init(options: wio.InitOptions) !void {
     }
 }
 
-pub usingnamespace switch (@import("builtin").os.tag) {
+pub usingnamespace switch (builtin.os.tag) {
     .linux => @import("unix/joystick/linux.zig"),
     else => struct {
         pub fn getJoysticks(allocator: std.mem.Allocator) ![]wio.JoystickInfo {

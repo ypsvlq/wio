@@ -1,5 +1,4 @@
 const std = @import("std");
-const builtin = @import("builtin");
 const wio = @import("../wio.zig");
 const h = @cImport({
     @cInclude("X11/Xlib.h");
@@ -70,10 +69,7 @@ var im: h.XIM = undefined;
 var keycodes: [248]wio.Button = undefined;
 var scale: f32 = 1;
 
-pub fn init(options: wio.InitOptions) !void {
-    if (builtin.os.tag == .linux and builtin.output_mode == .Exe and builtin.link_mode == .static) @compileError("dynamic link required");
-
-    const sonames = if (builtin.os.tag == .openbsd or builtin.os.tag == .netbsd) false else true;
+pub fn init(options: wio.InitOptions, sonames: bool) !void {
     libX11 = try std.DynLib.open(if (sonames) "libX11.so.6" else "libX11.so");
     errdefer libX11.close();
     libXcursor = try std.DynLib.open(if (sonames) "libXcursor.so.1" else "libXcursor.so");
