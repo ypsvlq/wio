@@ -70,14 +70,14 @@ var keycodes: [248]wio.Button = undefined;
 var scale: f32 = 1;
 
 pub fn init(options: wio.InitOptions, sonames: bool) !void {
-    libX11 = try std.DynLib.open(if (sonames) "libX11.so.6" else "libX11.so");
+    libX11 = std.DynLib.open(if (sonames) "libX11.so.6" else "libX11.so") catch return error.Unavailable;
     errdefer libX11.close();
-    libXcursor = try std.DynLib.open(if (sonames) "libXcursor.so.1" else "libXcursor.so");
+    libXcursor = std.DynLib.open(if (sonames) "libXcursor.so.1" else "libXcursor.so") catch return error.Unavailable;
     errdefer libXcursor.close();
-    libXfixes = try std.DynLib.open(if (sonames) "libXfixes.so.3" else "libXfixes.so");
+    libXfixes = std.DynLib.open(if (sonames) "libXfixes.so.3" else "libXfixes.so") catch return error.Unavailable;
     errdefer libXfixes.close();
     if (options.opengl) {
-        libGL = try std.DynLib.open(if (sonames) "libGL.so.1" else "libGL.so");
+        libGL = std.DynLib.open(if (sonames) "libGL.so.1" else "libGL.so") catch return error.Unavailable;
         errdefer libGL.close();
     }
 
@@ -94,7 +94,7 @@ pub fn init(options: wio.InitOptions, sonames: bool) !void {
         if (options.opengl or !std.mem.startsWith(u8, field.name, "glX")) {
             @field(c, field.name) = lib.lookup(field.type, field.name) orelse {
                 log.err("could not load {s}", .{field.name});
-                return error.Unexpected;
+                return error.Unavailable;
             };
         }
     }
