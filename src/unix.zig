@@ -2,6 +2,10 @@ const std = @import("std");
 const builtin = @import("builtin");
 const wio = @import("wio.zig");
 pub const x11 = @import("unix/x11.zig");
+const joystick = switch (builtin.os.tag) {
+    .linux => @import("unix/joystick/linux.zig"),
+    else => @import("unix/joystick/null.zig"),
+};
 const log = std.log.scoped(.wio);
 
 pub var active: enum {
@@ -23,31 +27,6 @@ pub fn init(options: wio.InitOptions) !void {
         else => return err,
     }
 }
-
-pub usingnamespace switch (builtin.os.tag) {
-    .linux => @import("unix/joystick/linux.zig"),
-    else => struct {
-        pub fn getJoysticks(allocator: std.mem.Allocator) ![]wio.JoystickInfo {
-            return allocator.alloc(wio.JoystickInfo, 0);
-        }
-
-        pub fn resolveJoystickId(allocator: std.mem.Allocator, id: []const u8) ![]u8 {
-            return allocator.dupe(u8, id);
-        }
-
-        pub fn openJoystick(_: []const u8) !?Joystick {
-            return null;
-        }
-
-        pub const Joystick = struct {
-            pub fn close(_: *Joystick) void {}
-
-            pub fn poll(_: *Joystick) !?wio.JoystickState {
-                return null;
-            }
-        };
-    },
-};
 
 pub fn deinit() void {
     switch (active) {
@@ -136,6 +115,20 @@ pub const Window = union {
         }
     }
 };
+
+pub fn getJoysticks(allocator: std.mem.Allocator) ![]wio.JoystickInfo {
+    return joystick.getJoysticks(allocator);
+}
+
+pub fn resolveJoystickId(allocator: std.mem.Allocator, id: []const u8) ![]u8 {
+    return joystick.resolveJoystickId(allocator, id);
+}
+
+pub fn openJoystick(id: []const u8) !?Joystick {
+    return joystick.openJoystick(id);
+}
+
+pub const Joystick = joystick.Joystick;
 
 pub fn messageBox(backend: ?Window, style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
     switch (active) {
