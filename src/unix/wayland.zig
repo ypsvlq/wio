@@ -17,7 +17,7 @@ var c: struct {
     wl_display_roundtrip: *const @TypeOf(h.wl_display_roundtrip),
     wl_display_dispatch: *const @TypeOf(h.wl_display_dispatch),
     wl_proxy_get_version: *const @TypeOf(h.wl_proxy_get_version),
-    wl_proxy_marshal_flags: *const @TypeOf(h.wl_proxy_marshal_flags),
+    wl_proxy_marshal_flags: *const fn () callconv(.C) ?*h.wl_proxy, // varargs hack
     wl_proxy_add_listener: *const @TypeOf(h.wl_proxy_add_listener),
     wl_proxy_destroy: *const @TypeOf(h.wl_proxy_destroy),
     wl_proxy_set_user_data: *const @TypeOf(h.wl_proxy_set_user_data),
@@ -289,8 +289,8 @@ export fn wl_proxy_get_version(proxy: ?*h.wl_proxy) u32 {
     return c.wl_proxy_get_version(proxy);
 }
 
-export fn wl_proxy_marshal_flags(proxy: ?*h.wl_proxy, opcode: u32, interface: [*c]const h.wl_interface, version: u32, flags: u32, ...) ?*h.wl_proxy {
-    return @call(.always_tail, c.wl_proxy_marshal_flags, .{ proxy, opcode, interface, version, flags });
+export fn wl_proxy_marshal_flags() ?*h.wl_proxy {
+    return @call(.always_tail, c.wl_proxy_marshal_flags, .{});
 }
 
 export fn wl_proxy_add_listener(proxy: ?*h.wl_proxy, implementation: [*c]?*const fn () callconv(.C) void, data: ?*anyopaque) c_int {
