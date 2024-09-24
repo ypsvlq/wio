@@ -3,7 +3,15 @@ on:
   push:
   pull_request:
 jobs:
-  x86-windows:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+        - x86-windows
+        - aarch64-macos
+        - arm-linux-gnueabihf
+        - wasm32-freestanding
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
@@ -14,40 +22,4 @@ jobs:
         version: 2024.5.0-mach
         mirror: 'https://pkg.machengine.org/zig'
     - name: Build
-      run: zig build -Dtarget=x86-windows
-  aarch64-macos:
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-    - name: Set up Zig
-      uses: mlugg/setup-zig@v1
-      with:
-        version: 2024.5.0-mach
-        mirror: 'https://pkg.machengine.org/zig'
-    - name: Build
-      run: zig build -Dtarget=aarch64-macos
-  arm-linux-gnueabihf:
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-    - name: Set up Zig
-      uses: mlugg/setup-zig@v1
-      with:
-        version: 2024.5.0-mach
-        mirror: 'https://pkg.machengine.org/zig'
-    - name: Build
-      run: zig build -Dtarget=arm-linux-gnueabihf
-  wasm32-freestanding:
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-    - name: Set up Zig
-      uses: mlugg/setup-zig@v1
-      with:
-        version: 2024.5.0-mach
-        mirror: 'https://pkg.machengine.org/zig'
-    - name: Build
-      run: zig build -Dtarget=wasm32-freestanding
+      run: zig build -Dtarget=${{ matrix.target }}
