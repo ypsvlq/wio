@@ -106,6 +106,9 @@ left_alt: bool = false,
 right_alt: bool = false,
 left_shift: bool = false,
 right_shift: bool = false,
+international2: bool = false,
+international3: bool = false,
+international4: bool = false,
 dc: w.HDC = null,
 rc: w.HGLRC = null,
 
@@ -564,6 +567,9 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
             self.right_alt = false;
             self.left_shift = false;
             self.right_shift = false;
+            self.international2 = false;
+            self.international3 = false;
+            self.international4 = false;
             return 0;
         },
         w.WM_PAINT => {
@@ -639,6 +645,9 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
                     .right_alt => &self.right_alt,
                     .left_shift => &self.left_shift,
                     .right_shift => &self.right_shift,
+                    .international2 => &self.international2,
+                    .international3 => &self.international3,
+                    .international4 => &self.international4,
                     else => null,
                 };
                 if (flags & w.KF_UP == 0) {
