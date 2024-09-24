@@ -29,6 +29,7 @@ pub fn build(b: *std.Build) void {
             if (b.lazyDependency("unix_headers", .{})) |unix_headers| {
                 module.addIncludePath(unix_headers.path("."));
             }
+            module.addCSourceFile(.{ .file = b.path("src/unix/wayland.c") });
         },
         else => {
             if (target.result.isWasm()) {

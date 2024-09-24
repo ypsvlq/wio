@@ -31,6 +31,11 @@ when targeting a given platform:
 - `wio.backend.x11.display` is the Xlib display
 - `Window.backend.x11.window` is the Xlib window
 
+#### `.wayland`
+
+- `wio.backend.wayland.display` is the Wayland `wl_display*`
+- `Window.backend.wayland.surface` is the Wayland `wl_surface*`
+
 
 [1]: https://machengine.org/docs/nominated-zig/
 [2]: https://github.com/ypsvlq/wio/blob/master/src/wio.zig
