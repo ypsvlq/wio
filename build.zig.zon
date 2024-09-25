@@ -13,8 +13,8 @@
             .lazy = true,
         },
         .unix_headers = .{
-            .url = "https://github.com/ypsvlq/wio-unix-headers/archive/1a5cbffd44c8fba83ce2b31e50a50147f25324a2.tar.gz",
-            .hash = "12209ab308408ad5a3d72bc486a12a462f341218887fbcffca1fe9d0b2468424d34d",
+            .url = "https://github.com/ypsvlq/wio-unix-headers/archive/1986411f2fff605825b2afe1bb757b04fc4c3c2f.tar.gz",
+            .hash = "1220ba75aa7672781c53f103a6bfaacba858437effd80215fb75d81d020248fed14a",
             .lazy = true,
         },
     },
