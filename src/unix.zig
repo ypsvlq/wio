@@ -17,14 +17,12 @@ pub var active: enum {
 pub fn init(options: wio.InitOptions) !void {
     if (builtin.os.tag == .linux and builtin.output_mode == .Exe and builtin.link_mode == .static) @compileError("dynamic link required");
 
-    const sonames = if (builtin.os.tag == .openbsd or builtin.os.tag == .netbsd) false else true;
-
-    if (wayland.init(options, sonames)) {
+    if (wayland.init(options)) {
         active = .wayland;
         return;
     } else |err| if (err != error.Unavailable) return err;
 
-    if (x11.init(options, sonames)) {
+    if (x11.init(options)) {
         active = .x11;
         return;
     } else |err| if (err != error.Unavailable) return err;

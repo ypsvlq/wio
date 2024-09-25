@@ -1,5 +1,6 @@
 const std = @import("std");
 const wio = @import("../wio.zig");
+const common = @import("common.zig");
 const log = std.log.scoped(.wio);
 const h = @cImport({
     @cInclude("wio-wayland.h");
@@ -12,7 +13,7 @@ const h = @cImport({
 
 const EventQueue = std.fifo.LinearFifo(wio.Event, .Dynamic);
 
-var c: struct {
+var c: extern struct {
     wl_display_connect: *const @TypeOf(h.wl_display_connect),
     wl_display_disconnect: *const @TypeOf(h.wl_display_disconnect),
     wl_display_roundtrip: *const @TypeOf(h.wl_display_roundtrip),
@@ -67,33 +68,17 @@ var xkb_state: ?*h.xkb_state = null;
 
 var egl_display: h.EGLDisplay = undefined;
 
-pub fn init(options: wio.InitOptions, sonames: bool) !void {
-    libwayland_client = std.DynLib.open(if (sonames) "libwayland-client.so.0" else "libwayland-client.so") catch return error.Unavailable;
+pub fn init(options: wio.InitOptions) !void {
+    common.loadLibs(&c, &.{
+        .{ .handle = &libxkbcommon, .name = "libxkbcommon.so.0", .prefix = "xkb" },
+        .{ .handle = &libwayland_egl, .name = "libwayland-egl.so.1", .prefix = "wl_egl", .predicate = options.opengl },
+        .{ .handle = &libEGL, .name = "libEGL.so.1", .prefix = "egl", .predicate = options.opengl },
+        .{ .handle = &libwayland_client, .name = "libwayland-client.so.0" },
+    }) catch return error.Unavailable;
     errdefer libwayland_client.close();
-    libxkbcommon = std.DynLib.open(if (sonames) "libxkbcommon.so.0" else "libxkbcommon.so") catch return error.Unavailable;
     errdefer libxkbcommon.close();
-    if (options.opengl) libwayland_egl = std.DynLib.open(if (sonames) "libwayland-egl.so.1" else "libwayland-egl.so") catch return error.Unavailable;
     errdefer if (options.opengl) libwayland_egl.close();
-    if (options.opengl) libEGL = std.DynLib.open(if (sonames) "libEGL.so.1" else "libEGL.so") catch return error.Unavailable;
     errdefer if (options.opengl) libEGL.close();
-
-    inline for (@typeInfo(@TypeOf(c)).Struct.fields) |field| {
-        const lib = comptime if (std.mem.startsWith(u8, field.name, "xkb"))
-            &libxkbcommon
-        else if (std.mem.startsWith(u8, field.name, "wl_egl"))
-            &libwayland_egl
-        else if (std.mem.startsWith(u8, field.name, "egl"))
-            &libEGL
-        else
-            &libwayland_client;
-
-        if (options.opengl or (!std.mem.startsWith(u8, field.name, "wl_egl") and !std.mem.startsWith(u8, field.name, "egl"))) {
-            @field(c, field.name) = lib.lookup(field.type, field.name) orelse {
-                log.err("could not load {s}", .{field.name});
-                return error.Unavailable;
-            };
-        }
-    }
 
     display = c.wl_display_connect(null) orelse return error.Unavailable;
     errdefer c.wl_display_disconnect(display);

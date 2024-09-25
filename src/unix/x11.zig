@@ -1,5 +1,6 @@
 const std = @import("std");
 const wio = @import("../wio.zig");
+const common = @import("common.zig");
 const h = @cImport({
     @cInclude("X11/Xlib.h");
     @cInclude("X11/Xatom.h");
@@ -13,7 +14,7 @@ const log = std.log.scoped(.wio);
 
 const EventQueue = std.fifo.LinearFifo(wio.Event, .Dynamic);
 
-var c: struct {
+var c: extern struct {
     XkbOpenDisplay: *const @TypeOf(h.XkbOpenDisplay),
     XCloseDisplay: *const @TypeOf(h.XCloseDisplay),
     XInternAtom: *const @TypeOf(h.XInternAtom),
@@ -69,35 +70,17 @@ var im: h.XIM = undefined;
 var keycodes: [248]wio.Button = undefined;
 var scale: f32 = 1;
 
-pub fn init(options: wio.InitOptions, sonames: bool) !void {
-    libX11 = std.DynLib.open(if (sonames) "libX11.so.6" else "libX11.so") catch return error.Unavailable;
+pub fn init(options: wio.InitOptions) !void {
+    common.loadLibs(&c, &.{
+        .{ .handle = &libXcursor, .name = "libXcursor.so.1", .prefix = "Xcursor" },
+        .{ .handle = &libXfixes, .name = "libXfixes.so.3", .prefix = "XFixes" },
+        .{ .handle = &libGL, .name = "libGL.so.1", .prefix = "glX", .predicate = options.opengl },
+        .{ .handle = &libX11, .name = "libX11.so.6" },
+    }) catch return error.Unavailable;
     errdefer libX11.close();
-    libXcursor = std.DynLib.open(if (sonames) "libXcursor.so.1" else "libXcursor.so") catch return error.Unavailable;
     errdefer libXcursor.close();
-    libXfixes = std.DynLib.open(if (sonames) "libXfixes.so.3" else "libXfixes.so") catch return error.Unavailable;
     errdefer libXfixes.close();
-    if (options.opengl) {
-        libGL = std.DynLib.open(if (sonames) "libGL.so.1" else "libGL.so") catch return error.Unavailable;
-        errdefer libGL.close();
-    }
-
-    inline for (@typeInfo(@TypeOf(c)).Struct.fields) |field| {
-        const lib = comptime if (std.mem.startsWith(u8, field.name, "Xcursor"))
-            &libXcursor
-        else if (std.mem.startsWith(u8, field.name, "XFixes"))
-            &libXfixes
-        else if (std.mem.startsWith(u8, field.name, "glX"))
-            &libGL
-        else
-            &libX11;
-
-        if (options.opengl or !std.mem.startsWith(u8, field.name, "glX")) {
-            @field(c, field.name) = lib.lookup(field.type, field.name) orelse {
-                log.err("could not load {s}", .{field.name});
-                return error.Unavailable;
-            };
-        }
-    }
+    errdefer if (options.opengl) libGL.close();
 
     display = c.XkbOpenDisplay(null, null, null, null, null, null) orelse return error.Unavailable;
     errdefer _ = c.XCloseDisplay(display);
