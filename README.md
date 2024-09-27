@@ -9,6 +9,18 @@ wio follows the [Mach nominated Zig version][1].
 The public API can be browsed in [src/wio.zig][2]. The [example][3] directory
 contains a test program covering most features.
 
+## Platform notes
+
+### Windows
+
+By default, wio embeds an [application manifest][4] for proper functionality.
+If you wish to use your own, set the `win32_manifest` build option to false.
+
+### Unix
+
+Unix-like systems support different backends in the same executable, with the most
+appropriate being chosen at runtime. When using the platform API, the available choices should be limited with the `unix_backends` build option.
+
 ## Platform-specific API
 
 The following variables and fields may be considered part of the public API
@@ -23,9 +35,6 @@ when targeting a given platform:
 - `Window.backend.window` is the AppKit `NSWindow*`
 
 ### Unix
-
-Unix-like systems support different backends in the same executable, with the most
-appropriate being chosen at runtime. When using the platform API, the available choices should be limited with the `unix_backends` build option.
 
 `wio.backend.active` is an enum describing the backend in use:
 
@@ -43,3 +52,4 @@ appropriate being chosen at runtime. When using the platform API, the available 
 [1]: https://machengine.org/docs/nominated-zig/
 [2]: https://github.com/ypsvlq/wio/blob/master/src/wio.zig
 [3]: https://github.com/ypsvlq/wio/tree/master/example
+[4]: https://learn.microsoft.com/en-us/windows/win32/sbscs/application-manifests
