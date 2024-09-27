@@ -156,7 +156,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
 
     const xdg_surface = h.xdg_wm_base_get_xdg_surface(xdg_wm_base, surface) orelse return error.Unexpected;
     errdefer h.xdg_surface_destroy(xdg_surface);
-    _ = h.xdg_surface_add_listener(xdg_surface, &xdg_surface_listener, surface);
+    _ = h.xdg_surface_add_listener(xdg_surface, &xdg_surface_listener, null);
 
     const xdg_toplevel = h.xdg_surface_get_toplevel(xdg_surface) orelse return error.Unexpected;
     errdefer h.xdg_toplevel_destroy(xdg_toplevel);
@@ -311,7 +311,7 @@ fn registryGlobal(_: ?*anyopaque, _: ?*h.wl_registry, name: u32, interface: [*c]
         xdg_wm_base = @ptrCast(h.wl_registry_bind(registry, name, &h.xdg_wm_base_interface, 1));
         _ = h.xdg_wm_base_add_listener(xdg_wm_base, &xdg_wm_base_listener, null);
     } else if (std.mem.eql(u8, interface_z, "wl_seat")) {
-        seat = @ptrCast(h.wl_registry_bind(registry, name, &h.wl_seat_interface, 1));
+        seat = @ptrCast(h.wl_registry_bind(registry, name, &h.wl_seat_interface, 3));
         _ = h.wl_seat_add_listener(seat, &seat_listener, null);
     }
 }
@@ -330,9 +330,8 @@ const xdg_surface_listener = h.xdg_surface_listener{
     .configure = xdgSurfaceConfigure,
 };
 
-fn xdgSurfaceConfigure(data: ?*anyopaque, xdg_surface: ?*h.xdg_surface, serial: u32) callconv(.C) void {
+fn xdgSurfaceConfigure(_: ?*anyopaque, xdg_surface: ?*h.xdg_surface, serial: u32) callconv(.C) void {
     h.xdg_surface_ack_configure(xdg_surface, serial);
-    h.wl_surface_commit(@ptrCast(data));
 }
 
 const xdg_toplevel_listener = h.xdg_toplevel_listener{
@@ -355,11 +354,18 @@ fn xdgToplevelClose(data: ?*anyopaque, _: ?*h.xdg_toplevel) callconv(.C) void {
 
 const seat_listener = h.wl_seat_listener{
     .capabilities = seatCapabilities,
+    .name = seatName,
 };
 
 fn seatCapabilities(_: ?*anyopaque, _: ?*h.wl_seat, capabilities: u32) callconv(.C) void {
-    if (keyboard) |_| h.wl_keyboard_destroy(keyboard);
-    if (pointer) |_| h.wl_pointer_destroy(pointer);
+    if (keyboard) |_| {
+        h.wl_keyboard_release(keyboard);
+        keyboard = null;
+    }
+    if (pointer) |_| {
+        h.wl_pointer_release(pointer);
+        pointer = null;
+    }
 
     if (capabilities & h.WL_SEAT_CAPABILITY_KEYBOARD != 0) {
         keyboard = h.wl_seat_get_keyboard(seat);
@@ -371,6 +377,8 @@ fn seatCapabilities(_: ?*anyopaque, _: ?*h.wl_seat, capabilities: u32) callconv(
     }
 }
 
+fn seatName(_: ?*anyopaque, _: ?*h.wl_seat, _: [*c]const u8) callconv(.C) void {}
+
 const keyboard_listener = h.wl_keyboard_listener{
     .keymap = keyboardKeymap,
     .enter = keyboardEnter,
@@ -380,6 +388,7 @@ const keyboard_listener = h.wl_keyboard_listener{
 };
 
 fn keyboardKeymap(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, fd: i32, size: u32) callconv(.C) void {
+    defer _ = std.c.close(fd);
     c.xkb_keymap_unref(keymap);
     c.xkb_state_unref(xkb_state);
 
