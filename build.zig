@@ -42,6 +42,10 @@ pub fn build(b: *std.Build) void {
         module.addWin32ResourceFile(.{ .file = b.path("src/win32.rc") });
     }
 
+    const options = b.addOptions();
+    options.addOption([]const u8, "unix_backends", b.option([]const u8, "unix_backends", "Comma-separated list of backends (default: x11,wayland)") orelse "x11,wayland");
+    module.addOptions("build_options", options);
+
     const exe = b.addExecutable(.{
         .name = "wio",
         .root_source_file = b.path("example/main.zig"),

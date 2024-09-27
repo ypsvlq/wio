@@ -24,6 +24,9 @@ when targeting a given platform:
 
 ### Unix
 
+Unix-like systems support different backends in the same executable, with the most
+appropriate being chosen at runtime. When using the platform API, the available choices should be limited with the `unix_backends` build option.
+
 `wio.backend.active` is an enum describing the backend in use:
 
 #### `.x11`

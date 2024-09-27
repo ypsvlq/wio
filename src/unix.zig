@@ -1,5 +1,6 @@
 const std = @import("std");
 const builtin = @import("builtin");
+const build_options = @import("build_options");
 const wio = @import("wio.zig");
 pub const x11 = @import("unix/x11.zig");
 pub const wayland = @import("unix/wayland.zig");
@@ -17,15 +18,34 @@ pub var active: enum {
 pub fn init(options: wio.InitOptions) !void {
     if (builtin.os.tag == .linux and builtin.output_mode == .Exe and builtin.link_mode == .static) @compileError("dynamic link required");
 
-    if (wayland.init(options)) {
-        active = .wayland;
-        return;
-    } else |err| if (err != error.Unavailable) return err;
+    comptime var enable_x11 = false;
+    comptime var enable_wayland = false;
+    comptime {
+        var iter = std.mem.splitScalar(u8, build_options.unix_backends, ',');
+        while (iter.next()) |name| {
+            if (std.mem.eql(u8, name, "x11")) {
+                enable_x11 = true;
+            } else if (std.mem.eql(u8, name, "wayland")) {
+                enable_wayland = true;
+            } else {
+                @compileError("unknown unix backend '" ++ name ++ "'");
+            }
+        }
+    }
 
-    if (x11.init(options)) {
-        active = .x11;
-        return;
-    } else |err| if (err != error.Unavailable) return err;
+    if (enable_wayland) {
+        if (wayland.init(options)) {
+            active = .wayland;
+            return;
+        } else |err| if (err != error.Unavailable) return err;
+    }
+
+    if (enable_x11) {
+        if (x11.init(options)) {
+            active = .x11;
+            return;
+        } else |err| if (err != error.Unavailable) return err;
+    }
 
     log.err("no backend found", .{});
     return error.Unexpected;
