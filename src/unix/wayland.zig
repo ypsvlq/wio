@@ -68,6 +68,8 @@ var xkb_state: ?*h.xkb_state = null;
 
 var egl_display: h.EGLDisplay = undefined;
 
+export var wio_wl_proxy_marshal_flags: *const @TypeOf(h.wl_proxy_marshal_flags) = undefined;
+
 pub fn init(options: wio.InitOptions) !void {
     common.loadLibs(&c, &.{
         .{ .handle = &libxkbcommon, .name = "libxkbcommon.so.0", .prefix = "xkb" },
@@ -79,6 +81,7 @@ pub fn init(options: wio.InitOptions) !void {
     errdefer libxkbcommon.close();
     errdefer if (options.opengl) libwayland_egl.close();
     errdefer if (options.opengl) libEGL.close();
+    wio_wl_proxy_marshal_flags = c.wl_proxy_marshal_flags;
 
     display = c.wl_display_connect(null) orelse return error.Unavailable;
     errdefer c.wl_display_disconnect(display);
@@ -270,8 +273,6 @@ pub fn getClipboardText(allocator: std.mem.Allocator) ?[]u8 {
 pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
     return c.eglGetProcAddress(name);
 }
-
-export const wio_wl_proxy_marshal_flags = &c.wl_proxy_marshal_flags;
 
 export fn wl_proxy_get_version(proxy: ?*h.wl_proxy) u32 {
     return c.wl_proxy_get_version(proxy);
