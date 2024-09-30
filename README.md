@@ -19,7 +19,8 @@ If you wish to use your own, set the `win32_manifest` build option to false.
 ### Unix
 
 Unix-like systems support different backends in the same executable, with the most
-appropriate being chosen at runtime. When using the platform API, the available choices should be limited with the `unix_backends` build option.
+appropriate being chosen at runtime. When using the platform API, set the
+`unix_backends` build option to a comma-separated list of those supported.
 
 ## Platform-specific API
 
