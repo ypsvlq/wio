@@ -6,6 +6,7 @@ const h = @cImport({
     @cInclude("wio-wayland.h");
     @cInclude("wayland-client-protocol.h");
     @cInclude("xdg-shell-client-protocol.h");
+    @cInclude("cursor-shape-v1-client-protocol.h");
     @cInclude("xkbcommon/xkbcommon.h");
     @cInclude("xkbcommon/xkbcommon-compose.h");
     @cInclude("wayland-egl.h");
@@ -71,11 +72,16 @@ var xdg_wm_base: ?*h.xdg_wm_base = null;
 var seat: ?*h.wl_seat = null;
 var keyboard: ?*h.wl_keyboard = null;
 var pointer: ?*h.wl_pointer = null;
+var cursor_shape_manager: ?*h.wp_cursor_shape_manager_v1 = null;
+var cursor_shape_device: ?*h.wp_cursor_shape_device_v1 = null;
 
 var xkb: *h.xkb_context = undefined;
 var keymap: ?*h.xkb_keymap = null;
 var xkb_state: ?*h.xkb_state = null;
 var compose_state: ?*h.xkb_compose_state = null;
+
+var focus: ?*@This() = null;
+var pointer_enter_serial: u32 = 0;
 
 var egl_display: h.EGLDisplay = undefined;
 
@@ -140,6 +146,8 @@ pub fn deinit() void {
     c.xkb_context_unref(xkb);
     libxkbcommon.close();
 
+    if (cursor_shape_device) |_| h.wp_cursor_shape_device_v1_destroy(cursor_shape_device);
+    if (cursor_shape_manager) |_| h.wp_cursor_shape_manager_v1_destroy(cursor_shape_manager);
     if (pointer) |_| h.wl_pointer_destroy(pointer);
     if (keyboard) |_| h.wl_keyboard_destroy(keyboard);
     h.wl_seat_destroy(seat);
@@ -163,6 +171,8 @@ xdg_toplevel: *h.xdg_toplevel,
 egl_window: ?*h.wl_egl_window = null,
 egl_surface: h.EGLSurface = null,
 egl_context: h.EGLContext = null,
+cursor: u32 = undefined,
+cursor_mode: wio.CursorMode,
 
 pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     const self = try wio.allocator.create(@This());
@@ -184,8 +194,10 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
         .surface = surface,
         .xdg_surface = xdg_surface,
         .xdg_toplevel = xdg_toplevel,
+        .cursor_mode = options.cursor_mode,
     };
     self.setTitle(options.title);
+    self.setCursor(options.cursor);
 
     h.wl_surface_commit(surface);
     _ = c.wl_display_roundtrip(display);
@@ -197,6 +209,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
 }
 
 pub fn destroy(self: *@This()) void {
+    if (focus == self) focus = null;
     if (self.egl_context) |_| _ = c.eglDestroyContext(egl_display, self.egl_context);
     if (self.egl_surface) |_| _ = c.eglDestroySurface(egl_display, self.egl_surface);
     if (self.egl_window) |_| c.wl_egl_window_destroy(self.egl_window);
@@ -228,13 +241,26 @@ pub fn setDisplayMode(self: *@This(), mode: wio.DisplayMode) void {
 }
 
 pub fn setCursor(self: *@This(), shape: wio.Cursor) void {
-    _ = self;
-    _ = shape;
+    self.cursor = switch (shape) {
+        .arrow => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_DEFAULT,
+        .arrow_busy => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_PROGRESS,
+        .busy => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_WAIT,
+        .text => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_TEXT,
+        .hand => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_POINTER,
+        .crosshair => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_CROSSHAIR,
+        .forbidden => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_NOT_ALLOWED,
+        .move => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_MOVE,
+        .size_ns => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_NS_RESIZE,
+        .size_ew => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_EW_RESIZE,
+        .size_nesw => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_NESW_RESIZE,
+        .size_nwse => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_NWSE_RESIZE,
+    };
+    if (focus == self) self.applyCursor();
 }
 
 pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
-    _ = self;
-    _ = mode;
+    self.cursor_mode = mode;
+    if (focus == self) self.applyCursor();
 }
 
 pub fn createContext(self: *@This(), options: wio.CreateContextOptions) !void {
@@ -315,6 +341,16 @@ fn pushEvent(self: *@This(), event: wio.Event) void {
     self.events.writeItem(event) catch return;
 }
 
+fn applyCursor(self: *@This()) void {
+    if (self.cursor_mode == .normal) {
+        if (cursor_shape_device) |_| {
+            h.wp_cursor_shape_device_v1_set_shape(cursor_shape_device, pointer_enter_serial, self.cursor);
+        }
+    } else {
+        h.wl_pointer_set_cursor(pointer, pointer_enter_serial, null, 0, 0);
+    }
+}
+
 const registry_listener = h.wl_registry_listener{
     .global = registryGlobal,
     .global_remove = registryGlobalRemove,
@@ -330,6 +366,8 @@ fn registryGlobal(_: ?*anyopaque, _: ?*h.wl_registry, name: u32, interface: [*c]
     } else if (std.mem.eql(u8, interface_z, "wl_seat")) {
         seat = @ptrCast(h.wl_registry_bind(registry, name, &h.wl_seat_interface, 3));
         _ = h.wl_seat_add_listener(seat, &seat_listener, null);
+    } else if (std.mem.eql(u8, interface_z, "wp_cursor_shape_manager_v1")) {
+        cursor_shape_manager = @ptrCast(h.wl_registry_bind(registry, name, &h.wp_cursor_shape_manager_v1_interface, 1));
     }
 }
 
@@ -383,6 +421,10 @@ fn seatCapabilities(_: ?*anyopaque, _: ?*h.wl_seat, capabilities: u32) callconv(
         h.wl_pointer_release(pointer);
         pointer = null;
     }
+    if (cursor_shape_device) |_| {
+        h.wp_cursor_shape_device_v1_destroy(cursor_shape_device);
+        cursor_shape_device = null;
+    }
 
     if (capabilities & h.WL_SEAT_CAPABILITY_KEYBOARD != 0) {
         keyboard = h.wl_seat_get_keyboard(seat);
@@ -391,6 +433,9 @@ fn seatCapabilities(_: ?*anyopaque, _: ?*h.wl_seat, capabilities: u32) callconv(
     if (capabilities & h.WL_SEAT_CAPABILITY_POINTER != 0) {
         pointer = h.wl_seat_get_pointer(seat);
         _ = h.wl_pointer_add_listener(pointer, &pointer_listener, null);
+        if (cursor_shape_manager) |_| {
+            cursor_shape_device = h.wp_cursor_shape_manager_v1_get_pointer(cursor_shape_manager, pointer);
+        }
     }
 }
 
@@ -415,8 +460,6 @@ fn keyboardKeymap(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, fd: i32, size: u32
     keymap = c.xkb_keymap_new_from_string(xkb, @ptrCast(string), h.XKB_KEYMAP_FORMAT_TEXT_V1, h.XKB_KEYMAP_COMPILE_NO_FLAGS);
     xkb_state = c.xkb_state_new(keymap);
 }
-
-var focus: ?*@This() = null;
 
 fn keyboardEnter(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, surface: ?*h.wl_surface, _: ?*h.wl_array) callconv(.C) void {
     focus = @alignCast(@ptrCast(h.wl_surface_get_user_data(surface)));
@@ -467,7 +510,13 @@ const pointer_listener = h.wl_pointer_listener{
     .axis = pointerAxis,
 };
 
-fn pointerEnter(_: ?*anyopaque, _: ?*h.wl_pointer, _: u32, _: ?*h.wl_surface, _: i32, _: i32) callconv(.C) void {}
+fn pointerEnter(_: ?*anyopaque, _: ?*h.wl_pointer, serial: u32, surface: ?*h.wl_surface, _: i32, _: i32) callconv(.C) void {
+    pointer_enter_serial = serial;
+    if (@as(?*@This(), @alignCast(@ptrCast(h.wl_surface_get_user_data(surface))))) |window| {
+        window.applyCursor();
+    }
+}
+
 fn pointerLeave(_: ?*anyopaque, _: ?*h.wl_pointer, _: u32, _: ?*h.wl_surface) callconv(.C) void {}
 
 fn pointerMotion(_: ?*anyopaque, _: ?*h.wl_pointer, _: u32, surface_x: i32, surface_y: i32) callconv(.C) void {
