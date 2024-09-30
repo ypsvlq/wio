@@ -7,6 +7,7 @@ const h = @cImport({
     @cInclude("wayland-client-protocol.h");
     @cInclude("xdg-shell-client-protocol.h");
     @cInclude("xkbcommon/xkbcommon.h");
+    @cInclude("xkbcommon/xkbcommon-compose.h");
     @cInclude("wayland-egl.h");
     @cInclude("EGL/egl.h");
 });
@@ -31,7 +32,16 @@ var c: extern struct {
     xkb_state_new: *const @TypeOf(h.xkb_state_new),
     xkb_state_unref: *const @TypeOf(h.xkb_state_unref),
     xkb_state_update_mask: *const @TypeOf(h.xkb_state_update_mask),
-    xkb_state_key_get_utf32: *const @TypeOf(h.xkb_state_key_get_utf32),
+    xkb_state_key_get_one_sym: *const @TypeOf(h.xkb_state_key_get_one_sym),
+    xkb_keysym_to_utf32: *const @TypeOf(h.xkb_keysym_to_utf32),
+    xkb_compose_table_new_from_locale: *const @TypeOf(h.xkb_compose_table_new_from_locale),
+    xkb_compose_table_unref: *const @TypeOf(h.xkb_compose_table_unref),
+    xkb_compose_state_new: *const @TypeOf(h.xkb_compose_state_new),
+    xkb_compose_state_unref: *const @TypeOf(h.xkb_compose_state_unref),
+    xkb_compose_state_feed: *const @TypeOf(h.xkb_compose_state_feed),
+    xkb_compose_state_get_status: *const @TypeOf(h.xkb_compose_state_get_status),
+    xkb_compose_state_get_one_sym: *const @TypeOf(h.xkb_compose_state_get_one_sym),
+    xkb_compose_state_reset: *const @TypeOf(h.xkb_compose_state_reset),
     wl_egl_window_create: *const @TypeOf(h.wl_egl_window_create),
     wl_egl_window_destroy: *const @TypeOf(h.wl_egl_window_destroy),
     wl_egl_window_resize: *const @TypeOf(h.wl_egl_window_resize),
@@ -65,6 +75,7 @@ var pointer: ?*h.wl_pointer = null;
 var xkb: *h.xkb_context = undefined;
 var keymap: ?*h.xkb_keymap = null;
 var xkb_state: ?*h.xkb_state = null;
+var compose_state: ?*h.xkb_compose_state = null;
 
 var egl_display: h.EGLDisplay = undefined;
 
@@ -88,6 +99,11 @@ pub fn init(options: wio.InitOptions) !void {
 
     xkb = c.xkb_context_new(h.XKB_CONTEXT_NO_FLAGS) orelse return error.Unexpected;
     errdefer c.xkb_context_unref(xkb);
+
+    const locale = std.c.getenv("LC_ALL") orelse std.c.getenv("LC_CTYPE") orelse std.c.getenv("LANG") orelse "C";
+    const compose_table = c.xkb_compose_table_new_from_locale(xkb, locale, h.XKB_COMPOSE_COMPILE_NO_FLAGS);
+    defer c.xkb_compose_table_unref(compose_table);
+    if (compose_table) |_| compose_state = c.xkb_compose_state_new(compose_table, h.XKB_COMPOSE_STATE_NO_FLAGS);
 
     registry = h.wl_display_get_registry(display) orelse return error.Unexpected;
     errdefer h.wl_registry_destroy(registry);
@@ -118,6 +134,7 @@ pub fn deinit() void {
         libwayland_egl.close();
     }
 
+    c.xkb_compose_state_unref(compose_state);
     c.xkb_state_unref(xkb_state);
     c.xkb_keymap_unref(keymap);
     c.xkb_context_unref(xkb);
@@ -411,14 +428,25 @@ fn keyboardLeave(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, surface: ?*h.wl_sur
             focus = null;
         }
     }
+    if (compose_state) |_| c.xkb_compose_state_reset(compose_state);
 }
 
 fn keyboardKey(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, _: u32, key: u32, state: u32) callconv(.C) void {
     if (focus) |window| {
         if (keyToButton(key)) |button| {
-            if (state == 1) {
+            if (state == h.WL_KEYBOARD_KEY_STATE_PRESSED) {
                 window.pushEvent(.{ .button_press = button });
-                const char: u21 = @intCast(c.xkb_state_key_get_utf32(xkb_state, key + 8));
+                var sym = c.xkb_state_key_get_one_sym(xkb_state, key + 8);
+                if (compose_state) |_| {
+                    if (c.xkb_compose_state_feed(compose_state, sym) == h.XKB_COMPOSE_FEED_ACCEPTED) {
+                        switch (c.xkb_compose_state_get_status(compose_state)) {
+                            h.XKB_COMPOSE_COMPOSED => sym = c.xkb_compose_state_get_one_sym(compose_state),
+                            h.XKB_COMPOSE_COMPOSING, h.XKB_COMPOSE_CANCELLED => return,
+                            else => {},
+                        }
+                    }
+                }
+                const char: u21 = @intCast(c.xkb_keysym_to_utf32(sym));
                 if (char >= ' ' and char != 0x7F) window.pushEvent(.{ .char = char });
             } else {
                 window.pushEvent(.{ .button_release = button });
@@ -456,7 +484,7 @@ fn pointerButton(_: ?*anyopaque, _: ?*h.wl_pointer, _: u32, _: u32, button: u32,
             0x114 => .mouse_forward,
             else => return,
         };
-        window.pushEvent(if (state == 1) .{ .button_press = wio_button } else .{ .button_release = wio_button });
+        window.pushEvent(if (state == h.WL_POINTER_BUTTON_STATE_PRESSED) .{ .button_press = wio_button } else .{ .button_release = wio_button });
     }
 }
 
