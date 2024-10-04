@@ -85,7 +85,7 @@ pub fn init(options: wio.InitOptions) !void {
     display = c.XkbOpenDisplay(null, null, null, null, null, null) orelse return error.Unavailable;
     errdefer _ = c.XCloseDisplay(display);
 
-    inline for (@typeInfo(@TypeOf(atoms)).Struct.fields) |field| {
+    inline for (@typeInfo(@TypeOf(atoms)).@"struct".fields) |field| {
         @field(atoms, field.name) = c.XInternAtom(display, field.name, h.False);
     }
 

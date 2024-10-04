@@ -71,7 +71,7 @@ pub fn createWindow(options: CreateWindowOptions) !Window {
 }
 
 pub const Window = struct {
-    backend: @typeInfo(@typeInfo(@TypeOf(backend.createWindow)).Fn.return_type.?).ErrorUnion.payload,
+    backend: @typeInfo(@typeInfo(@TypeOf(backend.createWindow)).@"fn".return_type.?).error_union.payload,
 
     pub fn destroy(self: *Window) void {
         self.backend.destroy();

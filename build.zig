@@ -18,8 +18,10 @@ pub fn build(b: *std.Build) void {
         },
         .macos => {
             module.addCSourceFile(.{ .file = b.path("src/cocoa.m"), .flags = &.{"-fobjc-arc"} });
-            if (b.lazyImport(@This(), "xcode_frameworks")) |xcode_frameworks| {
-                xcode_frameworks.addPaths(module);
+            if (b.lazyDependency("xcode_frameworks", .{})) |xcode_frameworks| {
+                module.addIncludePath(xcode_frameworks.path("include"));
+                module.addLibraryPath(xcode_frameworks.path("lib"));
+                module.addFrameworkPath(xcode_frameworks.path("Frameworks"));
             }
             module.linkFramework("Cocoa", .{});
             module.linkFramework("IOKit", .{});
