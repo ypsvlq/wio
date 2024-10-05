@@ -223,7 +223,7 @@ pub const Event = union(enum) {
     joystick: void,
 };
 
-pub const EventType = @typeInfo(Event).Union.tag_type.?;
+pub const EventType = @typeInfo(Event).@"union".tag_type.?;
 
 pub const DisplayMode = enum {
     windowed,
