@@ -206,10 +206,20 @@ pub fn setCursor(self: *@This(), shape: wio.Cursor) void {
         .size_nesw => w.IDC_SIZENESW,
         .size_nwse => w.IDC_SIZENWSE,
     });
+
+    // trigger WM_SETCURSOR
+    var pos: w.POINT = undefined;
+    _ = w.GetCursorPos(&pos);
+    _ = w.SetCursorPos(pos.x, pos.y);
 }
 
 pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
     self.cursor_mode = mode;
+
+    // trigger WM_SETCURSOR
+    var pos: w.POINT = undefined;
+    _ = w.GetCursorPos(&pos);
+    _ = w.SetCursorPos(pos.x, pos.y);
 }
 
 pub fn createContext(self: *@This(), options: wio.CreateContextOptions) !void {
