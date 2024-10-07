@@ -215,7 +215,6 @@ pub const Event = union(enum) {
     maximized: bool,
     char: u21,
     button_press: Button,
-    button_repeat: Button,
     button_release: Button,
     mouse: Position,
     scroll_vertical: f32,

@@ -69,7 +69,6 @@ pub fn getEvent(_: *@This()) ?wio.Event {
         .scale => .{ .scale = js.shiftFloat() },
         .char => .{ .char = @intCast(js.shift()) },
         .button_press => .{ .button_press = @enumFromInt(js.shift()) },
-        .button_repeat => .{ .button_repeat = @enumFromInt(js.shift()) },
         .button_release => .{ .button_release = @enumFromInt(js.shift()) },
         .mouse => .{ .mouse = .{ .x = @intCast(js.shift()), .y = @intCast(js.shift()) } },
         .scroll_vertical => .{ .scroll_vertical = js.shiftFloat() },

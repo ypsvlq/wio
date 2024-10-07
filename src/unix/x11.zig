@@ -372,7 +372,7 @@ fn handle(event: *h.XEvent) void {
         },
         h.KeyPress => {
             if (c.XFilterEvent(event, event.xkey.window) == h.True) return;
-            handleKeyPress(event, false);
+            handleKeyPress(event);
         },
         h.KeyRelease => {
             if (c.XPending(display) > 0) {
@@ -381,7 +381,7 @@ fn handle(event: *h.XEvent) void {
                 _ = c.XPeekEvent(display, &next);
                 if (next.type == h.KeyPress and next.xkey.time == event.xkey.time) {
                     _ = c.XNextEvent(display, &next);
-                    handleKeyPress(&next, true);
+                    handleKeyPress(&next);
                     return;
                 }
             }
@@ -431,12 +431,12 @@ fn handle(event: *h.XEvent) void {
     }
 }
 
-fn handleKeyPress(event: *h.XEvent, repeat: bool) void {
+fn handleKeyPress(event: *h.XEvent) void {
     if (windows.get(event.xkey.window)) |window| {
         if (event.xkey.keycode != 0) {
             const button = keycodes[event.xkey.keycode - 8];
             if (button != .mouse_left) {
-                window.pushEvent(if (repeat) .{ .button_repeat = button } else .{ .button_press = button });
+                window.pushEvent(.{ .button_press = button });
             }
         }
 

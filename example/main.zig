@@ -32,7 +32,6 @@ fn loop() !bool {
             .maximized => |maximized| std.log.info("{s}", .{if (maximized) "maximized" else "restored"}),
             .char => |char| std.log.info("char: {u}", .{char}),
             .button_press => |button| std.log.info("+{s}", .{@tagName(button)}),
-            .button_repeat => |button| std.log.info("*{s}", .{@tagName(button)}),
             .button_release => |button| std.log.info("-{s}", .{@tagName(button)}),
             .mouse => |mouse| std.log.info("({},{})", .{ mouse.x, mouse.y }),
             .scroll_vertical, .scroll_horizontal => |value| std.log.info("{s} {d}", .{ @tagName(event), value }),

@@ -197,13 +197,7 @@ export fn wioChars(self: *@This(), buf: [*:0]const u8) void {
 export fn wioKeyDown(self: *@This(), key: u16) void {
     if (keycodeToButton(key)) |button| {
         self.pushEvent(.{ .button_press = button });
-    } else {
-        log.warn("unknown keycode 0x{x}", .{key});
     }
-}
-
-export fn wioKeyRepeat(self: *@This(), key: u16) void {
-    if (keycodeToButton(key)) |button| self.pushEvent(.{ .button_repeat = button });
 }
 
 export fn wioKeyUp(self: *@This(), key: u16) void {

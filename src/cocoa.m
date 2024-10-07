@@ -8,7 +8,6 @@ extern void wioSize(void *, bool, UInt16, UInt16, UInt16, UInt16);
 extern void wioScale(void *, Float32);
 extern void wioChars(void *, const char *);
 extern void wioKeyDown(void *, UInt16);
-extern void wioKeyRepeat(void *, UInt16);
 extern void wioKeyUp(void *, UInt16);
 extern void wioButtonPress(void *, UInt8);
 extern void wioButtonRelease(void *, UInt8);
@@ -140,11 +139,7 @@ static NSString *string(const char *ptr, size_t len) {
 }
 
 - (void)keyDown:event {
-    if ([event isARepeat]) {
-        wioKeyRepeat(ptr, [event keyCode]);
-    } else {
-        wioKeyDown(ptr, [event keyCode]);
-    }
+    wioKeyDown(ptr, [event keyCode]);
     wioChars(ptr, [[event characters] UTF8String]);
 }
 
