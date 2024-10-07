@@ -55,8 +55,6 @@ pub const Size = struct {
     }
 };
 
-pub const Position = struct { x: u16, y: u16 };
-
 pub const CreateWindowOptions = struct {
     title: []const u8 = "wio",
     size: Size = .{ .width = 640, .height = 480 },
@@ -216,7 +214,8 @@ pub const Event = union(enum) {
     char: u21,
     button_press: Button,
     button_release: Button,
-    mouse: Position,
+    mouse: struct { x: u16, y: u16 },
+    mouse_relative: struct { x: i16, y: i16 },
     scroll_vertical: f32,
     scroll_horizontal: f32,
     joystick: void,
@@ -242,6 +241,7 @@ pub const Cursor = enum {
 pub const CursorMode = enum {
     normal,
     hidden,
+    relative,
 };
 
 pub const CreateContextOptions = struct {

@@ -34,6 +34,7 @@ fn loop() !bool {
             .button_press => |button| std.log.info("+{s}", .{@tagName(button)}),
             .button_release => |button| std.log.info("-{s}", .{@tagName(button)}),
             .mouse => |mouse| std.log.info("({},{})", .{ mouse.x, mouse.y }),
+            .mouse_relative => |mouse| std.log.info("{},{}", .{mouse.x,mouse.y}),
             .scroll_vertical, .scroll_horizontal => |value| std.log.info("{s} {d}", .{ @tagName(event), value }),
             else => std.log.info("{s}", .{@tagName(event)}),
         }
@@ -78,7 +79,8 @@ fn handlePress(button: wio.Button) void {
             window.setCursor(cursors[cursor % cursors.len]);
         },
         .n => window.setCursorMode(.normal),
-        .i => window.setCursorMode(.hidden),
+        .h => window.setCursorMode(.hidden),
+        .r => window.setCursorMode(.relative),
         .c => wio.setClipboardText("wio example"),
         .d => {
             wio.messageBox(.info, "wio", "info");

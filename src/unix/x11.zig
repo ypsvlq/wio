@@ -273,6 +273,7 @@ pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
                 self.cursor = false;
             }
         },
+        .relative => {},
     }
 }
 

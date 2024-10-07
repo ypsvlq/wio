@@ -46,15 +46,15 @@ const wio = {
             if (button != undefined) wio.events.push(11, button);
         });
         canvas.addEventListener("mousemove", event => {
-            wio.events.push(13, event.offsetX, event.offsetY);
+            wio.events.push(12, event.offsetX, event.offsetY);
         });
         canvas.addEventListener("wheel", event => {
-            if (event.deltaY != 0) wio.events.push(13, event.deltaY * 0.01);
-            if (event.deltaX != 0) wio.events.push(14, event.deltaX * 0.01);
+            if (event.deltaY != 0) wio.events.push(14, event.deltaY * 0.01);
+            if (event.deltaX != 0) wio.events.push(15, event.deltaX * 0.01);
         });
 
-        addEventListener("gamepadconnected", () => wio.events.push(15));
-        addEventListener("gamepaddisconnected", () => wio.events.push(15));
+        addEventListener("gamepadconnected", () => wio.events.push(16));
+        addEventListener("gamepaddisconnected", () => wio.events.push(16));
     },
 
     loop() {

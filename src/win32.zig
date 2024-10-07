@@ -519,7 +519,7 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
                 _ = w.SetCursor(self.cursor);
                 switch (self.cursor_mode) {
                     .normal => while (w.ShowCursor(w.TRUE) < 0) {},
-                    .hidden => while (w.ShowCursor(w.FALSE) >= 0) {},
+                    .hidden, .relative => while (w.ShowCursor(w.FALSE) >= 0) {},
                 }
                 return w.TRUE;
             } else {
