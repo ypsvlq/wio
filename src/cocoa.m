@@ -73,7 +73,7 @@ static NSString *string(const char *ptr, size_t len) {
     wioUnfocus(ptr);
 }
 
-- (void)windowDidResize:notification {
+- (void)windowDidEndLiveResize:notification {
     NSWindow *window = [notification object];
     NSView *view = [window contentView];
     NSRect rect = [view frame];
