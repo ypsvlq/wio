@@ -61,7 +61,7 @@ pub const CreateWindowOptions = struct {
     title: []const u8 = "wio",
     size: Size = .{ .width = 640, .height = 480 },
     scale: f32 = 1,
-    display_mode: DisplayMode = .windowed,
+    maximized: bool = false,
     cursor: Cursor = .arrow,
     cursor_mode: CursorMode = .normal,
 };
@@ -93,8 +93,8 @@ pub const Window = struct {
         self.backend.setSize(size);
     }
 
-    pub fn setDisplayMode(self: *Window, mode: DisplayMode) void {
-        self.backend.setDisplayMode(mode);
+    pub fn setMaximized(self: *Window, maximized: bool) void {
+        self.backend.setMaximized(maximized);
     }
 
     pub fn setCursor(self: *Window, cursor: Cursor) void {
@@ -204,15 +204,15 @@ pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const fn () void {
 
 pub const Event = union(enum) {
     close: void,
-    /// Sent on window creation, after `size` (or `maximized`), `framebuffer`, and `scale`.
+    /// Sent on window creation, after `size`, `framebuffer`, and `scale`.
     create: void,
     focused: void,
     unfocused: void,
     draw: void,
     size: Size,
-    maximized: Size,
     framebuffer: Size,
     scale: f32,
+    maximized: bool,
     char: u21,
     button_press: Button,
     button_repeat: Button,
@@ -224,13 +224,6 @@ pub const Event = union(enum) {
 };
 
 pub const EventType = @typeInfo(Event).@"union".tag_type.?;
-
-pub const DisplayMode = enum {
-    windowed,
-    maximized,
-    borderless,
-    hidden,
-};
 
 pub const Cursor = enum {
     arrow,

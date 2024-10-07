@@ -83,7 +83,7 @@ pub fn setTitle(_: *@This(), _: []const u8) void {}
 
 pub fn setSize(_: *@This(), _: wio.Size) void {}
 
-pub fn setDisplayMode(_: *@This(), _: wio.DisplayMode) void {}
+pub fn setMaximized(_: *@This(), _: bool) void {}
 
 pub fn setCursor(_: *@This(), shape: wio.Cursor) void {
     js.setCursor(@intFromEnum(shape));

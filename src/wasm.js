@@ -70,8 +70,8 @@ const wio = {
         canvas.height = height * devicePixelRatio;
         wio.events.push(
             5, width, height,
-            7, canvas.width, canvas.height,
-            8, devicePixelRatio,
+            6, canvas.width, canvas.height,
+            7, devicePixelRatio,
         );
     },
 

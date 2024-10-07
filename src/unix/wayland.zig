@@ -246,9 +246,9 @@ pub fn setSize(self: *@This(), size: wio.Size) void {
     _ = size;
 }
 
-pub fn setDisplayMode(self: *@This(), mode: wio.DisplayMode) void {
+pub fn setMaximized(self: *@This(), maximized: bool) void {
     _ = self;
-    _ = mode;
+    _ = maximized;
 }
 
 pub fn setCursor(self: *@This(), shape: wio.Cursor) void {

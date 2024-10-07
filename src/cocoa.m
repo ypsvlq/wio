@@ -261,6 +261,7 @@ void *wioCreateWindow(void *ptr, uint16_t width, uint16_t height) {
     [window setContentView:view];
     [window makeFirstResponder:view];
 
+    [window setStyleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable];
     [window setAcceptsMouseMovedEvents:YES];
     [window makeKeyAndOrderFront:nil];
     [window center];
@@ -288,18 +289,9 @@ void wioSetSize(NSWindow *window, uint16_t width, uint16_t height) {
     [window setContentSize:NSMakeSize(width, height)];
 }
 
-void wioSetDisplayMode(NSWindow *window, uint8_t mode) {
-    switch (mode) {
-        case 0:
-        case 1:
-            [window setStyleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable];
-            [window orderFront:nil];
-            break;
-        case 3:
-            [window orderOut:nil];
-            break;
-    }
-    if ((mode == 0 && [window isZoomed]) || (mode == 1 && ![window isZoomed])) {
+void wioSetMaximized(NSWindow *window, _Bool maximized) {
+    BOOL state = [window isZoomed];
+    if ((!maximized && state) || (maximized && !state)) {
         [window performZoom:nil];
     }
 }

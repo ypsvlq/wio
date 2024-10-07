@@ -37,7 +37,6 @@ var c: extern struct {
     Xutf8LookupString: *const @TypeOf(h.Xutf8LookupString),
     XConfigureWindow: *const @TypeOf(h.XConfigureWindow),
     XMapWindow: *const @TypeOf(h.XMapWindow),
-    XUnmapWindow: *const @TypeOf(h.XUnmapWindow),
     XcursorLibraryLoadCursor: *const @TypeOf(h.XcursorLibraryLoadCursor),
     XDefineCursor: *const @TypeOf(h.XDefineCursor),
     XFixesShowCursor: *const @TypeOf(h.XFixesShowCursor),
@@ -179,6 +178,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
         &attributes,
     );
     errdefer _ = c.XDestroyWindow(display, window);
+    _ = c.XMapWindow(display, self.window);
 
     const protocols = [_]h.Atom{atoms.WM_DELETE_WINDOW};
     _ = c.XChangeProperty(display, window, atoms.WM_PROTOCOLS, h.XA_ATOM, 32, h.PropModeReplace, @ptrCast(&protocols), protocols.len);
@@ -199,7 +199,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
         .ic = ic,
     };
     self.setTitle(options.title);
-    self.setDisplayMode(options.display_mode);
+    self.setMaximized(options.maximized);
     if (options.cursor_mode != .normal) self.setCursorMode(options.cursor_mode);
 
     try self.events.writeItem(.{ .size = size });
@@ -235,12 +235,9 @@ pub fn setSize(self: *@This(), size: wio.Size) void {
     _ = c.XConfigureWindow(display, self.window, h.CWWidth | h.CWHeight, &changes);
 }
 
-pub fn setDisplayMode(self: *@This(), mode: wio.DisplayMode) void {
-    if (mode == .hidden) {
-        _ = c.XUnmapWindow(display, self.window);
-    } else {
-        _ = c.XMapWindow(display, self.window);
-    }
+pub fn setMaximized(self: *@This(), maximized: bool) void {
+    _ = self;
+    _ = maximized;
 }
 
 pub fn setCursor(self: *@This(), shape: wio.Cursor) void {

@@ -118,7 +118,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
 
     const title = try std.unicode.utf8ToUtf16LeAllocZ(wio.allocator, options.title);
     defer wio.allocator.free(title);
-    const style: u32 = if (options.display_mode == .borderless) w.WS_POPUP else w.WS_OVERLAPPEDWINDOW;
+    const style: u32 = w.WS_OVERLAPPEDWINDOW;
     const size = clientToWindow(options.size, style);
     const window = w.CreateWindowExW(
         0,
@@ -150,12 +150,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     const size_scaled = options.size.multiply(scale / options.scale);
     self.setSize(size_scaled);
 
-    if (options.display_mode == .borderless and scale / options.scale == 1) {
-        self.pushEvent(.{ .size = size_scaled });
-        self.pushEvent(.{ .framebuffer = size_scaled });
-    }
-
-    self.setDisplayMode(options.display_mode);
+    self.setMaximized(options.maximized);
     if (options.cursor != .arrow) self.setCursor(options.cursor);
 
     self.pushEvent(.create);
@@ -188,41 +183,8 @@ pub fn setSize(self: *@This(), client_size: wio.Size) void {
     _ = w.SetWindowPos(self.window, null, 0, 0, size.width, size.height, w.SWP_NOMOVE | w.SWP_NOZORDER);
 }
 
-pub fn setDisplayMode(self: *@This(), mode: wio.DisplayMode) void {
-    switch (mode) {
-        .windowed, .borderless => _ = w.ShowWindow(self.window, w.SW_RESTORE),
-        .maximized => {},
-        .hidden => {
-            _ = w.ShowWindow(self.window, w.SW_HIDE);
-            return;
-        },
-    }
-
-    var rect: w.RECT = undefined;
-    _ = w.GetClientRect(self.window, &rect);
-    const style: u32 = if (mode == .borderless) w.WS_POPUP else w.WS_OVERLAPPEDWINDOW;
-    _ = w.AdjustWindowRect(&rect, style, w.FALSE);
-
-    _ = w.SetWindowLongPtrW(self.window, w.GWL_STYLE, @as(i32, @bitCast(style)));
-    _ = w.SetWindowPos(
-        self.window,
-        null,
-        0,
-        0,
-        rect.right - rect.left,
-        rect.bottom - rect.top,
-        blk: {
-            var flags: u32 = w.SWP_FRAMECHANGED | w.SWP_NOZORDER;
-            if (mode != .borderless) flags |= w.SWP_NOMOVE;
-            break :blk flags;
-        },
-    );
-
-    switch (mode) {
-        .windowed, .borderless => _ = w.ShowWindow(self.window, w.SW_RESTORE),
-        .maximized => _ = w.ShowWindow(self.window, w.SW_MAXIMIZE),
-        .hidden => unreachable,
-    }
+pub fn setMaximized(self: *@This(), maximized: bool) void {
+    _ = w.ShowWindow(self.window, if (maximized) w.SW_MAXIMIZE else w.SW_RESTORE);
 }
 
 pub fn setCursor(self: *@This(), shape: wio.Cursor) void {
@@ -580,12 +542,9 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
         w.WM_SIZE => {
             const size = wio.Size{ .width = LOWORD(lParam), .height = HIWORD(lParam) };
             if (wParam == w.SIZE_RESTORED or wParam == w.SIZE_MAXIMIZED) {
-                if (wParam == w.SIZE_MAXIMIZED) {
-                    self.pushEvent(.{ .maximized = size });
-                } else {
-                    self.pushEvent(.{ .size = size });
-                }
+                self.pushEvent(.{ .size = size });
                 self.pushEvent(.{ .framebuffer = size });
+                self.pushEvent(.{ .maximized = (wParam == w.SIZE_MAXIMIZED) });
             }
             return 0;
         },

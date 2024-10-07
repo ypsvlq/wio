@@ -27,8 +27,9 @@ fn loop() !bool {
     try joystick.update();
     while (window.getEvent()) |event| {
         switch (event) {
-            .size, .maximized, .framebuffer => |size| std.log.info("{s} {}x{}", .{ @tagName(event), size.width, size.height }),
+            .size, .framebuffer => |size| std.log.info("{s} {}x{}", .{ @tagName(event), size.width, size.height }),
             .scale => |scale| std.log.info("scale {d}", .{scale}),
+            .maximized => |maximized| std.log.info("{s}", .{if (maximized) "maximized" else "restored"}),
             .char => |char| std.log.info("char: {u}", .{char}),
             .button_press => |button| std.log.info("+{s}", .{@tagName(button)}),
             .button_repeat => |button| std.log.info("*{s}", .{@tagName(button)}),
@@ -70,10 +71,8 @@ fn handlePress(button: wio.Button) void {
     switch (button) {
         .t => window.setTitle("retitled wio example"),
         .s => window.setSize(.{ .width = 320, .height = 240 }),
-        .w => window.setDisplayMode(.windowed),
-        .m => window.setDisplayMode(.maximized),
-        .b => window.setDisplayMode(.borderless),
-        .h => window.setDisplayMode(.hidden),
+        .w => window.setMaximized(false),
+        .m => window.setMaximized(true),
         .p => {
             const cursors = std.enums.values(wio.Cursor);
             cursor +%= 1;
