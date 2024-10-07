@@ -22,6 +22,16 @@ pub fn init(options: wio.InitOptions) !void {
     });
     if (w.RegisterClassW(&class) == 0) return logLastError("RegisterClassW");
 
+    var rid = [_]w.RAWINPUTDEVICE{
+        .{
+            .usUsagePage = w.HID_USAGE_PAGE_GENERIC,
+            .usUsage = w.HID_USAGE_GENERIC_KEYBOARD,
+            .dwFlags = 0,
+            .hwndTarget = null,
+        },
+    };
+    if (w.RegisterRawInputDevices(&rid, rid.len, @sizeOf(w.RAWINPUTDEVICE)) == w.FALSE) return logLastError("RegisterRawInputDevices");
+
     if (options.joystick) {
         try SUCCEED(w.DirectInput8Create(instance, w.DIRECTINPUT_VERSION, &w.IID_IDirectInput8W, @ptrCast(&dinput), null), "DirectInput8Create");
     }
@@ -100,15 +110,8 @@ window: w.HWND,
 cursor: w.HCURSOR,
 cursor_mode: wio.CursorMode,
 surrogate: u16 = 0,
-left_control: bool = false,
-right_control: bool = false,
-left_alt: bool = false,
-right_alt: bool = false,
-left_shift: bool = false,
-right_shift: bool = false,
-international2: bool = false,
-international3: bool = false,
-international4: bool = false,
+input: []u8 = &.{},
+ignore_key: bool = false,
 dc: w.HDC = null,
 rc: w.HGLRC = null,
 
@@ -164,6 +167,7 @@ pub fn destroy(self: *@This()) void {
     }
     _ = w.DestroyWindow(self.window);
     self.events.deinit();
+    wio.allocator.free(self.input);
     wio.allocator.destroy(self);
 }
 
@@ -523,15 +527,6 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
         },
         w.WM_KILLFOCUS => {
             self.pushEvent(.unfocused);
-            self.left_control = false;
-            self.right_control = false;
-            self.left_alt = false;
-            self.right_alt = false;
-            self.left_shift = false;
-            self.right_shift = false;
-            self.international2 = false;
-            self.international3 = false;
-            self.international4 = false;
             return 0;
         },
         w.WM_PAINT => {
@@ -573,68 +568,40 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
             }
             return 0;
         },
-        w.WM_KEYDOWN, w.WM_SYSKEYDOWN, w.WM_KEYUP, w.WM_SYSKEYUP => {
-            if (wParam == w.VK_PROCESSKEY) {
-                return 0;
-            }
+        w.WM_INPUT => {
+            const handle: w.HRAWINPUT = @ptrFromInt(@as(usize, @bitCast(lParam)));
+            var size: u32 = undefined;
+            _ = w.GetRawInputData(handle, w.RID_INPUT, null, &size, @sizeOf(w.RAWINPUTHEADER));
+            if (size > self.input.len) self.input = wio.allocator.realloc(self.input, size) catch return 0;
+            _ = w.GetRawInputData(handle, w.RID_INPUT, self.input.ptr, &size, @sizeOf(w.RAWINPUTHEADER));
+            const raw: *w.RAWINPUT = @alignCast(@ptrCast(self.input));
 
-            if (msg == w.WM_SYSKEYDOWN and wParam == w.VK_F4) {
-                self.pushEvent(.close);
-            }
-
-            const flags = HIWORD(lParam);
-            const scancode: u9 = @intCast(flags & 0x1FF);
-
-            if (scancode == 0x1D) {
-                // discard spurious left control sent before right alt in some layouts
-                var next: w.MSG = undefined;
-                if (w.PeekMessageW(&next, window, 0, 0, w.PM_NOREMOVE) != 0 and
-                    next.time == w.GetMessageTime() and
-                    (HIWORD(next.lParam) & (0x1FF | w.KF_UP)) == (0x138 | (flags & w.KF_UP)))
-                {
-                    return 0;
-                }
-            }
-
-            if (scancodeToButton(scancode)) |button| {
-                const modifier = switch (button) {
-                    .left_control => &self.left_control,
-                    .right_control => &self.right_control,
-                    .left_alt => &self.left_alt,
-                    .right_alt => &self.right_alt,
-                    .left_shift => &self.left_shift,
-                    .right_shift => &self.right_shift,
-                    .international2 => &self.international2,
-                    .international3 => &self.international3,
-                    .international4 => &self.international4,
-                    else => null,
-                };
-                if (flags & w.KF_UP == 0) {
-                    var repeat = (flags & w.KF_REPEAT != 0);
-                    if (modifier) |ptr| {
-                        repeat = ptr.*;
-                        ptr.* = true;
+            switch (raw.header.dwType) {
+                w.RIM_TYPEKEYBOARD => {
+                    if (self.ignore_key) {
+                        self.ignore_key = false;
+                        return 0;
                     }
-                    if (!repeat) {
-                        self.pushEvent(.{ .button_press = button });
-                    } else {
-                        self.pushEvent(.{ .button_repeat = button });
-                    }
-                } else {
-                    if (self.left_shift and self.right_shift) {
-                        if (button == .left_shift) {
-                            self.pushEvent(.{ .button_release = .right_shift });
-                            self.right_shift = false;
-                        } else if (button == .right_shift) {
-                            self.pushEvent(.{ .button_release = .left_shift });
-                            self.left_shift = false;
+
+                    const button = blk: {
+                        if (raw.data.keyboard.Flags & w.RI_KEY_E1 != 0 and raw.data.keyboard.MakeCode == 0x1D) {
+                            // pause sends 2 input messages
+                            self.ignore_key = true;
+                            break :blk .pause;
+                        } else {
+                            var scancode: u9 = @intCast(raw.data.keyboard.MakeCode & 0xFF);
+                            if (raw.data.keyboard.Flags & w.RI_KEY_E0 != 0) scancode |= 0x100;
+                            break :blk scancodeToButton(scancode) orelse return 0;
                         }
-                    }
-                    if (modifier) |ptr| ptr.* = false;
-                    self.pushEvent(.{ .button_release = button });
-                }
-            } else {
-                log.warn("unknown scancode 0x{x}", .{scancode});
+                    };
+
+                    const press = if (button == .lang1 or button == .lang2)
+                        (raw.data.keyboard.Flags & w.RI_KEY_E1 == 0)
+                    else
+                        (raw.data.keyboard.Flags & w.RI_KEY_BREAK == 0);
+                    self.pushEvent(if (press) .{ .button_press = button } else .{ .button_release = button });
+                },
+                else => {},
             }
             return 0;
         },
@@ -757,7 +724,7 @@ fn scancodeToButton(scancode: u9) ?wio.Button {
             0x42 => .f8,
             0x43 => .f9,
             0x44 => .f10,
-            0x45 => .pause,
+            0x45 => .num_lock,
             0x46 => .scroll_lock,
             0x47 => .kp_7,
             0x48 => .kp_8,
@@ -790,6 +757,8 @@ fn scancodeToButton(scancode: u9) ?wio.Button {
             0x6D => .f22,
             0x6E => .f23,
             0x70 => .international2,
+            0x71 => .lang2,
+            0x72 => .lang1,
             0x73 => .international1,
             0x76 => .f24,
             0x79 => .international4,
@@ -802,7 +771,6 @@ fn scancodeToButton(scancode: u9) ?wio.Button {
             0x136 => .right_shift, // sent by IME
             0x137 => .print_screen,
             0x138 => .right_alt,
-            0x145 => .num_lock,
             0x146 => .pause, // break
             0x147 => .home,
             0x148 => .up,
