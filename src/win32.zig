@@ -29,6 +29,12 @@ pub fn init(options: wio.InitOptions) !void {
             .dwFlags = 0,
             .hwndTarget = null,
         },
+        .{
+            .usUsagePage = w.HID_USAGE_PAGE_GENERIC,
+            .usUsage = w.HID_USAGE_GENERIC_MOUSE,
+            .dwFlags = 0,
+            .hwndTarget = null,
+        },
     };
     if (w.RegisterRawInputDevices(&rid, rid.len, @sizeOf(w.RAWINPUTDEVICE)) == w.FALSE) return logLastError("RegisterRawInputDevices");
 
@@ -215,6 +221,15 @@ pub fn setCursor(self: *@This(), shape: wio.Cursor) void {
 
 pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
     self.cursor_mode = mode;
+    if (mode == .relative) {
+        var rect: w.RECT = undefined;
+        _ = w.GetClientRect(self.window, &rect);
+        _ = w.ClientToScreen(self.window, @ptrCast(&rect.left));
+        _ = w.ClientToScreen(self.window, @ptrCast(&rect.right));
+        _ = w.ClipCursor(&rect);
+    } else {
+        _ = w.ClipCursor(null);
+    }
 
     // trigger WM_SETCURSOR
     var pos: w.POINT = undefined;
@@ -533,6 +548,13 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
         },
         w.WM_SETFOCUS => {
             self.pushEvent(.focused);
+            if (self.cursor_mode == .relative) {
+                var rect: w.RECT = undefined;
+                _ = w.GetClientRect(self.window, &rect);
+                _ = w.ClientToScreen(self.window, @ptrCast(&rect.left));
+                _ = w.ClientToScreen(self.window, @ptrCast(&rect.right));
+                _ = w.ClipCursor(&rect);
+            }
             return 0;
         },
         w.WM_KILLFOCUS => {
@@ -611,6 +633,13 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
                         (raw.data.keyboard.Flags & w.RI_KEY_BREAK == 0);
                     self.pushEvent(if (press) .{ .button_press = button } else .{ .button_release = button });
                 },
+                w.RIM_TYPEMOUSE => {
+                    if (self.cursor_mode == .relative) {
+                        if (raw.data.mouse.usFlags & w.MOUSE_MOVE_ABSOLUTE == 0) {
+                            self.pushEvent(.{ .mouse_relative = .{ .x = @intCast(raw.data.mouse.lLastX), .y = @intCast(raw.data.mouse.lLastY) } });
+                        }
+                    }
+                },
                 else => {},
             }
             return 0;
@@ -643,7 +672,7 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
             return if (msg == w.WM_XBUTTONDOWN or msg == w.WM_XBUTTONUP) w.TRUE else 0;
         },
         w.WM_MOUSEMOVE => {
-            self.pushEvent(.{ .mouse = .{ .x = LOWORD(lParam), .y = HIWORD(lParam) } });
+            if (self.cursor_mode != .relative) self.pushEvent(.{ .mouse = .{ .x = LOWORD(lParam), .y = HIWORD(lParam) } });
             return 0;
         },
         w.WM_MOUSEWHEEL, w.WM_MOUSEHWHEEL => {
