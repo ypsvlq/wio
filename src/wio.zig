@@ -157,7 +157,7 @@ pub fn openJoystick(id: []const u8) !?Joystick {
 }
 
 pub const Joystick = struct {
-    backend: backend.Joystick,
+    backend: @typeInfo(@typeInfo(@typeInfo(@TypeOf(backend.openJoystick)).@"fn".return_type.?).error_union.payload).optional.child,
 
     pub fn close(self: *Joystick) void {
         self.backend.close();
