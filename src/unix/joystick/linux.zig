@@ -3,6 +3,15 @@ const wio = @import("../../wio.zig");
 const c = @cImport(@cInclude("linux/input.h"));
 const log = std.log.scoped(.wio);
 
+var permission_warning_shown = false;
+
+fn permissionWarning() void {
+    if (!permission_warning_shown) {
+        log.warn("access denied to joystick device", .{});
+        permission_warning_shown = true;
+    }
+}
+
 const JoystickIterator = struct {
     dir: std.fs.Dir,
     iter: std.fs.Dir.Iterator,
@@ -32,7 +41,13 @@ const JoystickIterator = struct {
 
     fn nextFile(self: *JoystickIterator) !?struct { std.fs.File, u16 } {
         const name, const index = try self.nextName() orelse return null;
-        const file = try self.dir.openFile(name, .{});
+        const file = self.dir.openFile(name, .{}) catch |err| switch (err) {
+            error.AccessDenied => {
+                permissionWarning();
+                return self.nextFile();
+            },
+            else => return err,
+        };
         return .{ file, index };
     }
 };
@@ -131,6 +146,14 @@ pub fn openJoystick(handle: usize) !Joystick {
     defer wio.allocator.free(path);
 
     const result = std.os.linux.open(path, .{ .NONBLOCK = true }, 0);
+    switch (std.os.linux.E.init(result)) {
+        .SUCCESS => {},
+        .ACCES => {
+            permissionWarning();
+            return error.Unavailable;
+        },
+        else => return error.Unavailable,
+    }
     if (std.os.linux.E.init(result) != .SUCCESS) return error.Unavailable;
     const fd: i32 = @intCast(result);
     errdefer _ = std.os.linux.close(fd);
