@@ -819,7 +819,7 @@ fn scancodeToButton(scancode: u9) ?wio.Button {
             0x42 => .f8,
             0x43 => .f9,
             0x44 => .f10,
-            0x45 => .num_lock,
+            0x45 => .pause,
             0x46 => .scroll_lock,
             0x47 => .kp_7,
             0x48 => .kp_8,
@@ -866,6 +866,7 @@ fn scancodeToButton(scancode: u9) ?wio.Button {
             0x136 => .right_shift, // sent by IME
             0x137 => .print_screen,
             0x138 => .right_alt,
+            0x145 => .num_lock,
             0x146 => .pause, // break
             0x147 => .home,
             0x148 => .up,
