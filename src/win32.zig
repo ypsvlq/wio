@@ -8,7 +8,6 @@ const class_name = w.L("wio");
 
 var helper_window: w.HWND = undefined;
 var helper_input: []u8 = &.{};
-var helper_values: []u16 = &.{};
 
 const JoystickInfo = struct {
     id: []const u8,
@@ -115,7 +114,6 @@ pub fn deinit() void {
         }
         joysticks.deinit();
     }
-    wio.allocator.free(helper_values);
     wio.allocator.free(helper_input);
     _ = w.DestroyWindow(helper_window);
 }
@@ -331,24 +329,65 @@ pub fn openJoystick(handle: usize) !*Joystick {
 
             var caps: w.HIDP_CAPS = undefined;
             _ = w.HidP_GetCaps(@bitCast(@intFromPtr(preparsed.ptr)), &caps);
-            const value_caps = try wio.allocator.alloc(w.HIDP_VALUE_CAPS, caps.NumberInputValueCaps);
+
+            var value_caps_len = caps.NumberInputValueCaps;
+            const value_caps = try wio.allocator.alloc(w.HIDP_VALUE_CAPS, value_caps_len);
             errdefer wio.allocator.free(value_caps);
-            var value_caps_size = caps.NumberInputValueCaps;
-            _ = w.HidP_GetValueCaps(w.HidP_Input, value_caps.ptr, &value_caps_size, @bitCast(@intFromPtr(preparsed.ptr)));
+            _ = w.HidP_GetValueCaps(w.HidP_Input, value_caps.ptr, &value_caps_len, @bitCast(@intFromPtr(preparsed.ptr)));
 
-            const axes = try wio.allocator.alloc(u16, value_caps_size);
+            var button_caps_len = caps.NumberInputButtonCaps;
+            const button_caps = try wio.allocator.alloc(w.HIDP_BUTTON_CAPS, button_caps_len);
+            defer wio.allocator.free(button_caps);
+            _ = w.HidP_GetButtonCaps(w.HidP_Input, button_caps.ptr, &button_caps_len, @bitCast(@intFromPtr(preparsed.ptr)));
+
+            const data_len = w.HidP_MaxDataListLength(w.HidP_Input, @bitCast(@intFromPtr(preparsed.ptr)));
+            const data = try wio.allocator.alloc(w.HIDP_DATA, data_len);
+            errdefer wio.allocator.free(data);
+
+            const indices = try wio.allocator.alloc(Joystick.DataIndex, data_len);
+            errdefer wio.allocator.free(indices);
+
+            var axis_count: u16 = 0;
+            for (value_caps, 0..) |cap, cap_index| {
+                const min = if (cap.IsRange == w.TRUE) cap.Anonymous.Range.DataIndexMin else cap.Anonymous.NotRange.DataIndex;
+                const max = (if (cap.IsRange == w.TRUE) cap.Anonymous.Range.DataIndexMax else cap.Anonymous.NotRange.DataIndex) + 1;
+                for (min..max) |i| {
+                    indices[i] = .{
+                        .axis = .{
+                            .index = axis_count,
+                            .caps_index = @intCast(cap_index),
+                        },
+                    };
+                    axis_count += 1;
+                }
+            }
+
+            var button_count: u16 = 0;
+            for (button_caps) |cap| {
+                const min = if (cap.IsRange == w.TRUE) cap.Anonymous.Range.DataIndexMin else cap.Anonymous.NotRange.DataIndex;
+                const max = (if (cap.IsRange == w.TRUE) cap.Anonymous.Range.DataIndexMax else cap.Anonymous.NotRange.DataIndex) + 1;
+                for (min..max) |i| {
+                    indices[i] = .{ .button = button_count };
+                    button_count += 1;
+                }
+            }
+
+            const axes = try wio.allocator.alloc(u16, axis_count);
             errdefer wio.allocator.free(axes);
+            @memset(axes, 0xFFFF / 2);
 
-            const button_count = w.HidP_MaxUsageListLength(w.HidP_Input, w.HID_USAGE_PAGE_BUTTON, @bitCast(@intFromPtr(preparsed.ptr)));
             const buttons = try wio.allocator.alloc(bool, button_count);
             errdefer wio.allocator.free(buttons);
+            @memset(buttons, false);
 
             const joystick = try wio.allocator.create(Joystick);
             errdefer wio.allocator.destroy(joystick);
             joystick.* = .{
                 .device = device,
                 .preparsed = preparsed,
-                .value_caps = value_caps[0..value_caps_size],
+                .value_caps = value_caps,
+                .data = data,
+                .indices = indices,
                 .axes = axes,
                 .hats = &.{},
                 .buttons = buttons,
@@ -364,10 +403,20 @@ pub const Joystick = struct {
     device: w.HANDLE,
     preparsed: []u8,
     value_caps: []w.HIDP_VALUE_CAPS,
+    data: []w.HIDP_DATA,
+    indices: []DataIndex,
     axes: []u16,
     hats: []wio.Hat,
     buttons: []bool,
     disconnected: bool = false,
+
+    const DataIndex = union(enum) {
+        axis: struct {
+            index: u16,
+            caps_index: u16,
+        },
+        button: u16,
+    };
 
     pub fn close(self: *Joystick) void {
         if (joysticks.getPtr(self.device)) |info| {
@@ -376,6 +425,8 @@ pub const Joystick = struct {
         wio.allocator.free(self.buttons);
         wio.allocator.free(self.hats);
         wio.allocator.free(self.axes);
+        wio.allocator.free(self.indices);
+        wio.allocator.free(self.data);
         wio.allocator.free(self.value_caps);
         wio.allocator.free(self.preparsed);
         wio.allocator.destroy(self);
@@ -540,26 +591,26 @@ fn helperWindowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM
                 if (joysticks.get(raw.header.hDevice)) |info| {
                     const joystick = info.joystick orelse return 0;
                     const report = raw.data.hid.bRawData()[0 .. raw.data.hid.dwSizeHid * raw.data.hid.dwCount];
-
-                    for (joystick.axes, joystick.value_caps) |*axis, caps| {
-                        var value: u32 = undefined;
-                        if (w.HidP_GetUsageValue(w.HidP_Input, caps.UsagePage, 0, caps.Anonymous.NotRange.Usage, &value, @bitCast(@intFromPtr(joystick.preparsed.ptr)), report.ptr, @intCast(report.len)) == w.HIDP_STATUS_SUCCESS) {
-                            if (value >= caps.LogicalMin and value <= caps.LogicalMax) {
-                                var float: f32 = @floatFromInt(value);
-                                float -= @floatFromInt(caps.LogicalMin);
-                                float /= @floatFromInt(caps.LogicalMax - caps.LogicalMin);
-                                float *= 0xFFFF;
-                                axis.* = @intFromFloat(float);
-                            }
-                        }
-                    }
-
-                    var button_count: u32 = @intCast(joystick.buttons.len);
-                    if (button_count > helper_values.len) helper_values = wio.allocator.realloc(helper_values, button_count) catch return 0;
-                    if (w.HidP_GetUsages(w.HidP_Input, w.HID_USAGE_PAGE_BUTTON, 0, helper_values.ptr, &button_count, @bitCast(@intFromPtr(joystick.preparsed.ptr)), report.ptr, @intCast(report.len)) == w.HIDP_STATUS_SUCCESS) {
+                    var data_len: u32 = @intCast(joystick.data.len);
+                    if (w.HidP_GetData(w.HidP_Input, joystick.data.ptr, &data_len, @bitCast(@intFromPtr(joystick.preparsed.ptr)), report.ptr, @intCast(report.len)) == w.HIDP_STATUS_SUCCESS) {
                         @memset(joystick.buttons, false);
-                        for (helper_values[0..button_count]) |button| {
-                            joystick.buttons[button - 1] = true;
+                        for (joystick.data[0..data_len]) |data| {
+                            switch (joystick.indices[data.DataIndex]) {
+                                .axis => |axis| {
+                                    const caps = &joystick.value_caps[axis.caps_index];
+                                    if (data.Anonymous.RawValue >= caps.LogicalMin and data.Anonymous.RawValue <= caps.LogicalMax) {
+                                        var float: f32 = @floatFromInt(data.Anonymous.RawValue);
+                                        float -= @floatFromInt(caps.LogicalMin);
+                                        float /= @floatFromInt(caps.LogicalMax - caps.LogicalMin);
+                                        float *= 0xFFFF;
+                                        joystick.axes[axis.index] = @intFromFloat(float);
+                                    } else {
+                                        // broken report descriptor, probably a u16
+                                        joystick.axes[axis.index] = @truncate(data.Anonymous.RawValue);
+                                    }
+                                },
+                                .button => |index| joystick.buttons[index] = (data.Anonymous.On == w.TRUE),
+                            }
                         }
                     }
                 }
