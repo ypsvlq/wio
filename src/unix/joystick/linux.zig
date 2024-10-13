@@ -220,6 +220,7 @@ pub const Joystick = struct {
         wio.allocator.free(self.buttons);
         wio.allocator.free(self.hats);
         wio.allocator.free(self.axes);
+        wio.allocator.free(self.axis_info);
         _ = std.os.linux.close(self.fd);
     }
 
