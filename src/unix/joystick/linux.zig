@@ -16,22 +16,37 @@ const JoystickIterator = struct {
         self.dir.close();
     }
 
-    fn next(self: *JoystickIterator) !?struct { std.fs.File, u16 } {
+    fn nextName(self: *JoystickIterator) !?struct { []const u8, u16 } {
         while (try self.iter.next()) |entry| {
             if (std.mem.endsWith(u8, entry.name, "-event-joystick")) {
                 var buf: [std.fs.max_path_bytes]u8 = undefined;
                 const link = try self.dir.readLink(entry.name, &buf);
                 const prefix = "../event";
                 if (std.mem.startsWith(u8, link, prefix)) {
-                    const index = try std.fmt.parseUnsigned(u16, link[prefix.len..], 10);
-                    const file = try self.dir.openFile(entry.name, .{});
-                    return .{ file, index };
+                    return .{ entry.name, try std.fmt.parseUnsigned(u16, link[prefix.len..], 10) };
                 }
             }
         }
         return null;
     }
+
+    fn nextFile(self: *JoystickIterator) !?struct { std.fs.File, u16 } {
+        const name, const index = try self.nextName() orelse return null;
+        const file = try self.dir.openFile(name, .{});
+        return .{ file, index };
+    }
 };
+
+pub fn init() !void {
+    var iter = try JoystickIterator.init();
+    defer iter.deinit();
+    while (try iter.nextName()) |value| {
+        _, const index = value;
+        if (wio.init_options.joystickCallback) |callback| {
+            callback(index);
+        }
+    }
+}
 
 pub fn getJoysticks(allocator: std.mem.Allocator) ![]wio.JoystickInfo {
     var list = std.ArrayList(wio.JoystickInfo).init(allocator);
@@ -45,7 +60,7 @@ pub fn getJoysticks(allocator: std.mem.Allocator) ![]wio.JoystickInfo {
 
     var iter = try JoystickIterator.init();
     defer iter.deinit();
-    while (try iter.next()) |value| {
+    while (try iter.nextFile()) |value| {
         const file, const index = value;
         defer file.close();
 
@@ -93,7 +108,7 @@ pub fn resolveJoystickId(id: []const u8) ?usize {
     } else |_| {}
 
     var iter = JoystickIterator.init() catch return null;
-    while (iter.next() catch return null) |value| {
+    while (iter.nextFile() catch return null) |value| {
         const file, const index = value;
         defer file.close();
         var info: c.input_id = undefined;

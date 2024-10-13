@@ -18,6 +18,10 @@ pub var active: enum {
 pub fn init(options: wio.InitOptions) !void {
     if (builtin.os.tag == .linux and builtin.output_mode == .Exe and builtin.link_mode == .static) @compileError("dynamic link required");
 
+    if (options.joystick) {
+        try joystick.init();
+    }
+
     comptime var enable_x11 = false;
     comptime var enable_wayland = false;
     comptime {
