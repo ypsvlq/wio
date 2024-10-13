@@ -175,6 +175,7 @@ pub fn openJoystick(handle: usize) !Joystick {
 
     const axes = try wio.allocator.alloc(u16, axis_count);
     errdefer wio.allocator.free(axes);
+    @memset(axes, 0xFFFF / 2);
     const hats = try wio.allocator.alloc(wio.Hat, hat_count);
     errdefer wio.allocator.free(hats);
     const buttons = try wio.allocator.alloc(bool, button_count);
