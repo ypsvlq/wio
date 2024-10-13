@@ -178,7 +178,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
         &attributes,
     );
     errdefer _ = c.XDestroyWindow(display, window);
-    _ = c.XMapWindow(display, self.window);
+    _ = c.XMapWindow(display, window);
 
     const protocols = [_]h.Atom{atoms.WM_DELETE_WINDOW};
     _ = c.XChangeProperty(display, window, atoms.WM_PROTOCOLS, h.XA_ATOM, 32, h.PropModeReplace, @ptrCast(&protocols), protocols.len);
