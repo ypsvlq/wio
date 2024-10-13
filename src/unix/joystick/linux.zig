@@ -201,8 +201,10 @@ pub fn openJoystick(handle: usize) !Joystick {
     @memset(axes, 0xFFFF / 2);
     const hats = try wio.allocator.alloc(wio.Hat, hat_count);
     errdefer wio.allocator.free(hats);
+    @memset(hats, .{});
     const buttons = try wio.allocator.alloc(bool, button_count);
     errdefer wio.allocator.free(buttons);
+    @memset(buttons, false);
 
     return .{ .fd = fd, .abs_map = abs_map, .key_map = key_map, .axis_info = axis_info, .axes = axes, .hats = hats, .buttons = buttons };
 }
