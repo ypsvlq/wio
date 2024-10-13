@@ -544,12 +544,13 @@ fn helperWindowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM
                     for (joystick.axes, joystick.value_caps) |*axis, caps| {
                         var value: u32 = undefined;
                         if (w.HidP_GetUsageValue(w.HidP_Input, caps.UsagePage, 0, caps.Anonymous.NotRange.Usage, &value, @bitCast(@intFromPtr(joystick.preparsed.ptr)), report.ptr, @intCast(report.len)) == w.HIDP_STATUS_SUCCESS) {
-                            var float: f32 = @floatFromInt(value);
-                            float -= @floatFromInt(caps.LogicalMin);
-                            float /= @floatFromInt(caps.LogicalMax - caps.LogicalMin);
-                            float *= 0xFFFF;
-                            // std.log.info("{} [{} {}] {} {}", .{ value, caps.LogicalMin, caps.LogicalMax, float, caps });
-                            axis.* = @intFromFloat(float);
+                            if (value >= caps.LogicalMin and value <= caps.LogicalMax) {
+                                var float: f32 = @floatFromInt(value);
+                                float -= @floatFromInt(caps.LogicalMin);
+                                float /= @floatFromInt(caps.LogicalMax - caps.LogicalMin);
+                                float *= 0xFFFF;
+                                axis.* = @intFromFloat(float);
+                            }
                         }
                     }
 
