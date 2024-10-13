@@ -23,7 +23,7 @@ const JoystickIterator = struct {
                 const link = try self.dir.readLink(entry.name, &buf);
                 const prefix = "../event";
                 if (std.mem.startsWith(u8, link, prefix)) {
-                    const index = try std.fmt.parseInt(u16, link[prefix.len..], 10);
+                    const index = try std.fmt.parseUnsigned(u16, link[prefix.len..], 10);
                     const file = try self.dir.openFile(entry.name, .{});
                     return .{ file, index };
                 }
@@ -55,85 +55,73 @@ pub fn getJoysticks(allocator: std.mem.Allocator) ![]wio.JoystickInfo {
         const count = std.os.linux.ioctl(file.handle, c.EVIOCGNAME(buf.len), @intFromPtr(&buf));
         if (std.os.linux.E.init(count) != .SUCCESS) continue;
 
-        const id = try std.fmt.allocPrint(allocator, "{}-{x:0>4}{x:0>4}", .{ index, info.vendor, info.product });
+        const id = try std.fmt.allocPrint(allocator, "{x:0>4}{x:0>4}-{}", .{ info.vendor, info.product, index });
         errdefer allocator.free(id);
         const name = try allocator.dupe(u8, buf[0..count]);
         errdefer allocator.free(name);
-        try list.append(.{ .id = id, .name = name });
+        try list.append(.{ .handle = index, .id = id, .name = name });
     }
 
     return list.toOwnedSlice();
 }
 
-const Id = struct {
-    index: []const u8,
-    vendor: u16,
-    product: u16,
-};
-
-fn parseId(id: []const u8) ?Id {
-    const index = std.mem.indexOfScalar(u8, id, '-') orelse return null;
-    if (id.len - index != 9) return null;
-    return .{
-        .index = id[0..index],
-        .vendor = std.fmt.parseInt(u16, id[index + 1 .. index + 5], 16) catch return null,
-        .product = std.fmt.parseInt(u16, id[index + 6 ..], 16) catch return null,
-    };
+pub fn freeJoysticks(allocator: std.mem.Allocator, list: []wio.JoystickInfo) void {
+    for (list) |info| {
+        allocator.free(info.id);
+        allocator.free(info.name);
+    }
+    allocator.free(list);
 }
 
-pub fn resolveJoystickId(allocator: std.mem.Allocator, id: []const u8) ![]u8 {
-    const target = parseId(id) orelse return allocator.dupe(u8, id);
+pub fn resolveJoystickId(id: []const u8) ?usize {
+    if (id.len < 10 or id[8] != '-') return null;
+    const target_vendor = std.fmt.parseUnsigned(u16, id[0..4], 16) catch return null;
+    const target_product = std.fmt.parseUnsigned(u16, id[4..8], 16) catch return null;
+    const target_index = std.fmt.parseUnsigned(u16, id[9..], 10) catch return null;
 
-    const path = try std.fmt.allocPrintZ(wio.allocator, "/dev/input/event{s}", .{target.index});
+    const path = std.fmt.allocPrintZ(wio.allocator, "/dev/input/event{}", .{target_index}) catch return null;
     defer wio.allocator.free(path);
 
     if (std.fs.openFileAbsoluteZ(path, .{})) |file| {
         defer file.close();
         var info: c.input_id = undefined;
         if (std.os.linux.ioctl(file.handle, c.EVIOCGID, @intFromPtr(&info)) == 0) {
-            if (info.vendor == target.vendor and info.product == target.product) {
-                return allocator.dupe(u8, id);
+            if (info.vendor == target_vendor and info.product == target_product) {
+                return target_index;
             }
         }
     } else |_| {}
 
-    var iter = try JoystickIterator.init();
-    while (try iter.next()) |value| {
+    var iter = JoystickIterator.init() catch return null;
+    while (iter.next() catch return null) |value| {
         const file, const index = value;
         defer file.close();
         var info: c.input_id = undefined;
         if (std.os.linux.ioctl(file.handle, c.EVIOCGID, @intFromPtr(&info)) == 0) {
-            if (info.vendor == target.vendor and info.product == target.product) {
-                return std.fmt.allocPrint(allocator, "{}-{x:0>4}{x:0>4}", .{ index, info.vendor, info.product });
+            if (info.vendor == target_vendor and info.product == target_product) {
+                return index;
             }
         }
     }
 
-    return allocator.dupe(u8, id);
+    return null;
 }
 
 fn EVIOCGABS(abs: u32) u32 {
     return 0x80184540 | abs;
 }
 
-pub fn openJoystick(s: []const u8) !?Joystick {
-    const id = parseId(s) orelse return null;
-
-    const path = try std.fmt.allocPrintZ(wio.allocator, "/dev/input/event{s}", .{id.index});
+pub fn openJoystick(handle: usize) !Joystick {
+    const path = try std.fmt.allocPrintZ(wio.allocator, "/dev/input/event{}", .{handle});
     defer wio.allocator.free(path);
 
     const result = std.os.linux.open(path, .{ .NONBLOCK = true }, 0);
-    if (std.os.linux.E.init(result) != .SUCCESS) return null;
+    if (std.os.linux.E.init(result) != .SUCCESS) return error.Unavailable;
     const fd: i32 = @intCast(result);
-    var success = false;
-    defer _ = if (!success) std.os.linux.close(fd);
-
-    var info: c.input_id = undefined;
-    if (std.os.linux.ioctl(fd, c.EVIOCGID, @intFromPtr(&info)) != 0) return null;
-    if (info.vendor != id.vendor or info.product != id.product) return null;
+    errdefer _ = std.os.linux.close(fd);
 
     var abs_bits = std.bit_set.ArrayBitSet(u8, c.ABS_CNT).initEmpty();
-    if (std.os.linux.E.init(std.os.linux.ioctl(fd, c.EVIOCGBIT(c.EV_ABS, @sizeOf(@TypeOf(abs_bits.masks))), @intFromPtr(&abs_bits.masks))) != .SUCCESS) return null;
+    if (std.os.linux.E.init(std.os.linux.ioctl(fd, c.EVIOCGBIT(c.EV_ABS, @sizeOf(@TypeOf(abs_bits.masks))), @intFromPtr(&abs_bits.masks))) != .SUCCESS) return error.Unavailable;
     var abs_iter = abs_bits.iterator(.{});
     var abs_map = [1]u8{0} ** c.ABS_CNT;
     var axis_count: u8 = 0;
@@ -151,17 +139,17 @@ pub fn openJoystick(s: []const u8) !?Joystick {
     }
 
     const axis_info = try wio.allocator.alloc(c.input_absinfo, axis_count);
-    defer if (!success) wio.allocator.free(axis_info);
+    errdefer wio.allocator.free(axis_info);
     for (abs_map, 0..) |index, code| {
         if (index != 0) {
             if (code < c.ABS_HAT0X or code > c.ABS_HAT3Y) {
-                if (std.os.linux.ioctl(fd, EVIOCGABS(@intCast(code)), @intFromPtr(&axis_info[index - 1])) != 0) return null;
+                if (std.os.linux.ioctl(fd, EVIOCGABS(@intCast(code)), @intFromPtr(&axis_info[index - 1])) != 0) return error.Unavailable;
             }
         }
     }
 
     var key_bits = std.bit_set.ArrayBitSet(u8, c.KEY_CNT).initEmpty();
-    if (std.os.linux.E.init(std.os.linux.ioctl(fd, c.EVIOCGBIT(c.EV_KEY, @sizeOf(@TypeOf(key_bits.masks))), @intFromPtr(&key_bits.masks))) != .SUCCESS) return null;
+    if (std.os.linux.E.init(std.os.linux.ioctl(fd, c.EVIOCGBIT(c.EV_KEY, @sizeOf(@TypeOf(key_bits.masks))), @intFromPtr(&key_bits.masks))) != .SUCCESS) return error.Unavailable;
     var key_iter = key_bits.iterator(.{});
     var key_map = [1]u16{0} ** c.KEY_CNT;
     var button_count: u16 = 0;
@@ -177,7 +165,6 @@ pub fn openJoystick(s: []const u8) !?Joystick {
     const buttons = try wio.allocator.alloc(bool, button_count);
     errdefer wio.allocator.free(buttons);
 
-    success = true;
     return .{ .fd = fd, .abs_map = abs_map, .key_map = key_map, .axis_info = axis_info, .axes = axes, .hats = hats, .buttons = buttons };
 }
 

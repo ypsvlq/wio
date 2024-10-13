@@ -5,22 +5,22 @@ pub fn getJoysticks(allocator: std.mem.Allocator) ![]wio.JoystickInfo {
     return allocator.alloc(wio.JoystickInfo, 0);
 }
 
-pub fn resolveJoystickId(allocator: std.mem.Allocator, id: []const u8) ![]u8 {
-    return allocator.dupe(u8, id);
+pub fn freeJoysticks(allocator: std.mem.Allocator, list: []wio.JoystickInfo) void {
+    allocator.free(list);
 }
 
-pub fn openJoystick(id: []const u8) !?Joystick {
-    _ = id;
+pub fn resolveJoystickId(_: []const u8) ?usize {
     return null;
 }
 
-pub const Joystick = struct {
-    pub fn close(self: *Joystick) void {
-        _ = self;
-    }
+pub fn openJoystick(_: usize) !Joystick {
+    return error.Unavailable;
+}
 
-    pub fn poll(self: *Joystick) !?wio.JoystickState {
-        _ = self;
+pub const Joystick = struct {
+    pub fn close(_: *Joystick) void {}
+
+    pub fn poll(_: *Joystick) !?wio.JoystickState {
         return null;
     }
 };

@@ -9,17 +9,20 @@ pub const std_options = std.Options{
 };
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-pub const allocator = gpa.allocator();
+const allocator = gpa.allocator();
 var window: wio.Window = undefined;
 
 pub fn main() !void {
-    try wio.init(allocator, .{ .joystick = true, .opengl = true });
+    try wio.init(allocator, .{
+        .joystick = true,
+        .joystickCallback = joystick.connected,
+        .opengl = true,
+    });
     window = try wio.createWindow(.{ .title = "wio example" });
     try window.createContext(.{});
     window.makeContextCurrent();
     window.swapInterval(1);
     renderer.init();
-    try joystick.open();
     return wio.run(loop, .{});
 }
 
@@ -34,7 +37,7 @@ fn loop() !bool {
             .button_press => |button| std.log.info("+{s}", .{@tagName(button)}),
             .button_release => |button| std.log.info("-{s}", .{@tagName(button)}),
             .mouse => |mouse| std.log.info("({},{})", .{ mouse.x, mouse.y }),
-            .mouse_relative => |mouse| std.log.info("{},{}", .{mouse.x,mouse.y}),
+            .mouse_relative => |mouse| std.log.info("{},{}", .{ mouse.x, mouse.y }),
             .scroll_vertical, .scroll_horizontal => |value| std.log.info("{s} {d}", .{ @tagName(event), value }),
             else => std.log.info("{s}", .{@tagName(event)}),
         }
@@ -50,7 +53,6 @@ fn loop() !bool {
             .framebuffer => |size| renderer.resize(size),
             .button_press => |button| handlePress(button),
             .button_release => |button| handleRelease(button),
-            .joystick => try joystick.open(),
             else => {},
         }
     }

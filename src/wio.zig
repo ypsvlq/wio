@@ -14,6 +14,7 @@ pub const logFn = if (@hasDecl(backend, "logFn")) backend.logFn else std.log.def
 
 pub const InitOptions = struct {
     joystick: bool = false,
+    joystickCallback: ?*const fn (usize) void = null,
     opengl: bool = false,
 };
 
@@ -133,31 +134,33 @@ pub const JoystickList = struct {
     allocator: std.mem.Allocator,
 
     pub fn deinit(self: JoystickList) void {
-        for (self.items) |info| {
-            self.allocator.free(info.id);
-            self.allocator.free(info.name);
-        }
-        self.allocator.free(self.items);
+        backend.freeJoysticks(self.allocator, self.items);
     }
 };
 
 pub const JoystickInfo = struct {
+    handle: usize,
     id: []const u8,
     name: []const u8,
 };
 
-pub fn resolveJoystickId(ally: std.mem.Allocator, id: []const u8) ![]u8 {
-    return backend.resolveJoystickId(ally, id);
+pub fn resolveJoystickId(id: []const u8) ?usize {
+    std.debug.assert(init_options.joystick);
+    return backend.resolveJoystickId(id);
 }
 
-/// `id` must have been obtained from an earlier call to `getJoysticks` or `resolveJoystickId`.
-pub fn openJoystick(id: []const u8) !?Joystick {
+pub fn openJoystick(handle: usize) !?Joystick {
     std.debug.assert(init_options.joystick);
-    return .{ .backend = try backend.openJoystick(id) orelse return null };
+    return .{
+        .backend = backend.openJoystick(handle) catch |err| switch (err) {
+            error.Unavailable => return null,
+            else => return err,
+        },
+    };
 }
 
 pub const Joystick = struct {
-    backend: @typeInfo(@typeInfo(@typeInfo(@TypeOf(backend.openJoystick)).@"fn".return_type.?).error_union.payload).optional.child,
+    backend: @typeInfo(@typeInfo(@TypeOf(backend.openJoystick)).@"fn".return_type.?).error_union.payload,
 
     pub fn close(self: *Joystick) void {
         self.backend.close();
@@ -218,7 +221,6 @@ pub const Event = union(enum) {
     mouse_relative: struct { x: i16, y: i16 },
     scroll_vertical: f32,
     scroll_horizontal: f32,
-    joystick: void,
 };
 
 pub const EventType = @typeInfo(Event).@"union".tag_type.?;

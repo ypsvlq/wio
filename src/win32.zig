@@ -10,7 +10,13 @@ var helper_window: w.HWND = undefined;
 var helper_input: []u8 = &.{};
 var helper_values: []u16 = &.{};
 
-var joysticks: std.AutoHashMap(w.HANDLE, struct { info: wio.JoystickInfo, joystick: ?*Joystick }) = undefined;
+const JoystickInfo = struct {
+    id: []const u8,
+    name: []const u8,
+    joystick: ?*Joystick = null,
+};
+
+var joysticks: std.AutoHashMap(w.HANDLE, JoystickInfo) = undefined;
 
 var wgl: struct {
     swapIntervalEXT: ?*const fn (i32) callconv(w.WINAPI) w.BOOL = null,
@@ -103,9 +109,9 @@ pub fn init(options: wio.InitOptions) !void {
 pub fn deinit() void {
     if (wio.init_options.joystick) {
         var iter = joysticks.valueIterator();
-        while (iter.next()) |value| {
-            wio.allocator.free(value.info.id);
-            wio.allocator.free(value.info.name);
+        while (iter.next()) |info| {
+            wio.allocator.free(info.id);
+            wio.allocator.free(info.name);
         }
         joysticks.deinit();
     }
@@ -285,77 +291,73 @@ pub fn swapInterval(_: @This(), interval: i32) void {
 }
 
 pub fn getJoysticks(allocator: std.mem.Allocator) ![]wio.JoystickInfo {
-    var list = try std.ArrayList(wio.JoystickInfo).initCapacity(allocator, joysticks.count());
-    errdefer {
-        for (list.items) |info| {
-            allocator.free(info.id);
-            allocator.free(info.name);
-        }
-        list.deinit();
+    const list = try allocator.alloc(wio.JoystickInfo, joysticks.count());
+    errdefer allocator.free(list);
+    var iter = joysticks.iterator();
+    for (list) |*ptr| {
+        const entry = iter.next().?;
+        ptr.* = .{
+            .handle = @intFromPtr(entry.key_ptr.*),
+            .id = entry.value_ptr.id,
+            .name = entry.value_ptr.name,
+        };
     }
-    var iter = joysticks.valueIterator();
-    while (iter.next()) |value| {
-        const id = try allocator.dupe(u8, value.info.id);
-        errdefer allocator.free(id);
-        const name = try allocator.dupe(u8, value.info.name);
-        errdefer allocator.free(name);
-        list.appendAssumeCapacity(.{
-            .id = id,
-            .name = name,
-        });
-    }
-    return list.toOwnedSlice();
+    return list;
 }
 
-pub fn resolveJoystickId(allocator: std.mem.Allocator, id: []const u8) ![]u8 {
-    return allocator.dupe(u8, id);
+pub fn freeJoysticks(allocator: std.mem.Allocator, list: []wio.JoystickInfo) void {
+    allocator.free(list);
 }
 
-pub fn openJoystick(id: []const u8) !?*Joystick {
+pub fn resolveJoystickId(id: []const u8) ?usize {
     var iter = joysticks.iterator();
     while (iter.next()) |entry| {
-        if (std.mem.eql(u8, entry.value_ptr.info.id, id)) {
-            if (entry.value_ptr.joystick == null) {
-                const device = entry.key_ptr.*;
-                var success = false;
-
-                var preparsed_size: u32 = undefined;
-                if (w.GetRawInputDeviceInfoW(device, w.RIDI_PREPARSEDDATA, null, &preparsed_size) < 0) return null;
-                const preparsed = try wio.allocator.alloc(u8, preparsed_size);
-                defer if (!success) wio.allocator.free(preparsed);
-                if (w.GetRawInputDeviceInfoW(device, w.RIDI_PREPARSEDDATA, preparsed.ptr, &preparsed_size) < 0) return null;
-
-                var caps: w.HIDP_CAPS = undefined;
-                _ = w.HidP_GetCaps(@bitCast(@intFromPtr(preparsed.ptr)), &caps);
-                const value_caps = try wio.allocator.alloc(w.HIDP_VALUE_CAPS, caps.NumberInputValueCaps);
-                defer if (!success) wio.allocator.free(value_caps);
-                var value_caps_size = caps.NumberInputValueCaps;
-                _ = w.HidP_GetValueCaps(w.HidP_Input, value_caps.ptr, &value_caps_size, @bitCast(@intFromPtr(preparsed.ptr)));
-
-                const axes = try wio.allocator.alloc(u16, value_caps_size);
-                defer if (!success) wio.allocator.free(axes);
-
-                const button_count = w.HidP_MaxUsageListLength(w.HidP_Input, w.HID_USAGE_PAGE_BUTTON, @bitCast(@intFromPtr(preparsed.ptr)));
-                const buttons = try wio.allocator.alloc(bool, button_count);
-                defer if (!success) wio.allocator.free(buttons);
-
-                const joystick = try wio.allocator.create(Joystick);
-                defer if (!success) wio.allocator.destroy(joystick);
-                joystick.* = .{
-                    .device = device,
-                    .preparsed = preparsed,
-                    .value_caps = value_caps[0..value_caps_size],
-                    .axes = axes,
-                    .hats = &.{},
-                    .buttons = buttons,
-                };
-                entry.value_ptr.joystick = joystick;
-                success = true;
-                return joystick;
-            }
+        if (std.mem.eql(u8, id, entry.value_ptr.id)) {
+            return @intFromPtr(entry.key_ptr.*);
         }
     }
     return null;
+}
+
+pub fn openJoystick(handle: usize) !*Joystick {
+    const device: w.HANDLE = @ptrFromInt(handle);
+    if (joysticks.getPtr(device)) |info| {
+        if (info.joystick == null) {
+            var preparsed_size: u32 = undefined;
+            if (w.GetRawInputDeviceInfoW(device, w.RIDI_PREPARSEDDATA, null, &preparsed_size) < 0) return error.Unavailable;
+            const preparsed = try wio.allocator.alloc(u8, preparsed_size);
+            errdefer wio.allocator.free(preparsed);
+            if (w.GetRawInputDeviceInfoW(device, w.RIDI_PREPARSEDDATA, preparsed.ptr, &preparsed_size) < 0) return error.Unavailable;
+
+            var caps: w.HIDP_CAPS = undefined;
+            _ = w.HidP_GetCaps(@bitCast(@intFromPtr(preparsed.ptr)), &caps);
+            const value_caps = try wio.allocator.alloc(w.HIDP_VALUE_CAPS, caps.NumberInputValueCaps);
+            errdefer wio.allocator.free(value_caps);
+            var value_caps_size = caps.NumberInputValueCaps;
+            _ = w.HidP_GetValueCaps(w.HidP_Input, value_caps.ptr, &value_caps_size, @bitCast(@intFromPtr(preparsed.ptr)));
+
+            const axes = try wio.allocator.alloc(u16, value_caps_size);
+            errdefer wio.allocator.free(axes);
+
+            const button_count = w.HidP_MaxUsageListLength(w.HidP_Input, w.HID_USAGE_PAGE_BUTTON, @bitCast(@intFromPtr(preparsed.ptr)));
+            const buttons = try wio.allocator.alloc(bool, button_count);
+            errdefer wio.allocator.free(buttons);
+
+            const joystick = try wio.allocator.create(Joystick);
+            errdefer wio.allocator.destroy(joystick);
+            joystick.* = .{
+                .device = device,
+                .preparsed = preparsed,
+                .value_caps = value_caps[0..value_caps_size],
+                .axes = axes,
+                .hats = &.{},
+                .buttons = buttons,
+            };
+            info.joystick = joystick;
+            return joystick;
+        }
+    }
+    return error.Unavailable;
 }
 
 pub const Joystick = struct {
@@ -368,8 +370,8 @@ pub const Joystick = struct {
     disconnected: bool = false,
 
     pub fn close(self: *Joystick) void {
-        if (joysticks.getPtr(self.device)) |value| {
-            value.joystick = null;
+        if (joysticks.getPtr(self.device)) |info| {
+            info.joystick = null;
         }
         wio.allocator.free(self.buttons);
         wio.allocator.free(self.hats);
@@ -497,26 +499,27 @@ fn helperWindowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM
                         product[0] = 0;
                         if (w.HidD_GetProductString(collection, &product, product.len * @sizeOf(u16)) == w.FALSE) return 0;
 
-                        var info: wio.JoystickInfo = undefined;
-                        info.id = std.unicode.utf16LeToUtf8Alloc(wio.allocator, std.mem.sliceTo(&instance, 0)) catch return 0;
-                        info.name = std.unicode.utf16LeToUtf8Alloc(wio.allocator, std.mem.sliceTo(&product, 0)) catch {
-                            wio.allocator.free(info.id);
+                        const id = std.unicode.utf16LeToUtf8Alloc(wio.allocator, std.mem.sliceTo(&instance, 0)) catch return 0;
+                        const name = std.unicode.utf16LeToUtf8Alloc(wio.allocator, std.mem.sliceTo(&product, 0)) catch {
+                            wio.allocator.free(id);
                             return 0;
                         };
 
-                        joysticks.put(device, .{ .info = info, .joystick = null }) catch {
-                            wio.allocator.free(info.id);
-                            wio.allocator.free(info.name);
+                        joysticks.put(device, .{ .id = id, .name = name }) catch {
+                            wio.allocator.free(id);
+                            wio.allocator.free(name);
                             return 0;
                         };
+
+                        if (wio.init_options.joystickCallback) |callback| callback(@intFromPtr(device));
                     },
                     w.GIDC_REMOVAL => {
-                        if (joysticks.get(device)) |value| {
-                            if (value.joystick) |joystick| {
+                        if (joysticks.get(device)) |info| {
+                            if (info.joystick) |joystick| {
                                 joystick.disconnected = true;
                             }
-                            wio.allocator.free(value.info.id);
-                            wio.allocator.free(value.info.name);
+                            wio.allocator.free(info.id);
+                            wio.allocator.free(info.name);
                             _ = joysticks.remove(device);
                         }
                     },
@@ -534,17 +537,18 @@ fn helperWindowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM
                 _ = w.GetRawInputData(handle, w.RID_INPUT, helper_input.ptr, &size, @sizeOf(w.RAWINPUTHEADER));
                 const raw: *w.RAWINPUT = @alignCast(@ptrCast(helper_input));
 
-                if (joysticks.get(raw.header.hDevice)) |entry| {
-                    const joystick = entry.joystick orelse return 0;
+                if (joysticks.get(raw.header.hDevice)) |info| {
+                    const joystick = info.joystick orelse return 0;
                     const report = raw.data.hid.bRawData()[0 .. raw.data.hid.dwSizeHid * raw.data.hid.dwCount];
 
-                    for (joystick.axes, joystick.value_caps) |*axis, info| {
+                    for (joystick.axes, joystick.value_caps) |*axis, caps| {
                         var value: u32 = undefined;
-                        if (w.HidP_GetUsageValue(w.HidP_Input, info.UsagePage, 0, info.Anonymous.NotRange.Usage, &value, @bitCast(@intFromPtr(joystick.preparsed.ptr)), report.ptr, @intCast(report.len)) == w.HIDP_STATUS_SUCCESS) {
+                        if (w.HidP_GetUsageValue(w.HidP_Input, caps.UsagePage, 0, caps.Anonymous.NotRange.Usage, &value, @bitCast(@intFromPtr(joystick.preparsed.ptr)), report.ptr, @intCast(report.len)) == w.HIDP_STATUS_SUCCESS) {
                             var float: f32 = @floatFromInt(value);
-                            float -= @floatFromInt(info.LogicalMin);
-                            float /= @floatFromInt(info.LogicalMax - info.LogicalMin);
+                            float -= @floatFromInt(caps.LogicalMin);
+                            float /= @floatFromInt(caps.LogicalMax - caps.LogicalMin);
                             float *= 0xFFFF;
+                            // std.log.info("{} [{} {}] {} {}", .{ value, caps.LogicalMin, caps.LogicalMax, float, caps });
                             axis.* = @intFromFloat(float);
                         }
                     }
@@ -736,12 +740,6 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
             const value = delta / w.WHEEL_DELTA;
             self.pushEvent(if (msg == w.WM_MOUSEWHEEL) .{ .scroll_vertical = -value } else .{ .scroll_horizontal = value });
             return 0;
-        },
-        w.WM_DEVICECHANGE => {
-            if (wParam == w.DBT_DEVNODES_CHANGED) {
-                self.pushEvent(.joystick);
-            }
-            return w.TRUE;
         },
         else => return w.DefWindowProcW(window, msg, wParam, lParam),
     }

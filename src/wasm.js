@@ -53,8 +53,7 @@ const wio = {
             if (event.deltaX != 0) wio.events.push(15, event.deltaX * 0.01);
         });
 
-        addEventListener("gamepadconnected", () => wio.events.push(16));
-        addEventListener("gamepaddisconnected", () => wio.events.push(16));
+        addEventListener("gamepadconnected", event => wio.module.exports.wioJoystick(event.gamepad.index));
     },
 
     loop() {

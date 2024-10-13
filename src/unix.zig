@@ -158,12 +158,16 @@ pub fn getJoysticks(allocator: std.mem.Allocator) ![]wio.JoystickInfo {
     return joystick.getJoysticks(allocator);
 }
 
-pub fn resolveJoystickId(allocator: std.mem.Allocator, id: []const u8) ![]u8 {
-    return joystick.resolveJoystickId(allocator, id);
+pub fn freeJoysticks(allocator: std.mem.Allocator, list: []wio.JoystickInfo) void {
+    joystick.freeJoysticks(allocator, list);
 }
 
-pub fn openJoystick(id: []const u8) !?Joystick {
-    return joystick.openJoystick(id);
+pub fn resolveJoystickId(id: []const u8) ?usize {
+    return joystick.resolveJoystickId(id);
+}
+
+pub fn openJoystick(handle: usize) !Joystick {
+    return joystick.openJoystick(handle);
 }
 
 pub const Joystick = joystick.Joystick;

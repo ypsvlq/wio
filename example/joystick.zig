@@ -6,15 +6,22 @@ const log = std.log.scoped(.joystick);
 var active: ?wio.Joystick = null;
 var last_state: u32 = 0;
 
-pub fn open() !void {
+pub fn connected(handle: usize) void {
     if (active == null) {
-        const joysticks = try wio.getJoysticks(main.allocator);
+        const joysticks = wio.getJoysticks(wio.allocator) catch return;
         defer joysticks.deinit();
-        if (joysticks.items.len > 0) {
-            const info = joysticks.items[0];
-            log.info("using {s} / {s}", .{ info.name, info.id });
-            active = try wio.openJoystick(info.id);
+        for (joysticks.items) |info| {
+            if (info.handle == handle) {
+                log.info("using 0x{x}: {s} / {s}", .{ handle, info.name, info.id });
+                if (wio.resolveJoystickId(info.id)) |resolved| {
+                    std.debug.assert(resolved == handle);
+                    log.info("resolved", .{});
+                }
+                break;
+            }
         }
+
+        active = wio.openJoystick(handle) catch return;
     }
 }
 
