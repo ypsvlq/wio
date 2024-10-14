@@ -795,9 +795,9 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
         w.WM_SIZE => {
             const size = wio.Size{ .width = LOWORD(lParam), .height = HIWORD(lParam) };
             if (wParam == w.SIZE_RESTORED or wParam == w.SIZE_MAXIMIZED) {
+                self.pushEvent(.{ .maximized = (wParam == w.SIZE_MAXIMIZED) });
                 self.pushEvent(.{ .size = size });
                 self.pushEvent(.{ .framebuffer = size });
-                self.pushEvent(.{ .maximized = (wParam == w.SIZE_MAXIMIZED) });
             }
             return 0;
         },

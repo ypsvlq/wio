@@ -213,6 +213,7 @@ pub const Event = union(enum) {
     size: Size,
     framebuffer: Size,
     scale: f32,
+    /// Sent before `size`.
     maximized: bool,
     char: u21,
     button_press: Button,

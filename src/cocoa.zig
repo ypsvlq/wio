@@ -180,9 +180,9 @@ export fn wioUnfocus(self: *@This()) void {
 }
 
 export fn wioSize(self: *@This(), maximized: bool, width: u16, height: u16, fb_width: u16, fb_height: u16) void {
+    self.pushEvent(.{ .maximized = maximized });
     self.pushEvent(.{ .size = .{ .width = width, .height = height } });
     self.pushEvent(.{ .framebuffer = .{ .width = fb_width, .height = fb_height } });
-    self.pushEvent(.{ .maximized = maximized });
 }
 
 export fn wioScale(self: *@This(), scale: f32) void {
