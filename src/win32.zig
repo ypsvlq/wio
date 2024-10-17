@@ -141,6 +141,8 @@ window: w.HWND,
 cursor: w.HCURSOR,
 cursor_mode: wio.CursorMode,
 surrogate: u16 = 0,
+left_shift: bool = false,
+right_shift: bool = false,
 input: []u8 = &.{},
 dc: w.HDC = null,
 rc: w.HGLRC = null,
@@ -748,6 +750,18 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
         break :blk ptr orelse return w.DefWindowProcW(window, msg, wParam, lParam);
     };
 
+    if (self.left_shift and self.right_shift) {
+        // when both shifts are pressed, only one keyup message is sent
+        if (w.GetAsyncKeyState(w.VK_LSHIFT) == 0) {
+            self.left_shift = false;
+            self.pushEvent(.{ .button_release = .left_shift });
+        }
+        if (w.GetAsyncKeyState(w.VK_RSHIFT) == 0) {
+            self.right_shift = false;
+            self.pushEvent(.{ .button_release = .right_shift });
+        }
+    }
+
     switch (msg) {
         w.WM_SYSCOMMAND => {
             switch (wParam & 0xFFF0) {
@@ -851,6 +865,8 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
 
             if (scancodeToButton(scancode)) |button| {
                 if (flags & w.KF_UP == 0) {
+                    if (button == .left_shift) self.left_shift = true;
+                    if (button == .right_shift) self.right_shift = true;
                     self.pushEvent(.{ .button_press = button });
                 } else {
                     self.pushEvent(.{ .button_release = button });
