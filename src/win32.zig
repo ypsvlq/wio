@@ -285,11 +285,7 @@ pub fn setCursor(self: *@This(), shape: wio.Cursor) void {
 pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
     self.cursor_mode = mode;
     if (mode == .relative) {
-        var rect: w.RECT = undefined;
-        _ = w.GetClientRect(self.window, &rect);
-        _ = w.ClientToScreen(self.window, @ptrCast(&rect.left));
-        _ = w.ClientToScreen(self.window, @ptrCast(&rect.right));
-        _ = w.ClipCursor(&rect);
+        self.clipCursor();
     } else {
         _ = w.ClipCursor(null);
     }
@@ -628,6 +624,14 @@ fn isFullscreen(self: *@This()) bool {
     return (w.GetWindowLongPtrW(self.window, w.GWL_STYLE) & w.WS_OVERLAPPEDWINDOW != w.WS_OVERLAPPEDWINDOW);
 }
 
+fn clipCursor(self: *@This()) void {
+    var rect: w.RECT = undefined;
+    _ = w.GetClientRect(self.window, &rect);
+    _ = w.ClientToScreen(self.window, @ptrCast(&rect.left));
+    _ = w.ClientToScreen(self.window, @ptrCast(&rect.right));
+    _ = w.ClipCursor(&rect);
+}
+
 fn clientToWindow(size: wio.Size, style: u32) wio.Size {
     var rect = w.RECT{
         .left = 0,
@@ -830,11 +834,7 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
         w.WM_SETFOCUS => {
             self.pushEvent(.focused);
             if (self.cursor_mode == .relative) {
-                var rect: w.RECT = undefined;
-                _ = w.GetClientRect(self.window, &rect);
-                _ = w.ClientToScreen(self.window, @ptrCast(&rect.left));
-                _ = w.ClientToScreen(self.window, @ptrCast(&rect.right));
-                _ = w.ClipCursor(&rect);
+                self.clipCursor();
             }
             return 0;
         },
@@ -849,6 +849,9 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
         },
         w.WM_SIZE => {
             const size = wio.Size{ .width = LOWORD(lParam), .height = HIWORD(lParam) };
+            if (self.cursor_mode == .relative) {
+                self.clipCursor();
+            }
             if (wParam == w.SIZE_RESTORED or wParam == w.SIZE_MAXIMIZED) {
                 const fullscreen = self.isFullscreen();
                 if (wParam == w.SIZE_RESTORED and !fullscreen) {
