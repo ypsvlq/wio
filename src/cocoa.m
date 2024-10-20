@@ -284,10 +284,14 @@ void wioSetSize(NSWindow *window, uint16_t width, uint16_t height) {
     [window setContentSize:NSMakeSize(width, height)];
 }
 
-void wioSetMaximized(NSWindow *window, _Bool maximized) {
-    BOOL state = [window isZoomed];
-    if ((!maximized && state) || (maximized && !state)) {
-        [window performZoom:nil];
+void wioSetMode(NSWindow *window, uint8_t mode) {
+    switch (mode) {
+        case 0:
+            if ([window isZoomed]) [window performZoom:nil];
+            break;
+        case 1:
+            if (![window isZoomed]) [window performZoom:nil];
+            break;
     }
 }
 

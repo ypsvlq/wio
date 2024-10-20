@@ -108,10 +108,10 @@ pub const Window = union {
         }
     }
 
-    pub fn setMaximized(self: *@This(), maximized: bool) void {
+    pub fn setMode(self: *@This(), mode: wio.WindowMode) void {
         switch (active) {
-            .x11 => self.x11.setMaximized(maximized),
-            .wayland => self.wayland.setMaximized(maximized),
+            .x11 => self.x11.setMode(mode),
+            .wayland => self.wayland.setMode(mode),
         }
     }
 

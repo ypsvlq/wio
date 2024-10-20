@@ -60,7 +60,7 @@ pub const CreateWindowOptions = struct {
     title: []const u8 = "wio",
     size: Size = .{ .width = 640, .height = 480 },
     scale: f32 = 1,
-    maximized: bool = false,
+    mode: WindowMode = .normal,
     cursor: Cursor = .arrow,
     cursor_mode: CursorMode = .normal,
 };
@@ -92,8 +92,8 @@ pub const Window = struct {
         self.backend.setSize(size);
     }
 
-    pub fn setMaximized(self: *Window, maximized: bool) void {
-        self.backend.setMaximized(maximized);
+    pub fn setMode(self: *Window, mode: WindowMode) void {
+        self.backend.setMode(mode);
     }
 
     pub fn setCursor(self: *Window, cursor: Cursor) void {
@@ -214,7 +214,7 @@ pub const Event = union(enum) {
     framebuffer: Size,
     scale: f32,
     /// Sent before `size`.
-    maximized: bool,
+    mode: WindowMode,
     char: u21,
     button_press: Button,
     button_release: Button,
@@ -225,6 +225,12 @@ pub const Event = union(enum) {
 };
 
 pub const EventType = @typeInfo(Event).@"union".tag_type.?;
+
+pub const WindowMode = enum {
+    normal,
+    maximized,
+    fullscreen,
+};
 
 pub const Cursor = enum {
     arrow,

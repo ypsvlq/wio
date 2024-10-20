@@ -10,7 +10,7 @@ extern fn wioCreateWindow(*anyopaque, u16, u16) *anyopaque;
 extern fn wioDestroyWindow(*anyopaque, ?*anyopaque) void;
 extern fn wioSetTitle(*anyopaque, [*]const u8, usize) void;
 extern fn wioSetSize(*anyopaque, u16, u16) void;
-extern fn wioSetMaximized(*anyopaque, bool) void;
+extern fn wioSetMode(*anyopaque, u8) void;
 extern fn wioSetCursor(*anyopaque, u8) void;
 extern fn wioSetCursorMode(*anyopaque, u8) void;
 extern fn wioCreateContext(*anyopaque) ?*anyopaque;
@@ -50,8 +50,9 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
         .window = wioCreateWindow(self, options.size.width, options.size.height),
     };
     self.setTitle(options.title);
-    self.setMaximized(options.maximized);
+    self.setMode(options.mode);
     self.setCursor(options.cursor);
+    self.setCursorMode(options.cursor_mode);
     return self;
 }
 
@@ -73,8 +74,8 @@ pub fn setSize(self: *@This(), size: wio.Size) void {
     wioSetSize(self.window, size.width, size.height);
 }
 
-pub fn setMaximized(self: *@This(), maximized: bool) void {
-    wioSetMaximized(self.window, maximized);
+pub fn setMode(self: *@This(), mode: wio.WindowMode) void {
+    wioSetMode(self.window, @intFromEnum(mode));
 }
 
 pub fn setCursor(self: *@This(), shape: wio.Cursor) void {
@@ -180,7 +181,7 @@ export fn wioUnfocus(self: *@This()) void {
 }
 
 export fn wioSize(self: *@This(), maximized: bool, width: u16, height: u16, fb_width: u16, fb_height: u16) void {
-    self.pushEvent(.{ .maximized = maximized });
+    self.pushEvent(.{ .mode = if (maximized) .maximized else .normal });
     self.pushEvent(.{ .size = .{ .width = width, .height = height } });
     self.pushEvent(.{ .framebuffer = .{ .width = fb_width, .height = fb_height } });
 }

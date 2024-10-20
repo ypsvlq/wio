@@ -32,7 +32,7 @@ fn loop() !bool {
         switch (event) {
             .size, .framebuffer => |size| std.log.info("{s} {}x{}", .{ @tagName(event), size.width, size.height }),
             .scale => |scale| std.log.info("scale {d}", .{scale}),
-            .maximized => |maximized| std.log.info("{s}", .{if (maximized) "maximized" else "restored"}),
+            .mode => |mode| std.log.info("{s}", .{@tagName(mode)}),
             .char => |char| std.log.info("char: {u}", .{char}),
             .button_press => |button| std.log.info("+{s}", .{@tagName(button)}),
             .button_release => |button| std.log.info("-{s}", .{@tagName(button)}),
@@ -73,8 +73,9 @@ fn handlePress(button: wio.Button) void {
     switch (button) {
         .t => window.setTitle("retitled wio example"),
         .s => window.setSize(.{ .width = 320, .height = 240 }),
-        .w => window.setMaximized(false),
-        .m => window.setMaximized(true),
+        .w => window.setMode(.normal),
+        .m => window.setMode(.maximized),
+        .f => window.setMode(.fullscreen),
         .p => {
             const cursors = std.enums.values(wio.Cursor);
             cursor +%= 1;

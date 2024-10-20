@@ -199,7 +199,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
         .ic = ic,
     };
     self.setTitle(options.title);
-    self.setMaximized(options.maximized);
+    self.setMode(options.mode);
     if (options.cursor_mode != .normal) self.setCursorMode(options.cursor_mode);
 
     try self.events.writeItem(.{ .size = size });
@@ -235,9 +235,9 @@ pub fn setSize(self: *@This(), size: wio.Size) void {
     _ = c.XConfigureWindow(display, self.window, h.CWWidth | h.CWHeight, &changes);
 }
 
-pub fn setMaximized(self: *@This(), maximized: bool) void {
+pub fn setMode(self: *@This(), mode: wio.WindowMode) void {
     _ = self;
-    _ = maximized;
+    _ = mode;
 }
 
 pub fn setCursor(self: *@This(), shape: wio.Cursor) void {

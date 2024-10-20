@@ -140,6 +140,7 @@ events: EventQueue,
 window: w.HWND,
 cursor: w.HCURSOR,
 cursor_mode: wio.CursorMode,
+rect: w.RECT = .{ .left = 0, .top = 0, .right = 0, .bottom = 0 },
 surrogate: u16 = 0,
 left_shift: bool = false,
 right_shift: bool = false,
@@ -185,7 +186,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     const size_scaled = options.size.multiply(scale / options.scale);
     self.setSize(size_scaled);
 
-    self.setMaximized(options.maximized);
+    self.setMode(options.mode);
     if (options.cursor != .arrow) self.setCursor(options.cursor);
 
     self.pushEvent(.create);
@@ -219,8 +220,44 @@ pub fn setSize(self: *@This(), client_size: wio.Size) void {
     _ = w.SetWindowPos(self.window, null, 0, 0, size.width, size.height, w.SWP_NOMOVE | w.SWP_NOZORDER);
 }
 
-pub fn setMaximized(self: *@This(), maximized: bool) void {
-    _ = w.ShowWindow(self.window, if (maximized) w.SW_MAXIMIZE else w.SW_RESTORE);
+pub fn setMode(self: *@This(), mode: wio.WindowMode) void {
+    switch (mode) {
+        .normal, .maximized => {
+            if (self.isFullscreen()) {
+                _ = w.SetWindowLongPtrW(self.window, w.GWL_STYLE, w.WS_OVERLAPPEDWINDOW);
+                _ = w.SetWindowPos(
+                    self.window,
+                    null,
+                    self.rect.left,
+                    self.rect.top,
+                    self.rect.right - self.rect.left,
+                    self.rect.bottom - self.rect.top,
+                    w.SWP_FRAMECHANGED | w.SWP_NOZORDER,
+                );
+            }
+        },
+        .fullscreen => {
+            const monitor = w.MonitorFromWindow(self.window, w.MONITOR_DEFAULTTONEAREST);
+            var info: w.MONITORINFO = undefined;
+            info.cbSize = @sizeOf(w.MONITORINFO);
+            _ = w.GetMonitorInfoW(monitor, &info);
+            _ = w.SetWindowLongPtrW(self.window, w.GWL_STYLE, w.WS_POPUP);
+            _ = w.SetWindowPos(
+                self.window,
+                null,
+                info.rcMonitor.left,
+                info.rcMonitor.top,
+                info.rcMonitor.right - info.rcMonitor.left,
+                info.rcMonitor.bottom - info.rcMonitor.top,
+                w.SWP_FRAMECHANGED | w.SWP_NOZORDER,
+            );
+        },
+    }
+
+    switch (mode) {
+        .normal, .fullscreen => _ = w.ShowWindow(self.window, w.SW_RESTORE),
+        .maximized => _ = w.ShowWindow(self.window, w.SW_MAXIMIZE),
+    }
 }
 
 pub fn setCursor(self: *@This(), shape: wio.Cursor) void {
@@ -587,6 +624,10 @@ pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
     return w.wglGetProcAddress(name);
 }
 
+fn isFullscreen(self: *@This()) bool {
+    return (w.GetWindowLongPtrW(self.window, w.GWL_STYLE) & w.WS_OVERLAPPEDWINDOW != w.WS_OVERLAPPEDWINDOW);
+}
+
 fn clientToWindow(size: wio.Size, style: u32) wio.Size {
     var rect = w.RECT{
         .left = 0,
@@ -809,7 +850,11 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
         w.WM_SIZE => {
             const size = wio.Size{ .width = LOWORD(lParam), .height = HIWORD(lParam) };
             if (wParam == w.SIZE_RESTORED or wParam == w.SIZE_MAXIMIZED) {
-                self.pushEvent(.{ .maximized = (wParam == w.SIZE_MAXIMIZED) });
+                const fullscreen = self.isFullscreen();
+                if (wParam == w.SIZE_RESTORED and !fullscreen) {
+                    _ = w.GetWindowRect(window, &self.rect);
+                }
+                self.pushEvent(.{ .mode = if (fullscreen) .fullscreen else if (wParam == w.SIZE_MAXIMIZED) .maximized else .normal });
                 self.pushEvent(.{ .size = size });
                 self.pushEvent(.{ .framebuffer = size });
             }
