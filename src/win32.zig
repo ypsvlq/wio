@@ -241,7 +241,7 @@ pub fn setMode(self: *@This(), mode: wio.WindowMode) void {
             var info: w.MONITORINFO = undefined;
             info.cbSize = @sizeOf(w.MONITORINFO);
             _ = w.GetMonitorInfoW(monitor, &info);
-            _ = w.SetWindowLongPtrW(self.window, w.GWL_STYLE, w.WS_POPUP);
+            _ = w.SetWindowLongPtrW(self.window, w.GWL_STYLE, @bitCast(@as(usize, w.WS_POPUP)));
             _ = w.SetWindowPos(
                 self.window,
                 null,
