@@ -1,39 +1,31 @@
 const std = @import("std");
 const wio = @import("../../wio.zig");
-const c = @cImport(@cInclude("linux/input.h"));
+const c = @cImport({
+    @cInclude("linux/input.h");
+    @cInclude("sys/inotify.h");
+});
 const log = std.log.scoped(.wio);
 
 var permission_warning_shown = false;
 
 fn permissionWarning() void {
     if (!permission_warning_shown) {
-        log.warn("access denied to joystick device", .{});
+        log.warn("could not access joystick", .{});
         permission_warning_shown = true;
     }
 }
 
 const JoystickIterator = struct {
-    dir: std.fs.Dir,
     iter: std.fs.Dir.Iterator,
 
-    fn init() !JoystickIterator {
-        const dir = try std.fs.openDirAbsoluteZ("/dev/input/by-path", .{ .iterate = true });
-        return .{ .dir = dir, .iter = dir.iterateAssumeFirstIteration() };
-    }
-
-    fn deinit(self: *JoystickIterator) void {
-        self.dir.close();
+    fn init() JoystickIterator {
+        return .{ .iter = dir.iterate() };
     }
 
     fn nextName(self: *JoystickIterator) !?struct { []const u8, u16 } {
         while (try self.iter.next()) |entry| {
-            if (std.mem.endsWith(u8, entry.name, "-event-joystick")) {
-                var buf: [std.fs.max_path_bytes]u8 = undefined;
-                const link = try self.dir.readLink(entry.name, &buf);
-                const prefix = "../event";
-                if (std.mem.startsWith(u8, link, prefix)) {
-                    return .{ entry.name, try std.fmt.parseUnsigned(u16, link[prefix.len..], 10) };
-                }
+            if (nameToIndex(entry.name)) |index| {
+                return .{ entry.name, index };
             }
         }
         return null;
@@ -41,7 +33,7 @@ const JoystickIterator = struct {
 
     fn nextFile(self: *JoystickIterator) !?struct { std.fs.File, u16 } {
         const name, const index = try self.nextName() orelse return null;
-        const file = self.dir.openFile(name, .{}) catch |err| switch (err) {
+        const file = dir.openFile(name, .{}) catch |err| switch (err) {
             error.AccessDenied => {
                 permissionWarning();
                 return self.nextFile();
@@ -52,13 +44,53 @@ const JoystickIterator = struct {
     }
 };
 
+fn nameToIndex(name: []const u8) ?u16 {
+    if (std.mem.endsWith(u8, name, "-event-joystick")) {
+        var buf: [std.fs.max_path_bytes]u8 = undefined;
+        const link = dir.readLink(name, &buf) catch return null;
+        const prefix = "../event";
+        if (std.mem.startsWith(u8, link, prefix)) {
+            return std.fmt.parseUnsigned(u16, link[prefix.len..], 10) catch null;
+        }
+    }
+    return null;
+}
+
+var dir: std.fs.Dir = undefined;
+var inotify: i32 = 0;
+
 pub fn init() !void {
-    var iter = try JoystickIterator.init();
-    defer iter.deinit();
+    dir = try std.fs.openDirAbsoluteZ("/dev/input/by-path", .{ .iterate = true });
+
+    var iter = JoystickIterator.init();
     while (try iter.nextName()) |value| {
         _, const index = value;
         if (wio.init_options.joystickCallback) |callback| {
             callback(index);
+        }
+    }
+
+    if (wio.init_options.joystickCallback) |_| {
+        inotify = c.inotify_init1(c.IN_NONBLOCK | c.IN_CLOEXEC);
+        _ = c.inotify_add_watch(inotify, "/dev/input/by-path", c.IN_CREATE);
+    }
+}
+
+pub fn deinit() void {
+    if (wio.init_options.joystickCallback) |_| {
+        _ = std.os.linux.close(inotify);
+    }
+}
+
+pub fn run() void {
+    if (wio.init_options.joystickCallback) |callback| {
+        var buf: [@sizeOf(c.inotify_event) + std.os.linux.NAME_MAX + 1]u8 align(@alignOf(c.inotify_event)) = undefined;
+        while (std.os.linux.E.init(std.os.linux.read(inotify, &buf, buf.len)) == .SUCCESS) {
+            const event: *c.inotify_event = @ptrCast(&buf);
+            const name = std.mem.sliceTo(event.name()[0..event.len], 0);
+            if (nameToIndex(name)) |index| {
+                callback(index);
+            }
         }
     }
 }
@@ -73,8 +105,7 @@ pub fn getJoysticks(allocator: std.mem.Allocator) ![]wio.JoystickInfo {
         list.deinit();
     }
 
-    var iter = try JoystickIterator.init();
-    defer iter.deinit();
+    var iter = JoystickIterator.init();
     while (try iter.nextFile()) |value| {
         const file, const index = value;
         defer file.close();
@@ -122,7 +153,7 @@ pub fn resolveJoystickId(id: []const u8) ?usize {
         }
     } else |_| {}
 
-    var iter = JoystickIterator.init() catch return null;
+    var iter = JoystickIterator.init();
     while (iter.nextFile() catch return null) |value| {
         const file, const index = value;
         defer file.close();

@@ -56,6 +56,9 @@ pub fn init(options: wio.InitOptions) !void {
 }
 
 pub fn deinit() void {
+    if (wio.init_options.joystick) {
+        joystick.deinit();
+    }
     switch (active) {
         .x11 => return x11.deinit(),
         .wayland => return wayland.deinit(),
@@ -64,8 +67,8 @@ pub fn deinit() void {
 
 pub fn run(func: fn () anyerror!bool, options: wio.RunOptions) !void {
     switch (active) {
-        .x11 => return x11.run(func, options),
-        .wayland => return wayland.run(func, options),
+        .x11 => return x11.run(func, options, joystick.run),
+        .wayland => return wayland.run(func, options, joystick.run),
     }
 }
 

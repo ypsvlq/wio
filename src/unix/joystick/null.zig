@@ -3,6 +3,10 @@ const wio = @import("../../wio.zig");
 
 pub fn init() !void {}
 
+pub fn deinit() void {}
+
+pub fn run() void {}
+
 pub fn getJoysticks(allocator: std.mem.Allocator) ![]wio.JoystickInfo {
     return allocator.alloc(wio.JoystickInfo, 0);
 }

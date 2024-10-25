@@ -169,9 +169,10 @@ pub fn deinit() void {
     libwayland_client.close();
 }
 
-pub fn run(func: fn () anyerror!bool, _: wio.RunOptions) !void {
+pub fn run(func: fn () anyerror!bool, _: wio.RunOptions, joystickFn: fn () void) !void {
     while (try func()) {
         _ = c.wl_display_dispatch(display);
+        if (wio.init_options.joystick) joystickFn();
     }
 }
 

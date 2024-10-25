@@ -1,5 +1,6 @@
 const std = @import("std");
 const wio = @import("../wio.zig");
+const unix = @import("../unix.zig");
 const common = @import("common.zig");
 const h = @cImport({
     @cInclude("X11/Xlib.h");
@@ -139,7 +140,7 @@ pub fn deinit() void {
     windows.deinit();
 }
 
-pub fn run(func: fn () anyerror!bool, options: wio.RunOptions) !void {
+pub fn run(func: fn () anyerror!bool, options: wio.RunOptions, joystickFn: fn () void) !void {
     _ = options;
     var event: h.XEvent = undefined;
     while (try func()) {
@@ -147,6 +148,7 @@ pub fn run(func: fn () anyerror!bool, options: wio.RunOptions) !void {
             _ = c.XNextEvent(display, &event);
             handle(&event);
         }
+        if (wio.init_options.joystick) joystickFn();
     }
 }
 
