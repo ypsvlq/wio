@@ -145,6 +145,8 @@ surrogate: u16 = 0,
 left_shift: bool = false,
 right_shift: bool = false,
 input: []u8 = &.{},
+last_x: u16 = 0,
+last_y: u16 = 0,
 dc: w.HDC = null,
 rc: w.HGLRC = null,
 
@@ -964,7 +966,15 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
                 _ = w.GetRawInputData(handle, w.RID_INPUT, self.input.ptr, &size, @sizeOf(w.RAWINPUTHEADER));
                 const raw: *w.RAWINPUT = @alignCast(@ptrCast(self.input));
 
-                if (raw.data.mouse.usFlags & w.MOUSE_MOVE_ABSOLUTE == 0) {
+                if (raw.data.mouse.usFlags & w.MOUSE_MOVE_ABSOLUTE != 0) {
+                    if (raw.data.mouse.lLastX != 0 or raw.data.mouse.lLastY != 0) { // prevent resetting position
+                        if (raw.data.mouse.Anonymous.Anonymous.usButtonFlags == 0) { // prevent jumping on touch input
+                            self.pushEvent(.{ .mouse_relative = .{ .x = @intCast(raw.data.mouse.lLastX - self.last_x), .y = @intCast(raw.data.mouse.lLastY - self.last_y) } });
+                        }
+                        self.last_x = @intCast(raw.data.mouse.lLastX);
+                        self.last_y = @intCast(raw.data.mouse.lLastY);
+                    }
+                } else {
                     self.pushEvent(.{ .mouse_relative = .{ .x = @intCast(raw.data.mouse.lLastX), .y = @intCast(raw.data.mouse.lLastY) } });
                 }
             }
