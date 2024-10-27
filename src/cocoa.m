@@ -12,6 +12,7 @@ extern void wioKeyUp(void *, UInt16);
 extern void wioButtonPress(void *, UInt8);
 extern void wioButtonRelease(void *, UInt8);
 extern void wioMouse(void *, UInt16, UInt16);
+extern void wioMouseRelative(void *, SInt16, SInt16);
 extern void wioScroll(void *, Float32, Float32);
 extern char *wioDupeClipboardText(const void *, const char *, size_t *);
 
@@ -88,7 +89,7 @@ static NSString *string(const char *ptr, size_t len) {
     void *ptr;
     NSTrackingArea *area;
     NSCursor *cursor;
-    BOOL cursorhidden;
+    uint8_t cursormode;
     BOOL cursorinside;
 }
 @end
@@ -106,11 +107,11 @@ static NSString *string(const char *ptr, size_t len) {
     [self updateTrackingAreas];
 }
 
-- (void)setCursorHidden:(BOOL)value {
-    if (value != cursorhidden) {
-        cursorhidden = value;
+- (void)setCursorMode:(uint8_t)value {
+    if (!!value != !!cursormode) {
         if (cursorinside) value ? [NSCursor hide] : [NSCursor unhide];
     }
+    cursormode = value;
 }
 
 - (void)updateTrackingAreas {
@@ -129,12 +130,12 @@ static NSString *string(const char *ptr, size_t len) {
 }
 
 - (void)mouseEntered:event {
-    if (cursorhidden) [NSCursor hide];
+    if (cursormode != 0) [NSCursor hide];
     cursorinside = true;
 }
 
 - (void)mouseExited:event {
-    if (cursorhidden) [NSCursor unhide];
+    if (cursormode != 0) [NSCursor unhide];
     cursorinside = false;
 }
 
@@ -196,6 +197,10 @@ static NSString *string(const char *ptr, size_t len) {
 }
 
 - (void)mouseMoved:event {
+    if (cursormode == 2) {
+        wioMouseRelative(ptr, [event deltaX], [event deltaY]);
+        return;
+    }
     NSPoint location = [event locationInWindow];
     NSRect frame = [self frame];
     location.y = frame.size.height - location.y - 1;
@@ -310,7 +315,13 @@ void wioSetCursor(NSWindow *window, uint8_t shape) {
 }
 
 void wioSetCursorMode(NSWindow *window, uint8_t mode) {
-    [[window contentView] setCursorHidden:mode];
+    [[window contentView] setCursorMode:mode];
+    if (mode == 2) {
+        CGWarpMouseCursorPosition(CGPointMake(0, 0));
+        CGAssociateMouseAndMouseCursorPosition(NO);
+    } else {
+        CGAssociateMouseAndMouseCursorPosition(YES);
+    }
 }
 
 void *wioCreateContext(NSWindow *window) {

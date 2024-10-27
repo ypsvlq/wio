@@ -52,7 +52,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     self.setTitle(options.title);
     self.setMode(options.mode);
     self.setCursor(options.cursor);
-    self.setCursorMode(options.cursor_mode);
+    if (options.cursor_mode != .normal) self.setCursorMode(options.cursor_mode);
     return self;
 }
 
@@ -224,6 +224,10 @@ export fn wioButtonRelease(self: *@This(), button: u8) void {
 
 export fn wioMouse(self: *@This(), x: u16, y: u16) void {
     self.pushEvent(.{ .mouse = .{ .x = x, .y = y } });
+}
+
+export fn wioMouseRelative(self: *@This(), x: i16, y: i16) void {
+    self.pushEvent(.{ .mouse_relative = .{ .x = x, .y = y } });
 }
 
 export fn wioScroll(self: *@This(), x: f32, y: f32) void {
