@@ -331,7 +331,7 @@ void *wioCreateContext(NSWindow *window) {
     [context setView:[window contentView]];
     WindowDelegate *delegate = [window delegate];
     [delegate setContext:context];
-    return CFBridgingRetain(context);
+    return (void*)CFBridgingRetain(context);
 }
 
 void wioMakeContextCurrent(NSOpenGLContext *context) {
