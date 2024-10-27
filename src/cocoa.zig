@@ -13,6 +13,7 @@ extern fn wioSetSize(*anyopaque, u16, u16) void;
 extern fn wioSetMode(*anyopaque, u8) void;
 extern fn wioSetCursor(*anyopaque, u8) void;
 extern fn wioSetCursorMode(*anyopaque, u8) void;
+extern fn wioRequestAttention() void;
 extern fn wioCreateContext(*anyopaque) ?*anyopaque;
 extern fn wioMakeContextCurrent(?*anyopaque) void;
 extern fn wioSwapBuffers(?*anyopaque) void;
@@ -86,8 +87,8 @@ pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
     wioSetCursorMode(self.window, @intFromEnum(mode));
 }
 
-pub fn requestAttention(self: *@This()) void {
-    _ = self;
+pub fn requestAttention(_: *@This()) void {
+    wioRequestAttention();
 }
 
 pub fn createContext(self: *@This(), options: wio.CreateContextOptions) !void {

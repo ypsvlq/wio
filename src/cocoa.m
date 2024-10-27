@@ -324,6 +324,10 @@ void wioSetCursorMode(NSWindow *window, uint8_t mode) {
     }
 }
 
+void wioRequestAttention(void) {
+    [NSApp requestUserAttention:NSCriticalRequest];
+}
+
 void *wioCreateContext(NSWindow *window) {
     NSOpenGLPixelFormatAttribute attributes[] = {NSOpenGLPFADoubleBuffer, 0};
     NSOpenGLPixelFormat *format = [[NSOpenGLPixelFormat alloc] initWithAttributes:attributes];
