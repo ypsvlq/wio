@@ -18,7 +18,7 @@ const EventQueue = std.fifo.LinearFifo(wio.Event, .Dynamic);
 var c: extern struct {
     XkbOpenDisplay: *const @TypeOf(h.XkbOpenDisplay),
     XCloseDisplay: *const @TypeOf(h.XCloseDisplay),
-    XInternAtom: *const @TypeOf(h.XInternAtom),
+    XInternAtoms: *const @TypeOf(h.XInternAtoms),
     XOpenIM: *const @TypeOf(h.XOpenIM),
     XCloseIM: *const @TypeOf(h.XCloseIM),
     XkbGetMap: *const @TypeOf(h.XkbGetMap),
@@ -57,7 +57,7 @@ var glx: struct {
     swapIntervalEXT: h.PFNGLXSWAPINTERVALEXTPROC = null,
 } = .{};
 
-var atoms: struct {
+var atoms: extern struct {
     WM_PROTOCOLS: h.Atom,
     WM_DELETE_WINDOW: h.Atom,
     _NET_WM_STATE: h.Atom,
@@ -91,9 +91,9 @@ pub fn init(options: wio.InitOptions) !void {
     display = c.XkbOpenDisplay(null, null, null, null, null, null) orelse return error.Unavailable;
     errdefer _ = c.XCloseDisplay(display);
 
-    inline for (@typeInfo(@TypeOf(atoms)).@"struct".fields) |field| {
-        @field(atoms, field.name) = c.XInternAtom(display, field.name, h.False);
-    }
+    var atom_names: [@typeInfo(@TypeOf(atoms)).@"struct".fields.len][*:0]const u8 = undefined;
+    for (&atom_names, std.meta.fieldNames(@TypeOf(atoms))) |*name_z, name| name_z.* = name;
+    _ = c.XInternAtoms(display, @ptrCast(&atom_names), atom_names.len, h.False, @ptrCast(&atoms));
 
     windows = std.AutoHashMap(h.Window, *@This()).init(wio.allocator);
     errdefer windows.deinit();
@@ -391,7 +391,7 @@ fn handle(event: *h.XEvent) void {
                 var actual_format: c_int = undefined;
                 var count: c_ulong = undefined;
                 var bytes_after: c_ulong = undefined;
-                _ = c.XGetWindowProperty(display, window.window, atoms._NET_WM_STATE, 0, 1024, h.False, h.XA_ATOM, &actual_type, &actual_format, &count, &bytes_after, @ptrCast(&states));
+                _ = c.XGetWindowProperty(display, window.window, atoms._NET_WM_STATE, 0, std.math.maxInt(c_long), h.False, h.XA_ATOM, &actual_type, &actual_format, &count, &bytes_after, @ptrCast(&states));
                 defer _ = c.XFree(states);
 
                 var mode = wio.WindowMode.normal;
