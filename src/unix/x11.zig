@@ -27,6 +27,7 @@ var c: extern struct {
     XGetDefault: *const @TypeOf(h.XGetDefault),
     XCreateWindow: *const @TypeOf(h.XCreateWindow),
     XDestroyWindow: *const @TypeOf(h.XDestroyWindow),
+    XMapWindow: *const @TypeOf(h.XMapWindow),
     XChangeProperty: *const @TypeOf(h.XChangeProperty),
     XCreateIC: *const @TypeOf(h.XCreateIC),
     XDestroyIC: *const @TypeOf(h.XDestroyIC),
@@ -35,9 +36,10 @@ var c: extern struct {
     XPending: *const @TypeOf(h.XPending),
     XFilterEvent: *const @TypeOf(h.XFilterEvent),
     XPeekEvent: *const @TypeOf(h.XPeekEvent),
+    XGetWindowProperty: *const @TypeOf(h.XGetWindowProperty),
     Xutf8LookupString: *const @TypeOf(h.Xutf8LookupString),
     XConfigureWindow: *const @TypeOf(h.XConfigureWindow),
-    XMapWindow: *const @TypeOf(h.XMapWindow),
+    XSendEvent: *const @TypeOf(h.XSendEvent),
     XcursorLibraryLoadCursor: *const @TypeOf(h.XcursorLibraryLoadCursor),
     XDefineCursor: *const @TypeOf(h.XDefineCursor),
     XFixesShowCursor: *const @TypeOf(h.XFixesShowCursor),
@@ -58,6 +60,10 @@ var glx: struct {
 var atoms: struct {
     WM_PROTOCOLS: h.Atom,
     WM_DELETE_WINDOW: h.Atom,
+    _NET_WM_STATE: h.Atom,
+    _NET_WM_STATE_MAXIMIZED_VERT: h.Atom,
+    _NET_WM_STATE_MAXIMIZED_HORZ: h.Atom,
+    _NET_WM_STATE_FULLSCREEN: h.Atom,
 } = undefined;
 
 var libX11: std.DynLib = undefined;
@@ -238,8 +244,20 @@ pub fn setSize(self: *@This(), size: wio.Size) void {
 }
 
 pub fn setMode(self: *@This(), mode: wio.WindowMode) void {
-    _ = self;
-    _ = mode;
+    var event = h.XEvent{
+        .xclient = std.mem.zeroInit(h.XClientMessageEvent, .{
+            .type = h.ClientMessage,
+            .window = self.window,
+            .message_type = atoms._NET_WM_STATE,
+            .format = 32,
+        }),
+    };
+
+    event.xclient.data.l = .{ if (mode == .fullscreen) 1 else 0, @bitCast(atoms._NET_WM_STATE_FULLSCREEN), 0, 1, 0 };
+    _ = c.XSendEvent(display, h.DefaultRootWindow(display), h.False, h.SubstructureRedirectMask | h.SubstructureNotifyMask, &event);
+
+    event.xclient.data.l = .{ if (mode == .maximized) 1 else 0, @bitCast(atoms._NET_WM_STATE_MAXIMIZED_VERT), @bitCast(atoms._NET_WM_STATE_MAXIMIZED_HORZ), 1, 0 };
+    _ = c.XSendEvent(display, h.DefaultRootWindow(display), h.False, h.SubstructureRedirectMask | h.SubstructureNotifyMask, &event);
 }
 
 pub fn setCursor(self: *@This(), shape: wio.Cursor) void {
@@ -368,6 +386,31 @@ fn handle(event: *h.XEvent) void {
         },
         h.ConfigureNotify => {
             if (windows.get(event.xconfigure.window)) |window| {
+                var states: [*]c_long = undefined;
+                var actual_type: h.Atom = undefined;
+                var actual_format: c_int = undefined;
+                var count: c_ulong = undefined;
+                var bytes_after: c_ulong = undefined;
+                _ = c.XGetWindowProperty(display, window.window, atoms._NET_WM_STATE, 0, 1024, h.False, h.XA_ATOM, &actual_type, &actual_format, &count, &bytes_after, @ptrCast(&states));
+                defer _ = c.XFree(states);
+
+                var mode = wio.WindowMode.normal;
+                var maximized_vert = false;
+                var maximized_horz = false;
+                if (actual_type == h.XA_ATOM and actual_format == 32) {
+                    for (states[0..count]) |state| {
+                        if (state == atoms._NET_WM_STATE_MAXIMIZED_VERT) {
+                            maximized_vert = true;
+                        } else if (state == atoms._NET_WM_STATE_MAXIMIZED_HORZ) {
+                            maximized_horz = true;
+                        } else if (state == atoms._NET_WM_STATE_FULLSCREEN) {
+                            mode = .fullscreen;
+                        }
+                    }
+                }
+                if (mode == .normal and maximized_horz and maximized_vert) mode = .maximized;
+                window.pushEvent(.{ .mode = mode });
+
                 const size = wio.Size{ .width = @intCast(event.xconfigure.width), .height = @intCast(event.xconfigure.height) };
                 window.pushEvent(.{ .size = size });
                 window.pushEvent(.{ .framebuffer = size });
