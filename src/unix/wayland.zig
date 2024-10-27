@@ -183,6 +183,7 @@ xdg_toplevel: *h.xdg_toplevel,
 egl_window: ?*h.wl_egl_window = null,
 egl_surface: h.EGLSurface = null,
 egl_context: h.EGLContext = null,
+size: wio.Size,
 cursor: u32 = undefined,
 cursor_mode: wio.CursorMode,
 
@@ -206,17 +207,20 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
         .surface = surface,
         .xdg_surface = xdg_surface,
         .xdg_toplevel = xdg_toplevel,
+        .size = options.size,
         .cursor_mode = options.cursor_mode,
     };
     self.setTitle(options.title);
     self.setCursor(options.cursor);
 
-    h.wl_surface_commit(surface);
-    _ = c.wl_display_roundtrip(display);
-
     self.pushEvent(.{ .size = options.size });
     self.pushEvent(.{ .framebuffer = options.size });
     self.pushEvent(.create);
+
+    h.wl_surface_commit(surface);
+    _ = c.wl_display_roundtrip(display);
+    self.setMode(options.mode);
+
     return self;
 }
 
@@ -248,8 +252,12 @@ pub fn setSize(self: *@This(), size: wio.Size) void {
 }
 
 pub fn setMode(self: *@This(), mode: wio.WindowMode) void {
-    _ = self;
-    _ = mode;
+    if (mode != .fullscreen) h.xdg_toplevel_unset_fullscreen(self.xdg_toplevel);
+    switch (mode) {
+        .normal => h.xdg_toplevel_unset_maximized(self.xdg_toplevel),
+        .maximized => h.xdg_toplevel_set_maximized(self.xdg_toplevel),
+        .fullscreen => h.xdg_toplevel_set_fullscreen(self.xdg_toplevel, null),
+    }
 }
 
 pub fn setCursor(self: *@This(), shape: wio.Cursor) void {
@@ -386,12 +394,29 @@ const xdg_toplevel_listener = h.xdg_toplevel_listener{
     .close = xdgToplevelClose,
 };
 
-fn xdgToplevelConfigure(data: ?*anyopaque, _: ?*h.xdg_toplevel, width: i32, height: i32, _: ?*h.wl_array) callconv(.C) void {
+fn xdgToplevelConfigure(data: ?*anyopaque, _: ?*h.xdg_toplevel, width: i32, height: i32, states: ?*h.wl_array) callconv(.C) void {
     const self: *@This() = @alignCast(@ptrCast(data orelse return));
-    const size = wio.Size{ .width = @intCast(width), .height = @intCast(height) };
+
+    var mode = wio.WindowMode.normal;
+    var focused = false;
+
+    for (@as([*]u32, @alignCast(@ptrCast(states.?.data.?)))[0 .. states.?.size / @sizeOf(u32)]) |state| {
+        switch (state) {
+            h.XDG_TOPLEVEL_STATE_MAXIMIZED => mode = .maximized,
+            h.XDG_TOPLEVEL_STATE_FULLSCREEN => mode = .fullscreen,
+            h.XDG_TOPLEVEL_STATE_ACTIVATED => focused = true,
+            else => {},
+        }
+    }
+
+    const size = if (width == 0 or height == 0) self.size else wio.Size{ .width = @intCast(width), .height = @intCast(height) };
+    if (mode == .normal) self.size = size;
+
+    self.pushEvent(if (focused) .focused else .unfocused);
+    self.pushEvent(.{ .mode = mode });
     self.pushEvent(.{ .size = size });
     self.pushEvent(.{ .framebuffer = size });
-    if (self.egl_window) |_| c.wl_egl_window_resize(self.egl_window, width, height, 0, 0);
+    if (self.egl_window) |_| c.wl_egl_window_resize(self.egl_window, size.width, size.height, 0, 0);
 }
 
 fn xdgToplevelClose(data: ?*anyopaque, _: ?*h.xdg_toplevel) callconv(.C) void {
