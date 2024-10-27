@@ -290,14 +290,8 @@ void wioSetSize(NSWindow *window, uint16_t width, uint16_t height) {
 }
 
 void wioSetMode(NSWindow *window, uint8_t mode) {
-    switch (mode) {
-        case 0:
-            if ([window isZoomed]) [window performZoom:nil];
-            break;
-        case 1:
-            if (![window isZoomed]) [window performZoom:nil];
-            break;
-    }
+    if (!!([window styleMask] & NSWindowStyleMaskFullScreen) != (mode == 2)) [window toggleFullScreen:nil];
+    if (mode != 2 && mode != [window isZoomed]) [window performZoom:nil];
 }
 
 void wioSetCursor(NSWindow *window, uint8_t shape) {
