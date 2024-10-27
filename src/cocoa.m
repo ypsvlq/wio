@@ -137,12 +137,12 @@ static NSString *string(const char *ptr, size_t len) {
 }
 
 - (void)mouseEntered:event {
-    if (cursormode != 0) [NSCursor hide];
+    if (!cursorinside && cursormode != 0) [NSCursor hide];
     cursorinside = true;
 }
 
 - (void)mouseExited:event {
-    if (cursormode != 0) [NSCursor unhide];
+    if (cursorinside && cursormode != 0) [NSCursor unhide];
     cursorinside = false;
 }
 
@@ -317,7 +317,7 @@ void wioSetCursor(NSWindow *window, uint8_t shape) {
 void wioSetCursorMode(NSWindow *window, uint8_t mode) {
     [[window contentView] setCursorMode:mode];
     if (mode == 2) {
-        CGWarpMouseCursorPosition(CGPointMake(0, 0));
+        CGWarpMouseCursorPosition([window convertPointToScreen:CGPointMake(1, 1)]);
         CGAssociateMouseAndMouseCursorPosition(NO);
     } else {
         CGAssociateMouseAndMouseCursorPosition(YES);
