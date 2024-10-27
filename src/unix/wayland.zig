@@ -529,7 +529,16 @@ fn pointerButton(_: ?*anyopaque, _: ?*h.wl_pointer, _: u32, _: u32, button: u32,
     }
 }
 
-fn pointerAxis(_: ?*anyopaque, _: ?*h.wl_pointer, _: u32, _: u32, _: i32) callconv(.C) void {}
+fn pointerAxis(_: ?*anyopaque, _: ?*h.wl_pointer, _: u32, axis: u32, value: i32) callconv(.C) void {
+    if (focus) |window| {
+        const float = @as(f32, @floatFromInt(value)) / 2560;
+        switch (axis) {
+            h.WL_POINTER_AXIS_VERTICAL_SCROLL => window.pushEvent(.{ .scroll_vertical = float }),
+            h.WL_POINTER_AXIS_HORIZONTAL_SCROLL => window.pushEvent(.{ .scroll_horizontal = float }),
+            else => {},
+        }
+    }
+}
 
 fn keyToButton(key: u32) ?wio.Button {
     comptime var table: [126]wio.Button = undefined;
