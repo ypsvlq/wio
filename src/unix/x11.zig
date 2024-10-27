@@ -297,6 +297,10 @@ pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
     }
 }
 
+pub fn requestAttention(self: *@This()) void {
+    _ = self;
+}
+
 pub fn createContext(self: *@This(), options: wio.CreateContextOptions) !void {
     var count: c_int = undefined;
     const configs = c.glXChooseFBConfig(display, h.DefaultScreen(display), &[_]c_int{

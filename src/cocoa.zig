@@ -86,6 +86,10 @@ pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
     wioSetCursorMode(self.window, @intFromEnum(mode));
 }
 
+pub fn requestAttention(self: *@This()) void {
+    _ = self;
+}
+
 pub fn createContext(self: *@This(), options: wio.CreateContextOptions) !void {
     _ = options;
     self.context = wioCreateContext(self.window);

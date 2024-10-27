@@ -132,6 +132,13 @@ pub const Window = union {
         }
     }
 
+    pub fn requestAttention(self: *@This()) void {
+        switch (active) {
+            .x11 => self.x11.requestAttention(),
+            .wayland => self.wayland.requestAttention(),
+        }
+    }
+
     pub fn createContext(self: *@This(), options: wio.CreateContextOptions) !void {
         switch (active) {
             .x11 => return self.x11.createContext(options),

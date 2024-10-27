@@ -283,6 +283,10 @@ pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
     if (focus == self) self.applyCursor();
 }
 
+pub fn requestAttention(self: *@This()) void {
+    _ = self;
+}
+
 pub fn createContext(self: *@This(), options: wio.CreateContextOptions) !void {
     var config: h.EGLConfig = undefined;
     var count: i32 = undefined;

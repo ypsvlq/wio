@@ -84,12 +84,13 @@ fn handlePress(button: wio.Button) void {
         .n => window.setCursorMode(.normal),
         .h => window.setCursorMode(.hidden),
         .r => window.setCursorMode(.relative),
-        .c => wio.setClipboardText("wio example"),
+        .a => window.requestAttention(),
         .d => {
             wio.messageBox(.info, "wio", "info");
             window.messageBox(.warn, "wio", "warning");
             window.messageBox(.err, "wio", "error");
         },
+        .c => wio.setClipboardText("wio example"),
         .v => {
             const text = wio.getClipboardText(allocator) orelse return;
             defer wio.allocator.free(text);

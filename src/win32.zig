@@ -298,6 +298,10 @@ pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
     _ = w.SetCursorPos(pos.x, pos.y);
 }
 
+pub fn requestAttention(self: *@This()) void {
+    _ = w.FlashWindow(self.window, w.TRUE);
+}
+
 pub fn createContext(self: *@This(), options: wio.CreateContextOptions) !void {
     _ = options;
     self.dc = w.GetDC(self.window);

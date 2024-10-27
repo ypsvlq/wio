@@ -104,6 +104,10 @@ pub const Window = struct {
         self.backend.setCursorMode(mode);
     }
 
+    pub fn requestAttention(self: *Window) void {
+        self.backend.requestAttention();
+    }
+
     pub fn createContext(self: *Window, options: CreateContextOptions) !void {
         std.debug.assert(init_options.opengl);
         return self.backend.createContext(options);
