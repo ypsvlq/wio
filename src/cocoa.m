@@ -4,7 +4,7 @@ extern void wioClose(void *);
 extern void wioCreate(void *);
 extern void wioFocus(void *);
 extern void wioUnfocus(void *);
-extern void wioSize(void *, bool, UInt16, UInt16, UInt16, UInt16);
+extern void wioSize(void *, uint8_t, UInt16, UInt16, UInt16, UInt16);
 extern void wioScale(void *, Float32);
 extern void wioChars(void *, const char *);
 extern void wioKeyDown(void *, UInt16);
@@ -78,7 +78,14 @@ static NSString *string(const char *ptr, size_t len) {
     NSView *view = [window contentView];
     NSRect rect = [view frame];
     NSRect framebuffer = [view convertRectToBacking:rect];
-    wioSize(ptr, [window isZoomed], rect.size.width, rect.size.height, framebuffer.size.width, framebuffer.size.height);
+
+    uint8_t mode = 0;
+    if ([window isZoomed])
+        mode = 1;
+    else if ([window styleMask] & NSWindowStyleMaskFullScreen)
+        mode = 2;
+
+    wioSize(ptr, mode, rect.size.width, rect.size.height, framebuffer.size.width, framebuffer.size.height);
     [context update];
 }
 
@@ -252,7 +259,7 @@ void wioLoop(void) {
 void *wioCreateWindow(void *ptr, uint16_t width, uint16_t height) {
     NSWindow *window = [[NSWindow alloc]
         initWithContentRect:NSMakeRect(0, 0, width, height)
-        styleMask:NSWindowStyleMaskTitled
+        styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable
         backing:NSBackingStoreBuffered
         defer:NO];
     [window setDelegate:[[WindowDelegate alloc] initWithPointer:ptr]];
@@ -261,7 +268,6 @@ void *wioCreateWindow(void *ptr, uint16_t width, uint16_t height) {
     [window setContentView:view];
     [window makeFirstResponder:view];
 
-    [window setStyleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable];
     [window setAcceptsMouseMovedEvents:YES];
     [window makeKeyAndOrderFront:nil];
     [window center];

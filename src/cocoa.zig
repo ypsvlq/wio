@@ -184,8 +184,8 @@ export fn wioUnfocus(self: *@This()) void {
     self.pushEvent(.unfocused);
 }
 
-export fn wioSize(self: *@This(), maximized: bool, width: u16, height: u16, fb_width: u16, fb_height: u16) void {
-    self.pushEvent(.{ .mode = if (maximized) .maximized else .normal });
+export fn wioSize(self: *@This(), mode: u8, width: u16, height: u16, fb_width: u16, fb_height: u16) void {
+    self.pushEvent(.{ .mode = @enumFromInt(mode) });
     self.pushEvent(.{ .size = .{ .width = width, .height = height } });
     self.pushEvent(.{ .framebuffer = .{ .width = fb_width, .height = fb_height } });
 }
