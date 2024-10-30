@@ -64,6 +64,7 @@ var atoms: extern struct {
     _NET_WM_STATE_MAXIMIZED_VERT: h.Atom,
     _NET_WM_STATE_MAXIMIZED_HORZ: h.Atom,
     _NET_WM_STATE_FULLSCREEN: h.Atom,
+    _NET_WM_STATE_DEMANDS_ATTENTION: h.Atom,
 } = undefined;
 
 var libX11: std.DynLib = undefined;
@@ -298,7 +299,21 @@ pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
 }
 
 pub fn requestAttention(self: *@This()) void {
-    _ = self;
+    var event = h.XEvent{
+        .xclient = .{
+            .type = h.ClientMessage,
+            .serial = undefined,
+            .send_event = undefined,
+            .display = undefined,
+            .window = self.window,
+            .message_type = atoms._NET_WM_STATE,
+            .format = 32,
+            .data = .{
+                .l = .{ 1, @as(c_long, @bitCast(atoms._NET_WM_STATE_DEMANDS_ATTENTION)), 0, 1, 0 },
+            },
+        },
+    };
+    _ = c.XSendEvent(display, h.DefaultRootWindow(display), h.False, h.SubstructureRedirectMask | h.SubstructureNotifyMask, &event);
 }
 
 pub fn createContext(self: *@This(), options: wio.CreateContextOptions) !void {
