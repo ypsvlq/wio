@@ -84,7 +84,10 @@ fn handlePress(button: wio.Button) void {
         .n => window.setCursorMode(.normal),
         .h => window.setCursorMode(.hidden),
         .r => window.setCursorMode(.relative),
-        .a => window.requestAttention(),
+        .a => {
+            std.time.sleep(3 * std.time.ns_per_s);
+            window.requestAttention();
+        },
         .d => {
             wio.messageBox(.info, "wio", "info");
             window.messageBox(.warn, "wio", "warning");
