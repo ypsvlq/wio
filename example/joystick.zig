@@ -6,22 +6,21 @@ const log = std.log.scoped(.joystick);
 var active: ?wio.Joystick = null;
 var last_state: u32 = 0;
 
-pub fn connected(handle: usize) void {
-    if (active == null) {
-        const joysticks = wio.getJoysticks(wio.allocator) catch return;
-        defer joysticks.deinit();
-        for (joysticks.items) |info| {
-            if (info.handle == handle) {
-                log.info("using 0x{x}: {s} / {s}", .{ handle, info.name, info.id });
-                if (wio.resolveJoystickId(info.id)) |resolved| {
-                    std.debug.assert(resolved == handle);
-                    log.info("resolved", .{});
-                }
-                break;
-            }
-        }
+pub fn connected(device: wio.JoystickDevice) void {
+    defer device.release();
 
-        active = wio.openJoystick(handle) catch return;
+    var iter = wio.JoystickIterator.init();
+    while (iter.next()) |cur| {
+        const id = cur.getId(main.allocator) orelse "";
+        defer main.allocator.free(id);
+        const name = cur.getName(main.allocator);
+        defer main.allocator.free(name);
+        log.info("connected: {s} / {s}", .{ name, id });
+    }
+
+    if (active == null) {
+        active = device.open();
+        if (active) |_| log.info("opened", .{});
     }
 }
 
@@ -29,9 +28,9 @@ pub fn close() void {
     if (active) |*joystick| joystick.close();
 }
 
-pub fn update() !void {
+pub fn update() void {
     if (active) |*joystick| {
-        const state = try joystick.poll() orelse {
+        const state = joystick.poll() orelse {
             log.info("lost", .{});
             joystick.close();
             active = null;

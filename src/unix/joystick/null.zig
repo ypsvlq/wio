@@ -5,28 +5,38 @@ pub fn init() !void {}
 
 pub fn deinit() void {}
 
-pub fn run() void {}
+pub fn update() void {}
 
-pub fn getJoysticks(allocator: std.mem.Allocator) ![]wio.JoystickInfo {
-    return allocator.alloc(wio.JoystickInfo, 0);
-}
+pub const JoystickIterator = struct {
+    pub fn init() JoystickIterator {
+        return .{};
+    }
 
-pub fn freeJoysticks(allocator: std.mem.Allocator, list: []wio.JoystickInfo) void {
-    allocator.free(list);
-}
+    pub fn next(_: *JoystickIterator) ?JoystickDevice {
+        return null;
+    }
+};
 
-pub fn resolveJoystickId(_: []const u8) ?usize {
-    return null;
-}
+pub const JoystickDevice = struct {
+    pub fn release(_: JoystickDevice) void {}
 
-pub fn openJoystick(_: usize) !Joystick {
-    return error.Unavailable;
-}
+    pub fn open(_: JoystickDevice) !Joystick {
+        return error.Unexpected;
+    }
+
+    pub fn getId(_: JoystickDevice, _: std.mem.Allocator) !?[]u8 {
+        return null;
+    }
+
+    pub fn getName(_: JoystickDevice, _: std.mem.Allocator) ![]u8 {
+        return "";
+    }
+};
 
 pub const Joystick = struct {
     pub fn close(_: *Joystick) void {}
 
-    pub fn poll(_: *Joystick) !?wio.JoystickState {
+    pub fn poll(_: *Joystick) ?wio.JoystickState {
         return null;
     }
 };

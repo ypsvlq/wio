@@ -106,45 +106,54 @@ pub fn swapBuffers(_: *@This()) void {}
 
 pub fn swapInterval(_: *@This(), _: i32) void {}
 
-pub fn getJoysticks(allocator: std.mem.Allocator) ![]wio.JoystickInfo {
-    const count = js.getJoysticks();
-    var list = try std.ArrayList(wio.JoystickInfo).initCapacity(allocator, count);
-    errdefer {
-        for (list.items) |info| allocator.free(info.name);
-        list.deinit();
+pub const JoystickIterator = struct {
+    index: u32 = 0,
+    count: u32,
+
+    pub fn init() JoystickIterator {
+        return .{ .count = js.getJoysticks() };
     }
-    for (0..count) |index| {
-        const len = js.getJoystickIdLen(index);
-        if (len > 0) {
-            const name = try allocator.alloc(u8, len);
-            js.getJoystickId(index, name.ptr);
-            list.appendAssumeCapacity(.{ .handle = index, .id = "", .name = name });
+
+    pub fn next(self: *JoystickIterator) ?JoystickDevice {
+        if (self.index < self.count) {
+            const device = .{ .index = self.index };
+            self.index += 1;
+            return device;
+        } else {
+            return null;
         }
     }
-    return list.toOwnedSlice();
-}
+};
 
-pub fn freeJoysticks(allocator: std.mem.Allocator, list: []wio.JoystickInfo) void {
-    for (list) |info| allocator.free(info.name);
-    allocator.free(list);
-}
+pub const JoystickDevice = struct {
+    index: u32,
 
-pub fn resolveJoystickId(_: []const u8) ?usize {
-    return null;
-}
+    pub fn release(_: JoystickDevice) void {}
 
-pub fn openJoystick(handle: usize) !Joystick {
-    var lengths: [2]u32 = undefined;
-    if (!js.openJoystick(handle, &lengths)) return error.Unavailable;
-    const axes = try wio.allocator.alloc(u16, lengths[0]);
-    errdefer wio.allocator.free(axes);
-    const buttons = try wio.allocator.alloc(bool, lengths[1]);
-    errdefer wio.allocator.free(buttons);
-    return .{ .handle = handle, .axes = axes, .buttons = buttons };
-}
+    pub fn open(self: JoystickDevice) !Joystick {
+        var lengths: [2]u32 = undefined;
+        if (!js.openJoystick(self.index, &lengths)) return error.Unexpected;
+        const axes = try wio.allocator.alloc(u16, lengths[0]);
+        errdefer wio.allocator.free(axes);
+        const buttons = try wio.allocator.alloc(bool, lengths[1]);
+        errdefer wio.allocator.free(buttons);
+        return .{ .index = self.index, .axes = axes, .buttons = buttons };
+    }
+
+    pub fn getId(_: JoystickDevice, _: std.mem.Allocator) !?[]u8 {
+        return null;
+    }
+
+    pub fn getName(self: JoystickDevice, allocator: std.mem.Allocator) ![]u8 {
+        const len = js.getJoystickIdLen(self.index);
+        const name = try allocator.alloc(u8, len);
+        js.getJoystickId(self.index, name.ptr);
+        return name;
+    }
+};
 
 pub const Joystick = struct {
-    handle: u32,
+    index: u32,
     axes: []u16,
     buttons: []bool,
 
@@ -153,13 +162,9 @@ pub const Joystick = struct {
         wio.allocator.free(self.buttons);
     }
 
-    pub fn poll(self: *Joystick) !?wio.JoystickState {
-        if (!js.getJoystickState(self.handle, self.axes.ptr, self.axes.len, self.buttons.ptr, self.buttons.len)) return null;
-        return .{
-            .axes = self.axes,
-            .hats = &.{},
-            .buttons = self.buttons,
-        };
+    pub fn poll(self: *Joystick) ?wio.JoystickState {
+        if (!js.getJoystickState(self.index, self.axes.ptr, self.axes.len, self.buttons.ptr, self.buttons.len)) return null;
+        return .{ .axes = self.axes, .hats = &.{}, .buttons = self.buttons };
     }
 };
 
@@ -181,7 +186,7 @@ pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
 
 export fn wioJoystick(index: u32) void {
     if (wio.init_options.joystickCallback) |callback| {
-        callback(index);
+        callback(.{ .backend = .{ .index = index } });
     }
 }
 

@@ -9,7 +9,7 @@ pub const std_options = std.Options{
 };
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-const allocator = gpa.allocator();
+pub const allocator = gpa.allocator();
 var window: wio.Window = undefined;
 
 pub fn main() !void {
@@ -27,7 +27,7 @@ pub fn main() !void {
 }
 
 fn loop() !bool {
-    try joystick.update();
+    joystick.update();
     while (window.getEvent()) |event| {
         switch (event) {
             .size, .framebuffer => |size| std.log.info("{s} {}x{}", .{ @tagName(event), size.width, size.height }),

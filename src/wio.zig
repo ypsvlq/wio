@@ -14,7 +14,8 @@ pub const logFn = if (@hasDecl(backend, "logFn")) backend.logFn else std.log.def
 
 pub const InitOptions = struct {
     joystick: bool = false,
-    joystickCallback: ?*const fn (usize) void = null,
+    /// Free with `JoystickDevice.release()`.
+    joystickCallback: ?*const fn (JoystickDevice) void = null,
     opengl: bool = false,
 };
 
@@ -128,49 +129,49 @@ pub const Window = struct {
     }
 };
 
-pub fn getJoysticks(ally: std.mem.Allocator) !JoystickList {
-    std.debug.assert(init_options.joystick);
-    return .{ .items = try backend.getJoysticks(ally), .allocator = ally };
-}
+pub const JoystickIterator = struct {
+    backend: backend.JoystickIterator,
 
-pub const JoystickList = struct {
-    items: []JoystickInfo,
-    allocator: std.mem.Allocator,
+    /// Invalidated on the next iteration of the main loop.
+    pub fn init() JoystickIterator {
+        return .{ .backend = backend.JoystickIterator.init() };
+    }
 
-    pub fn deinit(self: JoystickList) void {
-        backend.freeJoysticks(self.allocator, self.items);
+    /// Free with `JoystickDevice.release()`.
+    pub fn next(self: *JoystickIterator) ?JoystickDevice {
+        return if (self.backend.next()) |device| .{ .backend = device } else null;
     }
 };
 
-pub const JoystickInfo = struct {
-    handle: usize,
-    id: []const u8,
-    name: []const u8,
+pub const JoystickDevice = struct {
+    backend: backend.JoystickDevice,
+
+    pub fn release(self: JoystickDevice) void {
+        self.backend.release();
+    }
+
+    pub fn open(self: JoystickDevice) ?Joystick {
+        return .{ .backend = self.backend.open() catch return null };
+    }
+
+    pub fn getId(self: JoystickDevice, ally: std.mem.Allocator) ?[]u8 {
+        return self.backend.getId(ally) catch null;
+    }
+
+    /// Returns "" on error.
+    pub fn getName(self: JoystickDevice, ally: std.mem.Allocator) []u8 {
+        return self.backend.getName(ally) catch "";
+    }
 };
 
-pub fn resolveJoystickId(id: []const u8) ?usize {
-    std.debug.assert(init_options.joystick);
-    return backend.resolveJoystickId(id);
-}
-
-pub fn openJoystick(handle: usize) !?Joystick {
-    std.debug.assert(init_options.joystick);
-    return .{
-        .backend = backend.openJoystick(handle) catch |err| switch (err) {
-            error.Unavailable => return null,
-            else => return err,
-        },
-    };
-}
-
 pub const Joystick = struct {
-    backend: @typeInfo(@typeInfo(@TypeOf(backend.openJoystick)).@"fn".return_type.?).error_union.payload,
+    backend: @typeInfo(@typeInfo(@TypeOf(backend.JoystickDevice.open)).@"fn".return_type.?).error_union.payload,
 
     pub fn close(self: *Joystick) void {
         self.backend.close();
     }
 
-    pub fn poll(self: *Joystick) !?JoystickState {
+    pub fn poll(self: *Joystick) ?JoystickState {
         return self.backend.poll();
     }
 };

@@ -108,30 +108,46 @@ pub fn swapInterval(self: *@This(), interval: i32) void {
     wioSwapInterval(self.context, interval);
 }
 
-pub fn getJoysticks(allocator: std.mem.Allocator) ![]wio.JoystickInfo {
-    return allocator.alloc(wio.JoystickInfo, 0);
-}
+pub const JoystickIterator = struct {
+    pub fn init() JoystickIterator {
+        return .{};
+    }
 
-pub fn freeJoysticks(allocator: std.mem.Allocator, list: []wio.JoystickInfo) void {
-    allocator.free(list);
-}
+    pub fn next(self: *JoystickIterator) ?JoystickDevice {
+        _ = self;
+        return null;
+    }
+};
 
-pub fn resolveJoystickId(id: []const u8) ?usize {
-    _ = id;
-    return null;
-}
+pub const JoystickDevice = struct {
+    pub fn release(self: JoystickDevice) void {
+        _ = self;
+    }
 
-pub fn openJoystick(handle: usize) !Joystick {
-    _ = handle;
-    return error.Unavailable;
-}
+    pub fn open(self: JoystickDevice) !Joystick {
+        _ = self;
+        return error.Unexpected;
+    }
+
+    pub fn getId(self: JoystickDevice, allocator: std.mem.Allocator) !?[]u8 {
+        _ = self;
+        _ = allocator;
+        return null;
+    }
+
+    pub fn getName(self: JoystickDevice, allocator: std.mem.Allocator) ![]u8 {
+        _ = self;
+        _ = allocator;
+        return "";
+    }
+};
 
 pub const Joystick = struct {
     pub fn close(self: *Joystick) void {
         _ = self;
     }
 
-    pub fn poll(self: *Joystick) !?wio.JoystickState {
+    pub fn poll(self: *Joystick) ?wio.JoystickState {
         _ = self;
         return null;
     }

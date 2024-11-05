@@ -67,8 +67,8 @@ pub fn deinit() void {
 
 pub fn run(func: fn () anyerror!bool, options: wio.RunOptions) !void {
     switch (active) {
-        .x11 => return x11.run(func, options, joystick.run),
-        .wayland => return wayland.run(func, options, joystick.run),
+        .x11 => return x11.run(func, options, joystick.update),
+        .wayland => return wayland.run(func, options, joystick.update),
     }
 }
 
@@ -168,22 +168,8 @@ pub const Window = union {
     }
 };
 
-pub fn getJoysticks(allocator: std.mem.Allocator) ![]wio.JoystickInfo {
-    return joystick.getJoysticks(allocator);
-}
-
-pub fn freeJoysticks(allocator: std.mem.Allocator, list: []wio.JoystickInfo) void {
-    joystick.freeJoysticks(allocator, list);
-}
-
-pub fn resolveJoystickId(id: []const u8) ?usize {
-    return joystick.resolveJoystickId(id);
-}
-
-pub fn openJoystick(handle: usize) !Joystick {
-    return joystick.openJoystick(handle);
-}
-
+pub const JoystickIterator = joystick.JoystickIterator;
+pub const JoystickDevice = joystick.JoystickDevice;
 pub const Joystick = joystick.Joystick;
 
 pub fn messageBox(backend: ?Window, style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
