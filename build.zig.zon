@@ -3,8 +3,8 @@
     .version = "0.0.0",
     .dependencies = .{
         .win32 = .{
-            .url = "https://github.com/ypsvlq/win32/archive/51f96ae94b2e23f8fbb77e28c2fc91a33aa0f049.tar.gz",
-            .hash = "1220f847a1dc2a3571165ec2854e203de663c654a369fe9c980c1fdc4255c71b33be",
+            .url = "https://github.com/ypsvlq/win32/archive/c8ea0e6304c21e362426a40349bcfdae1d4684f8.tar.gz",
+            .hash = "12209acdad929041e872303691ea1caa848e5f4f635f28bfd763961c7466864368b2",
             .lazy = true,
         },
         .xcode_frameworks = .{

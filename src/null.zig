@@ -116,6 +116,70 @@ pub const Joystick = struct {
     }
 };
 
+pub const AudioDeviceIterator = struct {
+    pub fn init(mode: wio.AudioDeviceIteratorMode) AudioDeviceIterator {
+        _ = mode;
+        return .{};
+    }
+
+    pub fn deinit(self: *AudioDeviceIterator) void {
+        _ = self;
+    }
+
+    pub fn next(self: *AudioDeviceIterator) ?AudioDevice {
+        _ = self;
+        return null;
+    }
+};
+
+pub const AudioDevice = struct {
+    pub fn release(self: AudioDevice) void {
+        _ = self;
+    }
+
+    pub fn openOutput(self: AudioDevice, writeFn: *const fn ([]f32) void, format: wio.AudioFormat) !AudioOutput {
+        _ = self;
+        _ = writeFn;
+        _ = format;
+        return error.Unexpected;
+    }
+
+    pub fn openInput(self: AudioDevice, readFn: *const fn ([]const f32) void, format: wio.AudioFormat) !AudioInput {
+        _ = self;
+        _ = readFn;
+        _ = format;
+        return error.Unexpected;
+    }
+
+    pub fn getId(self: AudioDevice, allocator: std.mem.Allocator) ![]u8 {
+        _ = self;
+        _ = allocator;
+        return error.Unexpected;
+    }
+
+    pub fn getName(self: AudioDevice, allocator: std.mem.Allocator) ![]u8 {
+        _ = self;
+        _ = allocator;
+        return error.Unexpected;
+    }
+};
+
+pub const AudioOutput = struct {
+    pub fn close(self: *AudioOutput) void {
+        _ = self;
+    }
+};
+
+pub const AudioInput = struct {
+    pub fn close(self: *AudioInput) void {
+        _ = self;
+    }
+};
+
+pub fn getChannelOrder() []wio.Channel {
+    return &.{};
+}
+
 pub fn messageBox(backend: ?*@This(), style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
     _ = backend;
     _ = style;

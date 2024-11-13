@@ -2,6 +2,7 @@ const std = @import("std");
 const wio = @import("wio");
 const joystick = @import("joystick.zig");
 const renderer = @import("renderer.zig");
+const audio = @import("audio.zig");
 
 pub const std_options = std.Options{
     .log_level = .info,
@@ -16,6 +17,9 @@ pub fn main() !void {
     try wio.init(allocator, .{
         .joystick = true,
         .joystickCallback = joystick.connected,
+        .audio = true,
+        .audioDefaultOutputFn = audio.openOutput,
+        .audioDefaultInputFn = audio.openInput,
         .opengl = true,
     });
     window = try wio.createWindow(.{ .title = "wio example" });
@@ -43,6 +47,7 @@ fn loop() !bool {
         }
         switch (event) {
             .close => {
+                audio.close();
                 joystick.close();
                 window.destroy();
                 wio.deinit();
@@ -100,6 +105,29 @@ fn handlePress(button: wio.Button) void {
             const text = wio.getClipboardText(allocator) orelse return;
             defer wio.allocator.free(text);
             std.log.scoped(.clipboard).info("{s}", .{text});
+        },
+        .o => audio.play = !audio.play,
+        .i => audio.record = !audio.record,
+        .e => {
+            var joystick_iter = wio.JoystickIterator.init();
+            while (joystick_iter.next()) |device| {
+                defer device.release();
+                const id = device.getId(allocator) orelse "";
+                defer allocator.free(id);
+                const name = device.getName(allocator);
+                defer allocator.free(name);
+                std.log.info("joystick: {s} / {s}", .{ name, id });
+            }
+            var audio_iter = wio.AudioDeviceIterator.init(.all);
+            defer audio_iter.deinit();
+            while (audio_iter.next()) |device| {
+                defer device.release();
+                const id = device.getId(allocator) orelse "";
+                defer allocator.free(id);
+                const name = device.getName(allocator);
+                defer allocator.free(name);
+                std.log.info("audio: {s} / {s}", .{ name, id });
+            }
         },
         else => {},
     }

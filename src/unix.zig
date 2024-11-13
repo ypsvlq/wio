@@ -8,6 +8,9 @@ const joystick = switch (builtin.os.tag) {
     .linux => @import("unix/joystick/linux.zig"),
     else => @import("unix/joystick/null.zig"),
 };
+const audio = switch (builtin.os.tag) {
+    else => @import("unix/audio/null.zig"),
+};
 const log = std.log.scoped(.wio);
 
 pub var active: enum {
@@ -18,9 +21,8 @@ pub var active: enum {
 pub fn init(options: wio.InitOptions) !void {
     if (builtin.os.tag == .linux and builtin.output_mode == .Exe and builtin.link_mode == .static) @compileError("dynamic link required");
 
-    if (options.joystick) {
-        try joystick.init();
-    }
+    if (options.joystick) try joystick.init();
+    if (options.audio) try audio.init();
 
     comptime var enable_x11 = false;
     comptime var enable_wayland = false;
@@ -56,9 +58,8 @@ pub fn init(options: wio.InitOptions) !void {
 }
 
 pub fn deinit() void {
-    if (wio.init_options.joystick) {
-        joystick.deinit();
-    }
+    if (wio.init_options.audio) audio.deinit();
+    if (wio.init_options.joystick) joystick.deinit();
     switch (active) {
         .x11 => return x11.deinit(),
         .wayland => return wayland.deinit(),
@@ -171,6 +172,12 @@ pub const Window = union {
 pub const JoystickIterator = joystick.JoystickIterator;
 pub const JoystickDevice = joystick.JoystickDevice;
 pub const Joystick = joystick.Joystick;
+
+pub const AudioDeviceIterator = audio.AudioDeviceIterator;
+pub const AudioDevice = audio.AudioDevice;
+pub const AudioOutput = audio.AudioOutput;
+pub const AudioInput = audio.AudioInput;
+pub const getChannelOrder = audio.getChannelOrder;
 
 pub fn messageBox(backend: ?Window, style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
     switch (active) {

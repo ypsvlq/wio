@@ -17,6 +17,9 @@ const JoystickInfo = struct {
 var joysticks: std.AutoHashMap(w.HANDLE, JoystickInfo) = undefined;
 var xinput = std.StaticBitSet(4).initEmpty();
 
+var mm_device_enumerator: *w.IMMDeviceEnumerator = undefined;
+var mm_notification_client = MMNotificationClient{};
+
 var wgl: struct {
     swapIntervalEXT: ?*const fn (i32) callconv(w.WINAPI) w.BOOL = null,
 } = .{};
@@ -74,6 +77,27 @@ pub fn init(options: wio.InitOptions) !void {
         joysticks = @TypeOf(joysticks).init(wio.allocator);
     }
 
+    if (options.audio) {
+        try SUCCEED(w.CoInitializeEx(null, w.COINIT_MULTITHREADED | w.COINIT_DISABLE_OLE1DDE), "CoInitializeEx");
+        try SUCCEED(w.CoCreateInstance(&w.CLSID_MMDeviceEnumerator, null, w.CLSCTX_ALL, &w.IID_IMMDeviceEnumerator, @ptrCast(&mm_device_enumerator)), "CoCreateInstance");
+
+        var device: *w.IMMDevice = undefined;
+        if (wio.init_options.audioDefaultOutputFn) |callback| {
+            if (SUCCEED(mm_device_enumerator.GetDefaultAudioEndpoint(w.eRender, w.eConsole, @ptrCast(&device)), "GetDefaultAudioEndpoint")) {
+                callback(.{ .backend = .{ .device = device } });
+            } else |_| {}
+        }
+        if (wio.init_options.audioDefaultInputFn) |callback| {
+            if (SUCCEED(mm_device_enumerator.GetDefaultAudioEndpoint(w.eCapture, w.eConsole, @ptrCast(&device)), "GetDefaultAudioEndpoint")) {
+                callback(.{ .backend = .{ .device = device } });
+            } else |_| {}
+        }
+
+        if (wio.init_options.audioDefaultOutputFn != null or wio.init_options.audioDefaultInputFn != null) {
+            try SUCCEED(mm_device_enumerator.RegisterEndpointNotificationCallback(&mm_notification_client.parent), "RegisterEndpointNotificationCallback");
+        }
+    }
+
     if (options.opengl) {
         const dc = w.GetDC(helper_window);
         defer _ = w.ReleaseDC(helper_window, dc);
@@ -106,6 +130,10 @@ pub fn init(options: wio.InitOptions) !void {
 }
 
 pub fn deinit() void {
+    if (wio.init_options.audio) {
+        _ = mm_device_enumerator.Release();
+        w.CoUninitialize();
+    }
     if (wio.init_options.joystick) {
         var iter = joysticks.valueIterator();
         while (iter.next()) |info| wio.allocator.free(info.interface);
@@ -128,7 +156,26 @@ pub fn run(func: fn () anyerror!bool, options: wio.RunOptions) !void {
                 _ = w.DispatchMessageW(&msg);
             }
         }
+
         if (!try func()) return;
+
+        if (wio.init_options.audio) {
+            var maybe_device: ?*w.IMMDevice = undefined;
+            if (wio.init_options.audioDefaultOutputFn) |callback| {
+                mm_notification_client.mutex.lock();
+                maybe_device = mm_notification_client.default_output;
+                mm_notification_client.default_output = null;
+                mm_notification_client.mutex.unlock();
+                if (maybe_device) |device| callback(.{ .backend = .{ .device = device } });
+            }
+            if (wio.init_options.audioDefaultInputFn) |callback| {
+                mm_notification_client.mutex.lock();
+                maybe_device = mm_notification_client.default_input;
+                mm_notification_client.default_input = null;
+                mm_notification_client.mutex.unlock();
+                if (maybe_device) |device| callback(.{ .backend = .{ .device = device } });
+            }
+        }
     }
 }
 
@@ -563,6 +610,303 @@ const XInputJoystick = struct {
         }
 
         return .{ .axes = &self.axes, .hats = &self.hats, .buttons = &self.buttons };
+    }
+};
+
+pub const AudioDeviceIterator = struct {
+    devices: ?*w.IMMDeviceCollection = null,
+    count: u32 = 0,
+    index: u32 = 0,
+
+    pub fn init(mode: wio.AudioDeviceIteratorMode) AudioDeviceIterator {
+        var result = AudioDeviceIterator{};
+        if (SUCCEED(mm_device_enumerator.EnumAudioEndpoints(switch (mode) {
+            .all => w.EDataFlow_eAll,
+            .outputs => w.eRender,
+            .inputs => w.eCapture,
+        }, w.DEVICE_STATE_ACTIVE, @ptrCast(&result.devices)), "EnumAudioEndpoints")) {
+            SUCCEED(result.devices.?.GetCount(&result.count), "IMMDeviceCollection::GetCount") catch {};
+        } else |_| {}
+        return result;
+    }
+
+    pub fn deinit(self: *AudioDeviceIterator) void {
+        if (self.devices) |devices| _ = devices.Release();
+    }
+
+    pub fn next(self: *AudioDeviceIterator) ?AudioDevice {
+        if (self.index == self.count) return null;
+        var device: *w.IMMDevice = undefined;
+        SUCCEED(self.devices.?.Item(self.index, @ptrCast(&device)), "IMMDeviceCollection::Item") catch return null;
+        self.index += 1;
+        return .{ .device = device };
+    }
+};
+
+pub const AudioDevice = struct {
+    device: *w.IMMDevice,
+
+    pub fn release(self: AudioDevice) void {
+        _ = self.device.Release();
+    }
+
+    pub fn openOutput(self: AudioDevice, writeFn: *const fn ([]f32) void, format: wio.AudioFormat) !*AudioOutput {
+        return self.openAudioClient(format, &w.IID_IAudioRenderClient, @ptrCast(writeFn), AudioClient.outputThread);
+    }
+
+    pub fn openInput(self: AudioDevice, readFn: *const fn ([]const f32) void, format: wio.AudioFormat) !*AudioInput {
+        return self.openAudioClient(format, &w.IID_IAudioCaptureClient, @ptrCast(readFn), AudioClient.inputThread);
+    }
+
+    fn openAudioClient(self: AudioDevice, format: wio.AudioFormat, guid: *const w.GUID, dataFn: *const fn () void, threadFn: fn (*AudioClient) void) !*AudioClient {
+        var client: *w.IAudioClient = undefined;
+        try SUCCEED(self.device.Activate(&w.IID_IAudioClient, w.CLSCTX_ALL, null, @ptrCast(&client)), "IMMDevice::Activate");
+        errdefer _ = client.Release();
+
+        var channel_mask: u32 = 0;
+        var iter = format.channels.iterator();
+        while (iter.next()) |channel| {
+            channel_mask |= switch (channel) {
+                .FL => w.SPEAKER_FRONT_LEFT,
+                .FR => w.SPEAKER_FRONT_RIGHT,
+                .FC => w.SPEAKER_FRONT_CENTER,
+                .LFE1 => w.SPEAKER_LOW_FREQUENCY,
+                .BL => w.SPEAKER_BACK_LEFT,
+                .BR => w.SPEAKER_BACK_RIGHT,
+                .FLc => w.SPEAKER_FRONT_LEFT_OF_CENTER,
+                .FRc => w.SPEAKER_FRONT_RIGHT_OF_CENTER,
+                .BC => w.SPEAKER_BACK_CENTER,
+                .SiL => w.SPEAKER_SIDE_LEFT,
+                .SiR => w.SPEAKER_SIDE_RIGHT,
+                .TpC => w.SPEAKER_TOP_CENTER,
+                .TpFL => w.SPEAKER_TOP_FRONT_LEFT,
+                .TpFC => w.SPEAKER_TOP_FRONT_CENTER,
+                .TpFR => w.SPEAKER_TOP_FRONT_RIGHT,
+                .TpBL => w.SPEAKER_TOP_BACK_LEFT,
+                .TpBC => w.SPEAKER_TOP_BACK_CENTER,
+                .TpBR => w.SPEAKER_TOP_BACK_RIGHT,
+                else => return error.Unexpected,
+            };
+        }
+
+        const T = f32;
+        const channels: u16 = @intCast(format.channels.count());
+        const block_align = channels * @sizeOf(T);
+        const waveformat = w.WAVEFORMATEXTENSIBLE{
+            .Format = .{
+                .wFormatTag = w.WAVE_FORMAT_EXTENSIBLE,
+                .nChannels = channels,
+                .nSamplesPerSec = format.sample_rate,
+                .nAvgBytesPerSec = format.sample_rate * block_align,
+                .nBlockAlign = block_align,
+                .wBitsPerSample = @bitSizeOf(T),
+                .cbSize = @sizeOf(w.WAVEFORMATEXTENSIBLE) - @sizeOf(w.WAVEFORMATEX),
+            },
+            .Samples = .{ .wValidBitsPerSample = @bitSizeOf(T) },
+            .dwChannelMask = channel_mask,
+            .SubFormat = if (T == f32) w.KSDATAFORMAT_SUBTYPE_IEEE_FLOAT else w.KSDATAFORMAT_SUBTYPE_PCM,
+        };
+        try SUCCEED(client.Initialize(w.AUDCLNT_SHAREMODE_SHARED, w.AUDCLNT_STREAMFLAGS_EVENTCALLBACK | w.AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | w.AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY, 0, 0, &waveformat.Format, null), "IAudioClient::Initialize");
+
+        const event = w.CreateEventW(null, w.FALSE, w.FALSE, null) orelse return logLastError("CreateEventW");
+        errdefer std.os.windows.CloseHandle(event);
+        try SUCCEED(client.SetEventHandle(event), "IAudioClient::SetEventHandle");
+
+        var service: *w.IUnknown = undefined;
+        try SUCCEED(client.GetService(guid, @ptrCast(&service)), "IAudioClient::GetService");
+        errdefer _ = service.Release();
+
+        try SUCCEED(client.Start(), "IAudioClient::Start");
+
+        const result = try wio.allocator.create(AudioClient);
+        errdefer wio.allocator.destroy(result);
+        result.* = .{
+            .thread = undefined,
+            .client = client,
+            .event = event,
+            .channels = channels,
+            .service = service,
+            .dataFn = dataFn,
+        };
+        result.thread = try std.Thread.spawn(.{}, threadFn, .{result});
+        return result;
+    }
+
+    pub fn getId(self: AudioDevice, allocator: std.mem.Allocator) ![]u8 {
+        var id: [*:0]u16 = undefined;
+        try SUCCEED(self.device.GetId(@ptrCast(&id)), "IMMDevice::GetID");
+        defer w.CoTaskMemFree(id);
+        return std.unicode.utf16LeToUtf8Alloc(allocator, std.mem.sliceTo(id, 0));
+    }
+
+    pub fn getName(self: AudioDevice, allocator: std.mem.Allocator) ![]u8 {
+        var properties: *w.IPropertyStore = undefined;
+        try SUCCEED(self.device.OpenPropertyStore(w.STGM_READ, @ptrCast(&properties)), "IMMDevice::OpenPropertyStore");
+        defer _ = properties.Release();
+
+        var variant: w.PROPVARIANT = undefined;
+        try SUCCEED(properties.GetValue(&w.PKEY_Device_FriendlyName, &variant), "IPropertyStore::GetValue");
+        defer _ = w.PropVariantClear(&variant);
+
+        return if (variant.Anonymous.Anonymous.vt == w.VT_LPWSTR)
+            std.unicode.utf16LeToUtf8Alloc(allocator, std.mem.sliceTo(variant.Anonymous.Anonymous.Anonymous.pwszVal, 0))
+        else
+            "";
+    }
+};
+
+const AudioClient = struct {
+    thread: std.Thread,
+    client: *w.IAudioClient,
+    service: *w.IUnknown,
+    dataFn: *const fn () void,
+    event: w.HANDLE,
+    channels: u16,
+    stop: bool = false,
+
+    pub fn close(self: *AudioOutput) void {
+        self.stop = true;
+        self.thread.join();
+
+        std.os.windows.CloseHandle(self.event.?);
+        _ = self.service.Release();
+        _ = self.client.Release();
+        wio.allocator.destroy(self);
+    }
+
+    fn outputThread(self: *AudioClient) void {
+        const render_client: *w.IAudioRenderClient = @ptrCast(self.service);
+        const writeFn: *const fn ([]f32) void = @ptrCast(self.dataFn);
+
+        var size: u32 = undefined;
+        SUCCEED(self.client.GetBufferSize(&size), "IAudioClient::GetBufferSize") catch return;
+
+        while (!self.stop) {
+            _ = w.WaitForSingleObject(self.event, w.INFINITE);
+
+            var used: u32 = undefined;
+            SUCCEED(self.client.GetCurrentPadding(&used), "IAudioClient::GetCurrentPadding") catch break;
+            const available = size - used;
+
+            var buffer: [*]f32 = undefined;
+            SUCCEED(render_client.GetBuffer(available, @ptrCast(&buffer)), "IAudioRenderClient::GetBuffer") catch break;
+            writeFn(buffer[0 .. available * self.channels]);
+            SUCCEED(render_client.ReleaseBuffer(available, 0), "IAudioRenderClient::ReleaseBuffer") catch break;
+        }
+    }
+
+    fn inputThread(self: *AudioClient) void {
+        const capture_client: *w.IAudioCaptureClient = @ptrCast(self.service);
+        const readFn: *const fn ([]const f32) void = @ptrCast(self.dataFn);
+
+        while (!self.stop) {
+            _ = w.WaitForSingleObject(self.event, w.INFINITE);
+
+            var count: u32 = undefined;
+            SUCCEED(self.client.GetCurrentPadding(&count), "IAudioClient::GetCurrentPadding") catch break;
+
+            var buffer: [*]f32 = undefined;
+            var flags: u32 = undefined;
+            SUCCEED(capture_client.GetBuffer(@ptrCast(&buffer), &count, &flags, null, null), "IAudioCaptureClient::GetBuffer") catch break;
+            readFn(buffer[0 .. count * self.channels]);
+            SUCCEED(capture_client.ReleaseBuffer(count), "IAudioCaptureClient::ReleaseBuffer") catch break;
+        }
+    }
+};
+
+pub const AudioOutput = AudioClient;
+pub const AudioInput = AudioClient;
+
+pub fn getChannelOrder() []const wio.Channel {
+    return &.{
+        .FL,
+        .FR,
+        .FC,
+        .LFE1,
+        .BL,
+        .BR,
+        .FLc,
+        .FRc,
+        .BC,
+        .SiL,
+        .SiR,
+        .TpC,
+        .TpFL,
+        .TpFC,
+        .TpFR,
+        .TpBL,
+        .TpBC,
+        .TpBR,
+    };
+}
+
+const MMNotificationClient = struct {
+    parent: w.IMMNotificationClient = .{ .lpVtbl = &vtbl },
+    mutex: std.Thread.Mutex = .{},
+    default_output: ?*w.IMMDevice = null,
+    default_input: ?*w.IMMDevice = null,
+
+    const vtbl = w.IMMNotificationClient.Vtbl{
+        .parent = .{
+            .AddRef = AddRef,
+            .Release = Release,
+            .QueryInterface = QueryInterface,
+        },
+        .OnDeviceStateChanged = OnDeviceStateChanged,
+        .OnDeviceAdded = OnDeviceAdded,
+        .OnDeviceRemoved = OnDeviceRemoved,
+        .OnDefaultDeviceChanged = OnDefaultDeviceChanged,
+        .OnPropertyValueChanged = OnPropertyValueChanged,
+    };
+
+    fn AddRef(_: *const anyopaque) callconv(w.WINAPI) u32 {
+        return 1;
+    }
+
+    fn Release(_: *const anyopaque) callconv(w.WINAPI) u32 {
+        return 1;
+    }
+
+    fn QueryInterface(_: *const anyopaque, _: [*c]const w.GUID, _: [*c]?*anyopaque) callconv(w.WINAPI) w.HRESULT {
+        return w.E_NOINTERFACE;
+    }
+
+    fn OnDeviceStateChanged(_: *const anyopaque, _: [*c]const u16, _: u32) callconv(w.WINAPI) w.HRESULT {
+        return w.S_OK;
+    }
+
+    fn OnDeviceAdded(_: *const anyopaque, _: [*c]const u16) callconv(w.WINAPI) w.HRESULT {
+        return w.S_OK;
+    }
+
+    fn OnDeviceRemoved(_: *const anyopaque, _: [*c]const u16) callconv(w.WINAPI) w.HRESULT {
+        return w.S_OK;
+    }
+
+    fn OnDefaultDeviceChanged(_: *const anyopaque, flow: i32, role: i32, id: [*c]const u16) callconv(w.WINAPI) w.HRESULT {
+        if (role == w.eConsole) {
+            const maybe_device = if (flow == w.eRender and wio.init_options.audioDefaultOutputFn != null)
+                &mm_notification_client.default_output
+            else if (flow != w.eRender and wio.init_options.audioDefaultInputFn != null)
+                &mm_notification_client.default_input
+            else
+                null;
+
+            if (maybe_device) |device| {
+                mm_notification_client.mutex.lock();
+                if (device.*) |old| {
+                    _ = old.Release();
+                    device.* = null;
+                }
+                SUCCEED(mm_device_enumerator.GetDevice(id, @ptrCast(device)), "IMMDeviceEnumerator::GetDevice") catch {};
+                mm_notification_client.mutex.unlock();
+            }
+        }
+        return w.S_OK;
+    }
+
+    fn OnPropertyValueChanged(_: *const anyopaque, _: [*c]const u16, _: w.PROPERTYKEY) callconv(w.WINAPI) w.HRESULT {
+        return w.S_OK;
     }
 };
 

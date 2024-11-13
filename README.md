@@ -16,6 +16,9 @@ contains a test program covering most features.
 By default, wio embeds an [application manifest][4] for proper functionality.
 When using a custom manifest, set the `win32_manifest` build option to false.
 
+If audio is enabled, wio initializes COM with options `COINIT_MULTITHREADED`
+and `COINIT_DISABLE_OLE1DDE`.
+
 ### Unix
 
 Unix-like systems support different backends in the same executable, with the

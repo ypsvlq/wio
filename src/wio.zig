@@ -16,6 +16,13 @@ pub const InitOptions = struct {
     joystick: bool = false,
     /// Free with `JoystickDevice.release()`.
     joystickCallback: ?*const fn (JoystickDevice) void = null,
+
+    audio: bool = false,
+    /// Free with `AudioDevice.release()`.
+    audioDefaultOutputFn: ?*const fn (AudioDevice) void = null,
+    /// Free with `AudioDevice.release()`.
+    audioDefaultInputFn: ?*const fn (AudioDevice) void = null,
+
     opengl: bool = false,
 };
 
@@ -26,7 +33,7 @@ pub fn init(ally: std.mem.Allocator, options: InitOptions) !void {
     try backend.init(options);
 }
 
-/// All windows must be closed before deinit is called.
+/// All windows and devices must be closed before deinit is called.
 pub fn deinit() void {
     backend.deinit();
 }
@@ -139,7 +146,7 @@ pub const JoystickIterator = struct {
 
     /// Free with `JoystickDevice.release()`.
     pub fn next(self: *JoystickIterator) ?JoystickDevice {
-        return if (self.backend.next()) |device| .{ .backend = device } else null;
+        return .{ .backend = self.backend.next() orelse return null };
     }
 };
 
@@ -187,6 +194,102 @@ pub const Hat = packed struct {
     right: bool = false,
     down: bool = false,
     left: bool = false,
+};
+
+pub const AudioDeviceIteratorMode = enum { all, outputs, inputs };
+
+pub const AudioDeviceIterator = struct {
+    backend: backend.AudioDeviceIterator,
+
+    pub fn init(mode: AudioDeviceIteratorMode) AudioDeviceIterator {
+        return .{ .backend = backend.AudioDeviceIterator.init(mode) };
+    }
+
+    pub fn deinit(self: *AudioDeviceIterator) void {
+        self.backend.deinit();
+    }
+
+    // Free with `AudioDevice.release()`.
+    pub fn next(self: *AudioDeviceIterator) ?AudioDevice {
+        return .{ .backend = self.backend.next() orelse return null };
+    }
+};
+
+pub const AudioDevice = struct {
+    backend: backend.AudioDevice,
+
+    pub fn release(self: AudioDevice) void {
+        return self.backend.release();
+    }
+
+    pub fn openOutput(self: AudioDevice, writeFn: *const fn ([]f32) void, format: AudioFormat) ?AudioOutput {
+        return .{ .backend = self.backend.openOutput(writeFn, format) catch return null };
+    }
+
+    pub fn openInput(self: AudioDevice, readFn: *const fn ([]const f32) void, format: AudioFormat) ?AudioInput {
+        return .{ .backend = self.backend.openInput(readFn, format) catch return null };
+    }
+
+    pub fn getId(self: AudioDevice, ally: std.mem.Allocator) ?[]u8 {
+        return self.backend.getId(ally) catch null;
+    }
+
+    /// Returns "" on error.
+    pub fn getName(self: AudioDevice, ally: std.mem.Allocator) []u8 {
+        return self.backend.getName(ally) catch "";
+    }
+};
+
+pub const AudioOutput = struct {
+    backend: @typeInfo(@typeInfo(@TypeOf(backend.AudioDevice.openOutput)).@"fn".return_type.?).error_union.payload,
+
+    pub fn close(self: *AudioOutput) void {
+        self.backend.close();
+    }
+};
+
+pub const AudioInput = struct {
+    backend: @typeInfo(@typeInfo(@TypeOf(backend.AudioDevice.openInput)).@"fn".return_type.?).error_union.payload,
+
+    pub fn close(self: *AudioInput) void {
+        self.backend.close();
+    }
+};
+
+pub fn getChannelOrder() []const Channel {
+    return backend.getChannelOrder();
+}
+
+pub const AudioFormat = struct {
+    sample_rate: u32,
+    channels: std.EnumSet(Channel),
+};
+
+pub const Channel = enum {
+    FL,
+    FR,
+    FC,
+    LFE1,
+    BL,
+    BR,
+    FLc,
+    FRc,
+    BC,
+    LFE2,
+    SiL,
+    SiR,
+    TpFL,
+    TpFR,
+    TpFC,
+    TpC,
+    TpBL,
+    TpBR,
+    TpSiL,
+    TpSiR,
+    TpBC,
+    BtFC,
+    BtFL,
+    BtFR,
 };
 
 pub const MessageBoxStyle = enum { info, warn, err };

@@ -9,16 +9,13 @@ var last_state: u32 = 0;
 pub fn connected(device: wio.JoystickDevice) void {
     defer device.release();
 
-    var iter = wio.JoystickIterator.init();
-    while (iter.next()) |cur| {
-        const id = cur.getId(main.allocator) orelse "";
-        defer main.allocator.free(id);
-        const name = cur.getName(main.allocator);
-        defer main.allocator.free(name);
-        log.info("connected: {s} / {s}", .{ name, id });
-    }
-
     if (active == null) {
+        const id = device.getId(main.allocator) orelse "";
+        defer main.allocator.free(id);
+        const name = device.getName(main.allocator);
+        defer main.allocator.free(name);
+        log.info("{s} / {s}", .{ name, id });
+
         active = device.open();
         if (active) |_| log.info("opened", .{});
     }

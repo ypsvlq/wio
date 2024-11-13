@@ -19,13 +19,13 @@ const js = struct {
     pub extern "wio" fn setClipboardText([*]const u8, usize) void;
 };
 
-fn writeFn(_: void, bytes: []const u8) !usize {
+fn logWriteFn(_: void, bytes: []const u8) !usize {
     js.write(bytes.ptr, bytes.len);
     return bytes.len;
 }
 
 pub fn logFn(comptime level: std.log.Level, comptime scope: @TypeOf(.enum_literal), comptime format: []const u8, args: anytype) void {
-    const writer = std.io.GenericWriter(void, error{}, writeFn){ .context = {} };
+    const writer = std.io.GenericWriter(void, error{}, logWriteFn){ .context = {} };
     const prefix = if (scope == .default) ": " else "(" ++ @tagName(scope) ++ "): ";
     writer.print(level.asText() ++ prefix ++ format ++ "\n", args) catch {};
     js.flush();
@@ -167,6 +167,70 @@ pub const Joystick = struct {
         return .{ .axes = self.axes, .hats = &.{}, .buttons = self.buttons };
     }
 };
+
+pub const AudioDeviceIterator = struct {
+    pub fn init(mode: wio.AudioDeviceIteratorMode) AudioDeviceIterator {
+        _ = mode;
+        return .{};
+    }
+
+    pub fn deinit(self: *AudioDeviceIterator) void {
+        _ = self;
+    }
+
+    pub fn next(self: *AudioDeviceIterator) ?AudioDevice {
+        _ = self;
+        return null;
+    }
+};
+
+pub const AudioDevice = struct {
+    pub fn release(self: AudioDevice) void {
+        _ = self;
+    }
+
+    pub fn openOutput(self: AudioDevice, writeFn: *const fn ([]f32) void, format: wio.AudioFormat) !AudioOutput {
+        _ = self;
+        _ = writeFn;
+        _ = format;
+        return error.Unexpected;
+    }
+
+    pub fn openInput(self: AudioDevice, readFn: *const fn ([]const f32) void, format: wio.AudioFormat) !AudioInput {
+        _ = self;
+        _ = readFn;
+        _ = format;
+        return error.Unexpected;
+    }
+
+    pub fn getId(self: AudioDevice, allocator: std.mem.Allocator) ![]u8 {
+        _ = self;
+        _ = allocator;
+        return error.Unexpected;
+    }
+
+    pub fn getName(self: AudioDevice, allocator: std.mem.Allocator) ![]u8 {
+        _ = self;
+        _ = allocator;
+        return error.Unexpected;
+    }
+};
+
+pub const AudioOutput = struct {
+    pub fn close(self: *AudioOutput) void {
+        _ = self;
+    }
+};
+
+pub const AudioInput = struct {
+    pub fn close(self: *AudioInput) void {
+        _ = self;
+    }
+};
+
+pub fn getChannelOrder() []wio.Channel {
+    return &.{};
+}
 
 pub fn messageBox(_: ?@This(), _: wio.MessageBoxStyle, _: []const u8, message: []const u8) void {
     js.messageBox(message.ptr, message.len);
