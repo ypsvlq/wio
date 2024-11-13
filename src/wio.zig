@@ -145,7 +145,9 @@ pub const JoystickDeviceIterator = struct {
     }
 
     pub fn deinit(self: *JoystickDeviceIterator) void {
-        return self.backend.deinit();
+        if (@hasDecl(backend.JoystickDeviceIterator, "deinit")) {
+            self.backend.deinit();
+        }
     }
 
     /// Free with `JoystickDevice.release()`.
