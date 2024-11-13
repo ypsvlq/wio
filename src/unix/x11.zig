@@ -13,8 +13,6 @@ const h = @cImport({
 });
 const log = std.log.scoped(.wio);
 
-const EventQueue = std.fifo.LinearFifo(wio.Event, .Dynamic);
-
 var c: extern struct {
     XkbOpenDisplay: *const @TypeOf(h.XkbOpenDisplay),
     XCloseDisplay: *const @TypeOf(h.XCloseDisplay),
@@ -96,7 +94,7 @@ pub fn init(options: wio.InitOptions) !void {
     for (&atom_names, std.meta.fieldNames(@TypeOf(atoms))) |*name_z, name| name_z.* = name;
     _ = c.XInternAtoms(display, @ptrCast(&atom_names), atom_names.len, h.False, @ptrCast(&atoms));
 
-    windows = std.AutoHashMap(h.Window, *@This()).init(wio.allocator);
+    windows = .init(wio.allocator);
     errdefer windows.deinit();
 
     _ = h.setlocale(h.LC_CTYPE, "");
@@ -159,7 +157,7 @@ pub fn run(func: fn () anyerror!bool, options: wio.RunOptions, joystickFn: fn ()
     }
 }
 
-events: EventQueue,
+events: std.fifo.LinearFifo(wio.Event, .Dynamic),
 window: h.Window,
 ic: h.XIC,
 cursor: bool = true,
@@ -203,7 +201,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     errdefer _ = c.XDestroyIC(ic);
 
     self.* = .{
-        .events = EventQueue.init(wio.allocator),
+        .events = .init(wio.allocator),
         .window = window,
         .ic = ic,
     };

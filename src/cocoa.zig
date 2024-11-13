@@ -22,8 +22,6 @@ extern fn wioMessageBox(u8, [*]const u8, usize) void;
 extern fn wioSetClipboardText([*]const u8, usize) void;
 extern fn wioGetClipboardText(*const anyopaque, *usize) ?[*]u8;
 
-const EventQueue = std.fifo.LinearFifo(wio.Event, .Dynamic);
-
 pub fn init(options: wio.InitOptions) !void {
     _ = options;
     wioInit();
@@ -39,13 +37,13 @@ pub fn run(func: fn () anyerror!bool, options: wio.RunOptions) !void {
     }
 }
 
-events: EventQueue,
+events: std.fifo.LinearFifo(wio.Event, .Dynamic),
 window: *anyopaque,
 context: ?*anyopaque = null,
 
 pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     const self = try wio.allocator.create(@This());
-    self.events = EventQueue.init(wio.allocator); // must be valid in wioCreateWindow
+    self.events = .init(wio.allocator); // must be valid in wioCreateWindow
     self.* = .{
         .events = self.events,
         .window = wioCreateWindow(self, options.size.width, options.size.height),

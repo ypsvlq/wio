@@ -3,7 +3,6 @@ const w = @import("win32");
 const wio = @import("wio.zig");
 const log = std.log.scoped(.wio);
 
-const EventQueue = std.fifo.LinearFifo(wio.Event, .Dynamic);
 const class_name = w.L("wio");
 
 var helper_window: w.HWND = undefined;
@@ -74,7 +73,7 @@ pub fn init(options: wio.InitOptions) !void {
     if (w.RegisterRawInputDevices(&rid, rid.len, @sizeOf(w.RAWINPUTDEVICE)) == w.FALSE) return logLastError("RegisterRawInputDevices");
 
     if (options.joystick) {
-        joysticks = @TypeOf(joysticks).init(wio.allocator);
+        joysticks = .init(wio.allocator);
     }
 
     if (options.audio) {
@@ -179,7 +178,7 @@ pub fn run(func: fn () anyerror!bool, options: wio.RunOptions) !void {
     }
 }
 
-events: EventQueue,
+events: std.fifo.LinearFifo(wio.Event, .Dynamic),
 window: w.HWND,
 cursor: w.HCURSOR,
 cursor_mode: wio.CursorMode,
@@ -217,7 +216,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     ) orelse return logLastError("CreateWindowExW");
 
     self.* = .{
-        .events = EventQueue.init(wio.allocator),
+        .events = .init(wio.allocator),
         .window = window,
         .cursor = w.LoadCursorW(null, w.IDC_ARROW),
         .cursor_mode = options.cursor_mode,

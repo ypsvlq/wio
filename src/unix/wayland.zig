@@ -13,8 +13,6 @@ const h = @cImport({
     @cInclude("EGL/egl.h");
 });
 
-const EventQueue = std.fifo.LinearFifo(wio.Event, .Dynamic);
-
 var c: extern struct {
     wl_display_connect: *const @TypeOf(h.wl_display_connect),
     wl_display_disconnect: *const @TypeOf(h.wl_display_disconnect),
@@ -176,7 +174,7 @@ pub fn run(func: fn () anyerror!bool, _: wio.RunOptions, joystickFn: fn () void)
     }
 }
 
-events: EventQueue,
+events: std.fifo.LinearFifo(wio.Event, .Dynamic),
 surface: *h.wl_surface,
 xdg_surface: *h.xdg_surface,
 xdg_toplevel: *h.xdg_toplevel,
@@ -203,7 +201,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     _ = h.xdg_toplevel_add_listener(xdg_toplevel, &xdg_toplevel_listener, self);
 
     self.* = .{
-        .events = EventQueue.init(wio.allocator),
+        .events = .init(wio.allocator),
         .surface = surface,
         .xdg_surface = xdg_surface,
         .xdg_toplevel = xdg_toplevel,
