@@ -108,12 +108,14 @@ pub fn swapInterval(self: *@This(), interval: i32) void {
     wioSwapInterval(self.context, interval);
 }
 
-pub const JoystickIterator = struct {
-    pub fn init() JoystickIterator {
+pub const JoystickDeviceIterator = struct {
+    pub fn init() JoystickDeviceIterator {
         return .{};
     }
 
-    pub fn next(self: *JoystickIterator) ?JoystickDevice {
+    pub fn deinit(_: *JoystickDeviceIterator) void {}
+
+    pub fn next(self: *JoystickDeviceIterator) ?JoystickDevice {
         _ = self;
         return null;
     }

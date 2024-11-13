@@ -7,12 +7,12 @@ pub fn deinit() void {}
 
 pub fn update() void {}
 
-pub const JoystickIterator = struct {
-    pub fn init() JoystickIterator {
+pub const JoystickDeviceIterator = struct {
+    pub fn init() JoystickDeviceIterator {
         return .{};
     }
 
-    pub fn next(_: *JoystickIterator) ?JoystickDevice {
+    pub fn next(_: *JoystickDeviceIterator) ?JoystickDevice {
         return null;
     }
 };

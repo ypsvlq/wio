@@ -15,8 +15,8 @@ pub fn init() !void {
         return;
     };
 
-    if (wio.init_options.joystickCallback) |callback| {
-        var iter = JoystickIterator.init();
+    if (wio.init_options.joystickConnectedFn) |callback| {
+        var iter = JoystickDeviceIterator.init();
         while (iter.next()) |device| callback(.{ .backend = device });
 
         inotify = c.inotify_init1(c.IN_NONBLOCK | c.IN_CLOEXEC);
@@ -26,14 +26,14 @@ pub fn init() !void {
 
 pub fn deinit() void {
     if (maybe_dir == null) return;
-    if (wio.init_options.joystickCallback) |_| {
+    if (wio.init_options.joystickConnectedFn) |_| {
         _ = std.os.linux.close(inotify);
     }
 }
 
 pub fn update() void {
     if (maybe_dir == null) return;
-    if (wio.init_options.joystickCallback) |callback| {
+    if (wio.init_options.joystickConnectedFn) |callback| {
         var buf: [@sizeOf(c.inotify_event) + std.os.linux.NAME_MAX + 1]u8 align(@alignOf(c.inotify_event)) = undefined;
         while (std.os.linux.E.init(std.os.linux.read(inotify, &buf, buf.len)) == .SUCCESS) {
             const event: *c.inotify_event = @ptrCast(&buf);
@@ -45,14 +45,14 @@ pub fn update() void {
     }
 }
 
-pub const JoystickIterator = struct {
+pub const JoystickDeviceIterator = struct {
     iter: std.fs.Dir.Iterator,
 
-    pub fn init() JoystickIterator {
+    pub fn init() JoystickDeviceIterator {
         return .{ .iter = if (maybe_dir) |dir| dir.iterate() else undefined };
     }
 
-    pub fn next(self: *JoystickIterator) ?JoystickDevice {
+    pub fn next(self: *JoystickDeviceIterator) ?JoystickDevice {
         if (maybe_dir == null) return null;
         while (self.iter.next() catch return self.next()) |entry| {
             if (nameToDevice(entry.name)) |device| {

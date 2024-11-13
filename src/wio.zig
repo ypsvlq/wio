@@ -15,7 +15,7 @@ pub const logFn = if (@hasDecl(backend, "logFn")) backend.logFn else std.log.def
 pub const InitOptions = struct {
     joystick: bool = false,
     /// Free with `JoystickDevice.release()`.
-    joystickCallback: ?*const fn (JoystickDevice) void = null,
+    joystickConnectedFn: ?*const fn (JoystickDevice) void = null,
 
     audio: bool = false,
     /// Free with `AudioDevice.release()`.
@@ -136,16 +136,20 @@ pub const Window = struct {
     }
 };
 
-pub const JoystickIterator = struct {
-    backend: backend.JoystickIterator,
+pub const JoystickDeviceIterator = struct {
+    backend: backend.JoystickDeviceIterator,
 
     /// Invalidated on the next iteration of the main loop.
-    pub fn init() JoystickIterator {
-        return .{ .backend = backend.JoystickIterator.init() };
+    pub fn init() JoystickDeviceIterator {
+        return .{ .backend = backend.JoystickDeviceIterator.init() };
+    }
+
+    pub fn deinit(self: *JoystickDeviceIterator) void {
+        return self.backend.deinit();
     }
 
     /// Free with `JoystickDevice.release()`.
-    pub fn next(self: *JoystickIterator) ?JoystickDevice {
+    pub fn next(self: *JoystickDeviceIterator) ?JoystickDevice {
         return .{ .backend = self.backend.next() orelse return null };
     }
 };

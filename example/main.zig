@@ -16,7 +16,7 @@ var window: wio.Window = undefined;
 pub fn main() !void {
     try wio.init(allocator, .{
         .joystick = true,
-        .joystickCallback = joystick.connected,
+        .joystickConnectedFn = joystick.connected,
         .audio = true,
         .audioDefaultOutputFn = audio.openOutput,
         .audioDefaultInputFn = audio.openInput,
@@ -109,7 +109,8 @@ fn handlePress(button: wio.Button) void {
         .o => audio.play = !audio.play,
         .i => audio.record = !audio.record,
         .e => {
-            var joystick_iter = wio.JoystickIterator.init();
+            var joystick_iter = wio.JoystickDeviceIterator.init();
+            defer joystick_iter.deinit();
             while (joystick_iter.next()) |device| {
                 defer device.release();
                 const id = device.getId(allocator) orelse "";

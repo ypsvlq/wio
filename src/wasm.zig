@@ -106,15 +106,15 @@ pub fn swapBuffers(_: *@This()) void {}
 
 pub fn swapInterval(_: *@This(), _: i32) void {}
 
-pub const JoystickIterator = struct {
+pub const JoystickDeviceIterator = struct {
     index: u32 = 0,
     count: u32,
 
-    pub fn init() JoystickIterator {
+    pub fn init() JoystickDeviceIterator {
         return .{ .count = js.getJoysticks() };
     }
 
-    pub fn next(self: *JoystickIterator) ?JoystickDevice {
+    pub fn next(self: *JoystickDeviceIterator) ?JoystickDevice {
         if (self.index < self.count) {
             const device = .{ .index = self.index };
             self.index += 1;
@@ -249,7 +249,7 @@ pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
 }
 
 export fn wioJoystick(index: u32) void {
-    if (wio.init_options.joystickCallback) |callback| {
+    if (wio.init_options.joystickConnectedFn) |callback| {
         callback(.{ .backend = .{ .index = index } });
     }
 }

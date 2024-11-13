@@ -169,7 +169,7 @@ pub const Window = union {
     }
 };
 
-pub const JoystickIterator = joystick.JoystickIterator;
+pub const JoystickDeviceIterator = joystick.JoystickDeviceIterator;
 pub const JoystickDevice = joystick.JoystickDevice;
 pub const Joystick = joystick.Joystick;
 

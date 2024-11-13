@@ -373,15 +373,17 @@ pub fn swapInterval(_: @This(), interval: i32) void {
     }
 }
 
-pub const JoystickIterator = struct {
+pub const JoystickDeviceIterator = struct {
     joysticks: @TypeOf(joysticks).KeyIterator,
     xinput: @TypeOf(xinput).Iterator(.{}),
 
-    pub fn init() JoystickIterator {
+    pub fn init() JoystickDeviceIterator {
         return .{ .joysticks = joysticks.keyIterator(), .xinput = xinput.iterator(.{}) };
     }
 
-    pub fn next(self: *JoystickIterator) ?JoystickDevice {
+    pub fn deinit(_: *JoystickDeviceIterator) void {}
+
+    pub fn next(self: *JoystickDeviceIterator) ?JoystickDevice {
         return if (self.joysticks.next()) |key_ptr|
             .{ .rawinput = key_ptr.* }
         else if (self.xinput.next()) |index|
@@ -1032,7 +1034,7 @@ fn helperWindowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM
                                 var state: w.XINPUT_STATE = undefined;
                                 if (w.XInputGetState(@intCast(i), &state) == w.ERROR_SUCCESS) {
                                     xinput.set(i);
-                                    if (wio.init_options.joystickCallback) |callback| callback(.{ .backend = .{ .xinput = @intCast(i) } });
+                                    if (wio.init_options.joystickConnectedFn) |callback| callback(.{ .backend = .{ .xinput = @intCast(i) } });
                                 }
                             }
                             wio.allocator.free(interface);
@@ -1044,7 +1046,7 @@ fn helperWindowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM
                             return 0;
                         };
 
-                        if (wio.init_options.joystickCallback) |callback| callback(.{ .backend = .{ .rawinput = device } });
+                        if (wio.init_options.joystickConnectedFn) |callback| callback(.{ .backend = .{ .rawinput = device } });
                     },
                     w.GIDC_REMOVAL => {
                         var iter = xinput.iterator(.{});
