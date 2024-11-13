@@ -145,15 +145,11 @@ pub fn deinit() void {
     windows.deinit();
 }
 
-pub fn run(func: fn () anyerror!bool, options: wio.RunOptions, joystickFn: fn () void) !void {
-    _ = options;
+pub fn update() void {
     var event: h.XEvent = undefined;
-    while (try func()) {
-        while (c.XPending(display) > 0) {
-            _ = c.XNextEvent(display, &event);
-            handle(&event);
-        }
-        if (wio.init_options.joystick) joystickFn();
+    while (c.XPending(display) > 0) {
+        _ = c.XNextEvent(display, &event);
+        handle(&event);
     }
 }
 
