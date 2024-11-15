@@ -27,7 +27,7 @@ pub fn main() !void {
     window.makeContextCurrent();
     window.swapInterval(1);
     renderer.init();
-    return wio.run(loop, .{});
+    return wio.run(loop);
 }
 
 fn loop() !bool {
