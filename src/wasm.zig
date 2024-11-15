@@ -37,7 +37,7 @@ pub fn deinit() void {}
 
 var loop: *const fn () anyerror!bool = undefined;
 
-pub fn run(func: fn () anyerror!bool, _: wio.RunOptions) !void {
+pub fn run(func: fn () anyerror!bool) !void {
     loop = func;
 }
 

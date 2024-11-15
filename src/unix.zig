@@ -66,8 +66,7 @@ pub fn deinit() void {
     }
 }
 
-pub fn run(func: fn () anyerror!bool, options: wio.RunOptions) !void {
-    _ = options;
+pub fn run(func: fn () anyerror!bool) !void {
     while (try func()) {
         switch (active) {
             .x11 => x11.update(),

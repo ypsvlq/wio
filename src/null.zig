@@ -8,9 +8,8 @@ pub fn init(options: wio.InitOptions) !void {
 
 pub fn deinit() void {}
 
-pub fn run(func: fn () anyerror!bool, options: wio.RunOptions) !void {
+pub fn run(func: fn () anyerror!bool) !void {
     _ = func;
-    _ = options;
 }
 
 pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {

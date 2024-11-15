@@ -38,16 +38,12 @@ pub fn deinit() void {
     backend.deinit();
 }
 
-pub const RunOptions = struct {
-    wait: bool = false,
-};
-
 /// Begins the main loop, which continues as long as `func` returns true.
 ///
 /// This must be the final call on its thread, and there must be no uses of `defer` in the same scope
 /// (depending on the platform, it may return immediately, never, or when the main loop exits).
-pub fn run(func: fn () anyerror!bool, options: RunOptions) !void {
-    return backend.run(func, options);
+pub fn run(func: fn () anyerror!bool) !void {
+    return backend.run(func);
 }
 
 pub const Size = struct {

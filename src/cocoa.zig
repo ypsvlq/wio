@@ -29,8 +29,7 @@ pub fn init(options: wio.InitOptions) !void {
 
 pub fn deinit() void {}
 
-pub fn run(func: fn () anyerror!bool, options: wio.RunOptions) !void {
-    _ = options;
+pub fn run(func: fn () anyerror!bool) !void {
     wioRun();
     while (try func()) {
         wioLoop();

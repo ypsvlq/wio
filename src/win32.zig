@@ -142,18 +142,12 @@ pub fn deinit() void {
     _ = w.DestroyWindow(helper_window);
 }
 
-pub fn run(func: fn () anyerror!bool, options: wio.RunOptions) !void {
+pub fn run(func: fn () anyerror!bool) !void {
     var msg: w.MSG = undefined;
     while (true) {
-        if (options.wait) {
-            _ = w.GetMessageW(&msg, null, 0, 0);
+        while (w.PeekMessageW(&msg, null, 0, 0, w.PM_REMOVE) != 0) {
             _ = w.TranslateMessage(&msg);
             _ = w.DispatchMessageW(&msg);
-        } else {
-            while (w.PeekMessageW(&msg, null, 0, 0, w.PM_REMOVE) != 0) {
-                _ = w.TranslateMessage(&msg);
-                _ = w.DispatchMessageW(&msg);
-            }
         }
 
         if (!try func()) return;
