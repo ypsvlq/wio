@@ -52,6 +52,8 @@ pub const JoystickDeviceIterator = struct {
         return .{ .iter = if (maybe_dir) |dir| dir.iterate() else undefined };
     }
 
+    pub fn deinit(_: *JoystickDeviceIterator) void {}
+
     pub fn next(self: *JoystickDeviceIterator) ?JoystickDevice {
         if (maybe_dir == null) return null;
         while (self.iter.next() catch return self.next()) |entry| {

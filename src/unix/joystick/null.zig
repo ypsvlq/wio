@@ -12,6 +12,8 @@ pub const JoystickDeviceIterator = struct {
         return .{};
     }
 
+    pub fn deinit(_: *JoystickDeviceIterator) void {}
+
     pub fn next(_: *JoystickDeviceIterator) ?JoystickDevice {
         return null;
     }

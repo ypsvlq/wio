@@ -114,6 +114,8 @@ pub const JoystickDeviceIterator = struct {
         return .{ .count = js.getJoysticks() };
     }
 
+    pub fn deinit(_: *JoystickDeviceIterator) void {}
+
     pub fn next(self: *JoystickDeviceIterator) ?JoystickDevice {
         if (self.index < self.count) {
             const device = .{ .index = self.index };

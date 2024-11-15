@@ -380,6 +380,8 @@ pub const JoystickDeviceIterator = struct {
         return .{ .joysticks = joysticks.keyIterator(), .xinput = xinput.iterator(.{}) };
     }
 
+    pub fn deinit(_: *JoystickDeviceIterator) void {}
+
     pub fn next(self: *JoystickDeviceIterator) ?JoystickDevice {
         return if (self.joysticks.next()) |key_ptr|
             .{ .rawinput = key_ptr.* }
