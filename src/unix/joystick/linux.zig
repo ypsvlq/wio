@@ -10,8 +10,8 @@ var maybe_dir: ?std.fs.Dir = null;
 var inotify: i32 = 0;
 
 pub fn init() !void {
-    maybe_dir = std.fs.openDirAbsoluteZ("/dev/input/by-path", .{ .iterate = true }) catch |err| {
-        log.err("could not open {s}: {s}", .{ "/dev/input/by-path", @errorName(err) });
+    maybe_dir = std.fs.openDirAbsoluteZ("/dev/input/by-id", .{ .iterate = true }) catch |err| {
+        log.err("could not open {s}: {s}", .{ "/dev/input/by-id", @errorName(err) });
         return;
     };
 
@@ -20,7 +20,7 @@ pub fn init() !void {
         while (iter.next()) |device| callback(.{ .backend = device });
 
         inotify = c.inotify_init1(c.IN_NONBLOCK | c.IN_CLOEXEC);
-        _ = c.inotify_add_watch(inotify, "/dev/input/by-path", c.IN_CREATE);
+        _ = c.inotify_add_watch(inotify, "/dev/input/by-id", c.IN_CREATE);
     }
 }
 
