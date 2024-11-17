@@ -39,14 +39,27 @@ pub fn init(options: wio.InitOptions) !void {
         }
     }
 
-    if (enable_wayland) {
+    var try_x11 = enable_x11;
+    var try_wayland = enable_wayland;
+    if (try_x11 and try_wayland) {
+        if (std.c.getenv("XDG_SESSION_TYPE")) |value| {
+            const session_type = std.mem.sliceTo(value, 0);
+            if (std.mem.eql(u8, session_type, "x11")) {
+                try_wayland = false;
+            } else if (std.mem.eql(u8, session_type, "wayland")) {
+                try_x11 = false;
+            }
+        }
+    }
+
+    if (try_wayland) {
         if (wayland.init(options)) {
             active = .wayland;
             return;
         } else |err| if (err != error.Unavailable) return err;
     }
 
-    if (enable_x11) {
+    if (try_x11) {
         if (x11.init(options)) {
             active = .x11;
             return;
