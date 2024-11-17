@@ -407,17 +407,17 @@ pub const JoystickDevice = union(enum) {
                 if (w.GetRawInputDeviceInfoW(device, w.RIDI_PREPARSEDDATA, preparsed.ptr, &preparsed_size) < 0) return error.Unexpected;
 
                 var caps: w.HIDP_CAPS = undefined;
-                _ = w.HidP_GetCaps(@bitCast(@intFromPtr(preparsed.ptr)), &caps);
+                if (w.HidP_GetCaps(@bitCast(@intFromPtr(preparsed.ptr)), &caps) != w.HIDP_STATUS_SUCCESS) return error.Unexpected;
 
                 var value_caps_len = caps.NumberInputValueCaps;
                 const value_caps = try wio.allocator.alloc(w.HIDP_VALUE_CAPS, value_caps_len);
                 errdefer wio.allocator.free(value_caps);
-                _ = w.HidP_GetValueCaps(w.HidP_Input, value_caps.ptr, &value_caps_len, @bitCast(@intFromPtr(preparsed.ptr)));
+                if (w.HidP_GetValueCaps(w.HidP_Input, value_caps.ptr, &value_caps_len, @bitCast(@intFromPtr(preparsed.ptr))) != w.HIDP_STATUS_SUCCESS) return error.Unexpected;
 
                 var button_caps_len = caps.NumberInputButtonCaps;
                 const button_caps = try wio.allocator.alloc(w.HIDP_BUTTON_CAPS, button_caps_len);
                 defer wio.allocator.free(button_caps);
-                _ = w.HidP_GetButtonCaps(w.HidP_Input, button_caps.ptr, &button_caps_len, @bitCast(@intFromPtr(preparsed.ptr)));
+                if (w.HidP_GetButtonCaps(w.HidP_Input, button_caps.ptr, &button_caps_len, @bitCast(@intFromPtr(preparsed.ptr))) != w.HIDP_STATUS_SUCCESS) return error.Unexpected;
 
                 const data_len = w.HidP_MaxDataListLength(w.HidP_Input, @bitCast(@intFromPtr(preparsed.ptr)));
                 const data = try wio.allocator.alloc(w.HIDP_DATA, data_len);
