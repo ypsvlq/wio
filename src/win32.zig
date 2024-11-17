@@ -485,7 +485,7 @@ pub const JoystickDevice = union(enum) {
         switch (self) {
             .rawinput => |device| {
                 const info = joysticks.get(device) orelse return null;
-                return try std.unicode.utf16LeToUtf8Alloc(allocator, info.interface);
+                return try std.unicode.utf16LeToUtf8Alloc(allocator, info.interface[0 .. info.interface.len - 1]);
             },
             .xinput => |index| return try std.fmt.allocPrint(allocator, "{}", .{index}),
         }
