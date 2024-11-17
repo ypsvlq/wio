@@ -6,6 +6,7 @@ const h = @cImport({
     @cInclude("wio-wayland.h");
     @cInclude("wayland-client-protocol.h");
     @cInclude("xdg-shell-client-protocol.h");
+    @cInclude("fractional-scale-v1-client-protocol.h");
     @cInclude("cursor-shape-v1-client-protocol.h");
     @cInclude("xkbcommon/xkbcommon.h");
     @cInclude("xkbcommon/xkbcommon-compose.h");
@@ -70,6 +71,7 @@ var xdg_wm_base: ?*h.xdg_wm_base = null;
 var seat: ?*h.wl_seat = null;
 var keyboard: ?*h.wl_keyboard = null;
 var pointer: ?*h.wl_pointer = null;
+var fractional_scale_manager: ?*h.wp_fractional_scale_manager_v1 = null;
 var cursor_shape_manager: ?*h.wp_cursor_shape_manager_v1 = null;
 var cursor_shape_device: ?*h.wp_cursor_shape_device_v1 = null;
 
@@ -157,6 +159,7 @@ pub fn deinit() void {
 
     if (cursor_shape_device) |_| h.wp_cursor_shape_device_v1_destroy(cursor_shape_device);
     if (cursor_shape_manager) |_| h.wp_cursor_shape_manager_v1_destroy(cursor_shape_manager);
+    if (fractional_scale_manager) |_| h.wp_fractional_scale_manager_v1_destroy(fractional_scale_manager);
     if (pointer) |_| h.wl_pointer_destroy(pointer);
     if (keyboard) |_| h.wl_keyboard_destroy(keyboard);
     h.wl_seat_destroy(seat);
@@ -175,10 +178,12 @@ events: std.fifo.LinearFifo(wio.Event, .Dynamic),
 surface: *h.wl_surface,
 xdg_surface: *h.xdg_surface,
 xdg_toplevel: *h.xdg_toplevel,
+fractional_scale: ?*h.wp_fractional_scale_v1 = null,
 egl_window: ?*h.wl_egl_window = null,
 egl_surface: h.EGLSurface = null,
 egl_context: h.EGLContext = null,
 size: wio.Size,
+scale: f32,
 cursor: u32 = undefined,
 cursor_mode: wio.CursorMode,
 
@@ -203,11 +208,21 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
         .xdg_surface = xdg_surface,
         .xdg_toplevel = xdg_toplevel,
         .size = options.size,
+        .scale = options.scale,
         .cursor_mode = options.cursor_mode,
     };
+
+    if (fractional_scale_manager) |_| {
+        if (h.wp_fractional_scale_manager_v1_get_fractional_scale(fractional_scale_manager, surface)) |fractional_scale| {
+            self.fractional_scale = fractional_scale;
+            _ = h.wp_fractional_scale_v1_add_listener(fractional_scale, &fractional_scale_listener, self);
+        }
+    }
+
     self.setTitle(options.title);
     self.setCursor(options.cursor);
 
+    self.pushEvent(.{ .scale = options.scale });
     self.pushEvent(.{ .size = options.size });
     self.pushEvent(.{ .framebuffer = options.size });
     self.pushEvent(.create);
@@ -224,6 +239,7 @@ pub fn destroy(self: *@This()) void {
     if (self.egl_context) |_| _ = c.eglDestroyContext(egl_display, self.egl_context);
     if (self.egl_surface) |_| _ = c.eglDestroySurface(egl_display, self.egl_surface);
     if (self.egl_window) |_| c.wl_egl_window_destroy(self.egl_window);
+    if (self.fractional_scale) |_| h.wp_fractional_scale_v1_destroy(self.fractional_scale);
     self.events.deinit();
     h.xdg_toplevel_destroy(self.xdg_toplevel);
     h.xdg_surface_destroy(self.xdg_surface);
@@ -365,6 +381,8 @@ fn registryGlobal(_: ?*anyopaque, _: ?*h.wl_registry, name: u32, interface: [*c]
     } else if (std.mem.eql(u8, interface_z, "wl_seat")) {
         seat = @ptrCast(h.wl_registry_bind(registry, name, &h.wl_seat_interface, 3));
         _ = h.wl_seat_add_listener(seat, &seat_listener, null);
+    } else if (std.mem.eql(u8, interface_z, "wp_fractional_scale_manager_v1")) {
+        fractional_scale_manager = @ptrCast(h.wl_registry_bind(registry, name, &h.wp_fractional_scale_manager_v1_interface, 1));
     } else if (std.mem.eql(u8, interface_z, "wp_cursor_shape_manager_v1")) {
         cursor_shape_manager = @ptrCast(h.wl_registry_bind(registry, name, &h.wp_cursor_shape_manager_v1_interface, 1));
     }
@@ -414,8 +432,9 @@ fn xdgToplevelConfigure(data: ?*anyopaque, _: ?*h.xdg_toplevel, width: i32, heig
     self.pushEvent(if (focused) .focused else .unfocused);
     self.pushEvent(.{ .mode = mode });
     self.pushEvent(.{ .size = size });
-    self.pushEvent(.{ .framebuffer = size });
-    if (self.egl_window) |_| c.wl_egl_window_resize(self.egl_window, size.width, size.height, 0, 0);
+    const framebuffer = size.multiply(self.scale);
+    self.pushEvent(.{ .framebuffer = framebuffer });
+    if (self.egl_window) |_| c.wl_egl_window_resize(self.egl_window, framebuffer.width, framebuffer.height, 0, 0);
 }
 
 fn xdgToplevelClose(data: ?*anyopaque, _: ?*h.xdg_toplevel) callconv(.C) void {
@@ -562,6 +581,17 @@ fn pointerAxis(_: ?*anyopaque, _: ?*h.wl_pointer, _: u32, axis: u32, value: i32)
             else => {},
         }
     }
+}
+
+const fractional_scale_listener = h.wp_fractional_scale_v1_listener{
+    .preferred_scale = fractionalScalePreferredScale,
+};
+
+fn fractionalScalePreferredScale(data: ?*anyopaque, _: ?*h.wp_fractional_scale_v1, scale: u32) callconv(.C) void {
+    const self: *@This() = @alignCast(@ptrCast(data orelse return));
+    self.scale = @floatFromInt(scale);
+    self.scale /= 120;
+    self.pushEvent(.{ .scale = self.scale });
 }
 
 fn keyToButton(key: u32) ?wio.Button {
