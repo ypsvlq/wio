@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const wio = @import("wio");
 const joystick = @import("joystick.zig");
 const renderer = @import("renderer.zig");
@@ -63,11 +64,16 @@ fn loop() !bool {
     }
     renderer.draw();
     window.swapBuffers();
+    if (!builtin.cpu.arch.isWasm() and request_attention_at != 0 and std.time.timestamp() > request_attention_at) {
+        window.requestAttention();
+        request_attention_at = 0;
+    }
     return true;
 }
 
 var control: bool = false;
 var cursor: u8 = 0;
+var request_attention_at: i64 = 0;
 
 fn handlePress(button: wio.Button) void {
     switch (button) {
@@ -90,9 +96,8 @@ fn handlePress(button: wio.Button) void {
         .h => window.setCursorMode(.hidden),
         .r => window.setCursorMode(.relative),
         .a => {
-            if (!@import("builtin").cpu.arch.isWasm()) {
-                std.time.sleep(3 * std.time.ns_per_s);
-                window.requestAttention();
+            if (!builtin.cpu.arch.isWasm()) {
+                request_attention_at = std.time.timestamp() + 1;
             }
         },
         .d => {
