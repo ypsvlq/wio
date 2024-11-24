@@ -7,7 +7,6 @@ const h = @cImport({
     @cInclude("X11/Xatom.h");
     @cInclude("X11/XKBlib.h");
     @cInclude("X11/Xcursor/Xcursor.h");
-    @cInclude("X11/extensions/Xfixes.h");
     @cInclude("GL/glx.h");
     @cInclude("locale.h");
 });
@@ -40,8 +39,11 @@ var c: extern struct {
     XSendEvent: *const @TypeOf(h.XSendEvent),
     XcursorLibraryLoadCursor: *const @TypeOf(h.XcursorLibraryLoadCursor),
     XDefineCursor: *const @TypeOf(h.XDefineCursor),
-    XFixesShowCursor: *const @TypeOf(h.XFixesShowCursor),
-    XFixesHideCursor: *const @TypeOf(h.XFixesHideCursor),
+    XCreatePixmap: *const @TypeOf(h.XCreatePixmap),
+    XCreateGC: *const @TypeOf(h.XCreateGC),
+    XFreeGC: *const @TypeOf(h.XFreeGC),
+    XDrawPoint: *const @TypeOf(h.XDrawPoint),
+    XCreatePixmapCursor: *const @TypeOf(h.XCreatePixmapCursor),
     glXQueryExtensionsString: *const @TypeOf(h.glXQueryExtensionsString),
     glXGetProcAddress: *const @TypeOf(h.glXGetProcAddress),
     glXChooseFBConfig: *const @TypeOf(h.glXChooseFBConfig),
@@ -67,7 +69,6 @@ var atoms: extern struct {
 
 var libX11: std.DynLib = undefined;
 var libXcursor: std.DynLib = undefined;
-var libXfixes: std.DynLib = undefined;
 var libGL: std.DynLib = undefined;
 var windows: std.AutoHashMap(h.Window, *@This()) = undefined;
 pub var display: *h.Display = undefined;
@@ -78,13 +79,11 @@ var scale: f32 = 1;
 pub fn init(options: wio.InitOptions) !void {
     common.loadLibs(&c, &.{
         .{ .handle = &libXcursor, .name = "libXcursor.so.1", .prefix = "Xcursor" },
-        .{ .handle = &libXfixes, .name = "libXfixes.so.3", .prefix = "XFixes" },
         .{ .handle = &libGL, .name = "libGL.so.1", .prefix = "glX", .predicate = options.opengl },
         .{ .handle = &libX11, .name = "libX11.so.6" },
     }) catch return error.Unavailable;
     errdefer libX11.close();
     errdefer libXcursor.close();
-    errdefer libXfixes.close();
     errdefer if (options.opengl) libGL.close();
 
     display = c.XkbOpenDisplay(null, null, null, null, null, null) orelse return error.Unavailable;
@@ -156,7 +155,8 @@ pub fn update() void {
 events: std.fifo.LinearFifo(wio.Event, .Dynamic),
 window: h.Window,
 ic: h.XIC,
-cursor: bool = true,
+cursor: h.Cursor = h.None,
+cursor_mode: wio.CursorMode,
 context: h.GLXContext = null,
 
 pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
@@ -200,9 +200,11 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
         .events = .init(wio.allocator),
         .window = window,
         .ic = ic,
+        .cursor_mode = options.cursor_mode,
     };
     self.setTitle(options.title);
     self.setMode(options.mode);
+    self.setCursor(options.cursor);
     if (options.cursor_mode != .normal) self.setCursorMode(options.cursor_mode);
 
     try self.events.writeItem(.{ .size = size });
@@ -270,25 +272,24 @@ pub fn setCursor(self: *@This(), shape: wio.Cursor) void {
         .size_nesw => "nesw-resize",
         .size_nwse => "nwse-resize",
     };
-    const cursor = c.XcursorLibraryLoadCursor(display, name);
-    _ = c.XDefineCursor(display, self.window, cursor);
+    self.cursor = c.XcursorLibraryLoadCursor(display, name);
+    if (self.cursor_mode == .normal) {
+        _ = c.XDefineCursor(display, self.window, self.cursor);
+    }
 }
 
 pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
-    switch (mode) {
-        .normal => {
-            if (!self.cursor) {
-                c.XFixesShowCursor(display, self.window);
-                self.cursor = true;
-            }
-        },
-        .hidden => {
-            if (self.cursor) {
-                c.XFixesHideCursor(display, self.window);
-                self.cursor = false;
-            }
-        },
-        .relative => {},
+    self.cursor_mode = mode;
+    if (mode == .normal) {
+        _ = c.XDefineCursor(display, self.window, self.cursor);
+    } else {
+        const pixmap = c.XCreatePixmap(display, self.window, 1, 1, 1);
+        const gc = c.XCreateGC(display, pixmap, 0, null);
+        defer _ = c.XFreeGC(display, gc);
+        _ = c.XDrawPoint(display, pixmap, gc, 0, 0);
+        var color = std.mem.zeroes(h.XColor);
+        const cursor = c.XCreatePixmapCursor(display, pixmap, pixmap, &color, &color, 0, 0);
+        _ = c.XDefineCursor(display, self.window, cursor);
     }
 }
 
