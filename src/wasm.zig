@@ -7,6 +7,7 @@ const js = struct {
     pub extern "wio" fn flush() void;
     pub extern "wio" fn shift() u32;
     pub extern "wio" fn shiftFloat() f32;
+    pub extern "wio" fn setFullscreen(bool) void;
     pub extern "wio" fn setCursor(u8) void;
     pub extern "wio" fn setCursorMode(u8) void;
     pub extern "wio" fn createContext() void;
@@ -67,6 +68,7 @@ pub fn getEvent(_: *@This()) ?wio.Event {
         .size => .{ .size = .{ .width = @intCast(js.shift()), .height = @intCast(js.shift()) } },
         .framebuffer => .{ .framebuffer = .{ .width = @intCast(js.shift()), .height = @intCast(js.shift()) } },
         .scale => .{ .scale = js.shiftFloat() },
+        .mode => .{ .mode = @enumFromInt(js.shift()) },
         .char => .{ .char = @intCast(js.shift()) },
         .button_press => .{ .button_press = @enumFromInt(js.shift()) },
         .button_repeat => .{ .button_repeat = @enumFromInt(js.shift()) },
@@ -82,9 +84,8 @@ pub fn setTitle(_: *@This(), _: []const u8) void {}
 
 pub fn setSize(_: *@This(), _: wio.Size) void {}
 
-pub fn setMode(self: *@This(), mode: wio.WindowMode) void {
-    _ = self;
-    _ = mode;
+pub fn setMode(_: *@This(), mode: wio.WindowMode) void {
+    js.setFullscreen(mode == .fullscreen);
 }
 
 pub fn setCursor(_: *@This(), shape: wio.Cursor) void {

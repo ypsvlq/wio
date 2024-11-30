@@ -68,6 +68,7 @@ const wio = {
         canvas.width = width * devicePixelRatio;
         canvas.height = height * devicePixelRatio;
         wio.events.push(
+            8, (document.fullscreenElement == wio.canvas) ? 2 : 0,
             5, width, height,
             6, canvas.width, canvas.height,
             7, devicePixelRatio,
@@ -89,6 +90,14 @@ const wio = {
 
     shiftFloat() {
         return wio.events.shift();
+    },
+
+    setFullscreen(fullscreen) {
+        if (fullscreen) {
+            wio.canvas.requestFullscreen().catch(() => { });
+        } else {
+            document.exitFullscreen().catch(() => { });
+        }
     },
 
     setCursor(cursor) {
