@@ -325,6 +325,7 @@ pub const Event = union(enum) {
     mode: WindowMode,
     char: u21,
     button_press: Button,
+    button_repeat: Button,
     button_release: Button,
     mouse: struct { x: u16, y: u16 },
     mouse_relative: struct { x: i16, y: i16 },

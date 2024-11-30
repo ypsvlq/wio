@@ -7,8 +7,7 @@ extern void wioUnfocus(void *);
 extern void wioSize(void *, uint8_t, UInt16, UInt16, UInt16, UInt16);
 extern void wioScale(void *, Float32);
 extern void wioChars(void *, const char *);
-extern void wioKeyDown(void *, UInt16);
-extern void wioKeyUp(void *, UInt16);
+extern void wioKey(void *, UInt16, UInt8);
 extern void wioButtonPress(void *, UInt8);
 extern void wioButtonRelease(void *, UInt8);
 extern void wioMouse(void *, UInt16, UInt16);
@@ -147,12 +146,12 @@ static NSString *string(const char *ptr, size_t len) {
 }
 
 - (void)keyDown:event {
-    wioKeyDown(ptr, [event keyCode]);
+    wioKey(ptr, [event keyCode], [event isARepeat]);
     wioChars(ptr, [[event characters] UTF8String]);
 }
 
 - (void)keyUp:event {
-    wioKeyUp(ptr, [event keyCode]);
+    wioKey(ptr, [event keyCode], 2);
 }
 
 - (void)flagsChanged:event {
@@ -170,11 +169,7 @@ static NSString *string(const char *ptr, size_t len) {
         case 0x3E: flag = NX_DEVICERCTLKEYMASK; break;
         default: return;
     }
-    if ([event modifierFlags] & flag) {
-        wioKeyDown(ptr, key);
-    } else {
-        wioKeyUp(ptr, key);
-    }
+    wioKey(ptr, key, [event modifierFlags] & flag ? 0 : 2);
 }
 
 - (void)mouseDown:event {

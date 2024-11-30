@@ -284,14 +284,16 @@ export fn wioChars(self: *@This(), buf: [*:0]const u8) void {
     }
 }
 
-export fn wioKeyDown(self: *@This(), key: u16) void {
+export fn wioKey(self: *@This(), key: u16, event: u8) void {
     if (keycodeToButton(key)) |button| {
+        switch (event) {
+            0 => self.pushEvent(.{ .button_press = button }),
+            1 => self.pushEvent(.{ .button_repeat = button }),
+            2 => self.pushEvent(.{ .button_release = button }),
+            else => unreachable,
+        }
         self.pushEvent(.{ .button_press = button });
     }
-}
-
-export fn wioKeyUp(self: *@This(), key: u16) void {
-    if (keycodeToButton(key)) |button| self.pushEvent(.{ .button_release = button });
 }
 
 export fn wioButtonPress(self: *@This(), button: u8) void {

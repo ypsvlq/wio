@@ -30,12 +30,12 @@ const wio = {
         canvas.addEventListener("keydown", event => {
             event.preventDefault();
             const key = wio.keys[event.code];
-            if (key) wio.events.push(10, key);
+            if (key) wio.events.push(event.repeat ? 11 : 10, key);
             if ([...event.key].length == 1) wio.events.push(9, event.key.codePointAt(0));
         });
         canvas.addEventListener("keyup", event => {
             const key = wio.keys[event.code];
-            if (key) wio.events.push(11, key);
+            if (key) wio.events.push(12, key);
         });
         canvas.addEventListener("mousedown", event => {
             const button = wio.buttons[event.button];
@@ -43,14 +43,14 @@ const wio = {
         });
         canvas.addEventListener("mouseup", event => {
             const button = wio.buttons[event.button];
-            if (button != undefined) wio.events.push(11, button);
+            if (button != undefined) wio.events.push(12, button);
         });
         canvas.addEventListener("mousemove", event => {
-            wio.events.push(12, event.offsetX, event.offsetY);
+            wio.events.push(13, event.offsetX, event.offsetY);
         });
         canvas.addEventListener("wheel", event => {
-            if (event.deltaY != 0) wio.events.push(14, event.deltaY * 0.01);
-            if (event.deltaX != 0) wio.events.push(15, event.deltaX * 0.01);
+            if (event.deltaY != 0) wio.events.push(15, event.deltaY * 0.01);
+            if (event.deltaX != 0) wio.events.push(16, event.deltaX * 0.01);
         });
 
         addEventListener("gamepadconnected", event => wio.module.exports.wioJoystick(event.gamepad.index));

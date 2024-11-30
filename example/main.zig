@@ -40,6 +40,7 @@ fn loop() !bool {
             .mode => |mode| std.log.info("{s}", .{@tagName(mode)}),
             .char => |char| std.log.info("char: {u}", .{char}),
             .button_press => |button| std.log.info("+{s}", .{@tagName(button)}),
+            .button_repeat => |button| std.log.info("*{s}", .{@tagName(button)}),
             .button_release => |button| std.log.info("-{s}", .{@tagName(button)}),
             .mouse => |mouse| std.log.info("({},{})", .{ mouse.x, mouse.y }),
             .mouse_relative => |mouse| std.log.info("{},{}", .{ mouse.x, mouse.y }),

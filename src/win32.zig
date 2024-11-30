@@ -180,6 +180,13 @@ rect: w.RECT = .{ .left = 0, .top = 0, .right = 0, .bottom = 0 },
 surrogate: u16 = 0,
 left_shift: bool = false,
 right_shift: bool = false,
+left_control: bool = false,
+right_control: bool = false,
+left_alt: bool = false,
+right_alt: bool = false,
+international2: bool = false,
+international3: bool = false,
+international4: bool = false,
 input: []u8 = &.{},
 last_x: u16 = 0,
 last_y: u16 = 0,
@@ -1230,11 +1237,27 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
             }
 
             if (scancodeToButton(scancode)) |button| {
+                const modifier = switch (button) {
+                    .left_shift => &self.left_shift,
+                    .right_shift => &self.right_shift,
+                    .left_control => &self.left_control,
+                    .right_control => &self.right_control,
+                    .left_alt => &self.left_alt,
+                    .right_alt => &self.right_alt,
+                    .international2 => &self.international2,
+                    .international3 => &self.international3,
+                    .international4 => &self.international4,
+                    else => null,
+                };
                 if (flags & w.KF_UP == 0) {
-                    if (button == .left_shift) self.left_shift = true;
-                    if (button == .right_shift) self.right_shift = true;
-                    self.pushEvent(.{ .button_press = button });
+                    var repeat = (flags & w.KF_REPEAT != 0);
+                    if (modifier) |ptr| {
+                        repeat = ptr.*;
+                        ptr.* = true;
+                    }
+                    self.pushEvent(if (repeat) .{ .button_repeat = button } else .{ .button_press = button });
                 } else {
+                    if (modifier) |ptr| ptr.* = false;
                     self.pushEvent(.{ .button_release = button });
                 }
             } else {
