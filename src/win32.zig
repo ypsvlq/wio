@@ -1074,9 +1074,9 @@ fn helperWindowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM
             if (wio.init_options.joystick) {
                 const handle: w.HRAWINPUT = @ptrFromInt(@as(usize, @bitCast(lParam)));
                 var size: u32 = undefined;
-                _ = w.GetRawInputData(handle, w.RID_INPUT, null, &size, @sizeOf(w.RAWINPUTHEADER));
+                if (w.GetRawInputData(handle, w.RID_INPUT, null, &size, @sizeOf(w.RAWINPUTHEADER)) == -1) return 0;
                 if (size > helper_input.len) helper_input = wio.allocator.realloc(helper_input, size) catch return 0;
-                _ = w.GetRawInputData(handle, w.RID_INPUT, helper_input.ptr, &size, @sizeOf(w.RAWINPUTHEADER));
+                if (w.GetRawInputData(handle, w.RID_INPUT, helper_input.ptr, &size, @sizeOf(w.RAWINPUTHEADER)) == -1) return 0;
                 const raw: *w.RAWINPUT = @alignCast(@ptrCast(helper_input));
 
                 if (joysticks.get(raw.header.hDevice)) |info| {
@@ -1300,13 +1300,13 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
             if (self.cursor_mode == .relative) {
                 const handle: w.HRAWINPUT = @ptrFromInt(@as(usize, @bitCast(lParam)));
                 var size: u32 = undefined;
-                _ = w.GetRawInputData(handle, w.RID_INPUT, null, &size, @sizeOf(w.RAWINPUTHEADER));
+                if (w.GetRawInputData(handle, w.RID_INPUT, null, &size, @sizeOf(w.RAWINPUTHEADER)) == -1) return 0;
                 if (size > self.input.len) self.input = wio.allocator.realloc(self.input, size) catch return 0;
-                _ = w.GetRawInputData(handle, w.RID_INPUT, self.input.ptr, &size, @sizeOf(w.RAWINPUTHEADER));
+                if (w.GetRawInputData(handle, w.RID_INPUT, self.input.ptr, &size, @sizeOf(w.RAWINPUTHEADER)) == -1) return 0;
                 const raw: *w.RAWINPUT = @alignCast(@ptrCast(self.input));
 
                 if (raw.data.mouse.usFlags & w.MOUSE_MOVE_ABSOLUTE != 0) {
-                    if (raw.data.mouse.lLastX != 0 or raw.data.mouse.lLastY != 0) { // prevent resetting position
+                    if (raw.data.mouse.lLastX != 0 or raw.data.mouse.lLastY != 0) { // prevent spurious (0,0)
                         if (raw.data.mouse.Anonymous.Anonymous.usButtonFlags == 0) { // prevent jumping on touch input
                             self.pushEvent(.{ .mouse_relative = .{ .x = @intCast(raw.data.mouse.lLastX - self.last_x), .y = @intCast(raw.data.mouse.lLastY - self.last_y) } });
                         }
