@@ -58,7 +58,7 @@ fn loop() !bool {
             },
             .unfocused => control = false,
             .framebuffer => |size| renderer.resize(size),
-            .button_press => |button| handlePress(button),
+            .button_press, .button_repeat => |button| handlePress(button),
             .button_release => |button| handleRelease(button),
             else => {},
         }
