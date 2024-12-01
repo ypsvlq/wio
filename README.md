@@ -25,6 +25,19 @@ Unix-like systems support different backends in the same executable, with the
 most appropriate being chosen at runtime. To restrict the available choices,
 set the `unix_backends` build option to a comma-separated list.
 
+For X11, the following libraries are loaded:
+
+- `libX11.so.6`
+- `libXcursor.so.1`
+- `libGL.so.1` (if OpenGL is enabled)
+
+For Wayland, the following libraries are loaded:
+
+- `libwayland-client.so.0`
+- `libxkbcommon.so.0`
+- `libwayland-egl.so.1` (if OpenGL is enabled)
+- `libEGL.so.1` (if OpenGL is enabled)
+
 ## Platform-specific API
 
 The following variables and fields may be considered part of the public API
