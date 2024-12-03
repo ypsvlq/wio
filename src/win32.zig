@@ -755,6 +755,29 @@ pub const AudioDevice = struct {
         else
             "";
     }
+
+    pub fn getChannelOrder(_: AudioDevice) []const wio.Channel {
+        return &.{
+            .FL,
+            .FR,
+            .FC,
+            .LFE1,
+            .BL,
+            .BR,
+            .FLc,
+            .FRc,
+            .BC,
+            .SiL,
+            .SiR,
+            .TpC,
+            .TpFL,
+            .TpFC,
+            .TpFR,
+            .TpBL,
+            .TpBC,
+            .TpBR,
+        };
+    }
 };
 
 const AudioClient = struct {
@@ -818,29 +841,6 @@ const AudioClient = struct {
 
 pub const AudioOutput = AudioClient;
 pub const AudioInput = AudioClient;
-
-pub fn getChannelOrder() []const wio.Channel {
-    return &.{
-        .FL,
-        .FR,
-        .FC,
-        .LFE1,
-        .BL,
-        .BR,
-        .FLc,
-        .FRc,
-        .BC,
-        .SiL,
-        .SiR,
-        .TpC,
-        .TpFL,
-        .TpFC,
-        .TpFR,
-        .TpBL,
-        .TpBC,
-        .TpBR,
-    };
-}
 
 const MMNotificationClient = struct {
     parent: w.IMMNotificationClient = .{ .lpVtbl = &vtbl },

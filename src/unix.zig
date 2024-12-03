@@ -194,7 +194,6 @@ pub const AudioDeviceIterator = audio.AudioDeviceIterator;
 pub const AudioDevice = audio.AudioDevice;
 pub const AudioOutput = audio.AudioOutput;
 pub const AudioInput = audio.AudioInput;
-pub const getChannelOrder = audio.getChannelOrder;
 
 pub fn messageBox(backend: ?Window, style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
     switch (active) {

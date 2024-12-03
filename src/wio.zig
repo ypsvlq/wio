@@ -238,6 +238,13 @@ pub const AudioDevice = struct {
     pub fn getName(self: AudioDevice, ally: std.mem.Allocator) []u8 {
         return self.backend.getName(ally) catch "";
     }
+
+    /// Result is invalidated when the device is released.
+    ///
+    /// The device may not support all returned channels.
+    pub fn getChannelOrder(self: AudioDevice) []const Channel {
+        return self.backend.getChannelOrder();
+    }
 };
 
 pub const AudioOutput = struct {
@@ -255,10 +262,6 @@ pub const AudioInput = struct {
         self.backend.close();
     }
 };
-
-pub fn getChannelOrder() []const Channel {
-    return backend.getChannelOrder();
-}
 
 pub const AudioFormat = struct {
     sample_rate: u32,
