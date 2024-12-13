@@ -196,12 +196,12 @@ pub const Hat = packed struct {
     left: bool = false,
 };
 
-pub const AudioDeviceIteratorMode = enum { all, outputs, inputs };
+pub const AudioDeviceType = enum { output, input };
 
 pub const AudioDeviceIterator = struct {
     backend: backend.AudioDeviceIterator,
 
-    pub fn init(mode: AudioDeviceIteratorMode) AudioDeviceIterator {
+    pub fn init(mode: AudioDeviceType) AudioDeviceIterator {
         return .{ .backend = backend.AudioDeviceIterator.init(mode) };
     }
 

@@ -125,15 +125,17 @@ fn handlePress(button: wio.Button) void {
                 defer allocator.free(name);
                 std.log.info("joystick: {s} / {s}", .{ name, id });
             }
-            var audio_iter = wio.AudioDeviceIterator.init(.all);
-            defer audio_iter.deinit();
-            while (audio_iter.next()) |device| {
-                defer device.release();
-                const id = device.getId(allocator) orelse "";
-                defer allocator.free(id);
-                const name = device.getName(allocator);
-                defer allocator.free(name);
-                std.log.info("audio: {s} / {s}", .{ name, id });
+            for (std.enums.values(wio.AudioDeviceType)) |mode| {
+                var audio_iter = wio.AudioDeviceIterator.init(mode);
+                defer audio_iter.deinit();
+                while (audio_iter.next()) |device| {
+                    defer device.release();
+                    const id = device.getId(allocator) orelse "";
+                    defer allocator.free(id);
+                    const name = device.getName(allocator);
+                    defer allocator.free(name);
+                    std.log.info("{s}: {s} / {s}", .{ @tagName(mode), name, id });
+                }
             }
         },
         else => {},

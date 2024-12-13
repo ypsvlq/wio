@@ -153,7 +153,7 @@ pub const Joystick = struct {
 };
 
 pub const AudioDeviceIterator = struct {
-    pub fn init(mode: wio.AudioDeviceIteratorMode) AudioDeviceIterator {
+    pub fn init(mode: wio.AudioDeviceType) AudioDeviceIterator {
         _ = mode;
         return .{};
     }

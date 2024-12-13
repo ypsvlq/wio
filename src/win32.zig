@@ -620,13 +620,9 @@ pub const AudioDeviceIterator = struct {
     count: u32 = 0,
     index: u32 = 0,
 
-    pub fn init(mode: wio.AudioDeviceIteratorMode) AudioDeviceIterator {
+    pub fn init(mode: wio.AudioDeviceType) AudioDeviceIterator {
         var result = AudioDeviceIterator{};
-        if (SUCCEED(mm_device_enumerator.EnumAudioEndpoints(switch (mode) {
-            .all => w.EDataFlow_eAll,
-            .outputs => w.eRender,
-            .inputs => w.eCapture,
-        }, w.DEVICE_STATE_ACTIVE, @ptrCast(&result.devices)), "EnumAudioEndpoints")) {
+        if (SUCCEED(mm_device_enumerator.EnumAudioEndpoints(if (mode == .output) w.eRender else w.eCapture, w.DEVICE_STATE_ACTIVE, @ptrCast(&result.devices)), "EnumAudioEndpoints")) {
             SUCCEED(result.devices.?.GetCount(&result.count), "IMMDeviceCollection::GetCount") catch {};
         } else |_| {}
         return result;

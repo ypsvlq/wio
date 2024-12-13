@@ -8,7 +8,7 @@ pub fn deinit() void {}
 pub fn update() void {}
 
 pub const AudioDeviceIterator = struct {
-    pub fn init(_: wio.AudioDeviceIteratorMode) AudioDeviceIterator {
+    pub fn init(_: wio.AudioDeviceType) AudioDeviceIterator {
         return .{};
     }
 
