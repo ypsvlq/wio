@@ -222,10 +222,12 @@ pub const AudioDevice = struct {
         return self.backend.release();
     }
 
+    /// `writeFn` is called on a separate thread.
     pub fn openOutput(self: AudioDevice, writeFn: *const fn ([]f32) void, format: AudioFormat) ?AudioOutput {
         return .{ .backend = self.backend.openOutput(writeFn, format) catch return null };
     }
 
+    /// `readFn` is called on a separate thread.
     pub fn openInput(self: AudioDevice, readFn: *const fn ([]const f32) void, format: AudioFormat) ?AudioInput {
         return .{ .backend = self.backend.openInput(readFn, format) catch return null };
     }
