@@ -236,7 +236,7 @@ pub const AudioOutput = struct {
     }
 
     fn callback(stream: ?*h.pa_stream, _: usize, data: ?*anyopaque) callconv(.C) void {
-        const writeFn: *const fn ([]f32) void = @ptrCast(data);
+        const writeFn: *const fn ([]f32) void = @alignCast(@ptrCast(data));
         var ptr: ?*anyopaque = undefined;
         var nbytes: usize = std.math.maxInt(usize);
         if (c.pa_stream_begin_write(stream, &ptr, &nbytes) == 0 and ptr != null) {
@@ -258,7 +258,7 @@ pub const AudioInput = struct {
     }
 
     fn callback(stream: ?*h.pa_stream, _: usize, data: ?*anyopaque) callconv(.C) void {
-        const readFn: *const fn ([]const f32) void = @ptrCast(data);
+        const readFn: *const fn ([]const f32) void = @alignCast(@ptrCast(data));
         var ptr: ?*const anyopaque = null;
         var nbytes: usize = 0;
         if (c.pa_stream_peek(stream, &ptr, &nbytes) == 0 and ptr != null) {
