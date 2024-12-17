@@ -5,11 +5,11 @@ const log = std.log.scoped(.wio);
 const h = @cImport({
     @cInclude("wio-wayland.h");
     @cInclude("wayland-client-protocol.h");
-    @cInclude("xdg-shell-client-protocol.h");
     @cInclude("fractional-scale-v1-client-protocol.h");
     @cInclude("cursor-shape-v1-client-protocol.h");
     @cInclude("xkbcommon/xkbcommon.h");
     @cInclude("xkbcommon/xkbcommon-compose.h");
+    @cInclude("libdecor.h");
     @cInclude("wayland-egl.h");
     @cInclude("EGL/egl.h");
 });
@@ -42,6 +42,20 @@ var c: extern struct {
     xkb_compose_state_get_status: *const @TypeOf(h.xkb_compose_state_get_status),
     xkb_compose_state_get_one_sym: *const @TypeOf(h.xkb_compose_state_get_one_sym),
     xkb_compose_state_reset: *const @TypeOf(h.xkb_compose_state_reset),
+    libdecor_new: *const @TypeOf(h.libdecor_new),
+    libdecor_unref: *const @TypeOf(h.libdecor_unref),
+    libdecor_decorate: *const @TypeOf(h.libdecor_decorate),
+    libdecor_frame_unref: *const @TypeOf(h.libdecor_frame_unref),
+    libdecor_configuration_get_window_state: *const @TypeOf(h.libdecor_configuration_get_window_state),
+    libdecor_configuration_get_content_size: *const @TypeOf(h.libdecor_configuration_get_content_size),
+    libdecor_state_new: *const @TypeOf(h.libdecor_state_new),
+    libdecor_state_free: *const @TypeOf(h.libdecor_state_free),
+    libdecor_frame_commit: *const @TypeOf(h.libdecor_frame_commit),
+    libdecor_frame_set_title: *const @TypeOf(h.libdecor_frame_set_title),
+    libdecor_frame_set_maximized: *const @TypeOf(h.libdecor_frame_set_maximized),
+    libdecor_frame_unset_maximized: *const @TypeOf(h.libdecor_frame_unset_maximized),
+    libdecor_frame_set_fullscreen: *const @TypeOf(h.libdecor_frame_set_fullscreen),
+    libdecor_frame_unset_fullscreen: *const @TypeOf(h.libdecor_frame_unset_fullscreen),
     wl_egl_window_create: *const @TypeOf(h.wl_egl_window_create),
     wl_egl_window_destroy: *const @TypeOf(h.wl_egl_window_destroy),
     wl_egl_window_resize: *const @TypeOf(h.wl_egl_window_resize),
@@ -61,13 +75,13 @@ var c: extern struct {
 
 var libwayland_client: std.DynLib = undefined;
 var libxkbcommon: std.DynLib = undefined;
+var libdecor: std.DynLib = undefined;
 var libwayland_egl: std.DynLib = undefined;
 var libEGL: std.DynLib = undefined;
 
 pub var display: *h.wl_display = undefined;
 var registry: *h.wl_registry = undefined;
 var compositor: ?*h.wl_compositor = null;
-var xdg_wm_base: ?*h.xdg_wm_base = null;
 var seat: ?*h.wl_seat = null;
 var keyboard: ?*h.wl_keyboard = null;
 var pointer: ?*h.wl_pointer = null;
@@ -79,6 +93,8 @@ var xkb: *h.xkb_context = undefined;
 var keymap: ?*h.xkb_keymap = null;
 var xkb_state: ?*h.xkb_state = null;
 var compose_state: ?*h.xkb_compose_state = null;
+
+var libdecor_context: *h.libdecor = undefined;
 
 var focus: ?*@This() = null;
 var pointer_enter_serial: u32 = 0;
@@ -95,6 +111,7 @@ export var wio_wl_proxy_get_user_data: *const @TypeOf(h.wl_proxy_get_user_data) 
 pub fn init(options: wio.InitOptions) !void {
     common.loadLibs(&c, &.{
         .{ .handle = &libxkbcommon, .name = "libxkbcommon.so.0", .prefix = "xkb" },
+        .{ .handle = &libdecor, .name = "libdecor-0.so.0", .prefix = "libdecor" },
         .{ .handle = &libwayland_egl, .name = "libwayland-egl.so.1", .prefix = "wl_egl", .predicate = options.opengl },
         .{ .handle = &libEGL, .name = "libEGL.so.1", .prefix = "egl", .predicate = options.opengl },
         .{ .handle = &libwayland_client, .name = "libwayland-client.so.0" },
@@ -128,9 +145,11 @@ pub fn init(options: wio.InitOptions) !void {
 
     _ = c.wl_display_roundtrip(display);
     errdefer if (compositor) |_| h.wl_compositor_destroy(compositor);
-    errdefer if (xdg_wm_base) |_| h.xdg_wm_base_destroy(xdg_wm_base);
     errdefer if (seat) |_| h.wl_seat_destroy(seat);
-    if (compositor == null or xdg_wm_base == null or seat == null) return error.Unexpected;
+    if (compositor == null or seat == null) return error.Unexpected;
+
+    libdecor_context = c.libdecor_new(display, &libdecor_interface) orelse return error.Unexpected;
+    errdefer c.libdecor_unref(libdecor_context);
 
     if (options.opengl) {
         egl_display = c.eglGetDisplay(display) orelse {
@@ -151,6 +170,9 @@ pub fn deinit() void {
         libwayland_egl.close();
     }
 
+    c.libdecor_unref(libdecor_context);
+    libdecor.close();
+
     c.xkb_compose_state_unref(compose_state);
     c.xkb_state_unref(xkb_state);
     c.xkb_keymap_unref(keymap);
@@ -163,7 +185,6 @@ pub fn deinit() void {
     if (pointer) |_| h.wl_pointer_destroy(pointer);
     if (keyboard) |_| h.wl_keyboard_destroy(keyboard);
     h.wl_seat_destroy(seat);
-    h.xdg_wm_base_destroy(xdg_wm_base);
     h.wl_compositor_destroy(compositor);
     h.wl_registry_destroy(registry);
     c.wl_display_disconnect(display);
@@ -176,8 +197,7 @@ pub fn update() void {
 
 events: std.fifo.LinearFifo(wio.Event, .Dynamic),
 surface: *h.wl_surface,
-xdg_surface: *h.xdg_surface,
-xdg_toplevel: *h.xdg_toplevel,
+frame: *h.libdecor_frame,
 fractional_scale: ?*h.wp_fractional_scale_v1 = null,
 egl_window: ?*h.wl_egl_window = null,
 egl_surface: h.EGLSurface = null,
@@ -194,19 +214,12 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     errdefer h.wl_surface_destroy(surface);
     h.wl_surface_set_user_data(surface, self);
 
-    const xdg_surface = h.xdg_wm_base_get_xdg_surface(xdg_wm_base, surface) orelse return error.Unexpected;
-    errdefer h.xdg_surface_destroy(xdg_surface);
-    _ = h.xdg_surface_add_listener(xdg_surface, &xdg_surface_listener, null);
-
-    const xdg_toplevel = h.xdg_surface_get_toplevel(xdg_surface) orelse return error.Unexpected;
-    errdefer h.xdg_toplevel_destroy(xdg_toplevel);
-    _ = h.xdg_toplevel_add_listener(xdg_toplevel, &xdg_toplevel_listener, self);
+    const frame = c.libdecor_decorate(libdecor_context, surface, &libdecor_frame_interface, self) orelse return error.Unexpected;
 
     self.* = .{
         .events = .init(wio.allocator),
         .surface = surface,
-        .xdg_surface = xdg_surface,
-        .xdg_toplevel = xdg_toplevel,
+        .frame = frame,
         .size = options.size,
         .scale = options.scale,
         .cursor_mode = options.cursor_mode,
@@ -241,8 +254,7 @@ pub fn destroy(self: *@This()) void {
     if (self.egl_window) |_| c.wl_egl_window_destroy(self.egl_window);
     if (self.fractional_scale) |_| h.wp_fractional_scale_v1_destroy(self.fractional_scale);
     self.events.deinit();
-    h.xdg_toplevel_destroy(self.xdg_toplevel);
-    h.xdg_surface_destroy(self.xdg_surface);
+    c.libdecor_frame_unref(self.frame);
     h.wl_surface_destroy(self.surface);
     wio.allocator.destroy(self);
 }
@@ -254,7 +266,7 @@ pub fn getEvent(self: *@This()) ?wio.Event {
 pub fn setTitle(self: *@This(), title: []const u8) void {
     const title_z = wio.allocator.dupeZ(u8, title) catch return;
     defer wio.allocator.free(title_z);
-    h.xdg_toplevel_set_title(self.xdg_toplevel, title_z);
+    c.libdecor_frame_set_title(self.frame, title_z);
 }
 
 pub fn setSize(self: *@This(), size: wio.Size) void {
@@ -263,11 +275,11 @@ pub fn setSize(self: *@This(), size: wio.Size) void {
 }
 
 pub fn setMode(self: *@This(), mode: wio.WindowMode) void {
-    if (mode != .fullscreen) h.xdg_toplevel_unset_fullscreen(self.xdg_toplevel);
+    if (mode != .fullscreen) c.libdecor_frame_unset_fullscreen(self.frame);
     switch (mode) {
-        .normal => h.xdg_toplevel_unset_maximized(self.xdg_toplevel),
-        .maximized => h.xdg_toplevel_set_maximized(self.xdg_toplevel),
-        .fullscreen => h.xdg_toplevel_set_fullscreen(self.xdg_toplevel, null),
+        .normal => c.libdecor_frame_unset_maximized(self.frame),
+        .maximized => c.libdecor_frame_set_maximized(self.frame),
+        .fullscreen => c.libdecor_frame_set_fullscreen(self.frame, null),
     }
 }
 
@@ -375,9 +387,6 @@ fn registryGlobal(_: ?*anyopaque, _: ?*h.wl_registry, name: u32, interface: [*c]
     const interface_z = std.mem.sliceTo(interface, 0);
     if (std.mem.eql(u8, interface_z, "wl_compositor")) {
         compositor = @ptrCast(h.wl_registry_bind(registry, name, &h.wl_compositor_interface, 3));
-    } else if (std.mem.eql(u8, interface_z, "xdg_wm_base")) {
-        xdg_wm_base = @ptrCast(h.wl_registry_bind(registry, name, &h.xdg_wm_base_interface, 1));
-        _ = h.xdg_wm_base_add_listener(xdg_wm_base, &xdg_wm_base_listener, null);
     } else if (std.mem.eql(u8, interface_z, "wl_seat")) {
         seat = @ptrCast(h.wl_registry_bind(registry, name, &h.wl_seat_interface, 3));
         _ = h.wl_seat_add_listener(seat, &seat_listener, null);
@@ -389,58 +398,6 @@ fn registryGlobal(_: ?*anyopaque, _: ?*h.wl_registry, name: u32, interface: [*c]
 }
 
 fn registryGlobalRemove(_: ?*anyopaque, _: ?*h.wl_registry, _: u32) callconv(.C) void {}
-
-const xdg_wm_base_listener = h.xdg_wm_base_listener{
-    .ping = xdgWmBasePing,
-};
-
-fn xdgWmBasePing(_: ?*anyopaque, _: ?*h.xdg_wm_base, serial: u32) callconv(.C) void {
-    h.xdg_wm_base_pong(xdg_wm_base, serial);
-}
-
-const xdg_surface_listener = h.xdg_surface_listener{
-    .configure = xdgSurfaceConfigure,
-};
-
-fn xdgSurfaceConfigure(_: ?*anyopaque, xdg_surface: ?*h.xdg_surface, serial: u32) callconv(.C) void {
-    h.xdg_surface_ack_configure(xdg_surface, serial);
-}
-
-const xdg_toplevel_listener = h.xdg_toplevel_listener{
-    .configure = xdgToplevelConfigure,
-    .close = xdgToplevelClose,
-};
-
-fn xdgToplevelConfigure(data: ?*anyopaque, _: ?*h.xdg_toplevel, width: i32, height: i32, states: ?*h.wl_array) callconv(.C) void {
-    const self: *@This() = @alignCast(@ptrCast(data orelse return));
-
-    var mode = wio.WindowMode.normal;
-    var focused = false;
-
-    for (@as([*]u32, @alignCast(@ptrCast(states.?.data.?)))[0 .. states.?.size / @sizeOf(u32)]) |state| {
-        switch (state) {
-            h.XDG_TOPLEVEL_STATE_MAXIMIZED => mode = .maximized,
-            h.XDG_TOPLEVEL_STATE_FULLSCREEN => mode = .fullscreen,
-            h.XDG_TOPLEVEL_STATE_ACTIVATED => focused = true,
-            else => {},
-        }
-    }
-
-    const size = if (width == 0 or height == 0) self.size else wio.Size{ .width = @intCast(width), .height = @intCast(height) };
-    if (mode == .normal) self.size = size;
-
-    self.pushEvent(if (focused) .focused else .unfocused);
-    self.pushEvent(.{ .mode = mode });
-    self.pushEvent(.{ .size = size });
-    const framebuffer = size.multiply(self.scale);
-    self.pushEvent(.{ .framebuffer = framebuffer });
-    if (self.egl_window) |_| c.wl_egl_window_resize(self.egl_window, framebuffer.width, framebuffer.height, 0, 0);
-}
-
-fn xdgToplevelClose(data: ?*anyopaque, _: ?*h.xdg_toplevel) callconv(.C) void {
-    const self: *@This() = @alignCast(@ptrCast(data orelse return));
-    self.pushEvent(.close);
-}
 
 const seat_listener = h.wl_seat_listener{
     .capabilities = seatCapabilities,
@@ -593,6 +550,64 @@ fn fractionalScalePreferredScale(data: ?*anyopaque, _: ?*h.wp_fractional_scale_v
     self.scale /= 120;
     self.pushEvent(.{ .scale = self.scale });
 }
+
+var libdecor_interface = h.libdecor_interface{
+    .@"error" = libdecorError,
+};
+
+fn libdecorError(_: ?*h.libdecor, _: h.libdecor_error, message: [*c]const u8) callconv(.C) void {
+    log.err("{s}", .{message});
+}
+
+var libdecor_frame_interface = h.libdecor_frame_interface{
+    .configure = frameConfigure,
+    .close = frameClose,
+    .commit = frameCommit,
+    .dismiss_popup = frameDismissPopup,
+};
+
+fn frameConfigure(frame: ?*h.libdecor_frame, configuration: ?*h.libdecor_configuration, data: ?*anyopaque) callconv(.C) void {
+    const self: *@This() = @alignCast(@ptrCast(data));
+
+    var mode = wio.WindowMode.normal;
+    var focused = false;
+
+    var window_state: h.libdecor_window_state = 0;
+    if (c.libdecor_configuration_get_window_state(configuration, &window_state)) {
+        if (window_state & h.LIBDECOR_WINDOW_STATE_ACTIVE != 0) focused = true;
+        if (window_state & h.LIBDECOR_WINDOW_STATE_MAXIMIZED != 0) mode = .maximized;
+        if (window_state & h.LIBDECOR_WINDOW_STATE_FULLSCREEN != 0) mode = .fullscreen;
+    }
+
+    var width: c_int = undefined;
+    var height: c_int = undefined;
+    if (!c.libdecor_configuration_get_content_size(configuration, frame, &width, &height)) {
+        width = self.size.width;
+        height = self.size.height;
+    }
+
+    const state = c.libdecor_state_new(width, height);
+    defer c.libdecor_state_free(state);
+    c.libdecor_frame_commit(frame, state, configuration);
+
+    const size = wio.Size{ .width = @intCast(width), .height = @intCast(height) };
+    if (mode == .normal) self.size = size;
+
+    self.pushEvent(if (focused) .focused else .unfocused);
+    self.pushEvent(.{ .mode = mode });
+    self.pushEvent(.{ .size = size });
+    const framebuffer = size.multiply(self.scale);
+    self.pushEvent(.{ .framebuffer = framebuffer });
+    if (self.egl_window != null) c.wl_egl_window_resize(self.egl_window, framebuffer.width, framebuffer.height, 0, 0);
+}
+
+fn frameClose(_: ?*h.libdecor_frame, data: ?*anyopaque) callconv(.C) void {
+    const self: *@This() = @alignCast(@ptrCast(data));
+    self.pushEvent(.close);
+}
+
+fn frameCommit(_: ?*h.libdecor_frame, _: ?*anyopaque) callconv(.C) void {}
+fn frameDismissPopup(_: ?*h.libdecor_frame, _: [*c]const u8, _: ?*anyopaque) callconv(.C) void {}
 
 fn keyToButton(key: u32) ?wio.Button {
     comptime var table: [126]wio.Button = undefined;

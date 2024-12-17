@@ -35,6 +35,7 @@ For Wayland, the following libraries are loaded:
 
 - `libwayland-client.so.0`
 - `libxkbcommon.so.0`
+- `libdecor-0.so.0`
 - `libwayland-egl.so.1` (if OpenGL is enabled)
 - `libEGL.so.1` (if OpenGL is enabled)
 
