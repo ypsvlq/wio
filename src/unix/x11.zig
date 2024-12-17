@@ -44,6 +44,7 @@ var c: extern struct {
     XFreeGC: *const @TypeOf(h.XFreeGC),
     XDrawPoint: *const @TypeOf(h.XDrawPoint),
     XCreatePixmapCursor: *const @TypeOf(h.XCreatePixmapCursor),
+    XWarpPointer: *const @TypeOf(h.XWarpPointer),
     glXQueryExtensionsString: *const @TypeOf(h.glXQueryExtensionsString),
     glXGetProcAddress: *const @TypeOf(h.glXGetProcAddress),
     glXChooseFBConfig: *const @TypeOf(h.glXChooseFBConfig),
@@ -157,6 +158,8 @@ window: h.Window,
 ic: h.XIC,
 cursor: h.Cursor = h.None,
 cursor_mode: wio.CursorMode,
+size: wio.Size,
+warped: bool = false,
 context: h.GLXContext = null,
 
 pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
@@ -201,6 +204,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
         .window = window,
         .ic = ic,
         .cursor_mode = options.cursor_mode,
+        .size = options.size,
     };
     self.setTitle(options.title);
     self.setMode(options.mode);
@@ -291,6 +295,7 @@ pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
         const cursor = c.XCreatePixmapCursor(display, pixmap, pixmap, &color, &color, 0, 0);
         _ = c.XDefineCursor(display, self.window, cursor);
     }
+    if (mode == .relative) self.warped = false;
 }
 
 pub fn requestAttention(self: *@This()) void {
@@ -384,6 +389,7 @@ fn handle(event: *h.XEvent) void {
         h.FocusIn => {
             if (windows.get(event.xfocus.window)) |window| {
                 window.pushEvent(.focused);
+                window.warped = false;
             }
         },
         h.FocusOut => {
@@ -425,9 +431,9 @@ fn handle(event: *h.XEvent) void {
                 if (mode == .normal and maximized_horz and maximized_vert) mode = .maximized;
                 window.pushEvent(.{ .mode = mode });
 
-                const size = wio.Size{ .width = @intCast(event.xconfigure.width), .height = @intCast(event.xconfigure.height) };
-                window.pushEvent(.{ .size = size });
-                window.pushEvent(.{ .framebuffer = size });
+                window.size = wio.Size{ .width = @intCast(event.xconfigure.width), .height = @intCast(event.xconfigure.height) };
+                window.pushEvent(.{ .size = window.size });
+                window.pushEvent(.{ .framebuffer = window.size });
             }
         },
         h.KeyPress => {
@@ -482,9 +488,19 @@ fn handle(event: *h.XEvent) void {
         },
         h.MotionNotify => {
             if (windows.get(event.xmotion.window)) |window| {
-                const x = std.math.cast(u16, event.xmotion.x) orelse return;
-                const y = std.math.cast(u16, event.xmotion.y) orelse return;
-                window.pushEvent(.{ .mouse = .{ .x = x, .y = y } });
+                if (window.cursor_mode == .relative) {
+                    const dx = event.xmotion.x - window.size.width / 2;
+                    const dy = event.xmotion.y - window.size.height / 2;
+                    if (dx != 0 or dy != 0) {
+                        if (window.warped) window.pushEvent(.{ .mouse_relative = .{ .x = @intCast(dx), .y = @intCast(dy) } });
+                        _ = c.XWarpPointer(display, h.None, window.window, 0, 0, 0, 0, window.size.width / 2, window.size.height / 2);
+                        window.warped = true;
+                    }
+                } else {
+                    const x = std.math.cast(u16, event.xmotion.x) orelse return;
+                    const y = std.math.cast(u16, event.xmotion.y) orelse return;
+                    window.pushEvent(.{ .mouse = .{ .x = x, .y = y } });
+                }
             }
         },
         else => {},
