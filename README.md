@@ -38,6 +38,8 @@ For Wayland, the following libraries are loaded:
 - `libwayland-egl.so.1` (if OpenGL is enabled)
 - `libEGL.so.1` (if OpenGL is enabled)
 
+When building for Linux with audio enabled, `libpulse.so.0` is loaded.
+
 ## Platform-specific API
 
 The following variables and fields may be considered part of the public API
