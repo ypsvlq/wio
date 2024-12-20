@@ -7,6 +7,7 @@ const h = @cImport({
     @cInclude("wayland-client-protocol.h");
     @cInclude("fractional-scale-v1-client-protocol.h");
     @cInclude("cursor-shape-v1-client-protocol.h");
+    @cInclude("xdg-activation-v1-client-protocol.h");
     @cInclude("xkbcommon/xkbcommon.h");
     @cInclude("xkbcommon/xkbcommon-compose.h");
     @cInclude("libdecor.h");
@@ -88,6 +89,7 @@ var pointer: ?*h.wl_pointer = null;
 var fractional_scale_manager: ?*h.wp_fractional_scale_manager_v1 = null;
 var cursor_shape_manager: ?*h.wp_cursor_shape_manager_v1 = null;
 var data_device_manager: ?*h.wl_data_device_manager = null;
+var activation: ?*h.xdg_activation_v1 = null;
 
 var cursor_shape_device: ?*h.wp_cursor_shape_device_v1 = null;
 var data_device: ?*h.wl_data_device = null;
@@ -200,6 +202,7 @@ fn destroyProxies() void {
     if (data_offer) |_| h.wl_data_offer_destroy(data_offer);
     if (data_device) |_| h.wl_data_device_destroy(data_device);
     if (cursor_shape_device) |_| h.wp_cursor_shape_device_v1_destroy(cursor_shape_device);
+    if (activation) |_| h.xdg_activation_v1_destroy(activation);
     if (data_device_manager) |_| h.wl_data_device_manager_destroy(data_device_manager);
     if (cursor_shape_manager) |_| h.wp_cursor_shape_manager_v1_destroy(cursor_shape_manager);
     if (fractional_scale_manager) |_| h.wp_fractional_scale_manager_v1_destroy(fractional_scale_manager);
@@ -326,7 +329,10 @@ pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
 }
 
 pub fn requestAttention(self: *@This()) void {
-    _ = self;
+    if (activation == null) return;
+    const token = h.xdg_activation_v1_get_activation_token(activation);
+    _ = h.xdg_activation_token_v1_add_listener(token, &activation_token_listener, self.surface);
+    h.xdg_activation_token_v1_commit(token);
 }
 
 pub fn createContext(self: *@This(), options: wio.CreateContextOptions) !void {
@@ -431,6 +437,8 @@ fn registryGlobal(_: ?*anyopaque, _: ?*h.wl_registry, name: u32, interface_ptr: 
         cursor_shape_manager = @ptrCast(h.wl_registry_bind(registry, name, &h.wp_cursor_shape_manager_v1_interface, 1));
     } else if (std.mem.eql(u8, interface, "wl_data_device_manager")) {
         data_device_manager = @ptrCast(h.wl_registry_bind(registry, name, &h.wl_data_device_manager_interface, 1));
+    } else if (std.mem.eql(u8, interface, "xdg_activation_v1")) {
+        activation = @ptrCast(h.wl_registry_bind(registry, name, &h.xdg_activation_v1_interface, 1));
     }
 }
 
@@ -625,6 +633,15 @@ fn dataSourceSend(_: ?*anyopaque, _: ?*h.wl_data_source, _: [*c]const u8, fd: i3
 }
 
 fn dataSourceCancelled(_: ?*anyopaque, _: ?*h.wl_data_source) callconv(.C) void {}
+
+const activation_token_listener = h.xdg_activation_token_v1_listener{
+    .done = activationTokenDone,
+};
+
+fn activationTokenDone(surface: ?*anyopaque, token: ?*h.xdg_activation_token_v1, string: [*c]const u8) callconv(.C) void {
+    h.xdg_activation_v1_activate(activation, string, @ptrCast(surface));
+    h.xdg_activation_token_v1_destroy(token);
+}
 
 var libdecor_interface = h.libdecor_interface{
     .@"error" = libdecorError,
