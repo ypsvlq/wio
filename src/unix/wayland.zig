@@ -340,6 +340,8 @@ pub fn createContext(self: *@This(), options: wio.CreateContextOptions) !void {
         h.EGL_ALPHA_SIZE,      options.alpha_bits,
         h.EGL_DEPTH_SIZE,      options.depth_bits,
         h.EGL_STENCIL_SIZE,    options.stencil_bits,
+        h.EGL_SAMPLE_BUFFERS,  if (options.samples != 0) 1 else 0,
+        h.EGL_SAMPLES,         options.samples,
         h.EGL_NONE,
     }, &config, 1, &count);
 
