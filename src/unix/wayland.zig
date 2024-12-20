@@ -87,7 +87,12 @@ var keyboard: ?*h.wl_keyboard = null;
 var pointer: ?*h.wl_pointer = null;
 var fractional_scale_manager: ?*h.wp_fractional_scale_manager_v1 = null;
 var cursor_shape_manager: ?*h.wp_cursor_shape_manager_v1 = null;
+var data_device_manager: ?*h.wl_data_device_manager = null;
+
 var cursor_shape_device: ?*h.wp_cursor_shape_device_v1 = null;
+var data_device: ?*h.wl_data_device = null;
+var data_offer: ?*h.wl_data_offer = null;
+var data_source: ?*h.wl_data_source = null;
 
 var xkb: *h.xkb_context = undefined;
 var keymap: ?*h.xkb_keymap = null;
@@ -97,7 +102,9 @@ var compose_state: ?*h.xkb_compose_state = null;
 var libdecor_context: *h.libdecor = undefined;
 
 var focus: ?*@This() = null;
+var last_serial: u32 = 0;
 var pointer_enter_serial: u32 = 0;
+var clipboard_text: []const u8 = "";
 
 var egl_display: h.EGLDisplay = undefined;
 
@@ -144,9 +151,11 @@ pub fn init(options: wio.InitOptions) !void {
     _ = h.wl_registry_add_listener(registry, &registry_listener, null);
 
     _ = c.wl_display_roundtrip(display);
-    errdefer if (compositor) |_| h.wl_compositor_destroy(compositor);
-    errdefer if (seat) |_| h.wl_seat_destroy(seat);
-    if (compositor == null or seat == null) return error.Unexpected;
+    errdefer destroyProxies();
+    if (compositor == null or seat == null or data_device_manager == null) return error.Unexpected;
+
+    data_device = h.wl_data_device_manager_get_data_device(data_device_manager, seat) orelse return error.Unexpected;
+    _ = h.wl_data_device_add_listener(data_device, &data_device_listener, null);
 
     libdecor_context = c.libdecor_new(display, &libdecor_interface) orelse return error.Unexpected;
     errdefer c.libdecor_unref(libdecor_context);
@@ -170,6 +179,8 @@ pub fn deinit() void {
         libwayland_egl.close();
     }
 
+    wio.allocator.free(clipboard_text);
+
     c.libdecor_unref(libdecor_context);
     libdecor.close();
 
@@ -179,16 +190,24 @@ pub fn deinit() void {
     c.xkb_context_unref(xkb);
     libxkbcommon.close();
 
+    destroyProxies();
+    c.wl_display_disconnect(display);
+    libwayland_client.close();
+}
+
+fn destroyProxies() void {
+    if (data_source) |_| h.wl_data_source_destroy(data_source);
+    if (data_offer) |_| h.wl_data_offer_destroy(data_offer);
+    if (data_device) |_| h.wl_data_device_destroy(data_device);
     if (cursor_shape_device) |_| h.wp_cursor_shape_device_v1_destroy(cursor_shape_device);
+    if (data_device_manager) |_| h.wl_data_device_manager_destroy(data_device_manager);
     if (cursor_shape_manager) |_| h.wp_cursor_shape_manager_v1_destroy(cursor_shape_manager);
     if (fractional_scale_manager) |_| h.wp_fractional_scale_manager_v1_destroy(fractional_scale_manager);
     if (pointer) |_| h.wl_pointer_destroy(pointer);
     if (keyboard) |_| h.wl_keyboard_destroy(keyboard);
-    h.wl_seat_destroy(seat);
-    h.wl_compositor_destroy(compositor);
+    if (seat) |_| h.wl_seat_destroy(seat);
+    if (compositor) |_| h.wl_compositor_destroy(compositor);
     h.wl_registry_destroy(registry);
-    c.wl_display_disconnect(display);
-    libwayland_client.close();
 }
 
 pub fn update() void {
@@ -352,12 +371,26 @@ pub fn messageBox(backend: ?*@This(), style: wio.MessageBoxStyle, title: []const
 }
 
 pub fn setClipboardText(text: []const u8) void {
-    _ = text;
+    wio.allocator.free(clipboard_text);
+    clipboard_text = wio.allocator.dupe(u8, text) catch "";
+
+    if (data_source) |_| h.wl_data_source_destroy(data_source);
+    data_source = h.wl_data_device_manager_create_data_source(data_device_manager);
+    _ = h.wl_data_source_add_listener(data_source, &data_source_listener, null);
+    h.wl_data_source_offer(data_source, "text/plain;charset=utf-8");
+    h.wl_data_device_set_selection(data_device, data_source, last_serial);
 }
 
 pub fn getClipboardText(allocator: std.mem.Allocator) ?[]u8 {
-    _ = allocator;
-    return null;
+    if (data_offer == null) return null;
+    var pipe: [2]i32 = undefined;
+    if (std.c.pipe(&pipe) == -1) return null;
+    defer _ = std.c.close(pipe[0]);
+    h.wl_data_offer_receive(data_offer, "text/plain;charset=utf-8", pipe[1]);
+    _ = c.wl_display_roundtrip(display);
+    _ = std.c.close(pipe[1]);
+    const file = std.fs.File{ .handle = pipe[0] };
+    return file.readToEndAlloc(allocator, std.math.maxInt(usize)) catch null;
 }
 
 pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
@@ -383,17 +416,19 @@ const registry_listener = h.wl_registry_listener{
     .global_remove = registryGlobalRemove,
 };
 
-fn registryGlobal(_: ?*anyopaque, _: ?*h.wl_registry, name: u32, interface: [*c]const u8, _: u32) callconv(.C) void {
-    const interface_z = std.mem.sliceTo(interface, 0);
-    if (std.mem.eql(u8, interface_z, "wl_compositor")) {
+fn registryGlobal(_: ?*anyopaque, _: ?*h.wl_registry, name: u32, interface_ptr: [*c]const u8, _: u32) callconv(.C) void {
+    const interface = std.mem.sliceTo(interface_ptr, 0);
+    if (std.mem.eql(u8, interface, "wl_compositor")) {
         compositor = @ptrCast(h.wl_registry_bind(registry, name, &h.wl_compositor_interface, 3));
-    } else if (std.mem.eql(u8, interface_z, "wl_seat")) {
+    } else if (std.mem.eql(u8, interface, "wl_seat")) {
         seat = @ptrCast(h.wl_registry_bind(registry, name, &h.wl_seat_interface, 3));
         _ = h.wl_seat_add_listener(seat, &seat_listener, null);
-    } else if (std.mem.eql(u8, interface_z, "wp_fractional_scale_manager_v1")) {
+    } else if (std.mem.eql(u8, interface, "wp_fractional_scale_manager_v1")) {
         fractional_scale_manager = @ptrCast(h.wl_registry_bind(registry, name, &h.wp_fractional_scale_manager_v1_interface, 1));
-    } else if (std.mem.eql(u8, interface_z, "wp_cursor_shape_manager_v1")) {
+    } else if (std.mem.eql(u8, interface, "wp_cursor_shape_manager_v1")) {
         cursor_shape_manager = @ptrCast(h.wl_registry_bind(registry, name, &h.wp_cursor_shape_manager_v1_interface, 1));
+    } else if (std.mem.eql(u8, interface, "wl_data_device_manager")) {
+        data_device_manager = @ptrCast(h.wl_registry_bind(registry, name, &h.wl_data_device_manager_interface, 1));
     }
 }
 
@@ -466,7 +501,8 @@ fn keyboardLeave(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, surface: ?*h.wl_sur
     if (compose_state) |_| c.xkb_compose_state_reset(compose_state);
 }
 
-fn keyboardKey(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, _: u32, key: u32, state: u32) callconv(.C) void {
+fn keyboardKey(_: ?*anyopaque, _: ?*h.wl_keyboard, serial: u32, _: u32, key: u32, state: u32) callconv(.C) void {
+    last_serial = serial;
     if (focus) |window| {
         if (keyToButton(key)) |button| {
             if (state == h.WL_KEYBOARD_KEY_STATE_PRESSED) {
@@ -515,7 +551,8 @@ fn pointerMotion(_: ?*anyopaque, _: ?*h.wl_pointer, _: u32, surface_x: i32, surf
     if (focus) |window| window.pushEvent(.{ .mouse = .{ .x = @intCast(surface_x >> 8), .y = @intCast(surface_y >> 8) } });
 }
 
-fn pointerButton(_: ?*anyopaque, _: ?*h.wl_pointer, _: u32, _: u32, button: u32, state: u32) callconv(.C) void {
+fn pointerButton(_: ?*anyopaque, _: ?*h.wl_pointer, serial: u32, _: u32, button: u32, state: u32) callconv(.C) void {
+    last_serial = serial;
     if (focus) |window| {
         const wio_button: wio.Button = switch (button) {
             0x110 => .mouse_left,
@@ -550,6 +587,42 @@ fn fractionalScalePreferredScale(data: ?*anyopaque, _: ?*h.wp_fractional_scale_v
     self.scale /= 120;
     self.pushEvent(.{ .scale = self.scale });
 }
+
+const data_device_listener = h.wl_data_device_listener{
+    .data_offer = dataDeviceDataOffer,
+    .enter = dataDeviceEnter,
+    .leave = dataDeviceLeave,
+    .motion = dataDeviceMotion,
+    .drop = dataDeviceDrop,
+    .selection = dataDeviceSelection,
+};
+
+fn dataDeviceDataOffer(_: ?*anyopaque, _: ?*h.wl_data_device, _: ?*h.wl_data_offer) callconv(.C) void {}
+fn dataDeviceEnter(_: ?*anyopaque, _: ?*h.wl_data_device, _: u32, _: ?*h.wl_surface, _: i32, _: i32, _: ?*h.wl_data_offer) callconv(.C) void {}
+fn dataDeviceLeave(_: ?*anyopaque, _: ?*h.wl_data_device) callconv(.C) void {}
+fn dataDeviceMotion(_: ?*anyopaque, _: ?*h.wl_data_device, _: u32, _: i32, _: i32) callconv(.C) void {}
+fn dataDeviceDrop(_: ?*anyopaque, _: ?*h.wl_data_device) callconv(.C) void {}
+
+fn dataDeviceSelection(_: ?*anyopaque, _: ?*h.wl_data_device, offer: ?*h.wl_data_offer) callconv(.C) void {
+    if (data_offer) |_| h.wl_data_offer_destroy(data_offer);
+    data_offer = offer;
+}
+
+const data_source_listener = h.wl_data_source_listener{
+    .target = dataSourceTarget,
+    .send = dataSourceSend,
+    .cancelled = dataSourceCancelled,
+};
+
+fn dataSourceTarget(_: ?*anyopaque, _: ?*h.wl_data_source, _: [*c]const u8) callconv(.C) void {}
+
+fn dataSourceSend(_: ?*anyopaque, _: ?*h.wl_data_source, _: [*c]const u8, fd: i32) callconv(.C) void {
+    defer _ = std.c.close(fd);
+    const file = std.fs.File{ .handle = fd };
+    file.writeAll(clipboard_text) catch {};
+}
+
+fn dataSourceCancelled(_: ?*anyopaque, _: ?*h.wl_data_source) callconv(.C) void {}
 
 var libdecor_interface = h.libdecor_interface{
     .@"error" = libdecorError,
