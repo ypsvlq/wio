@@ -136,7 +136,14 @@ pub const AudioDevice = struct {
         const stream = try openStream(format);
         errdefer c.pa_stream_unref(stream);
         c.pa_stream_set_write_callback(stream, AudioOutput.callback, @constCast(writeFn));
-        if (c.pa_stream_connect_playback(stream, self.id, null, 0, null, null) != 0) return error.Unexpected;
+        const attr = h.pa_buffer_attr{
+            .maxlength = std.math.maxInt(u32),
+            .tlength = 1,
+            .prebuf = std.math.maxInt(u32),
+            .minreq = std.math.maxInt(u32),
+            .fragsize = std.math.maxInt(u32),
+        };
+        if (c.pa_stream_connect_playback(stream, self.id, &attr, h.PA_STREAM_ADJUST_LATENCY, null, null) != 0) return error.Unexpected;
         return .{ .stream = stream };
     }
 
@@ -146,7 +153,14 @@ pub const AudioDevice = struct {
         const stream = try openStream(format);
         errdefer c.pa_stream_unref(stream);
         c.pa_stream_set_read_callback(stream, AudioInput.callback, @constCast(readFn));
-        if (c.pa_stream_connect_record(stream, self.id, null, 0) != 0) return error.Unexpected;
+        const attr = h.pa_buffer_attr{
+            .maxlength = std.math.maxInt(u32),
+            .tlength = std.math.maxInt(u32),
+            .prebuf = std.math.maxInt(u32),
+            .minreq = std.math.maxInt(u32),
+            .fragsize = 1,
+        };
+        if (c.pa_stream_connect_record(stream, self.id, &attr, h.PA_STREAM_ADJUST_LATENCY) != 0) return error.Unexpected;
         return .{ .stream = stream };
     }
 
