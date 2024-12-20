@@ -24,7 +24,7 @@ pub fn main() !void {
         .opengl = true,
     });
     window = try wio.createWindow(.{ .title = "wio example" });
-    try window.createContext(.{});
+    try window.createContext(.{ .samples = 2 });
     window.makeContextCurrent();
     window.swapInterval(1);
     renderer.init();
