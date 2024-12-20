@@ -228,8 +228,8 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     const scale = dpi / w.USER_DEFAULT_SCREEN_DPI;
     self.pushEvent(.{ .scale = scale });
 
-    const size_scaled = options.size.multiply(scale / options.scale);
-    self.setSize(size_scaled);
+    const size_scaled = clientToWindow(options.size.multiply(scale / options.scale), style);
+    _ = w.SetWindowPos(window, null, 0, 0, size_scaled.width, size_scaled.height, w.SWP_NOMOVE | w.SWP_NOZORDER);
 
     self.setMode(options.mode);
     if (options.cursor != .arrow) self.setCursor(options.cursor);
@@ -257,12 +257,6 @@ pub fn setTitle(self: *@This(), title: []const u8) void {
     const title_w = std.unicode.utf8ToUtf16LeAllocZ(wio.allocator, title) catch return;
     defer wio.allocator.free(title_w);
     _ = w.SetWindowTextW(self.window, title_w);
-}
-
-pub fn setSize(self: *@This(), client_size: wio.Size) void {
-    const style: u32 = @truncate(@as(usize, @bitCast(w.GetWindowLongPtrW(self.window, w.GWL_STYLE))));
-    const size = clientToWindow(client_size, style);
-    _ = w.SetWindowPos(self.window, null, 0, 0, size.width, size.height, w.SWP_NOMOVE | w.SWP_NOZORDER);
 }
 
 pub fn setMode(self: *@This(), mode: wio.WindowMode) void {

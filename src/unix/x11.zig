@@ -35,7 +35,6 @@ var c: extern struct {
     XPeekEvent: *const @TypeOf(h.XPeekEvent),
     XGetWindowProperty: *const @TypeOf(h.XGetWindowProperty),
     Xutf8LookupString: *const @TypeOf(h.Xutf8LookupString),
-    XConfigureWindow: *const @TypeOf(h.XConfigureWindow),
     XSendEvent: *const @TypeOf(h.XSendEvent),
     XcursorLibraryLoadCursor: *const @TypeOf(h.XcursorLibraryLoadCursor),
     XDefineCursor: *const @TypeOf(h.XDefineCursor),
@@ -235,13 +234,6 @@ pub fn getEvent(self: *@This()) ?wio.Event {
 
 pub fn setTitle(self: *@This(), title: []const u8) void {
     _ = c.XChangeProperty(display, self.window, h.XA_WM_NAME, h.XA_STRING, 8, h.PropModeReplace, title.ptr, @intCast(title.len));
-}
-
-pub fn setSize(self: *@This(), size: wio.Size) void {
-    var changes: h.XWindowChanges = undefined;
-    changes.width = size.width;
-    changes.height = size.height;
-    _ = c.XConfigureWindow(display, self.window, h.CWWidth | h.CWHeight, &changes);
 }
 
 pub fn setMode(self: *@This(), mode: wio.WindowMode) void {

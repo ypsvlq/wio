@@ -291,11 +291,6 @@ pub fn setTitle(self: *@This(), title: []const u8) void {
     c.libdecor_frame_set_title(self.frame, title_z);
 }
 
-pub fn setSize(self: *@This(), size: wio.Size) void {
-    _ = self;
-    _ = size;
-}
-
 pub fn setMode(self: *@This(), mode: wio.WindowMode) void {
     if (mode != .fullscreen) c.libdecor_frame_unset_fullscreen(self.frame);
     switch (mode) {

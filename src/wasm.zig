@@ -82,8 +82,6 @@ pub fn getEvent(_: *@This()) ?wio.Event {
 
 pub fn setTitle(_: *@This(), _: []const u8) void {}
 
-pub fn setSize(_: *@This(), _: wio.Size) void {}
-
 pub fn setMode(_: *@This(), mode: wio.WindowMode) void {
     js.setFullscreen(mode == .fullscreen);
 }

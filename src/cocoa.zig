@@ -9,7 +9,6 @@ extern fn wioLoop() void;
 extern fn wioCreateWindow(*anyopaque, u16, u16) *anyopaque;
 extern fn wioDestroyWindow(*anyopaque, ?*anyopaque) void;
 extern fn wioSetTitle(*anyopaque, [*]const u8, usize) void;
-extern fn wioSetSize(*anyopaque, u16, u16) void;
 extern fn wioSetMode(*anyopaque, u8) void;
 extern fn wioSetCursor(*anyopaque, u8) void;
 extern fn wioSetCursorMode(*anyopaque, u8) void;
@@ -66,10 +65,6 @@ pub fn getEvent(self: *@This()) ?wio.Event {
 
 pub fn setTitle(self: *@This(), title: []const u8) void {
     wioSetTitle(self.window, title.ptr, title.len);
-}
-
-pub fn setSize(self: *@This(), size: wio.Size) void {
-    wioSetSize(self.window, size.width, size.height);
 }
 
 pub fn setMode(self: *@This(), mode: wio.WindowMode) void {

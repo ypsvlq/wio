@@ -92,10 +92,6 @@ pub const Window = struct {
         self.backend.setTitle(title);
     }
 
-    pub fn setSize(self: *Window, size: Size) void {
-        self.backend.setSize(size);
-    }
-
     pub fn setMode(self: *Window, mode: WindowMode) void {
         self.backend.setMode(mode);
     }

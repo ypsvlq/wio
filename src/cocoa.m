@@ -286,10 +286,6 @@ void wioSetTitle(NSWindow *window, const char *ptr, size_t len) {
     [window setTitle:string(ptr, len)];
 }
 
-void wioSetSize(NSWindow *window, uint16_t width, uint16_t height) {
-    [window setContentSize:NSMakeSize(width, height)];
-}
-
 void wioSetMode(NSWindow *window, uint8_t mode) {
     if (!!([window styleMask] & NSWindowStyleMaskFullScreen) != (mode == 2)) [window toggleFullScreen:nil];
     if (mode != 2 && mode != [window isZoomed]) [window performZoom:nil];

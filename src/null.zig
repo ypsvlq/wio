@@ -32,11 +32,6 @@ pub fn setTitle(self: *@This(), title: []const u8) void {
     _ = title;
 }
 
-pub fn setSize(self: *@This(), size: wio.Size) void {
-    _ = self;
-    _ = size;
-}
-
 pub fn setMode(self: *@This(), mode: wio.WindowMode) void {
     _ = self;
     _ = mode;

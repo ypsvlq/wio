@@ -84,7 +84,6 @@ fn handlePress(button: wio.Button) void {
 
     switch (button) {
         .t => window.setTitle("retitled wio example"),
-        .s => window.setSize(.{ .width = 320, .height = 240 }),
         .w => window.setMode(.normal),
         .m => window.setMode(.maximized),
         .f => window.setMode(.fullscreen),

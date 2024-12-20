@@ -123,13 +123,6 @@ pub const Window = union {
         }
     }
 
-    pub fn setSize(self: *@This(), size: wio.Size) void {
-        switch (active) {
-            .x11 => self.x11.setSize(size),
-            .wayland => self.wayland.setSize(size),
-        }
-    }
-
     pub fn setMode(self: *@This(), mode: wio.WindowMode) void {
         switch (active) {
             .x11 => self.x11.setMode(mode),
