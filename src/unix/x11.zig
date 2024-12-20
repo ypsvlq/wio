@@ -44,6 +44,9 @@ var c: extern struct {
     XDrawPoint: *const @TypeOf(h.XDrawPoint),
     XCreatePixmapCursor: *const @TypeOf(h.XCreatePixmapCursor),
     XWarpPointer: *const @TypeOf(h.XWarpPointer),
+    XSetSelectionOwner: *const @TypeOf(h.XSetSelectionOwner),
+    XConvertSelection: *const @TypeOf(h.XConvertSelection),
+    XCheckTypedWindowEvent: *const @TypeOf(h.XCheckTypedWindowEvent),
     glXQueryExtensionsString: *const @TypeOf(h.glXQueryExtensionsString),
     glXGetProcAddress: *const @TypeOf(h.glXGetProcAddress),
     glXChooseFBConfig: *const @TypeOf(h.glXChooseFBConfig),
@@ -65,6 +68,11 @@ var atoms: extern struct {
     _NET_WM_STATE_MAXIMIZED_HORZ: h.Atom,
     _NET_WM_STATE_FULLSCREEN: h.Atom,
     _NET_WM_STATE_DEMANDS_ATTENTION: h.Atom,
+    CLIPBOARD: h.Atom,
+    UTF8_STRING: h.Atom,
+    TARGETS: h.Atom,
+    INCR: h.Atom,
+    SELECTION: h.Atom,
 } = undefined;
 
 var libX11: std.DynLib = undefined;
@@ -75,6 +83,8 @@ pub var display: *h.Display = undefined;
 var im: h.XIM = undefined;
 var keycodes: [248]wio.Button = undefined;
 var scale: f32 = 1;
+var helper_window: h.Window = undefined;
+var clipboard_text: []const u8 = "";
 
 pub fn init(options: wio.InitOptions) !void {
     common.loadLibs(&c, &.{
@@ -123,6 +133,10 @@ pub fn init(options: wio.InitOptions) !void {
         } else |_| {}
     }
 
+    var attributes: h.XSetWindowAttributes = undefined;
+    attributes.event_mask = h.PropertyChangeMask;
+    helper_window = c.XCreateWindow(display, h.DefaultRootWindow(display), 0, 0, 1, 1, 0, 0, h.InputOutput, null, h.CWEventMask, &attributes);
+
     if (options.opengl) {
         if (c.glXQueryExtensionsString(display, h.DefaultScreen(display))) |extensions| {
             var iter = std.mem.tokenizeScalar(u8, std.mem.sliceTo(extensions, 0), ' ');
@@ -136,6 +150,7 @@ pub fn init(options: wio.InitOptions) !void {
 }
 
 pub fn deinit() void {
+    wio.allocator.free(clipboard_text);
     _ = c.XCloseIM(im);
     _ = c.XCloseDisplay(display);
     libGL.close();
@@ -351,12 +366,45 @@ pub fn messageBox(backend: ?*@This(), style: wio.MessageBoxStyle, title: []const
 }
 
 pub fn setClipboardText(text: []const u8) void {
-    _ = text;
+    wio.allocator.free(clipboard_text);
+    clipboard_text = wio.allocator.dupe(u8, text) catch "";
+    _ = c.XSetSelectionOwner(display, atoms.CLIPBOARD, helper_window, h.CurrentTime);
 }
 
 pub fn getClipboardText(allocator: std.mem.Allocator) ?[]u8 {
-    _ = allocator;
-    return null;
+    _ = c.XConvertSelection(display, atoms.CLIPBOARD, atoms.UTF8_STRING, atoms.SELECTION, helper_window, h.CurrentTime);
+    var event: h.XEvent = undefined;
+    while (c.XCheckTypedWindowEvent(display, helper_window, h.SelectionNotify, &event) == h.False) {
+        if (c.XCheckTypedWindowEvent(display, helper_window, h.SelectionRequest, &event) == h.True) handle(&event);
+    }
+    if (event.xselection.property == h.None) return null;
+
+    var actual_type: h.Atom = undefined;
+    var actual_format: c_int = undefined;
+    var nitems: c_ulong = undefined;
+    var bytes_after: c_ulong = undefined;
+    var property: [*]u8 = undefined;
+    _ = c.XGetWindowProperty(display, helper_window, atoms.SELECTION, 0, std.math.maxInt(c_long), h.True, h.AnyPropertyType, &actual_type, &actual_format, &nitems, &bytes_after, @ptrCast(&property));
+    defer _ = c.XFree(property);
+
+    if (actual_type == atoms.INCR) {
+        var result = allocator.alloc(u8, 0) catch unreachable;
+        while (true) {
+            while (c.XCheckTypedWindowEvent(display, helper_window, h.PropertyNotify, &event) == h.False) {}
+            if (event.xproperty.atom != atoms.SELECTION or event.xproperty.state != h.PropertyNewValue) continue;
+
+            var chunk: [*]u8 = undefined;
+            _ = c.XGetWindowProperty(display, helper_window, atoms.SELECTION, 0, std.math.maxInt(c_long), h.True, h.AnyPropertyType, &actual_type, &actual_format, &nitems, &bytes_after, @ptrCast(&chunk));
+            defer _ = c.XFree(chunk);
+
+            if (result.len > 0 and nitems == 0) break;
+            result = allocator.realloc(result, result.len + nitems) catch return null;
+            @memcpy(result[result.len - nitems ..], chunk);
+        }
+        return result;
+    } else {
+        return allocator.dupe(u8, property[0..nitems]) catch null;
+    }
 }
 
 pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
@@ -369,6 +417,33 @@ fn pushEvent(self: *@This(), event: wio.Event) void {
 
 fn handle(event: *h.XEvent) void {
     switch (event.type) {
+        h.SelectionRequest => {
+            const requestor = event.xselectionrequest.requestor;
+            const target = event.xselectionrequest.target;
+            var property = event.xselectionrequest.property;
+            if (property == h.None) property = target;
+
+            if (target == atoms.TARGETS) {
+                const targets = [_]h.Atom{ atoms.TARGETS, atoms.UTF8_STRING };
+                _ = c.XChangeProperty(display, requestor, property, h.XA_ATOM, 32, h.PropModeReplace, @ptrCast(&targets), targets.len);
+            } else if (target == atoms.UTF8_STRING) {
+                _ = c.XChangeProperty(display, requestor, property, atoms.UTF8_STRING, 8, h.PropModeReplace, clipboard_text.ptr, @intCast(clipboard_text.len));
+            } else {
+                property = h.None;
+            }
+
+            var reply = h.XEvent{
+                .xselection = .{
+                    .type = h.SelectionNotify,
+                    .requestor = requestor,
+                    .selection = event.xselectionrequest.selection,
+                    .target = target,
+                    .property = property,
+                    .time = h.CurrentTime,
+                },
+            };
+            _ = c.XSendEvent(display, requestor, h.True, h.NoEventMask, &reply);
+        },
         h.ClientMessage => {
             if (event.xclient.message_type == atoms.WM_PROTOCOLS) {
                 if (event.xclient.data.l[0] == atoms.WM_DELETE_WINDOW) {
