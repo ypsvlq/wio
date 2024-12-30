@@ -288,7 +288,6 @@ export fn wioKey(self: *@This(), key: u16, event: u8) void {
             2 => self.pushEvent(.{ .button_release = button }),
             else => unreachable,
         }
-        self.pushEvent(.{ .button_press = button });
     }
 }
 
