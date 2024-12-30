@@ -264,6 +264,7 @@ void *wioCreateWindow(void *ptr, uint16_t width, uint16_t height) {
     [window makeFirstResponder:view];
 
     [window setAcceptsMouseMovedEvents:YES];
+    [window setCollectionBehavior:NSWindowCollectionBehaviorFullScreenPrimary];
     [window makeKeyAndOrderFront:nil];
     [window center];
 
@@ -273,7 +274,7 @@ void *wioCreateWindow(void *ptr, uint16_t width, uint16_t height) {
     wioScale(ptr, [window backingScaleFactor]);
     wioCreate(ptr);
 
-    return (__bridge_retained void *)window;
+    return (void*)CFBridgingRetain(window);
 }
 
 void wioDestroyWindow(void *ptr, void *context) {
