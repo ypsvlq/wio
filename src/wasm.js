@@ -18,8 +18,6 @@ const wio = {
         module.exports._start();
         requestAnimationFrame(wio.loop);
 
-        if (canvas.style.width == "") canvas.style.width = `${canvas.scrollWidth}px`;
-        if (canvas.style.height == "") canvas.style.height = `${canvas.scrollHeight}px`;
         new ResizeObserver(() => wio.resize()).observe(canvas);
         wio.resize();
         wio.events.push(1);
@@ -63,8 +61,8 @@ const wio = {
     },
 
     resize() {
-        const width = parseInt(canvas.style.width);
-        const height = parseInt(canvas.style.height);
+        const width = parseInt(canvas.scrollWidth);
+        const height = parseInt(canvas.scrollHeight);
         canvas.width = width * devicePixelRatio;
         canvas.height = height * devicePixelRatio;
         wio.events.push(
