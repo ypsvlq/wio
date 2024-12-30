@@ -17,16 +17,11 @@ pub fn build(b: *std.Build) void {
             }
         },
         .macos => {
-            module.addCSourceFile(.{ .file = b.path("src/cocoa.m"), .flags = &.{
-                "-fobjc-arc",
-                "-Wno-deprecated-declarations",
-                "-Wno-availability",
-                "-Wno-unguarded-availability",
-            } });
+            module.addCSourceFile(.{ .file = b.path("src/cocoa.m"), .flags = &.{ "-fobjc-arc", "-Wno-deprecated-declarations" } });
             if (b.lazyDependency("xcode_frameworks", .{})) |xcode_frameworks| {
+                module.addSystemFrameworkPath(xcode_frameworks.path("Frameworks"));
                 module.addSystemIncludePath(xcode_frameworks.path("include"));
                 module.addLibraryPath(xcode_frameworks.path("lib"));
-                module.addFrameworkPath(xcode_frameworks.path("Frameworks"));
             }
             module.linkFramework("Cocoa", .{});
             module.linkFramework("IOKit", .{});
