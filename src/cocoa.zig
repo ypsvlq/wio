@@ -15,7 +15,7 @@ extern fn wioSetCursorMode(*anyopaque, u8) void;
 extern fn wioRequestAttention() void;
 extern fn wioCreateContext(*anyopaque) ?*anyopaque;
 extern fn wioMakeContextCurrent(?*anyopaque) void;
-extern fn wioSwapBuffers(?*anyopaque) void;
+extern fn wioSwapBuffers(*anyopaque, ?*anyopaque) void;
 extern fn wioSwapInterval(?*anyopaque, i32) void;
 extern fn wioMessageBox(u8, [*]const u8, usize) void;
 extern fn wioSetClipboardText([*]const u8, usize) void;
@@ -93,7 +93,7 @@ pub fn makeContextCurrent(self: *@This()) void {
 }
 
 pub fn swapBuffers(self: *@This()) void {
-    wioSwapBuffers(self.context);
+    wioSwapBuffers(self.window, self.context);
 }
 
 pub fn swapInterval(self: *@This(), interval: i32) void {

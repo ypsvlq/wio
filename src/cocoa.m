@@ -339,8 +339,14 @@ void wioMakeContextCurrent(NSOpenGLContext *context) {
     [context makeCurrentContext];
 }
 
-void wioSwapBuffers(NSOpenGLContext *context) {
-    [context flushBuffer];
+void wioSwapBuffers(NSWindow *window, NSOpenGLContext *context) {
+    if ([window occlusionState] & NSApplicationOcclusionStateVisible) {
+        [context flushBuffer];
+    } else {
+        // vsync does not apply to occluded windows
+        struct timespec time = {0, 33333333};
+        nanosleep(&time, NULL);
+    }
 }
 
 void wioSwapInterval(NSOpenGLContext *context, int32_t interval) {
