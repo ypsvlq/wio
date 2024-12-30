@@ -247,6 +247,11 @@ void wioLoop(void) {
             inMode:NSDefaultRunLoopMode
             dequeue:YES];
         [NSApp sendEvent:event];
+
+        // keyUp is not called when cmd is held
+        if ([event type] == NSEventTypeKeyUp && ([event modifierFlags] & NSEventModifierFlagCommand)) {
+            [[NSApp keyWindow] sendEvent:event];
+        }
     } while (event);
     [NSApp updateWindows];
 }
