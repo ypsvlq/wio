@@ -1,5 +1,6 @@
+const std = @import("std");
 const builtin = @import("builtin");
-const APIENTRY = if (builtin.os.tag == .windows and builtin.cpu.arch == .x86) .Stdcall else .C;
+const APIENTRY = if (builtin.os.tag == .windows) std.builtin.CallingConvention.winapi else std.builtin.CallingConvention.c;
 pub const Enum = u32;
 pub const Boolean = u8;
 pub const Bitfield = u32;

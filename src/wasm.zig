@@ -118,7 +118,7 @@ pub const JoystickDeviceIterator = struct {
 
     pub fn next(self: *JoystickDeviceIterator) ?JoystickDevice {
         if (self.index < self.count) {
-            const device = .{ .index = self.index };
+            const device = JoystickDevice{ .index = self.index };
             self.index += 1;
             return device;
         } else {

@@ -19,7 +19,7 @@ jobs:
     - name: Set up Zig
       uses: mlugg/setup-zig@v1
       with:
-        version: 2024.10.0-mach
+        version: 2024.11.0-mach
         mirror: 'https://pkg.machengine.org/zig'
     - name: Build
       run: zig build -Dtarget=${{ matrix.target }}
