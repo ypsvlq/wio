@@ -314,7 +314,9 @@ void wioSetCursor(NSWindow *window, uint8_t shape) {
 void wioSetCursorMode(NSWindow *window, uint8_t mode) {
     [[window contentView] setCursorMode:mode];
     if (mode == 2) {
-        CGWarpMouseCursorPosition([window convertPointToScreen:CGPointMake(1, 1)]);
+        NSRect frame = [window frame];
+        NSRect screen = [[NSScreen mainScreen] frame];
+        CGWarpMouseCursorPosition(CGPointMake(CGRectGetMidX(frame), CGRectGetMaxY(screen) - CGRectGetMidY(frame)));
         CGAssociateMouseAndMouseCursorPosition(NO);
     } else {
         CGAssociateMouseAndMouseCursorPosition(YES);
