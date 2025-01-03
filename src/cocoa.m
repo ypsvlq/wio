@@ -161,12 +161,15 @@ static NSString *string(const char *ptr, size_t len) {
         case 0x36: flag = NX_DEVICERCMDKEYMASK; break;
         case 0x37: flag = NX_DEVICELCMDKEYMASK; break;
         case 0x38: flag = NX_DEVICELSHIFTKEYMASK; break;
-        case 0x39: flag = NSEventModifierFlagCapsLock; break;
         case 0x3A: flag = NX_DEVICELALTKEYMASK; break;
         case 0x3B: flag = NX_DEVICELCTLKEYMASK; break;
         case 0x3C: flag = NX_DEVICERSHIFTKEYMASK; break;
         case 0x3D: flag = NX_DEVICERALTKEYMASK; break;
         case 0x3E: flag = NX_DEVICERCTLKEYMASK; break;
+        case 0x39:
+            wioKey(ptr, key, 0);
+            wioKey(ptr, key, 2);
+            return;
         default: return;
     }
     wioKey(ptr, key, [event modifierFlags] & flag ? 0 : 2);
