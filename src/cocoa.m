@@ -19,7 +19,20 @@ static NSString *string(const char *ptr, size_t len) {
     return [[NSString alloc] initWithBytes:ptr length:len encoding:NSUTF8StringEncoding];
 }
 
+static void warpCursor(NSWindow *window) {
+    NSRect frame = [window frame];
+    NSRect screen = [[NSScreen mainScreen] frame];
+    CGWarpMouseCursorPosition(CGPointMake(CGRectGetMidX(frame), CGRectGetMaxY(screen) - CGRectGetMidY(frame)));
+}
+
 @interface ApplicationDelegate : NSObject <NSApplicationDelegate>
+@end
+
+@interface WindowDelegate : NSObject <NSWindowDelegate>
+@end
+
+@interface View : NSView
+- (uint8_t)cursorMode;
 @end
 
 @implementation ApplicationDelegate
@@ -40,14 +53,11 @@ static NSString *string(const char *ptr, size_t len) {
 
 @end
 
-@interface WindowDelegate : NSObject <NSWindowDelegate>
+@implementation WindowDelegate
 {
     void *ptr;
     NSOpenGLContext *context;
 }
-@end
-
-@implementation WindowDelegate
 
 - (instancetype)initWithPointer:(void*)value {
     self = [super init];
@@ -66,6 +76,12 @@ static NSString *string(const char *ptr, size_t len) {
 
 - (void)windowDidBecomeKey:notification {
     wioFocus(ptr);
+
+    NSWindow *window = [notification object];
+    View *view = [window contentView];
+    if ([view cursorMode] == 2) {
+        warpCursor(window);
+    }
 }
 
 - (void)windowDidResignKey:notification {
@@ -90,17 +106,14 @@ static NSString *string(const char *ptr, size_t len) {
 
 @end
 
-@interface View : NSView
+@implementation View
 {
     void *ptr;
     NSTrackingArea *area;
     NSCursor *cursor;
-    uint8_t cursormode;
-    BOOL cursorinside;
+    uint8_t cursorMode;
+    BOOL cursorInside;
 }
-@end
-
-@implementation View
 
 - (instancetype)initWithPointer:(void*)value {
     self = [super init];
@@ -114,10 +127,14 @@ static NSString *string(const char *ptr, size_t len) {
 }
 
 - (void)setCursorMode:(uint8_t)value {
-    if (!!value != !!cursormode) {
-        if (cursorinside) value ? [NSCursor hide] : [NSCursor unhide];
+    if (!!value != !!cursorMode) {
+        if (cursorInside) value ? [NSCursor hide] : [NSCursor unhide];
     }
-    cursormode = value;
+    cursorMode = value;
+}
+
+- (uint8_t)cursorMode {
+    return cursorMode;
 }
 
 - (void)updateTrackingAreas {
@@ -136,13 +153,13 @@ static NSString *string(const char *ptr, size_t len) {
 }
 
 - (void)mouseEntered:event {
-    if (!cursorinside && cursormode != 0) [NSCursor hide];
-    cursorinside = true;
+    if (!cursorInside && cursorMode != 0) [NSCursor hide];
+    cursorInside = true;
 }
 
 - (void)mouseExited:event {
-    if (cursorinside && cursormode != 0) [NSCursor unhide];
-    cursorinside = false;
+    if (cursorInside && cursorMode != 0) [NSCursor unhide];
+    cursorInside = false;
 }
 
 - (void)keyDown:event {
@@ -202,7 +219,7 @@ static NSString *string(const char *ptr, size_t len) {
 }
 
 - (void)mouseMoved:event {
-    if (cursormode == 2) {
+    if (cursorMode == 2) {
         wioMouseRelative(ptr, [event deltaX], [event deltaY]);
         return;
     }
@@ -317,9 +334,7 @@ void wioSetCursor(NSWindow *window, uint8_t shape) {
 void wioSetCursorMode(NSWindow *window, uint8_t mode) {
     [[window contentView] setCursorMode:mode];
     if (mode == 2) {
-        NSRect frame = [window frame];
-        NSRect screen = [[NSScreen mainScreen] frame];
-        CGWarpMouseCursorPosition(CGPointMake(CGRectGetMidX(frame), CGRectGetMaxY(screen) - CGRectGetMidY(frame)));
+        warpCursor(window);
         CGAssociateMouseAndMouseCursorPosition(NO);
     } else {
         CGAssociateMouseAndMouseCursorPosition(YES);
