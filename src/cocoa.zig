@@ -1,6 +1,9 @@
 const std = @import("std");
 const wio = @import("wio.zig");
-const c = @cImport(@cInclude("mach-o/dyld.h"));
+const c = @cImport({
+    @cInclude("OpenGL/OpenGL.h");
+    @cInclude("mach-o/dyld.h");
+});
 const log = std.log.scoped(.wio);
 
 extern fn wioInit() void;
@@ -13,7 +16,7 @@ extern fn wioSetMode(*anyopaque, u8) void;
 extern fn wioSetCursor(*anyopaque, u8) void;
 extern fn wioSetCursorMode(*anyopaque, u8) void;
 extern fn wioRequestAttention() void;
-extern fn wioCreateContext(*anyopaque) ?*anyopaque;
+extern fn wioCreateContext(*anyopaque, [*]const c.CGLPixelFormatAttribute) ?*anyopaque;
 extern fn wioMakeContextCurrent(?*anyopaque) void;
 extern fn wioSwapBuffers(*anyopaque, ?*anyopaque) void;
 extern fn wioSwapInterval(?*anyopaque, i32) void;
@@ -84,8 +87,19 @@ pub fn requestAttention(_: *@This()) void {
 }
 
 pub fn createContext(self: *@This(), options: wio.CreateContextOptions) !void {
-    _ = options;
-    self.context = wioCreateContext(self.window);
+    self.context = wioCreateContext(self.window, &.{
+        c.kCGLPFAColorSize,     options.red_bits + options.green_bits + options.blue_bits,
+        c.kCGLPFAAlphaSize,     options.alpha_bits,
+        c.kCGLPFADepthSize,     options.depth_bits,
+        c.kCGLPFAStencilSize,   options.stencil_bits,
+        c.kCGLPFASampleBuffers, if (options.samples == 0) 0 else 1,
+        c.kCGLPFASamples,       options.samples,
+        if (options.doublebuffer)
+            c.kCGLPFADoubleBuffer
+        else
+            0,
+        0,
+    });
 }
 
 pub fn makeContextCurrent(self: *@This()) void {

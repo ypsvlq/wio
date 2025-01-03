@@ -327,8 +327,7 @@ void wioRequestAttention(void) {
     [NSApp requestUserAttention:NSCriticalRequest];
 }
 
-void *wioCreateContext(NSWindow *window) {
-    NSOpenGLPixelFormatAttribute attributes[] = {NSOpenGLPFADoubleBuffer, 0};
+void *wioCreateContext(NSWindow *window, NSOpenGLPixelFormatAttribute *attributes) {
     NSOpenGLPixelFormat *format = [[NSOpenGLPixelFormat alloc] initWithAttributes:attributes];
     NSOpenGLContext *context = [[NSOpenGLContext alloc] initWithFormat:format shareContext:nil];
     [context setView:[window contentView]];
