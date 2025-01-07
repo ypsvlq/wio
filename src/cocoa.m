@@ -255,6 +255,7 @@ static void warpCursor(NSWindow *window) {
 void wioInit() {
     [NSApplication sharedApplication];
     [NSApp setDelegate:[[ApplicationDelegate alloc] init]];
+    [[NSBundle mainBundle] loadNibNamed:@"MainMenu" owner:NSApp topLevelObjects:nil];
 }
 
 void wioRun(void) {
@@ -294,6 +295,7 @@ void *wioCreateWindow(void *ptr, uint16_t width, uint16_t height) {
 
     [window setAcceptsMouseMovedEvents:YES];
     [window setCollectionBehavior:NSWindowCollectionBehaviorFullScreenPrimary];
+    [window setTabbingMode:NSWindowTabbingModeDisallowed];
     [window makeKeyAndOrderFront:nil];
     [window center];
 
