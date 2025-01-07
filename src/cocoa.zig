@@ -1,6 +1,8 @@
 const std = @import("std");
 const wio = @import("wio.zig");
 const c = @cImport({
+    @cInclude("CoreAudio/CoreAudio.h");
+    @cInclude("AudioUnit/AudioUnit.h");
     @cInclude("OpenGL/OpenGL.h");
     @cInclude("mach-o/dyld.h");
 });
@@ -25,8 +27,32 @@ extern fn wioSetClipboardText([*]const u8, usize) void;
 extern fn wioGetClipboardText(*const anyopaque, *usize) ?[*]u8;
 
 pub fn init(options: wio.InitOptions) !void {
-    _ = options;
     wioInit();
+
+    if (options.audio) {
+        if (options.audioDefaultOutputFn) |callback| {
+            const address = c.AudioObjectPropertyAddress{
+                .mSelector = c.kAudioHardwarePropertyDefaultOutputDevice,
+                .mScope = c.kAudioObjectPropertyScopeGlobal,
+                .mElement = c.kAudioObjectPropertyElementMain,
+            };
+            var id: c.AudioObjectID = undefined;
+            var size: u32 = @sizeOf(c.AudioObjectID);
+            try succeed(c.AudioObjectGetPropertyData(c.kAudioObjectSystemObject, &address, 0, null, &size, &id), "GetProperty(DefaultOutputDevice)");
+            callback(.{ .backend = .{ .id = id } });
+        }
+        if (options.audioDefaultInputFn) |callback| {
+            const address = c.AudioObjectPropertyAddress{
+                .mSelector = c.kAudioHardwarePropertyDefaultInputDevice,
+                .mScope = c.kAudioObjectPropertyScopeGlobal,
+                .mElement = c.kAudioObjectPropertyElementMain,
+            };
+            var id: c.AudioObjectID = undefined;
+            var size: u32 = @sizeOf(c.AudioObjectID);
+            try succeed(c.AudioObjectGetPropertyData(c.kAudioObjectSystemObject, &address, 0, null, &size, &id), "GetProperty(DefaultInputDevice)");
+            callback(.{ .backend = .{ .id = id } });
+        }
+    }
 }
 
 pub fn deinit() void {}
@@ -162,31 +188,100 @@ pub const Joystick = struct {
 };
 
 pub const AudioDeviceIterator = struct {
-    pub fn init(mode: wio.AudioDeviceType) AudioDeviceIterator {
-        _ = mode;
-        return .{};
+    devices: []c.AudioObjectID = &.{},
+    index: usize = 0,
+
+    pub fn init(_: wio.AudioDeviceType) AudioDeviceIterator {
+        const address = c.AudioObjectPropertyAddress{
+            .mSelector = c.kAudioHardwarePropertyDevices,
+            .mScope = c.kAudioObjectPropertyScopeGlobal,
+            .mElement = c.kAudioObjectPropertyElementMain,
+        };
+        var size: u32 = undefined;
+        succeed(c.AudioObjectGetPropertyDataSize(c.kAudioObjectSystemObject, &address, 0, null, &size), "GetPropertySize(Devices)") catch return .{};
+        const devices = wio.allocator.alloc(c.AudioObjectID, size / @sizeOf(c.AudioObjectID)) catch return .{};
+        succeed(c.AudioObjectGetPropertyData(c.kAudioObjectSystemObject, &address, 0, null, &size, devices.ptr), "GetProperty(Devices)") catch return .{};
+        return .{ .devices = devices };
     }
 
     pub fn deinit(self: *AudioDeviceIterator) void {
-        _ = self;
+        wio.allocator.free(self.devices);
     }
 
     pub fn next(self: *AudioDeviceIterator) ?AudioDevice {
-        _ = self;
-        return null;
+        if (self.index == self.devices.len) return null;
+        defer self.index += 1;
+        return .{ .id = self.devices[self.index] };
     }
 };
 
 pub const AudioDevice = struct {
-    pub fn release(self: AudioDevice) void {
-        _ = self;
-    }
+    id: c.AudioObjectID,
+
+    pub fn release(_: AudioDevice) void {}
 
     pub fn openOutput(self: AudioDevice, writeFn: *const fn ([]f32) void, format: wio.AudioFormat) !AudioOutput {
-        _ = self;
-        _ = writeFn;
-        _ = format;
-        return error.Unexpected;
+        const component_desc = c.AudioComponentDescription{
+            .componentType = c.kAudioUnitType_Output,
+            .componentSubType = c.kAudioUnitSubType_HALOutput,
+            .componentManufacturer = c.kAudioUnitManufacturer_Apple,
+            .componentFlags = 0,
+            .componentFlagsMask = 0,
+        };
+        const component = c.AudioComponentFindNext(null, &component_desc);
+        var unit: c.AudioComponentInstance = undefined;
+        try succeed(c.AudioComponentInstanceNew(component, &unit), "AudioComponentInstanceNew");
+        try succeed(c.AudioUnitSetProperty(unit, c.kAudioOutputUnitProperty_CurrentDevice, c.kAudioUnitScope_Global, 0, &self.id, @sizeOf(c.AudioDeviceID)), "SetProperty(CurrentDevice)");
+
+        const channels: u8 = @intCast(format.channels.count());
+        const stream_desc = c.AudioStreamBasicDescription{
+            .mSampleRate = @floatFromInt(format.sample_rate),
+            .mFormatID = c.kAudioFormatLinearPCM,
+            .mFormatFlags = c.kAudioFormatFlagIsFloat,
+            .mBytesPerPacket = @sizeOf(f32) * channels,
+            .mFramesPerPacket = 1,
+            .mBytesPerFrame = @sizeOf(f32) * channels,
+            .mChannelsPerFrame = channels,
+            .mBitsPerChannel = @bitSizeOf(f32),
+        };
+        try succeed(c.AudioUnitSetProperty(unit, c.kAudioUnitProperty_StreamFormat, c.kAudioUnitScope_Input, 0, &stream_desc, @sizeOf(c.AudioStreamBasicDescription)), "SetProperty(StreamFormat)");
+
+        var layout = c.AudioChannelLayout{ .mChannelLayoutTag = c.kAudioChannelLayoutTag_UseChannelBitmap };
+        var iter = format.channels.iterator();
+        while (iter.next()) |channel| {
+            layout.mChannelBitmap |= switch (channel) {
+                .FL => c.kAudioChannelBit_Left,
+                .FR => c.kAudioChannelBit_Right,
+                .FC => c.kAudioChannelBit_Center,
+                .LFE1 => c.kAudioChannelBit_LFEScreen,
+                .BL => c.kAudioChannelBit_LeftSurround,
+                .BR => c.kAudioChannelBit_RightSurround,
+                .FLc => c.kAudioChannelBit_LeftCenter,
+                .FRc => c.kAudioChannelBit_RightCenter,
+                .BC => c.kAudioChannelBit_CenterSurround,
+                .SiL => c.kAudioChannelBit_LeftSurroundDirect,
+                .SiR => c.kAudioChannelBit_RightSurroundDirect,
+                .TpC => c.kAudioChannelBit_TopCenterSurround,
+                .TpFL => c.kAudioChannelBit_VerticalHeightLeft,
+                .TpFC => c.kAudioChannelBit_VerticalHeightCenter,
+                .TpFR => c.kAudioChannelBit_VerticalHeightRight,
+                .TpBL => c.kAudioChannelBit_TopBackLeft,
+                .TpBC => c.kAudioChannelBit_TopBackCenter,
+                .TpBR => c.kAudioChannelBit_TopBackRight,
+                else => return error.Unexpected,
+            };
+        }
+        try succeed(c.AudioUnitSetProperty(unit, c.kAudioUnitProperty_AudioChannelLayout, c.kAudioUnitScope_Input, 0, &layout, @sizeOf(c.AudioChannelLayout)), "SetProperty(ChannelLayout)");
+
+        const callback = c.AURenderCallbackStruct{
+            .inputProc = AudioOutput.callback,
+            .inputProcRefCon = @constCast(writeFn),
+        };
+        try succeed(c.AudioUnitSetProperty(unit, c.kAudioUnitProperty_SetRenderCallback, c.kAudioUnitScope_Global, 0, &callback, @sizeOf(c.AURenderCallbackStruct)), "SetProperty(RenderCallback)");
+
+        try succeed(c.AudioUnitInitialize(unit), "AudioUnitInitialize");
+        try succeed(c.AudioOutputUnitStart(unit), "AudioOutputUnitStart");
+        return .{ .unit = unit };
     }
 
     pub fn openInput(self: AudioDevice, readFn: *const fn ([]const f32) void, format: wio.AudioFormat) !AudioInput {
@@ -197,26 +292,68 @@ pub const AudioDevice = struct {
     }
 
     pub fn getId(self: AudioDevice, allocator: std.mem.Allocator) ![]u8 {
-        _ = self;
-        _ = allocator;
-        return error.Unexpected;
+        const address = c.AudioObjectPropertyAddress{
+            .mSelector = c.kAudioDevicePropertyDeviceUID,
+            .mScope = c.kAudioObjectPropertyScopeGlobal,
+            .mElement = c.kAudioObjectPropertyElementMain,
+        };
+        var string: c.CFStringRef = undefined;
+        var size: u32 = @sizeOf(c.CFStringRef);
+        try succeed(c.AudioObjectGetPropertyData(self.id, &address, 0, null, &size, @ptrCast(&string)), "GetProperty(DeviceUID)");
+        defer c.CFRelease(string);
+        return cfStringToUtf8(allocator, string);
     }
 
     pub fn getName(self: AudioDevice, allocator: std.mem.Allocator) ![]u8 {
-        _ = self;
-        _ = allocator;
-        return error.Unexpected;
+        const address = c.AudioObjectPropertyAddress{
+            .mSelector = c.kAudioObjectPropertyName,
+            .mScope = c.kAudioObjectPropertyScopeGlobal,
+            .mElement = c.kAudioObjectPropertyElementMain,
+        };
+        var string: c.CFStringRef = undefined;
+        var size: u32 = @sizeOf(c.CFStringRef);
+        try succeed(c.AudioObjectGetPropertyData(self.id, &address, 0, null, &size, @ptrCast(&string)), "GetProperty(Name)");
+        defer c.CFRelease(string);
+        return cfStringToUtf8(allocator, string);
     }
 
-    pub fn getChannelOrder(self: AudioDevice) []const wio.Channel {
-        _ = self;
-        return &.{};
+    pub fn getChannelOrder(_: AudioDevice) []const wio.Channel {
+        return &.{
+            .FL,
+            .FR,
+            .FC,
+            .LFE1,
+            .BL,
+            .BR,
+            .FLc,
+            .FRc,
+            .BC,
+            .SiL,
+            .SiR,
+            .TpC,
+            .TpFL,
+            .TpFC,
+            .TpFR,
+            .TpBL,
+            .TpBC,
+            .TpBR,
+        };
     }
 };
 
 pub const AudioOutput = struct {
+    unit: c.AudioUnit,
+
     pub fn close(self: *AudioOutput) void {
-        _ = self;
+        _ = c.AudioUnitUninitialize(self.unit);
+    }
+
+    fn callback(data: ?*anyopaque, _: [*c]c.AudioUnitRenderActionFlags, _: [*c]const c.AudioTimeStamp, _: u32, _: u32, buffer_list: [*c]c.AudioBufferList) callconv(.C) c.OSStatus {
+        const writeFn: *const fn ([]f32) void = @ptrCast(data);
+        const buffer = buffer_list.*.mBuffers[0];
+        const ptr: [*]f32 = @alignCast(@ptrCast(buffer.mData));
+        writeFn(ptr[0 .. buffer.mDataByteSize / @sizeOf(f32)]);
+        return c.noErr;
     }
 };
 
@@ -324,6 +461,22 @@ export fn wioMouseRelative(self: *@This(), x: i16, y: i16) void {
 export fn wioScroll(self: *@This(), x: f32, y: f32) void {
     if (x != 0) self.pushEvent(.{ .scroll_horizontal = x });
     if (y != 0) self.pushEvent(.{ .scroll_vertical = -y });
+}
+
+fn succeed(status: c.OSStatus, name: []const u8) !void {
+    if (status != c.noErr) {
+        log.err("{s}: {}", .{ name, status });
+        return error.Unexpected;
+    }
+}
+
+fn cfStringToUtf8(allocator: std.mem.Allocator, string: c.CFStringRef) ![]u8 {
+    const range = c.CFRangeMake(0, c.CFStringGetLength(string));
+    var len: c.CFIndex = undefined;
+    _ = c.CFStringGetBytes(string, range, c.kCFStringEncodingUTF8, 0, 0, null, 0, &len);
+    const utf8 = try allocator.alloc(u8, @intCast(len));
+    _ = c.CFStringGetBytes(string, range, c.kCFStringEncodingUTF8, 0, 0, utf8.ptr, len, &len);
+    return utf8;
 }
 
 fn keycodeToButton(keycode: u16) ?wio.Button {

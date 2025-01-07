@@ -25,6 +25,8 @@ pub fn build(b: *std.Build) void {
             }
             module.linkFramework("Cocoa", .{});
             module.linkFramework("IOKit", .{});
+            module.linkFramework("CoreAudio", .{});
+            module.linkFramework("AudioUnit", .{});
         },
         .linux, .openbsd, .netbsd, .freebsd, .dragonfly => {
             module.link_libc = true;
