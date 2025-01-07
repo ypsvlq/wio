@@ -349,7 +349,7 @@ pub const AudioOutput = struct {
     }
 
     fn callback(data: ?*anyopaque, _: [*c]c.AudioUnitRenderActionFlags, _: [*c]const c.AudioTimeStamp, _: u32, _: u32, buffer_list: [*c]c.AudioBufferList) callconv(.C) c.OSStatus {
-        const writeFn: *const fn ([]f32) void = @ptrCast(data);
+        const writeFn: *const fn ([]f32) void = @alignCast(@ptrCast(data));
         const buffer = buffer_list.*.mBuffers[0];
         const ptr: [*]f32 = @alignCast(@ptrCast(buffer.mData));
         writeFn(ptr[0 .. buffer.mDataByteSize / @sizeOf(f32)]);
