@@ -69,6 +69,10 @@ static void warpCursor(NSWindow *window) {
     context = value;
 }
 
+- (void)windowDidEnterFullScreen:notification {
+    [[[notification object] contentView] updateTrackingAreas];
+}
+
 - (BOOL)windowShouldClose:sender {
     wioClose(ptr);
     return NO;
