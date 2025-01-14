@@ -1,4 +1,5 @@
 #import <Cocoa/Cocoa.h>
+#include <IOKit/hid/IOHIDKeys.h>
 
 extern void wioClose(void *);
 extern void wioCreate(void *);
@@ -14,6 +15,12 @@ extern void wioMouse(void *, UInt16, UInt16);
 extern void wioMouseRelative(void *, SInt16, SInt16);
 extern void wioScroll(void *, Float32, Float32);
 extern char *wioDupeClipboardText(const void *, const char *, size_t *);
+
+const CFStringRef wioHIDDeviceUsagePageKey = CFSTR(kIOHIDDeviceUsagePageKey);
+const CFStringRef wioHIDDeviceUsageKey = CFSTR(kIOHIDDeviceUsageKey);
+const CFStringRef wioHIDVendorIDKey = CFSTR(kIOHIDVendorIDKey);
+const CFStringRef wioHIDProductIDKey = CFSTR(kIOHIDProductIDKey);
+const CFStringRef wioHIDProductKey = CFSTR(kIOHIDProductKey);
 
 static NSString *string(const char *ptr, size_t len) {
     return [[NSString alloc] initWithBytes:ptr length:len encoding:NSUTF8StringEncoding];

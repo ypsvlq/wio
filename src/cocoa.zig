@@ -1,6 +1,7 @@
 const std = @import("std");
 const wio = @import("wio.zig");
 const c = @cImport({
+    @cInclude("IOKit/hid/IOHIDLib.h");
     @cInclude("CoreAudio/CoreAudio.h");
     @cInclude("AudioUnit/AudioUnit.h");
     @cInclude("OpenGL/OpenGL.h");
@@ -25,9 +26,45 @@ extern fn wioSwapInterval(?*anyopaque, i32) void;
 extern fn wioMessageBox(u8, [*]const u8, usize) void;
 extern fn wioSetClipboardText([*]const u8, usize) void;
 extern fn wioGetClipboardText(*const anyopaque, *usize) ?[*]u8;
+extern const wioHIDDeviceUsagePageKey: c.CFStringRef;
+extern const wioHIDDeviceUsageKey: c.CFStringRef;
+extern const wioHIDVendorIDKey: c.CFStringRef;
+extern const wioHIDProductIDKey: c.CFStringRef;
+extern const wioHIDProductKey: c.CFStringRef;
+
+var hid: c.IOHIDManagerRef = undefined;
+var removed_joysticks: std.AutoHashMap(c.IOHIDDeviceRef, bool) = undefined;
 
 pub fn init(options: wio.InitOptions) !void {
     wioInit();
+
+    if (options.joystick) {
+        hid = c.IOHIDManagerCreate(c.kCFAllocatorDefault, c.kIOHIDOptionsTypeNone);
+        errdefer c.CFRelease(hid);
+
+        const joystick = try usageDictionary(c.kHIDPage_GenericDesktop, c.kHIDUsage_GD_Joystick);
+        defer c.CFRelease(joystick);
+        const gamepad = try usageDictionary(c.kHIDPage_GenericDesktop, c.kHIDUsage_GD_GamePad);
+        defer c.CFRelease(gamepad);
+        const matching = c.CFArrayCreate(
+            c.kCFAllocatorDefault,
+            @constCast(&[_]c.CFTypeRef{ joystick, gamepad }),
+            2,
+            &c.kCFTypeArrayCallBacks,
+        );
+        defer c.CFRelease(matching);
+        c.IOHIDManagerSetDeviceMatchingMultiple(hid, matching);
+
+        removed_joysticks = .init(wio.allocator);
+        c.IOHIDManagerRegisterDeviceRemovalCallback(hid, joystickRemoved, null);
+        if (wio.init_options.joystickConnectedFn != null) {
+            c.IOHIDManagerRegisterDeviceMatchingCallback(hid, joystickConnected, null);
+        }
+
+        c.IOHIDManagerScheduleWithRunLoop(hid, c.CFRunLoopGetMain(), c.kCFRunLoopDefaultMode);
+        try succeed(c.IOHIDManagerOpen(hid, c.kIOHIDOptionsTypeNone), "IOHIDManagerOpen");
+    }
+    errdefer if (options.joystick) c.CFRelease(hid);
 
     if (options.audio) {
         if (options.audioDefaultOutputFn) |callback| {
@@ -55,7 +92,12 @@ pub fn init(options: wio.InitOptions) !void {
     }
 }
 
-pub fn deinit() void {}
+pub fn deinit() void {
+    if (wio.init_options.joystick) {
+        removed_joysticks.deinit();
+        c.CFRelease(hid);
+    }
+}
 
 pub fn run(func: fn () anyerror!bool) !void {
     wioRun();
@@ -141,49 +183,169 @@ pub fn swapInterval(self: *@This(), interval: i32) void {
 }
 
 pub const JoystickDeviceIterator = struct {
+    devices: []c.IOHIDDeviceRef = &.{},
+    index: usize = 0,
+
     pub fn init() JoystickDeviceIterator {
-        return .{};
+        const set = c.IOHIDManagerCopyDevices(hid) orelse return .{};
+        defer c.CFRelease(set);
+        const len: usize = @intCast(c.CFSetGetCount(set));
+        const devices = wio.allocator.alloc(c.IOHIDDeviceRef, len) catch return .{};
+        c.CFSetGetValues(set, @ptrCast(devices.ptr));
+        return .{ .devices = devices };
     }
 
-    pub fn deinit(_: *JoystickDeviceIterator) void {}
+    pub fn deinit(self: *JoystickDeviceIterator) void {
+        wio.allocator.free(self.devices);
+    }
 
     pub fn next(self: *JoystickDeviceIterator) ?JoystickDevice {
-        _ = self;
-        return null;
+        if (self.index == self.devices.len) return null;
+        defer self.index += 1;
+        return .{ .device = self.devices[self.index] };
     }
 };
 
 pub const JoystickDevice = struct {
-    pub fn release(self: JoystickDevice) void {
-        _ = self;
-    }
+    device: c.IOHIDDeviceRef,
+
+    pub fn release(_: JoystickDevice) void {}
 
     pub fn open(self: JoystickDevice) !Joystick {
-        _ = self;
-        return error.Unexpected;
+        const elements = c.IOHIDDeviceCopyMatchingElements(self.device, null, c.kIOHIDOptionsTypeNone) orelse return error.Unexpected;
+        defer c.CFRelease(elements);
+
+        var axis_elements = std.ArrayList(c.IOHIDElementRef).init(wio.allocator);
+        errdefer axis_elements.deinit();
+        var hat_elements = std.ArrayList(c.IOHIDElementRef).init(wio.allocator);
+        errdefer hat_elements.deinit();
+        var button_elements = std.ArrayList(c.IOHIDElementRef).init(wio.allocator);
+        errdefer button_elements.deinit();
+
+        const count = c.CFArrayGetCount(elements);
+        var i: c.CFIndex = 0;
+        while (i < count) : (i += 1) {
+            const element: c.IOHIDElementRef = @constCast(@ptrCast(c.CFArrayGetValueAtIndex(elements, i)));
+            if (c.IOHIDElementGetType(element) == c.kIOHIDElementTypeInput_Button) {
+                try button_elements.append(element);
+            } else {
+                const page = c.IOHIDElementGetUsagePage(element);
+                const usage = c.IOHIDElementGetUsage(element);
+                switch (page) {
+                    c.kHIDPage_GenericDesktop => {
+                        switch (usage) {
+                            c.kHIDUsage_GD_Hatswitch => try hat_elements.append(element),
+                            c.kHIDUsage_GD_X,
+                            c.kHIDUsage_GD_Y,
+                            c.kHIDUsage_GD_Z,
+                            c.kHIDUsage_GD_Rx,
+                            c.kHIDUsage_GD_Ry,
+                            c.kHIDUsage_GD_Rz,
+                            c.kHIDUsage_GD_Slider,
+                            c.kHIDUsage_GD_Dial,
+                            c.kHIDUsage_GD_Wheel,
+                            => try axis_elements.append(element),
+                            else => {},
+                        }
+                    },
+                    else => {},
+                }
+            }
+        }
+
+        const axes = try wio.allocator.alloc(u16, axis_elements.items.len);
+        errdefer wio.allocator.free(axes);
+        const hats = try wio.allocator.alloc(wio.Hat, hat_elements.items.len);
+        errdefer wio.allocator.free(hats);
+        const buttons = try wio.allocator.alloc(bool, button_elements.items.len);
+        errdefer wio.allocator.free(buttons);
+
+        const axis_elements_slice = try axis_elements.toOwnedSlice();
+        errdefer wio.allocator.free(axis_elements_slice);
+        const hat_elements_slice = try hat_elements.toOwnedSlice();
+        errdefer wio.allocator.free(hat_elements_slice);
+        const button_elements_slice = try button_elements.toOwnedSlice();
+        errdefer wio.allocator.free(button_elements_slice);
+
+        try removed_joysticks.put(self.device, false);
+
+        return .{
+            .device = self.device,
+            .axis_elements = axis_elements_slice,
+            .hat_elements = hat_elements_slice,
+            .button_elements = button_elements_slice,
+            .axes = axes,
+            .hats = hats,
+            .buttons = buttons,
+        };
     }
 
     pub fn getId(self: JoystickDevice, allocator: std.mem.Allocator) !?[]u8 {
-        _ = self;
-        _ = allocator;
-        return null;
+        const vendor_cf = c.IOHIDDeviceGetProperty(self.device, wioHIDVendorIDKey) orelse return null;
+        const product_cf = c.IOHIDDeviceGetProperty(self.device, wioHIDProductIDKey) orelse return null;
+        var vendor: u32 = undefined;
+        var product: u32 = undefined;
+        _ = c.CFNumberGetValue(@ptrCast(vendor_cf), c.kCFNumberSInt32Type, &vendor);
+        _ = c.CFNumberGetValue(@ptrCast(product_cf), c.kCFNumberSInt32Type, &product);
+        return try std.fmt.allocPrint(allocator, "{x:0>4}{x:0>4}", .{ vendor, product });
     }
 
     pub fn getName(self: JoystickDevice, allocator: std.mem.Allocator) ![]u8 {
-        _ = self;
-        _ = allocator;
-        return "";
+        return cfStringToUtf8(allocator, @ptrCast(c.IOHIDDeviceGetProperty(self.device, wioHIDProductKey)));
     }
 };
 
 pub const Joystick = struct {
+    device: c.IOHIDDeviceRef,
+    axis_elements: []c.IOHIDElementRef,
+    hat_elements: []c.IOHIDElementRef,
+    button_elements: []c.IOHIDElementRef,
+    axes: []u16,
+    hats: []wio.Hat,
+    buttons: []bool,
+
     pub fn close(self: *Joystick) void {
-        _ = self;
+        _ = removed_joysticks.remove(self.device);
+        wio.allocator.free(self.buttons);
+        wio.allocator.free(self.hats);
+        wio.allocator.free(self.axes);
+        wio.allocator.free(self.button_elements);
+        wio.allocator.free(self.hat_elements);
+        wio.allocator.free(self.axis_elements);
     }
 
     pub fn poll(self: *Joystick) ?wio.JoystickState {
-        _ = self;
-        return null;
+        if (removed_joysticks.get(self.device).?) return null;
+        var value: c.IOHIDValueRef = undefined;
+        for (self.axis_elements, self.axes) |element, *axis| {
+            const min = c.IOHIDElementGetLogicalMin(element);
+            const max = c.IOHIDElementGetLogicalMax(element);
+            _ = c.IOHIDDeviceGetValue(self.device, element, &value);
+            var float: f32 = @floatFromInt(c.IOHIDValueGetIntegerValue(value));
+            float -= @floatFromInt(min);
+            float /= @floatFromInt(max - min);
+            float *= 0xFFFF;
+            axis.* = @intFromFloat(float);
+        }
+        for (self.hat_elements, self.hats) |element, *hat| {
+            _ = c.IOHIDDeviceGetValue(self.device, element, &value);
+            hat.* = switch (c.IOHIDValueGetIntegerValue(value)) {
+                0 => .{ .up = true },
+                1 => .{ .up = true, .right = true },
+                2 => .{ .right = true },
+                3 => .{ .right = true, .down = true },
+                4 => .{ .down = true },
+                5 => .{ .down = true, .left = true },
+                6 => .{ .left = true },
+                7 => .{ .left = true, .up = true },
+                else => .{},
+            };
+        }
+        for (self.button_elements, self.buttons) |element, *button| {
+            _ = c.IOHIDDeviceGetValue(self.device, element, &value);
+            button.* = if (c.IOHIDValueGetIntegerValue(value) == 0) false else true;
+        }
+        return .{ .axes = self.axes, .hats = self.hats, .buttons = self.buttons };
     }
 };
 
@@ -461,6 +623,29 @@ export fn wioMouseRelative(self: *@This(), x: i16, y: i16) void {
 export fn wioScroll(self: *@This(), x: f32, y: f32) void {
     if (x != 0) self.pushEvent(.{ .scroll_horizontal = x });
     if (y != 0) self.pushEvent(.{ .scroll_vertical = -y });
+}
+
+fn usageDictionary(page: i32, usage: i32) !c.CFDictionaryRef {
+    const page_cf = c.CFNumberCreate(c.kCFAllocatorDefault, c.kCFNumberSInt32Type, &page) orelse return error.Unexpected;
+    defer c.CFRelease(page_cf);
+    const usage_cf = c.CFNumberCreate(c.kCFAllocatorDefault, c.kCFNumberSInt32Type, &usage) orelse return error.Unexpected;
+    defer c.CFRelease(usage_cf);
+    return c.CFDictionaryCreate(
+        c.kCFAllocatorDefault,
+        @constCast(&[_]c.CFTypeRef{ wioHIDDeviceUsagePageKey, wioHIDDeviceUsageKey }),
+        @constCast(&[_]c.CFTypeRef{ page_cf, usage_cf }),
+        2,
+        &c.kCFTypeDictionaryKeyCallBacks,
+        &c.kCFTypeDictionaryValueCallBacks,
+    ) orelse error.Unexpected;
+}
+
+fn joystickConnected(_: ?*anyopaque, _: c.IOReturn, _: ?*anyopaque, device: c.IOHIDDeviceRef) callconv(.c) void {
+    wio.init_options.joystickConnectedFn.?(.{ .backend = .{ .device = device } });
+}
+
+fn joystickRemoved(_: ?*anyopaque, _: c.IOReturn, _: ?*anyopaque, device: c.IOHIDDeviceRef) callconv(.c) void {
+    if (removed_joysticks.getPtr(device)) |removed| removed.* = true;
 }
 
 fn succeed(status: c.OSStatus, name: []const u8) !void {
