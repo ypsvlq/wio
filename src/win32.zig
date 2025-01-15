@@ -426,12 +426,38 @@ pub const JoystickDevice = union(enum) {
 
                 const indices = try wio.allocator.alloc(RawInputJoystick.DataIndex, data_len);
                 errdefer wio.allocator.free(indices);
+                @memset(indices, .none);
 
                 var axis_count: u16 = 0;
+                var hat_count: u16 = 0;
                 for (value_caps, 0..) |cap, cap_index| {
                     const min = if (cap.IsRange == w.TRUE) cap.Anonymous.Range.DataIndexMin else cap.Anonymous.NotRange.DataIndex;
                     const max = (if (cap.IsRange == w.TRUE) cap.Anonymous.Range.DataIndexMax else cap.Anonymous.NotRange.DataIndex) + 1;
                     for (min..max) |i| {
+                        const usage = if (cap.IsRange == w.TRUE) cap.Anonymous.Range.UsageMin + i else cap.Anonymous.NotRange.Usage;
+                        switch (cap.UsagePage) {
+                            w.HID_USAGE_PAGE_GENERIC => {
+                                switch (usage) {
+                                    w.HID_USAGE_GENERIC_HATSWITCH => {
+                                        indices[i] = .{ .hat = hat_count };
+                                        hat_count += 1;
+                                        continue;
+                                    },
+                                    w.HID_USAGE_GENERIC_X,
+                                    w.HID_USAGE_GENERIC_Y,
+                                    w.HID_USAGE_GENERIC_Z,
+                                    w.HID_USAGE_GENERIC_RX,
+                                    w.HID_USAGE_GENERIC_RY,
+                                    w.HID_USAGE_GENERIC_RZ,
+                                    w.HID_USAGE_GENERIC_SLIDER,
+                                    w.HID_USAGE_GENERIC_DIAL,
+                                    w.HID_USAGE_GENERIC_WHEEL,
+                                    => {},
+                                    else => continue,
+                                }
+                            },
+                            else => continue,
+                        }
                         indices[i] = .{
                             .axis = .{
                                 .index = axis_count,
@@ -456,6 +482,10 @@ pub const JoystickDevice = union(enum) {
                 errdefer wio.allocator.free(axes);
                 @memset(axes, 0xFFFF / 2);
 
+                const hats = try wio.allocator.alloc(wio.Hat, hat_count);
+                errdefer wio.allocator.free(hats);
+                @memset(hats, .{});
+
                 const buttons = try wio.allocator.alloc(bool, button_count);
                 errdefer wio.allocator.free(buttons);
                 @memset(buttons, false);
@@ -468,7 +498,7 @@ pub const JoystickDevice = union(enum) {
                         .data = data,
                         .indices = indices,
                         .axes = axes,
-                        .hats = &.{},
+                        .hats = hats,
                         .buttons = buttons,
                     },
                 };
@@ -538,10 +568,12 @@ const RawInputJoystick = struct {
     disconnected: bool = false,
 
     const DataIndex = union(enum) {
+        none: void,
         axis: struct {
             index: u16,
             caps_index: u16,
         },
+        hat: u16,
         button: u16,
     };
 
@@ -1077,6 +1109,7 @@ fn helperWindowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM
                         @memset(joystick.buttons, false);
                         for (joystick.data[0..data_len]) |data| {
                             switch (joystick.indices[data.DataIndex]) {
+                                .none => {},
                                 .axis => |axis| {
                                     const caps = &joystick.value_caps[axis.caps_index];
                                     if (data.Anonymous.RawValue >= caps.LogicalMin and data.Anonymous.RawValue <= caps.LogicalMax) {
@@ -1089,6 +1122,19 @@ fn helperWindowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM
                                         // broken report descriptor, probably a u16
                                         joystick.axes[axis.index] = @truncate(data.Anonymous.RawValue);
                                     }
+                                },
+                                .hat => |index| {
+                                    joystick.hats[index] = switch (data.Anonymous.RawValue) {
+                                        0 => .{ .up = true },
+                                        1 => .{ .up = true, .right = true },
+                                        2 => .{ .right = true },
+                                        3 => .{ .right = true, .down = true },
+                                        4 => .{ .down = true },
+                                        5 => .{ .down = true, .left = true },
+                                        6 => .{ .left = true },
+                                        7 => .{ .left = true, .up = true },
+                                        else => .{},
+                                    };
                                 },
                                 .button => |index| joystick.buttons[index] = (data.Anonymous.On == w.TRUE),
                             }
