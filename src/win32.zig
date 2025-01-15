@@ -547,7 +547,7 @@ pub const JoystickDevice = union(enum) {
                 const info = joysticks.get(device) orelse return null;
                 return try std.unicode.utf16LeToUtf8Alloc(allocator, info.interface[0 .. info.interface.len - 1]);
             },
-            .xinput => |index| return try std.fmt.allocPrint(allocator, "{}", .{index}),
+            .xinput => return try allocator.dupe(u8, "xinput"),
         }
     }
 
@@ -562,7 +562,7 @@ pub const JoystickDevice = union(enum) {
                 if (w.HidD_GetProductString(collection, &product, product.len * @sizeOf(u16)) == w.FALSE) return "";
                 return std.unicode.utf16LeToUtf8Alloc(allocator, std.mem.sliceTo(&product, 0));
             },
-            .xinput => return allocator.dupe(u8, "XInput Controller"),
+            .xinput => return allocator.dupe(u8, "Xbox Controller"),
         }
     }
 };
