@@ -426,7 +426,7 @@ const registry_listener = h.wl_registry_listener{
     .global_remove = registryGlobalRemove,
 };
 
-fn registryGlobal(_: ?*anyopaque, _: ?*h.wl_registry, name: u32, interface_ptr: [*c]const u8, _: u32) callconv(.C) void {
+fn registryGlobal(_: ?*anyopaque, _: ?*h.wl_registry, name: u32, interface_ptr: [*c]const u8, _: u32) callconv(.c) void {
     const interface = std.mem.sliceTo(interface_ptr, 0);
     if (std.mem.eql(u8, interface, "wl_compositor")) {
         compositor = @ptrCast(h.wl_registry_bind(registry, name, &h.wl_compositor_interface, 3));
@@ -446,14 +446,14 @@ fn registryGlobal(_: ?*anyopaque, _: ?*h.wl_registry, name: u32, interface_ptr: 
     }
 }
 
-fn registryGlobalRemove(_: ?*anyopaque, _: ?*h.wl_registry, _: u32) callconv(.C) void {}
+fn registryGlobalRemove(_: ?*anyopaque, _: ?*h.wl_registry, _: u32) callconv(.c) void {}
 
 const seat_listener = h.wl_seat_listener{
     .capabilities = seatCapabilities,
     .name = seatName,
 };
 
-fn seatCapabilities(_: ?*anyopaque, _: ?*h.wl_seat, capabilities: u32) callconv(.C) void {
+fn seatCapabilities(_: ?*anyopaque, _: ?*h.wl_seat, capabilities: u32) callconv(.c) void {
     if (keyboard) |_| {
         h.wl_keyboard_release(keyboard);
         keyboard = null;
@@ -480,7 +480,7 @@ fn seatCapabilities(_: ?*anyopaque, _: ?*h.wl_seat, capabilities: u32) callconv(
     }
 }
 
-fn seatName(_: ?*anyopaque, _: ?*h.wl_seat, _: [*c]const u8) callconv(.C) void {}
+fn seatName(_: ?*anyopaque, _: ?*h.wl_seat, _: [*c]const u8) callconv(.c) void {}
 
 const keyboard_listener = h.wl_keyboard_listener{
     .keymap = keyboardKeymap,
@@ -490,7 +490,7 @@ const keyboard_listener = h.wl_keyboard_listener{
     .modifiers = keyboardModifiers,
 };
 
-fn keyboardKeymap(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, fd: i32, size: u32) callconv(.C) void {
+fn keyboardKeymap(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, fd: i32, size: u32) callconv(.c) void {
     defer _ = std.c.close(fd);
     c.xkb_keymap_unref(keymap);
     c.xkb_state_unref(xkb_state);
@@ -502,11 +502,11 @@ fn keyboardKeymap(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, fd: i32, size: u32
     xkb_state = c.xkb_state_new(keymap);
 }
 
-fn keyboardEnter(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, surface: ?*h.wl_surface, _: ?*h.wl_array) callconv(.C) void {
+fn keyboardEnter(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, surface: ?*h.wl_surface, _: ?*h.wl_array) callconv(.c) void {
     focus = @alignCast(@ptrCast(h.wl_surface_get_user_data(surface)));
 }
 
-fn keyboardLeave(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, surface: ?*h.wl_surface) callconv(.C) void {
+fn keyboardLeave(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, surface: ?*h.wl_surface) callconv(.c) void {
     if (focus) |window| {
         if (window.surface == surface) {
             focus = null;
@@ -515,7 +515,7 @@ fn keyboardLeave(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, surface: ?*h.wl_sur
     if (compose_state) |_| c.xkb_compose_state_reset(compose_state);
 }
 
-fn keyboardKey(_: ?*anyopaque, _: ?*h.wl_keyboard, serial: u32, _: u32, key: u32, state: u32) callconv(.C) void {
+fn keyboardKey(_: ?*anyopaque, _: ?*h.wl_keyboard, serial: u32, _: u32, key: u32, state: u32) callconv(.c) void {
     last_serial = serial;
     if (focus) |window| {
         if (keyToButton(key)) |button| {
@@ -540,7 +540,7 @@ fn keyboardKey(_: ?*anyopaque, _: ?*h.wl_keyboard, serial: u32, _: u32, key: u32
     }
 }
 
-fn keyboardModifiers(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, mods_depressed: u32, mods_latched: u32, mods_locked: u32, _: u32) callconv(.C) void {
+fn keyboardModifiers(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, mods_depressed: u32, mods_latched: u32, mods_locked: u32, _: u32) callconv(.c) void {
     _ = c.xkb_state_update_mask(xkb_state, mods_depressed, mods_latched, mods_locked, 0, 0, 0);
 }
 
@@ -552,20 +552,20 @@ const pointer_listener = h.wl_pointer_listener{
     .axis = pointerAxis,
 };
 
-fn pointerEnter(_: ?*anyopaque, _: ?*h.wl_pointer, serial: u32, surface: ?*h.wl_surface, _: i32, _: i32) callconv(.C) void {
+fn pointerEnter(_: ?*anyopaque, _: ?*h.wl_pointer, serial: u32, surface: ?*h.wl_surface, _: i32, _: i32) callconv(.c) void {
     pointer_enter_serial = serial;
     if (@as(?*@This(), @alignCast(@ptrCast(h.wl_surface_get_user_data(surface))))) |window| {
         window.applyCursor();
     }
 }
 
-fn pointerLeave(_: ?*anyopaque, _: ?*h.wl_pointer, _: u32, _: ?*h.wl_surface) callconv(.C) void {}
+fn pointerLeave(_: ?*anyopaque, _: ?*h.wl_pointer, _: u32, _: ?*h.wl_surface) callconv(.c) void {}
 
-fn pointerMotion(_: ?*anyopaque, _: ?*h.wl_pointer, _: u32, surface_x: i32, surface_y: i32) callconv(.C) void {
+fn pointerMotion(_: ?*anyopaque, _: ?*h.wl_pointer, _: u32, surface_x: i32, surface_y: i32) callconv(.c) void {
     if (focus) |window| window.pushEvent(.{ .mouse = .{ .x = @intCast(surface_x >> 8), .y = @intCast(surface_y >> 8) } });
 }
 
-fn pointerButton(_: ?*anyopaque, _: ?*h.wl_pointer, serial: u32, _: u32, button: u32, state: u32) callconv(.C) void {
+fn pointerButton(_: ?*anyopaque, _: ?*h.wl_pointer, serial: u32, _: u32, button: u32, state: u32) callconv(.c) void {
     last_serial = serial;
     if (focus) |window| {
         const wio_button: wio.Button = switch (button) {
@@ -580,7 +580,7 @@ fn pointerButton(_: ?*anyopaque, _: ?*h.wl_pointer, serial: u32, _: u32, button:
     }
 }
 
-fn pointerAxis(_: ?*anyopaque, _: ?*h.wl_pointer, _: u32, axis: u32, value: i32) callconv(.C) void {
+fn pointerAxis(_: ?*anyopaque, _: ?*h.wl_pointer, _: u32, axis: u32, value: i32) callconv(.c) void {
     if (focus) |window| {
         const float = @as(f32, @floatFromInt(value)) / 2560;
         switch (axis) {
@@ -595,7 +595,7 @@ const fractional_scale_listener = h.wp_fractional_scale_v1_listener{
     .preferred_scale = fractionalScalePreferredScale,
 };
 
-fn fractionalScalePreferredScale(data: ?*anyopaque, _: ?*h.wp_fractional_scale_v1, scale: u32) callconv(.C) void {
+fn fractionalScalePreferredScale(data: ?*anyopaque, _: ?*h.wp_fractional_scale_v1, scale: u32) callconv(.c) void {
     const self: *@This() = @alignCast(@ptrCast(data orelse return));
     self.scale = @floatFromInt(scale);
     self.scale /= 120;
@@ -611,13 +611,13 @@ const data_device_listener = h.wl_data_device_listener{
     .selection = dataDeviceSelection,
 };
 
-fn dataDeviceDataOffer(_: ?*anyopaque, _: ?*h.wl_data_device, _: ?*h.wl_data_offer) callconv(.C) void {}
-fn dataDeviceEnter(_: ?*anyopaque, _: ?*h.wl_data_device, _: u32, _: ?*h.wl_surface, _: i32, _: i32, _: ?*h.wl_data_offer) callconv(.C) void {}
-fn dataDeviceLeave(_: ?*anyopaque, _: ?*h.wl_data_device) callconv(.C) void {}
-fn dataDeviceMotion(_: ?*anyopaque, _: ?*h.wl_data_device, _: u32, _: i32, _: i32) callconv(.C) void {}
-fn dataDeviceDrop(_: ?*anyopaque, _: ?*h.wl_data_device) callconv(.C) void {}
+fn dataDeviceDataOffer(_: ?*anyopaque, _: ?*h.wl_data_device, _: ?*h.wl_data_offer) callconv(.c) void {}
+fn dataDeviceEnter(_: ?*anyopaque, _: ?*h.wl_data_device, _: u32, _: ?*h.wl_surface, _: i32, _: i32, _: ?*h.wl_data_offer) callconv(.c) void {}
+fn dataDeviceLeave(_: ?*anyopaque, _: ?*h.wl_data_device) callconv(.c) void {}
+fn dataDeviceMotion(_: ?*anyopaque, _: ?*h.wl_data_device, _: u32, _: i32, _: i32) callconv(.c) void {}
+fn dataDeviceDrop(_: ?*anyopaque, _: ?*h.wl_data_device) callconv(.c) void {}
 
-fn dataDeviceSelection(_: ?*anyopaque, _: ?*h.wl_data_device, offer: ?*h.wl_data_offer) callconv(.C) void {
+fn dataDeviceSelection(_: ?*anyopaque, _: ?*h.wl_data_device, offer: ?*h.wl_data_offer) callconv(.c) void {
     if (data_offer) |_| h.wl_data_offer_destroy(data_offer);
     data_offer = offer;
 }
@@ -628,21 +628,21 @@ const data_source_listener = h.wl_data_source_listener{
     .cancelled = dataSourceCancelled,
 };
 
-fn dataSourceTarget(_: ?*anyopaque, _: ?*h.wl_data_source, _: [*c]const u8) callconv(.C) void {}
+fn dataSourceTarget(_: ?*anyopaque, _: ?*h.wl_data_source, _: [*c]const u8) callconv(.c) void {}
 
-fn dataSourceSend(_: ?*anyopaque, _: ?*h.wl_data_source, _: [*c]const u8, fd: i32) callconv(.C) void {
+fn dataSourceSend(_: ?*anyopaque, _: ?*h.wl_data_source, _: [*c]const u8, fd: i32) callconv(.c) void {
     defer _ = std.c.close(fd);
     const file = std.fs.File{ .handle = fd };
     file.writeAll(clipboard_text) catch {};
 }
 
-fn dataSourceCancelled(_: ?*anyopaque, _: ?*h.wl_data_source) callconv(.C) void {}
+fn dataSourceCancelled(_: ?*anyopaque, _: ?*h.wl_data_source) callconv(.c) void {}
 
 const activation_token_listener = h.xdg_activation_token_v1_listener{
     .done = activationTokenDone,
 };
 
-fn activationTokenDone(surface: ?*anyopaque, token: ?*h.xdg_activation_token_v1, string: [*c]const u8) callconv(.C) void {
+fn activationTokenDone(surface: ?*anyopaque, token: ?*h.xdg_activation_token_v1, string: [*c]const u8) callconv(.c) void {
     h.xdg_activation_v1_activate(activation, string, @ptrCast(surface));
     h.xdg_activation_token_v1_destroy(token);
 }
@@ -651,7 +651,7 @@ var libdecor_interface = h.libdecor_interface{
     .@"error" = libdecorError,
 };
 
-fn libdecorError(_: ?*h.libdecor, _: h.libdecor_error, message: [*c]const u8) callconv(.C) void {
+fn libdecorError(_: ?*h.libdecor, _: h.libdecor_error, message: [*c]const u8) callconv(.c) void {
     log.err("{s}", .{message});
 }
 
@@ -662,7 +662,7 @@ var libdecor_frame_interface = h.libdecor_frame_interface{
     .dismiss_popup = frameDismissPopup,
 };
 
-fn frameConfigure(frame: ?*h.libdecor_frame, configuration: ?*h.libdecor_configuration, data: ?*anyopaque) callconv(.C) void {
+fn frameConfigure(frame: ?*h.libdecor_frame, configuration: ?*h.libdecor_configuration, data: ?*anyopaque) callconv(.c) void {
     const self: *@This() = @alignCast(@ptrCast(data));
 
     var mode = wio.WindowMode.normal;
@@ -698,13 +698,13 @@ fn frameConfigure(frame: ?*h.libdecor_frame, configuration: ?*h.libdecor_configu
     self.pushEvent(.{ .framebuffer = framebuffer });
 }
 
-fn frameClose(_: ?*h.libdecor_frame, data: ?*anyopaque) callconv(.C) void {
+fn frameClose(_: ?*h.libdecor_frame, data: ?*anyopaque) callconv(.c) void {
     const self: *@This() = @alignCast(@ptrCast(data));
     self.pushEvent(.close);
 }
 
-fn frameCommit(_: ?*h.libdecor_frame, _: ?*anyopaque) callconv(.C) void {}
-fn frameDismissPopup(_: ?*h.libdecor_frame, _: [*c]const u8, _: ?*anyopaque) callconv(.C) void {}
+fn frameCommit(_: ?*h.libdecor_frame, _: ?*anyopaque) callconv(.c) void {}
+fn frameDismissPopup(_: ?*h.libdecor_frame, _: [*c]const u8, _: ?*anyopaque) callconv(.c) void {}
 
 fn keyToButton(key: u32) ?wio.Button {
     comptime var table: [126]wio.Button = undefined;

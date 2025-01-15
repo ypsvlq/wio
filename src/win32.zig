@@ -20,8 +20,8 @@ var mm_device_enumerator: *w.IMMDeviceEnumerator = undefined;
 var mm_notification_client = MMNotificationClient{};
 
 var wgl: struct {
-    swapIntervalEXT: ?*const fn (i32) callconv(w.WINAPI) w.BOOL = null,
-    choosePixelFormatARB: ?*const fn (w.HDC, ?[*]const i32, ?[*]const f32, u32, [*c]i32, *u32) callconv(w.WINAPI) w.BOOL = null,
+    swapIntervalEXT: ?*const fn (i32) callconv(.winapi) w.BOOL = null,
+    choosePixelFormatARB: ?*const fn (w.HDC, ?[*]const i32, ?[*]const f32, u32, [*c]i32, *u32) callconv(.winapi) w.BOOL = null,
 } = .{};
 
 pub fn init(options: wio.InitOptions) !void {
@@ -116,7 +116,7 @@ pub fn init(options: wio.InitOptions) !void {
         _ = w.wglMakeCurrent(dc, temp_rc);
 
         if (w.wglGetProcAddress("wglGetExtensionsStringARB")) |proc| {
-            const getExtensionsStringARB: *const fn (w.HDC) callconv(w.WINAPI) ?[*:0]const u8 = @ptrCast(proc);
+            const getExtensionsStringARB: *const fn (w.HDC) callconv(.winapi) ?[*:0]const u8 = @ptrCast(proc);
             if (getExtensionsStringARB(dc)) |extensions| {
                 var iter = std.mem.tokenizeScalar(u8, std.mem.sliceTo(extensions, 0), ' ');
                 while (iter.next()) |name| {
@@ -912,31 +912,31 @@ const MMNotificationClient = struct {
         .OnPropertyValueChanged = OnPropertyValueChanged,
     };
 
-    fn AddRef(_: *const anyopaque) callconv(w.WINAPI) u32 {
+    fn AddRef(_: *const anyopaque) callconv(.winapi) u32 {
         return 1;
     }
 
-    fn Release(_: *const anyopaque) callconv(w.WINAPI) u32 {
+    fn Release(_: *const anyopaque) callconv(.winapi) u32 {
         return 1;
     }
 
-    fn QueryInterface(_: *const anyopaque, _: [*c]const w.GUID, _: [*c]?*anyopaque) callconv(w.WINAPI) w.HRESULT {
+    fn QueryInterface(_: *const anyopaque, _: [*c]const w.GUID, _: [*c]?*anyopaque) callconv(.winapi) w.HRESULT {
         return w.E_NOINTERFACE;
     }
 
-    fn OnDeviceStateChanged(_: *const anyopaque, _: [*c]const u16, _: u32) callconv(w.WINAPI) w.HRESULT {
+    fn OnDeviceStateChanged(_: *const anyopaque, _: [*c]const u16, _: u32) callconv(.winapi) w.HRESULT {
         return w.S_OK;
     }
 
-    fn OnDeviceAdded(_: *const anyopaque, _: [*c]const u16) callconv(w.WINAPI) w.HRESULT {
+    fn OnDeviceAdded(_: *const anyopaque, _: [*c]const u16) callconv(.winapi) w.HRESULT {
         return w.S_OK;
     }
 
-    fn OnDeviceRemoved(_: *const anyopaque, _: [*c]const u16) callconv(w.WINAPI) w.HRESULT {
+    fn OnDeviceRemoved(_: *const anyopaque, _: [*c]const u16) callconv(.winapi) w.HRESULT {
         return w.S_OK;
     }
 
-    fn OnDefaultDeviceChanged(_: *const anyopaque, flow: i32, role: i32, id: [*c]const u16) callconv(w.WINAPI) w.HRESULT {
+    fn OnDefaultDeviceChanged(_: *const anyopaque, flow: i32, role: i32, id: [*c]const u16) callconv(.winapi) w.HRESULT {
         if (role == w.eConsole) {
             const maybe_device = if (flow == w.eRender and wio.init_options.audioDefaultOutputFn != null)
                 &mm_notification_client.default_output
@@ -958,7 +958,7 @@ const MMNotificationClient = struct {
         return w.S_OK;
     }
 
-    fn OnPropertyValueChanged(_: *const anyopaque, _: [*c]const u16, _: w.PROPERTYKEY) callconv(w.WINAPI) w.HRESULT {
+    fn OnPropertyValueChanged(_: *const anyopaque, _: [*c]const u16, _: w.PROPERTYKEY) callconv(.winapi) w.HRESULT {
         return w.S_OK;
     }
 };
@@ -1064,7 +1064,7 @@ fn pushEvent(self: *@This(), event: wio.Event) void {
     self.events.writeItem(event) catch {};
 }
 
-fn helperWindowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) callconv(w.WINAPI) w.LRESULT {
+fn helperWindowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) callconv(.winapi) w.LRESULT {
     switch (msg) {
         w.WM_INPUT_DEVICE_CHANGE => {
             if (wio.init_options.joystick) {
@@ -1178,7 +1178,7 @@ fn helperWindowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM
     return w.DefWindowProcW(window, msg, wParam, lParam);
 }
 
-fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) callconv(w.WINAPI) w.LRESULT {
+fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) callconv(.winapi) w.LRESULT {
     const self = blk: {
         const userdata: usize = @bitCast(w.GetWindowLongPtrW(window, w.GWLP_USERDATA));
         const ptr: ?*@This() = @ptrFromInt(userdata);
