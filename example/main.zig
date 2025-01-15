@@ -1,5 +1,4 @@
 const std = @import("std");
-const builtin = @import("builtin");
 const wio = @import("wio");
 const joystick = @import("joystick.zig");
 const renderer = @import("renderer.zig");
@@ -19,8 +18,8 @@ pub fn main() !void {
         .joystick = true,
         .joystickConnectedFn = joystick.connected,
         .audio = true,
-        .audioDefaultOutputFn = audio.openOutput,
-        .audioDefaultInputFn = audio.openInput,
+        .audioDefaultOutputFn = audio.defaultOutput,
+        .audioDefaultInputFn = audio.defaultInput,
         .opengl = true,
     });
     window = try wio.createWindow(.{ .title = "wio example" });
@@ -31,22 +30,12 @@ pub fn main() !void {
     return wio.run(loop);
 }
 
+var actions = false;
+var request_attention = false;
+
 fn loop() !bool {
-    joystick.update();
     while (window.getEvent()) |event| {
-        switch (event) {
-            .size, .framebuffer => |size| std.log.info("{s} {}x{}", .{ @tagName(event), size.width, size.height }),
-            .scale => |scale| std.log.info("scale {d}", .{scale}),
-            .mode => |mode| std.log.info("{s}", .{@tagName(mode)}),
-            .char => |char| std.log.info("char: {u}", .{char}),
-            .button_press => |button| std.log.info("+{s}", .{@tagName(button)}),
-            .button_repeat => |button| std.log.info("*{s}", .{@tagName(button)}),
-            .button_release => |button| std.log.info("-{s}", .{@tagName(button)}),
-            .mouse => |mouse| std.log.info("({},{})", .{ mouse.x, mouse.y }),
-            .mouse_relative => |mouse| std.log.info("{},{}", .{ mouse.x, mouse.y }),
-            .scroll_vertical, .scroll_horizontal => |value| std.log.info("{s} {d}", .{ @tagName(event), value }),
-            else => std.log.info("{s}", .{@tagName(event)}),
-        }
+        logEvent(event);
         switch (event) {
             .close => {
                 audio.close();
@@ -56,32 +45,49 @@ fn loop() !bool {
                 _ = gpa.deinit();
                 return false;
             },
-            .unfocused => control = false,
             .framebuffer => |size| renderer.resize(size),
-            .button_press, .button_repeat => |button| handlePress(button),
-            .button_release => |button| handleRelease(button),
+            .button_press, .button_repeat => |button| {
+                if (button == .left_control or button == .right_control) actions = true;
+                if (actions) action(button);
+            },
+            .button_release => |button| {
+                if (button == .left_control or button == .right_control) actions = false;
+            },
+            .unfocused => {
+                actions = false;
+                if (request_attention) {
+                    window.requestAttention();
+                    request_attention = false;
+                }
+            },
             else => {},
         }
     }
+    joystick.update();
     renderer.draw();
     window.swapBuffers();
-    if (!builtin.cpu.arch.isWasm() and request_attention_at != 0 and std.time.timestamp() > request_attention_at) {
-        window.requestAttention();
-        request_attention_at = 0;
-    }
     return true;
 }
 
-var control: bool = false;
-var cursor: u8 = 0;
-var request_attention_at: i64 = 0;
-
-fn handlePress(button: wio.Button) void {
-    switch (button) {
-        .left_control, .right_control => control = true,
-        else => if (!control) return,
+fn logEvent(event: wio.Event) void {
+    switch (event) {
+        .size, .framebuffer => |size| std.log.info("{s} {}x{}", .{ @tagName(event), size.width, size.height }),
+        .scale => |scale| std.log.info("scale {d}", .{scale}),
+        .mode => |mode| std.log.info("{s}", .{@tagName(mode)}),
+        .char => |char| std.log.info("char: {u}", .{char}),
+        .button_press => |button| std.log.info("+{s}", .{@tagName(button)}),
+        .button_repeat => |button| std.log.info("*{s}", .{@tagName(button)}),
+        .button_release => |button| std.log.info("-{s}", .{@tagName(button)}),
+        .mouse => |mouse| std.log.info("({},{})", .{ mouse.x, mouse.y }),
+        .mouse_relative => |mouse| std.log.info("{},{}", .{ mouse.x, mouse.y }),
+        .scroll_vertical, .scroll_horizontal => |value| std.log.info("{s} {d}", .{ @tagName(event), value }),
+        else => std.log.info("{s}", .{@tagName(event)}),
     }
+}
 
+var cursor: u8 = 0;
+
+fn action(button: wio.Button) void {
     switch (button) {
         .t => window.setTitle("retitled wio example"),
         .w => window.setMode(.normal),
@@ -95,11 +101,7 @@ fn handlePress(button: wio.Button) void {
         .n => window.setCursorMode(.normal),
         .h => window.setCursorMode(.hidden),
         .r => window.setCursorMode(.relative),
-        .a => {
-            if (!builtin.cpu.arch.isWasm()) {
-                request_attention_at = std.time.timestamp() + 1;
-            }
-        },
+        .a => request_attention = true,
         .d => {
             wio.messageBox(.info, "wio", "info");
             window.messageBox(.warn, "wio", "warning");
@@ -107,9 +109,10 @@ fn handlePress(button: wio.Button) void {
         },
         .c => wio.setClipboardText("wio example"),
         .v => {
-            const text = wio.getClipboardText(allocator) orelse return;
-            defer wio.allocator.free(text);
-            std.log.scoped(.clipboard).info("{s}", .{text});
+            if (wio.getClipboardText(allocator)) |text| {
+                defer wio.allocator.free(text);
+                std.log.scoped(.clipboard).info("{s}", .{text});
+            }
         },
         .o => audio.play = !audio.play,
         .i => audio.record = !audio.record,
@@ -133,17 +136,10 @@ fn handlePress(button: wio.Button) void {
                     defer allocator.free(id);
                     const name = device.getName(allocator);
                     defer allocator.free(name);
-                    std.log.info("{s}: {s} / {s}", .{ @tagName(mode), name, id });
+                    std.log.info("audio {s}: {s} / {s}", .{ @tagName(mode), name, id });
                 }
             }
         },
-        else => {},
-    }
-}
-
-fn handleRelease(button: wio.Button) void {
-    switch (button) {
-        .left_control, .right_control => control = false,
         else => {},
     }
 }

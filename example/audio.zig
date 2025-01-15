@@ -6,7 +6,7 @@ const log = std.log.scoped(.audio);
 var maybe_output: ?wio.AudioOutput = null;
 var maybe_input: ?wio.AudioInput = null;
 
-pub fn openOutput(device: wio.AudioDevice) void {
+pub fn defaultOutput(device: wio.AudioDevice) void {
     defer device.release();
 
     const id = device.getId(main.allocator) orelse "";
@@ -15,14 +15,11 @@ pub fn openOutput(device: wio.AudioDevice) void {
     defer main.allocator.free(name);
     log.info("output: {s} / {s}", .{ name, id });
 
-    if (maybe_output) |*old| {
-        old.close();
-        maybe_output = null;
-    }
+    if (maybe_output) |*old| old.close();
     maybe_output = device.openOutput(write, .{ .sample_rate = 48000, .channels = .initMany(&.{ .FL, .FR }) });
 }
 
-pub fn openInput(device: wio.AudioDevice) void {
+pub fn defaultInput(device: wio.AudioDevice) void {
     defer device.release();
 
     const id = device.getId(main.allocator) orelse "";
@@ -50,7 +47,7 @@ fn write(samples: []f32) void {
             samples[i * 2 + 1] = 0.1 * @sin(2 * std.math.pi * 440 * time);
             time += 1.0 / 48000.0;
         }
-        time = @rem(time, 1);
+        time = @rem(time, 1); // prevent distortion from float inaccuracy
     } else {
         @memset(samples, 0);
     }
@@ -63,9 +60,7 @@ var count: usize = 0;
 fn read(samples: []const f32) void {
     if (record) {
         for (samples) |sample| {
-            if (@abs(sample) > amplitude) {
-                amplitude = @abs(sample);
-            }
+            amplitude = @max(amplitude, @abs(sample));
         }
         count += samples.len;
         if (count >= 48000) {

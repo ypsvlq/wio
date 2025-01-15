@@ -17,7 +17,6 @@ pub fn connected(device: wio.JoystickDevice) void {
         log.info("{s} / {s}", .{ name, id });
 
         active = device.open();
-        if (active) |_| log.info("opened", .{});
     }
 }
 
@@ -31,6 +30,7 @@ pub fn update() void {
             log.info("lost", .{});
             joystick.close();
             active = null;
+            last_state = 0;
             return;
         };
         var xxh = std.hash.XxHash32.init(0);
