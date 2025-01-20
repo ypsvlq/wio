@@ -19,6 +19,10 @@ When using a custom manifest, set the `win32_manifest` build option to false.
 If audio is enabled, wio initializes COM with options `COINIT_MULTITHREADED`
 and `COINIT_DISABLE_OLE1DDE`.
 
+### macOS
+
+Versions 10.15 and above are supported.
+
 ### Unix
 
 Unix-like systems support different backends in the same executable, with the
