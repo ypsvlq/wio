@@ -1325,8 +1325,6 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
                     if (modifier) |ptr| ptr.* = false;
                     self.pushEvent(.{ .button_release = button });
                 }
-            } else {
-                log.warn("unknown scancode 0x{x}", .{scancode});
             }
             return 0;
         },
