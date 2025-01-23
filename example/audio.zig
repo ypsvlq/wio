@@ -17,6 +17,7 @@ pub fn defaultOutput(device: wio.AudioDevice) void {
 
     if (maybe_output) |*old| old.close();
     maybe_output = device.openOutput(write, .{ .sample_rate = 48000 });
+    if (maybe_output == null) log.info("lost", .{});
 }
 
 pub fn defaultInput(device: wio.AudioDevice) void {
@@ -30,6 +31,7 @@ pub fn defaultInput(device: wio.AudioDevice) void {
 
     if (maybe_input) |*old| old.close();
     maybe_input = device.openInput(read, .{ .sample_rate = 48000, .channels = 1 });
+    if (maybe_input == null) log.info("lost", .{});
 }
 
 pub fn close() void {
