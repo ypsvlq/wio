@@ -47,6 +47,17 @@ pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
     _ = mode;
 }
 
+pub fn setClipboardText(self: *@This(), text: []const u8) void {
+    _ = self;
+    _ = text;
+}
+
+pub fn getClipboardText(self: *@This(), allocator: std.mem.Allocator) ?[]u8 {
+    _ = self;
+    _ = allocator;
+    return null;
+}
+
 pub fn createContext(self: *@This(), options: wio.CreateContextOptions) !void {
     _ = self;
     _ = options;
@@ -63,6 +74,18 @@ pub fn swapBuffers(self: *@This()) void {
 pub fn swapInterval(self: *@This(), interval: i32) void {
     _ = self;
     _ = interval;
+}
+
+pub fn messageBox(backend: ?*@This(), style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
+    _ = backend;
+    _ = style;
+    _ = title;
+    _ = message;
+}
+
+pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
+    _ = name;
+    return null;
 }
 
 pub const JoystickDeviceIterator = struct {
@@ -173,24 +196,3 @@ pub const AudioInput = struct {
         _ = self;
     }
 };
-
-pub fn messageBox(backend: ?*@This(), style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
-    _ = backend;
-    _ = style;
-    _ = title;
-    _ = message;
-}
-
-pub fn setClipboardText(text: []const u8) void {
-    _ = text;
-}
-
-pub fn getClipboardText(allocator: std.mem.Allocator) ?[]u8 {
-    _ = allocator;
-    return null;
-}
-
-pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
-    _ = name;
-    return null;
-}

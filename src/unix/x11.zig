@@ -83,7 +83,6 @@ pub var display: *h.Display = undefined;
 var im: h.XIM = undefined;
 var keycodes: [248]wio.Button = undefined;
 var scale: f32 = 1;
-var helper_window: h.Window = undefined;
 var clipboard_text: []const u8 = "";
 
 pub fn init(options: wio.InitOptions) !void {
@@ -133,10 +132,6 @@ pub fn init(options: wio.InitOptions) !void {
         } else |_| {}
     }
 
-    var attributes: h.XSetWindowAttributes = undefined;
-    attributes.event_mask = h.PropertyChangeMask;
-    helper_window = c.XCreateWindow(display, h.DefaultRootWindow(display), 0, 0, 1, 1, 0, 0, h.InputOutput, null, h.CWEventMask, &attributes);
-
     if (options.opengl) {
         if (c.glXQueryExtensionsString(display, h.DefaultScreen(display))) |extensions| {
             var iter = std.mem.tokenizeScalar(u8, std.mem.sliceTo(extensions, 0), ' ');
@@ -182,7 +177,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
 
     const size = options.size.multiply(scale / options.scale);
     var attributes: h.XSetWindowAttributes = undefined;
-    attributes.event_mask = h.FocusChangeMask | h.ExposureMask | h.StructureNotifyMask | h.KeyPressMask | h.KeyReleaseMask | h.ButtonPressMask | h.ButtonReleaseMask | h.PointerMotionMask;
+    attributes.event_mask = h.PropertyChangeMask | h.FocusChangeMask | h.ExposureMask | h.StructureNotifyMask | h.KeyPressMask | h.KeyReleaseMask | h.ButtonPressMask | h.ButtonReleaseMask | h.PointerMotionMask;
     const window = c.XCreateWindow(
         display,
         h.DefaultRootWindow(display),
@@ -305,6 +300,48 @@ pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
     if (mode == .relative) self.warped = false;
 }
 
+pub fn setClipboardText(self: *@This(), text: []const u8) void {
+    wio.allocator.free(clipboard_text);
+    clipboard_text = wio.allocator.dupe(u8, text) catch "";
+    _ = c.XSetSelectionOwner(display, atoms.CLIPBOARD, self.window, h.CurrentTime);
+}
+
+pub fn getClipboardText(self: *@This(), allocator: std.mem.Allocator) ?[]u8 {
+    _ = c.XConvertSelection(display, atoms.CLIPBOARD, atoms.UTF8_STRING, atoms.SELECTION, self.window, h.CurrentTime);
+    var event: h.XEvent = undefined;
+    while (c.XCheckTypedWindowEvent(display, self.window, h.SelectionNotify, &event) == h.False) {
+        if (c.XCheckTypedWindowEvent(display, self.window, h.SelectionRequest, &event) == h.True) handle(&event);
+    }
+    if (event.xselection.property == h.None) return null;
+
+    var actual_type: h.Atom = undefined;
+    var actual_format: c_int = undefined;
+    var nitems: c_ulong = undefined;
+    var bytes_after: c_ulong = undefined;
+    var property: [*]u8 = undefined;
+    _ = c.XGetWindowProperty(display, self.window, atoms.SELECTION, 0, std.math.maxInt(c_long), h.True, h.AnyPropertyType, &actual_type, &actual_format, &nitems, &bytes_after, @ptrCast(&property));
+    defer _ = c.XFree(property);
+
+    if (actual_type == atoms.INCR) {
+        var result = allocator.alloc(u8, 0) catch unreachable;
+        while (true) {
+            while (c.XCheckTypedWindowEvent(display, self.window, h.PropertyNotify, &event) == h.False) {}
+            if (event.xproperty.atom != atoms.SELECTION or event.xproperty.state != h.PropertyNewValue) continue;
+
+            var chunk: [*]u8 = undefined;
+            _ = c.XGetWindowProperty(display, self.window, atoms.SELECTION, 0, std.math.maxInt(c_long), h.True, h.AnyPropertyType, &actual_type, &actual_format, &nitems, &bytes_after, @ptrCast(&chunk));
+            defer _ = c.XFree(chunk);
+
+            if (result.len > 0 and nitems == 0) break;
+            result = allocator.realloc(result, result.len + nitems) catch return null;
+            @memcpy(result[result.len - nitems ..], chunk);
+        }
+        return result;
+    } else {
+        return allocator.dupe(u8, property[0..nitems]) catch null;
+    }
+}
+
 pub fn requestAttention(self: *@This()) void {
     var event = h.XEvent{
         .xclient = .{
@@ -363,48 +400,6 @@ pub fn messageBox(backend: ?*@This(), style: wio.MessageBoxStyle, title: []const
     _ = style;
     _ = title;
     _ = message;
-}
-
-pub fn setClipboardText(text: []const u8) void {
-    wio.allocator.free(clipboard_text);
-    clipboard_text = wio.allocator.dupe(u8, text) catch "";
-    _ = c.XSetSelectionOwner(display, atoms.CLIPBOARD, helper_window, h.CurrentTime);
-}
-
-pub fn getClipboardText(allocator: std.mem.Allocator) ?[]u8 {
-    _ = c.XConvertSelection(display, atoms.CLIPBOARD, atoms.UTF8_STRING, atoms.SELECTION, helper_window, h.CurrentTime);
-    var event: h.XEvent = undefined;
-    while (c.XCheckTypedWindowEvent(display, helper_window, h.SelectionNotify, &event) == h.False) {
-        if (c.XCheckTypedWindowEvent(display, helper_window, h.SelectionRequest, &event) == h.True) handle(&event);
-    }
-    if (event.xselection.property == h.None) return null;
-
-    var actual_type: h.Atom = undefined;
-    var actual_format: c_int = undefined;
-    var nitems: c_ulong = undefined;
-    var bytes_after: c_ulong = undefined;
-    var property: [*]u8 = undefined;
-    _ = c.XGetWindowProperty(display, helper_window, atoms.SELECTION, 0, std.math.maxInt(c_long), h.True, h.AnyPropertyType, &actual_type, &actual_format, &nitems, &bytes_after, @ptrCast(&property));
-    defer _ = c.XFree(property);
-
-    if (actual_type == atoms.INCR) {
-        var result = allocator.alloc(u8, 0) catch unreachable;
-        while (true) {
-            while (c.XCheckTypedWindowEvent(display, helper_window, h.PropertyNotify, &event) == h.False) {}
-            if (event.xproperty.atom != atoms.SELECTION or event.xproperty.state != h.PropertyNewValue) continue;
-
-            var chunk: [*]u8 = undefined;
-            _ = c.XGetWindowProperty(display, helper_window, atoms.SELECTION, 0, std.math.maxInt(c_long), h.True, h.AnyPropertyType, &actual_type, &actual_format, &nitems, &bytes_after, @ptrCast(&chunk));
-            defer _ = c.XFree(chunk);
-
-            if (result.len > 0 and nitems == 0) break;
-            result = allocator.realloc(result, result.len + nitems) catch return null;
-            @memcpy(result[result.len - nitems ..], chunk);
-        }
-        return result;
-    } else {
-        return allocator.dupe(u8, property[0..nitems]) catch null;
-    }
 }
 
 pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {

@@ -342,6 +342,33 @@ pub fn requestAttention(self: *@This()) void {
     _ = w.FlashWindow(self.window, w.TRUE);
 }
 
+pub fn setClipboardText(_: *@This(), text: []const u8) void {
+    if (w.OpenClipboard(null) == 0) return;
+    defer _ = w.CloseClipboard();
+    const text_w = std.unicode.utf8ToUtf16LeAlloc(wio.allocator, text) catch return;
+    defer wio.allocator.free(text_w);
+    const mem = w.GlobalAlloc(w.GMEM_MOVEABLE, (text_w.len + 1) * @sizeOf(u16)) orelse return;
+    const buf: [*]u16 = @alignCast(@ptrCast(w.GlobalLock(mem) orelse {
+        _ = w.GlobalFree(mem);
+        return;
+    }));
+    @memcpy(buf, text_w);
+    buf[text_w.len] = 0;
+    _ = w.GlobalUnlock(mem);
+    if (w.SetClipboardData(w.CF_UNICODETEXT, buf) == null) {
+        _ = w.GlobalFree(mem);
+    }
+}
+
+pub fn getClipboardText(_: *@This(), allocator: std.mem.Allocator) ?[]u8 {
+    if (w.OpenClipboard(null) == 0) return null;
+    defer _ = w.CloseClipboard();
+    const mem = w.GetClipboardData(w.CF_UNICODETEXT) orelse return null;
+    const text: [*:0]const u16 = @alignCast(@ptrCast(w.GlobalLock(mem) orelse return null));
+    defer _ = w.GlobalUnlock(mem);
+    return std.unicode.utf16LeToUtf8Alloc(allocator, std.mem.sliceTo(text, 0)) catch null;
+}
+
 pub fn createContext(self: *@This(), options: wio.CreateContextOptions) !void {
     self.dc = w.GetDC(self.window);
 
@@ -394,6 +421,28 @@ pub fn swapInterval(_: @This(), interval: i32) void {
     if (wgl.swapIntervalEXT) |swapIntervalEXT| {
         _ = swapIntervalEXT(interval);
     }
+}
+
+pub fn messageBox(backend: ?*@This(), style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
+    const window = if (backend) |self| self.window else null;
+
+    const title_w = std.unicode.utf8ToUtf16LeAllocZ(wio.allocator, title) catch return;
+    defer wio.allocator.free(title_w);
+    const message_w = std.unicode.utf8ToUtf16LeAllocZ(wio.allocator, message) catch return;
+    defer wio.allocator.free(message_w);
+
+    _ = w.MessageBoxW(window, message_w, title_w, switch (style) {
+        .info => w.MB_ICONINFORMATION,
+        .warn => w.MB_ICONWARNING,
+        .err => w.MB_ICONERROR,
+    });
+}
+
+pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
+    if (@hasDecl(w, name)) {
+        return &@field(w, name);
+    }
+    return w.wglGetProcAddress(name);
 }
 
 pub const JoystickDeviceIterator = struct {
@@ -906,55 +955,6 @@ const MMNotificationClient = struct {
         return w.S_OK;
     }
 };
-
-pub fn messageBox(backend: ?*@This(), style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
-    const window = if (backend) |self| self.window else null;
-
-    const title_w = std.unicode.utf8ToUtf16LeAllocZ(wio.allocator, title) catch return;
-    defer wio.allocator.free(title_w);
-    const message_w = std.unicode.utf8ToUtf16LeAllocZ(wio.allocator, message) catch return;
-    defer wio.allocator.free(message_w);
-
-    _ = w.MessageBoxW(window, message_w, title_w, switch (style) {
-        .info => w.MB_ICONINFORMATION,
-        .warn => w.MB_ICONWARNING,
-        .err => w.MB_ICONERROR,
-    });
-}
-
-pub fn setClipboardText(text: []const u8) void {
-    if (w.OpenClipboard(null) == 0) return;
-    defer _ = w.CloseClipboard();
-    const text_w = std.unicode.utf8ToUtf16LeAlloc(wio.allocator, text) catch return;
-    defer wio.allocator.free(text_w);
-    const mem = w.GlobalAlloc(w.GMEM_MOVEABLE, (text_w.len + 1) * @sizeOf(u16)) orelse return;
-    const buf: [*]u16 = @alignCast(@ptrCast(w.GlobalLock(mem) orelse {
-        _ = w.GlobalFree(mem);
-        return;
-    }));
-    @memcpy(buf, text_w);
-    buf[text_w.len] = 0;
-    _ = w.GlobalUnlock(mem);
-    if (w.SetClipboardData(w.CF_UNICODETEXT, buf) == null) {
-        _ = w.GlobalFree(mem);
-    }
-}
-
-pub fn getClipboardText(allocator: std.mem.Allocator) ?[]u8 {
-    if (w.OpenClipboard(null) == 0) return null;
-    defer _ = w.CloseClipboard();
-    const mem = w.GetClipboardData(w.CF_UNICODETEXT) orelse return null;
-    const text: [*:0]const u16 = @alignCast(@ptrCast(w.GlobalLock(mem) orelse return null));
-    defer _ = w.GlobalUnlock(mem);
-    return std.unicode.utf16LeToUtf8Alloc(allocator, std.mem.sliceTo(text, 0)) catch null;
-}
-
-pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
-    if (@hasDecl(w, name)) {
-        return &@field(w, name);
-    }
-    return w.wglGetProcAddress(name);
-}
 
 fn isFullscreen(self: *@This()) bool {
     return (w.GetWindowLongPtrW(self.window, w.GWL_STYLE) & w.WS_OVERLAPPEDWINDOW != w.WS_OVERLAPPEDWINDOW);

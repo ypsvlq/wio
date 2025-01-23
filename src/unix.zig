@@ -151,6 +151,20 @@ pub const Window = union {
         }
     }
 
+    pub fn setClipboardText(self: *@This(), text: []const u8) void {
+        switch (active) {
+            .x11 => self.x11.setClipboardText(text),
+            .wayland => self.wayland.setClipboardText(text),
+        }
+    }
+
+    pub fn getClipboardText(self: *@This(), allocator: std.mem.Allocator) ?[]u8 {
+        switch (active) {
+            .x11 => return self.x11.getClipboardText(allocator),
+            .wayland => return self.wayland.getClipboardText(allocator),
+        }
+    }
+
     pub fn createContext(self: *@This(), options: wio.CreateContextOptions) !void {
         switch (active) {
             .x11 => return self.x11.createContext(options),
@@ -180,33 +194,10 @@ pub const Window = union {
     }
 };
 
-pub const JoystickDeviceIterator = joystick.JoystickDeviceIterator;
-pub const JoystickDevice = joystick.JoystickDevice;
-pub const Joystick = joystick.Joystick;
-
-pub const AudioDeviceIterator = audio.AudioDeviceIterator;
-pub const AudioDevice = audio.AudioDevice;
-pub const AudioOutput = audio.AudioOutput;
-pub const AudioInput = audio.AudioInput;
-
 pub fn messageBox(backend: ?Window, style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
     switch (active) {
         .x11 => x11.messageBox(if (backend) |self| self.x11 else null, style, title, message),
         .wayland => wayland.messageBox(if (backend) |self| self.wayland else null, style, title, message),
-    }
-}
-
-pub fn setClipboardText(text: []const u8) void {
-    switch (active) {
-        .x11 => x11.setClipboardText(text),
-        .wayland => wayland.setClipboardText(text),
-    }
-}
-
-pub fn getClipboardText(allocator: std.mem.Allocator) ?[]u8 {
-    switch (active) {
-        .x11 => return x11.getClipboardText(allocator),
-        .wayland => return wayland.getClipboardText(allocator),
     }
 }
 
@@ -216,3 +207,12 @@ pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
         .wayland => return wayland.glGetProcAddress(name),
     }
 }
+
+pub const JoystickDeviceIterator = joystick.JoystickDeviceIterator;
+pub const JoystickDevice = joystick.JoystickDevice;
+pub const Joystick = joystick.Joystick;
+
+pub const AudioDeviceIterator = audio.AudioDeviceIterator;
+pub const AudioDevice = audio.AudioDevice;
+pub const AudioOutput = audio.AudioOutput;
+pub const AudioInput = audio.AudioInput;

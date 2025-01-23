@@ -96,6 +96,14 @@ pub fn setCursorMode(_: *@This(), mode: wio.CursorMode) void {
 
 pub fn requestAttention(_: *@This()) void {}
 
+pub fn setClipboardText(_: *@This(), text: []const u8) void {
+    js.setClipboardText(text.ptr, text.len);
+}
+
+pub fn getClipboardText(_: *@This(), _: std.mem.Allocator) ?[]u8 {
+    return null;
+}
+
 pub fn createContext(_: *@This(), _: wio.CreateContextOptions) !void {
     js.createContext();
 }
@@ -105,6 +113,14 @@ pub fn makeContextCurrent(_: *@This()) void {}
 pub fn swapBuffers(_: *@This()) void {}
 
 pub fn swapInterval(_: *@This(), _: i32) void {}
+
+pub fn messageBox(_: ?@This(), _: wio.MessageBoxStyle, _: []const u8, message: []const u8) void {
+    js.messageBox(message.ptr, message.len);
+}
+
+pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
+    return if (@hasDecl(gl, name)) @field(gl, name) else null;
+}
 
 pub const JoystickDeviceIterator = struct {
     index: u32 = 0,
@@ -216,11 +232,6 @@ pub const AudioDevice = struct {
         _ = allocator;
         return error.Unexpected;
     }
-
-    pub fn getChannelOrder(self: AudioDevice) []const wio.Channel {
-        _ = self;
-        return &.{};
-    }
 };
 
 pub const AudioOutput = struct {
@@ -234,22 +245,6 @@ pub const AudioInput = struct {
         _ = self;
     }
 };
-
-pub fn messageBox(_: ?@This(), _: wio.MessageBoxStyle, _: []const u8, message: []const u8) void {
-    js.messageBox(message.ptr, message.len);
-}
-
-pub fn setClipboardText(text: []const u8) void {
-    js.setClipboardText(text.ptr, text.len);
-}
-
-pub fn getClipboardText(_: std.mem.Allocator) ?[]u8 {
-    return null;
-}
-
-pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
-    return if (@hasDecl(gl, name)) @field(gl, name) else null;
-}
 
 export fn wioJoystick(index: u32) void {
     if (wio.init_options.joystickConnectedFn) |callback| {

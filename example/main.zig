@@ -107,9 +107,9 @@ fn action(button: wio.Button) void {
             window.messageBox(.warn, "wio", "warning");
             window.messageBox(.err, "wio", "error");
         },
-        .c => wio.setClipboardText("wio example"),
+        .c => window.setClipboardText("wio example"),
         .v => {
-            if (wio.getClipboardText(allocator)) |text| {
+            if (window.getClipboardText(allocator)) |text| {
                 defer wio.allocator.free(text);
                 std.log.scoped(.clipboard).info("{s}", .{text});
             }

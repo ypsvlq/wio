@@ -108,6 +108,14 @@ pub const Window = struct {
         self.backend.requestAttention();
     }
 
+    pub fn setClipboardText(self: *Window, text: []const u8) void {
+        self.backend.setClipboardText(text);
+    }
+
+    pub fn getClipboardText(self: *Window, ally: std.mem.Allocator) ?[]u8 {
+        return self.backend.getClipboardText(ally);
+    }
+
     pub fn createContext(self: *Window, options: CreateContextOptions) !void {
         std.debug.assert(init_options.opengl);
         return self.backend.createContext(options);
@@ -127,6 +135,17 @@ pub const Window = struct {
         self.backend.swapInterval(interval);
     }
 };
+
+pub const MessageBoxStyle = enum { info, warn, err };
+
+pub fn messageBox(style: MessageBoxStyle, title: []const u8, message: []const u8) void {
+    backend.messageBox(null, style, title, message);
+}
+
+pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const fn () void {
+    std.debug.assert(init_options.opengl);
+    return @alignCast(@ptrCast(backend.glGetProcAddress(name)));
+}
 
 pub const JoystickDeviceIterator = struct {
     backend: backend.JoystickDeviceIterator,
@@ -258,25 +277,6 @@ pub const AudioFormat = struct {
     sample_rate: u32,
     channels: u8 = 2,
 };
-
-pub const MessageBoxStyle = enum { info, warn, err };
-
-pub fn messageBox(style: MessageBoxStyle, title: []const u8, message: []const u8) void {
-    backend.messageBox(null, style, title, message);
-}
-
-pub fn setClipboardText(text: []const u8) void {
-    backend.setClipboardText(text);
-}
-
-pub fn getClipboardText(ally: std.mem.Allocator) ?[]u8 {
-    return backend.getClipboardText(ally);
-}
-
-pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const fn () void {
-    std.debug.assert(init_options.opengl);
-    return @alignCast(@ptrCast(backend.glGetProcAddress(name)));
-}
 
 pub const Event = union(enum) {
     close: void,

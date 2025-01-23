@@ -154,6 +154,16 @@ pub fn requestAttention(_: *@This()) void {
     wioRequestAttention();
 }
 
+pub fn setClipboardText(_: *@This(), text: []const u8) void {
+    wioSetClipboardText(text.ptr, text.len);
+}
+
+pub fn getClipboardText(_: *@This(), allocator: std.mem.Allocator) ?[]u8 {
+    var len: usize = undefined;
+    const text = wioGetClipboardText(&allocator, &len) orelse return null;
+    return text[0..len];
+}
+
 pub fn createContext(self: *@This(), options: wio.CreateContextOptions) !void {
     self.context = wioCreateContext(self.window, &.{
         c.kCGLPFAColorSize,     options.red_bits + options.green_bits + options.blue_bits,
@@ -180,6 +190,14 @@ pub fn swapBuffers(self: *@This()) void {
 
 pub fn swapInterval(self: *@This(), interval: i32) void {
     wioSwapInterval(self.context, interval);
+}
+
+pub fn messageBox(_: ?*@This(), style: wio.MessageBoxStyle, _: []const u8, message: []const u8) void {
+    wioMessageBox(@intFromEnum(style), message.ptr, message.len);
+}
+
+pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
+    return if (c.NSLookupAndBindSymbol("_" ++ name)) |symbol| c.NSAddressOfSymbol(symbol) else null;
 }
 
 pub const JoystickDeviceIterator = struct {
@@ -474,34 +492,6 @@ pub const AudioInput = struct {
     }
 };
 
-pub fn messageBox(_: ?*@This(), style: wio.MessageBoxStyle, _: []const u8, message: []const u8) void {
-    wioMessageBox(@intFromEnum(style), message.ptr, message.len);
-}
-
-pub fn setClipboardText(text: []const u8) void {
-    wioSetClipboardText(text.ptr, text.len);
-}
-
-pub fn getClipboardText(allocator: std.mem.Allocator) ?[]u8 {
-    var len: usize = undefined;
-    const text = wioGetClipboardText(&allocator, &len) orelse return null;
-    return text[0..len];
-}
-
-export fn wioDupeClipboardText(allocator: *const std.mem.Allocator, bytes: [*:0]const u8, len: *usize) ?[*]u8 {
-    const slice = std.mem.sliceTo(bytes, 0);
-    if (allocator.dupe(u8, slice)) |dupe| {
-        len.* = dupe.len;
-        return dupe.ptr;
-    } else |_| {
-        return null;
-    }
-}
-
-pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
-    return if (c.NSLookupAndBindSymbol("_" ++ name)) |symbol| c.NSAddressOfSymbol(symbol) else null;
-}
-
 fn pushEvent(self: *@This(), event: wio.Event) void {
     self.events.writeItem(event) catch {};
 }
@@ -572,6 +562,16 @@ export fn wioMouseRelative(self: *@This(), x: i16, y: i16) void {
 export fn wioScroll(self: *@This(), x: f32, y: f32) void {
     if (x != 0) self.pushEvent(.{ .scroll_horizontal = x });
     if (y != 0) self.pushEvent(.{ .scroll_vertical = -y });
+}
+
+export fn wioDupeClipboardText(allocator: *const std.mem.Allocator, bytes: [*:0]const u8, len: *usize) ?[*]u8 {
+    const slice = std.mem.sliceTo(bytes, 0);
+    if (allocator.dupe(u8, slice)) |dupe| {
+        len.* = dupe.len;
+        return dupe.ptr;
+    } else |_| {
+        return null;
+    }
 }
 
 fn usageDictionary(page: i32, usage: i32) !c.CFDictionaryRef {

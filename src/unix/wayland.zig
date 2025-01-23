@@ -337,6 +337,29 @@ pub fn requestAttention(self: *@This()) void {
     h.xdg_activation_token_v1_commit(token);
 }
 
+pub fn setClipboardText(_: *@This(), text: []const u8) void {
+    wio.allocator.free(clipboard_text);
+    clipboard_text = wio.allocator.dupe(u8, text) catch "";
+
+    if (data_source) |_| h.wl_data_source_destroy(data_source);
+    data_source = h.wl_data_device_manager_create_data_source(data_device_manager);
+    _ = h.wl_data_source_add_listener(data_source, &data_source_listener, null);
+    h.wl_data_source_offer(data_source, "text/plain;charset=utf-8");
+    h.wl_data_device_set_selection(data_device, data_source, last_serial);
+}
+
+pub fn getClipboardText(_: *@This(), allocator: std.mem.Allocator) ?[]u8 {
+    if (data_offer == null) return null;
+    var pipe: [2]i32 = undefined;
+    if (std.c.pipe(&pipe) == -1) return null;
+    defer _ = std.c.close(pipe[0]);
+    h.wl_data_offer_receive(data_offer, "text/plain;charset=utf-8", pipe[1]);
+    _ = c.wl_display_roundtrip(display);
+    _ = std.c.close(pipe[1]);
+    const file = std.fs.File{ .handle = pipe[0] };
+    return file.readToEndAlloc(allocator, std.math.maxInt(usize)) catch null;
+}
+
 pub fn createContext(self: *@This(), options: wio.CreateContextOptions) !void {
     var config: h.EGLConfig = undefined;
     var count: i32 = undefined;
@@ -378,29 +401,6 @@ pub fn messageBox(backend: ?*@This(), style: wio.MessageBoxStyle, title: []const
     _ = style;
     _ = title;
     _ = message;
-}
-
-pub fn setClipboardText(text: []const u8) void {
-    wio.allocator.free(clipboard_text);
-    clipboard_text = wio.allocator.dupe(u8, text) catch "";
-
-    if (data_source) |_| h.wl_data_source_destroy(data_source);
-    data_source = h.wl_data_device_manager_create_data_source(data_device_manager);
-    _ = h.wl_data_source_add_listener(data_source, &data_source_listener, null);
-    h.wl_data_source_offer(data_source, "text/plain;charset=utf-8");
-    h.wl_data_device_set_selection(data_device, data_source, last_serial);
-}
-
-pub fn getClipboardText(allocator: std.mem.Allocator) ?[]u8 {
-    if (data_offer == null) return null;
-    var pipe: [2]i32 = undefined;
-    if (std.c.pipe(&pipe) == -1) return null;
-    defer _ = std.c.close(pipe[0]);
-    h.wl_data_offer_receive(data_offer, "text/plain;charset=utf-8", pipe[1]);
-    _ = c.wl_display_roundtrip(display);
-    _ = std.c.close(pipe[1]);
-    const file = std.fs.File{ .handle = pipe[0] };
-    return file.readToEndAlloc(allocator, std.math.maxInt(usize)) catch null;
 }
 
 pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
