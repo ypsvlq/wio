@@ -716,50 +716,17 @@ pub const AudioDevice = struct {
         try SUCCEED(self.device.Activate(&w.IID_IAudioClient, w.CLSCTX_ALL, null, @ptrCast(&client)), "IMMDevice::Activate");
         errdefer _ = client.Release();
 
-        var channel_mask: u32 = 0;
-        var iter = format.channels.iterator();
-        while (iter.next()) |channel| {
-            channel_mask |= switch (channel) {
-                .FL => w.SPEAKER_FRONT_LEFT,
-                .FR => w.SPEAKER_FRONT_RIGHT,
-                .FC => w.SPEAKER_FRONT_CENTER,
-                .LFE1 => w.SPEAKER_LOW_FREQUENCY,
-                .BL => w.SPEAKER_BACK_LEFT,
-                .BR => w.SPEAKER_BACK_RIGHT,
-                .FLc => w.SPEAKER_FRONT_LEFT_OF_CENTER,
-                .FRc => w.SPEAKER_FRONT_RIGHT_OF_CENTER,
-                .BC => w.SPEAKER_BACK_CENTER,
-                .SiL => w.SPEAKER_SIDE_LEFT,
-                .SiR => w.SPEAKER_SIDE_RIGHT,
-                .TpC => w.SPEAKER_TOP_CENTER,
-                .TpFL => w.SPEAKER_TOP_FRONT_LEFT,
-                .TpFC => w.SPEAKER_TOP_FRONT_CENTER,
-                .TpFR => w.SPEAKER_TOP_FRONT_RIGHT,
-                .TpBL => w.SPEAKER_TOP_BACK_LEFT,
-                .TpBC => w.SPEAKER_TOP_BACK_CENTER,
-                .TpBR => w.SPEAKER_TOP_BACK_RIGHT,
-                else => return error.Unexpected,
-            };
-        }
-
-        const T = f32;
-        const channels: u16 = @intCast(format.channels.count());
-        const block_align = channels * @sizeOf(T);
-        const waveformat = w.WAVEFORMATEXTENSIBLE{
-            .Format = .{
-                .wFormatTag = w.WAVE_FORMAT_EXTENSIBLE,
-                .nChannels = channels,
-                .nSamplesPerSec = format.sample_rate,
-                .nAvgBytesPerSec = format.sample_rate * block_align,
-                .nBlockAlign = block_align,
-                .wBitsPerSample = @bitSizeOf(T),
-                .cbSize = @sizeOf(w.WAVEFORMATEXTENSIBLE) - @sizeOf(w.WAVEFORMATEX),
-            },
-            .Samples = .{ .wValidBitsPerSample = @bitSizeOf(T) },
-            .dwChannelMask = channel_mask,
-            .SubFormat = if (T == f32) w.KSDATAFORMAT_SUBTYPE_IEEE_FLOAT else w.KSDATAFORMAT_SUBTYPE_PCM,
+        const block_align = format.channels * @sizeOf(f32);
+        const waveformat = w.WAVEFORMATEX{
+            .wFormatTag = w.WAVE_FORMAT_IEEE_FLOAT,
+            .nChannels = format.channels,
+            .nSamplesPerSec = format.sample_rate,
+            .nAvgBytesPerSec = format.sample_rate * block_align,
+            .nBlockAlign = block_align,
+            .wBitsPerSample = @bitSizeOf(f32),
+            .cbSize = 0,
         };
-        try SUCCEED(client.Initialize(w.AUDCLNT_SHAREMODE_SHARED, w.AUDCLNT_STREAMFLAGS_EVENTCALLBACK | w.AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | w.AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY, 0, 0, &waveformat.Format, null), "IAudioClient::Initialize");
+        try SUCCEED(client.Initialize(w.AUDCLNT_SHAREMODE_SHARED, w.AUDCLNT_STREAMFLAGS_EVENTCALLBACK | w.AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | w.AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY, 0, 0, &waveformat, null), "IAudioClient::Initialize");
 
         const event = w.CreateEventW(null, w.FALSE, w.FALSE, null) orelse return logLastError("CreateEventW");
         errdefer std.os.windows.CloseHandle(event);
@@ -777,7 +744,7 @@ pub const AudioDevice = struct {
             .thread = undefined,
             .client = client,
             .event = event,
-            .channels = channels,
+            .channels = format.channels,
             .service = service,
             .dataFn = dataFn,
         };
@@ -805,29 +772,6 @@ pub const AudioDevice = struct {
             std.unicode.utf16LeToUtf8Alloc(allocator, std.mem.sliceTo(variant.Anonymous.Anonymous.Anonymous.pwszVal, 0))
         else
             "";
-    }
-
-    pub fn getChannelOrder(_: AudioDevice) []const wio.Channel {
-        return &.{
-            .FL,
-            .FR,
-            .FC,
-            .LFE1,
-            .BL,
-            .BR,
-            .FLc,
-            .FRc,
-            .BC,
-            .SiL,
-            .SiR,
-            .TpC,
-            .TpFL,
-            .TpFC,
-            .TpFR,
-            .TpBL,
-            .TpBC,
-            .TpBR,
-        };
     }
 };
 

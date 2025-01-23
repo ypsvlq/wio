@@ -28,6 +28,7 @@ var c: extern struct {
     pa_context_get_source_info_list: *const @TypeOf(h.pa_context_get_source_info_list),
     pa_operation_unref: *const @TypeOf(h.pa_operation_unref),
     pa_operation_get_state: *const @TypeOf(h.pa_operation_get_state),
+    pa_channel_map_init_auto: *const @TypeOf(h.pa_channel_map_init_auto),
     pa_stream_new: *const @TypeOf(h.pa_stream_new),
     pa_stream_unref: *const @TypeOf(h.pa_stream_unref),
     pa_stream_connect_playback: *const @TypeOf(h.pa_stream_connect_playback),
@@ -133,9 +134,15 @@ pub const AudioDevice = struct {
     pub fn openOutput(self: AudioDevice, writeFn: *const fn ([]f32) void, format: wio.AudioFormat) !AudioOutput {
         c.pa_threaded_mainloop_lock(loop);
         defer c.pa_threaded_mainloop_unlock(loop);
-        const stream = try openStream(format);
+
+        var map: h.pa_channel_map = undefined;
+        _ = c.pa_channel_map_init_auto(&map, format.channels, h.PA_CHANNEL_MAP_DEFAULT) orelse return error.Unexpected;
+
+        const stream = c.pa_stream_new(context, "", &.{ .format = h.PA_SAMPLE_FLOAT32, .rate = format.sample_rate, .channels = map.channels }, &map) orelse return error.Unexpected;
         errdefer c.pa_stream_unref(stream);
+
         c.pa_stream_set_write_callback(stream, AudioOutput.callback, @constCast(writeFn));
+
         const attr = h.pa_buffer_attr{
             .maxlength = std.math.maxInt(u32),
             .tlength = 1,
@@ -144,15 +151,21 @@ pub const AudioDevice = struct {
             .fragsize = std.math.maxInt(u32),
         };
         if (c.pa_stream_connect_playback(stream, self.id, &attr, h.PA_STREAM_ADJUST_LATENCY, null, null) != 0) return error.Unexpected;
+
         return .{ .stream = stream };
     }
 
     pub fn openInput(self: AudioDevice, readFn: *const fn ([]const f32) void, format: wio.AudioFormat) !AudioInput {
         c.pa_threaded_mainloop_lock(loop);
         defer c.pa_threaded_mainloop_unlock(loop);
-        const stream = try openStream(format);
+
+        var map: h.pa_channel_map = undefined;
+        _ = c.pa_channel_map_init_auto(&map, format.channels, h.PA_CHANNEL_MAP_DEFAULT) orelse return error.Unexpected;
+
+        const stream = c.pa_stream_new(context, "", &.{ .format = h.PA_SAMPLE_FLOAT32, .rate = format.sample_rate, .channels = map.channels }, &map) orelse return error.Unexpected;
         errdefer c.pa_stream_unref(stream);
         c.pa_stream_set_read_callback(stream, AudioInput.callback, @constCast(readFn));
+
         const attr = h.pa_buffer_attr{
             .maxlength = std.math.maxInt(u32),
             .tlength = std.math.maxInt(u32),
@@ -161,6 +174,7 @@ pub const AudioDevice = struct {
             .fragsize = 1,
         };
         if (c.pa_stream_connect_record(stream, self.id, &attr, h.PA_STREAM_ADJUST_LATENCY) != 0) return error.Unexpected;
+
         return .{ .stream = stream };
     }
 
@@ -184,58 +198,10 @@ pub const AudioDevice = struct {
         defer c.pa_threaded_mainloop_accept(loop);
         return if (maybe_name) |name| allocator.dupe(u8, std.mem.sliceTo(name, 0)) else "";
     }
-
-    pub fn getChannelOrder(_: AudioDevice) []const wio.Channel {
-        return &.{
-            .FL,
-            .FR,
-            .FC,
-            .LFE1,
-            .BL,
-            .BR,
-            .FLc,
-            .FRc,
-            .BC,
-            .SiL,
-            .SiR,
-            .TpFL,
-            .TpFR,
-            .TpFC,
-            .TpC,
-            .TpBL,
-            .TpBR,
-            .TpBC,
-        };
-    }
 };
 
 fn openStream(format: wio.AudioFormat) !*h.pa_stream {
     var map = h.pa_channel_map{ .channels = 0, .map = undefined };
-    var iter = format.channels.iterator();
-    while (iter.next()) |channel| {
-        map.map[map.channels] = switch (channel) {
-            .FL => h.PA_CHANNEL_POSITION_FRONT_LEFT,
-            .FR => h.PA_CHANNEL_POSITION_FRONT_RIGHT,
-            .FC => h.PA_CHANNEL_POSITION_FRONT_CENTER,
-            .LFE1 => h.PA_CHANNEL_POSITION_LFE,
-            .BL => h.PA_CHANNEL_POSITION_REAR_LEFT,
-            .BR => h.PA_CHANNEL_POSITION_REAR_RIGHT,
-            .FLc => h.PA_CHANNEL_POSITION_FRONT_LEFT_OF_CENTER,
-            .FRc => h.PA_CHANNEL_POSITION_FRONT_RIGHT_OF_CENTER,
-            .BC => h.PA_CHANNEL_POSITION_REAR_CENTER,
-            .SiL => h.PA_CHANNEL_POSITION_SIDE_LEFT,
-            .SiR => h.PA_CHANNEL_POSITION_SIDE_RIGHT,
-            .TpFL => h.PA_CHANNEL_POSITION_TOP_FRONT_LEFT,
-            .TpFR => h.PA_CHANNEL_POSITION_TOP_FRONT_RIGHT,
-            .TpFC => h.PA_CHANNEL_POSITION_TOP_FRONT_CENTER,
-            .TpC => h.PA_CHANNEL_POSITION_TOP_CENTER,
-            .TpBL => h.PA_CHANNEL_POSITION_TOP_REAR_LEFT,
-            .TpBR => h.PA_CHANNEL_POSITION_TOP_REAR_RIGHT,
-            .TpBC => h.PA_CHANNEL_POSITION_TOP_REAR_CENTER,
-            else => return error.Unexpected,
-        };
-        map.channels += 1;
-    }
     return c.pa_stream_new(context, "", &.{ .format = h.PA_SAMPLE_FLOAT32LE, .rate = format.sample_rate, .channels = map.channels }, &map) orelse return error.Unexpected;
 }
 

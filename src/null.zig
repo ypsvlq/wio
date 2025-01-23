@@ -160,11 +160,6 @@ pub const AudioDevice = struct {
         _ = allocator;
         return error.Unexpected;
     }
-
-    pub fn getChannelOrder(self: AudioDevice) []const wio.Channel {
-        _ = self;
-        return &.{};
-    }
 };
 
 pub const AudioOutput = struct {

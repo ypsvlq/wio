@@ -395,45 +395,17 @@ pub const AudioDevice = struct {
         try succeed(c.AudioComponentInstanceNew(component, &unit), "AudioComponentInstanceNew");
         try succeed(c.AudioUnitSetProperty(unit, c.kAudioOutputUnitProperty_CurrentDevice, c.kAudioUnitScope_Global, 0, &self.id, @sizeOf(c.AudioDeviceID)), "SetProperty(CurrentDevice)");
 
-        const channels: u8 = @intCast(format.channels.count());
         const stream_desc = c.AudioStreamBasicDescription{
             .mSampleRate = @floatFromInt(format.sample_rate),
             .mFormatID = c.kAudioFormatLinearPCM,
             .mFormatFlags = c.kAudioFormatFlagIsFloat,
-            .mBytesPerPacket = @sizeOf(f32) * channels,
+            .mBytesPerPacket = @sizeOf(f32) * format.channels,
             .mFramesPerPacket = 1,
-            .mBytesPerFrame = @sizeOf(f32) * channels,
-            .mChannelsPerFrame = channels,
+            .mBytesPerFrame = @sizeOf(f32) * format.channels,
+            .mChannelsPerFrame = format.channels,
             .mBitsPerChannel = @bitSizeOf(f32),
         };
         try succeed(c.AudioUnitSetProperty(unit, c.kAudioUnitProperty_StreamFormat, c.kAudioUnitScope_Input, 0, &stream_desc, @sizeOf(c.AudioStreamBasicDescription)), "SetProperty(StreamFormat)");
-
-        var layout = c.AudioChannelLayout{ .mChannelLayoutTag = c.kAudioChannelLayoutTag_UseChannelBitmap };
-        var iter = format.channels.iterator();
-        while (iter.next()) |channel| {
-            layout.mChannelBitmap |= switch (channel) {
-                .FL => c.kAudioChannelBit_Left,
-                .FR => c.kAudioChannelBit_Right,
-                .FC => c.kAudioChannelBit_Center,
-                .LFE1 => c.kAudioChannelBit_LFEScreen,
-                .BL => c.kAudioChannelBit_LeftSurround,
-                .BR => c.kAudioChannelBit_RightSurround,
-                .FLc => c.kAudioChannelBit_LeftCenter,
-                .FRc => c.kAudioChannelBit_RightCenter,
-                .BC => c.kAudioChannelBit_CenterSurround,
-                .SiL => c.kAudioChannelBit_LeftSurroundDirect,
-                .SiR => c.kAudioChannelBit_RightSurroundDirect,
-                .TpC => c.kAudioChannelBit_TopCenterSurround,
-                .TpFL => c.kAudioChannelBit_VerticalHeightLeft,
-                .TpFC => c.kAudioChannelBit_VerticalHeightCenter,
-                .TpFR => c.kAudioChannelBit_VerticalHeightRight,
-                .TpBL => c.kAudioChannelBit_TopBackLeft,
-                .TpBC => c.kAudioChannelBit_TopBackCenter,
-                .TpBR => c.kAudioChannelBit_TopBackRight,
-                else => return error.Unexpected,
-            };
-        }
-        try succeed(c.AudioUnitSetProperty(unit, c.kAudioUnitProperty_AudioChannelLayout, c.kAudioUnitScope_Input, 0, &layout, @sizeOf(c.AudioChannelLayout)), "SetProperty(ChannelLayout)");
 
         const callback = c.AURenderCallbackStruct{
             .inputProc = AudioOutput.callback,
@@ -477,29 +449,6 @@ pub const AudioDevice = struct {
         try succeed(c.AudioObjectGetPropertyData(self.id, &address, 0, null, &size, @ptrCast(&string)), "GetProperty(Name)");
         defer c.CFRelease(string);
         return cfStringToUtf8(allocator, string);
-    }
-
-    pub fn getChannelOrder(_: AudioDevice) []const wio.Channel {
-        return &.{
-            .FL,
-            .FR,
-            .FC,
-            .LFE1,
-            .BL,
-            .BR,
-            .FLc,
-            .FRc,
-            .BC,
-            .SiL,
-            .SiR,
-            .TpC,
-            .TpFL,
-            .TpFC,
-            .TpFR,
-            .TpBL,
-            .TpBC,
-            .TpBR,
-        };
     }
 };
 

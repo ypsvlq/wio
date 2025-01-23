@@ -236,13 +236,6 @@ pub const AudioDevice = struct {
     pub fn getName(self: AudioDevice, ally: std.mem.Allocator) []u8 {
         return self.backend.getName(ally) catch "";
     }
-
-    /// Result is invalidated when the device is released.
-    ///
-    /// The device may not support all returned channels.
-    pub fn getChannelOrder(self: AudioDevice) []const Channel {
-        return self.backend.getChannelOrder();
-    }
 };
 
 pub const AudioOutput = struct {
@@ -263,34 +256,7 @@ pub const AudioInput = struct {
 
 pub const AudioFormat = struct {
     sample_rate: u32,
-    channels: std.EnumSet(Channel),
-};
-
-pub const Channel = enum {
-    FL,
-    FR,
-    FC,
-    LFE1,
-    BL,
-    BR,
-    FLc,
-    FRc,
-    BC,
-    LFE2,
-    SiL,
-    SiR,
-    TpFL,
-    TpFR,
-    TpFC,
-    TpC,
-    TpBL,
-    TpBR,
-    TpSiL,
-    TpSiR,
-    TpBC,
-    BtFC,
-    BtFL,
-    BtFR,
+    channels: u8 = 2,
 };
 
 pub const MessageBoxStyle = enum { info, warn, err };

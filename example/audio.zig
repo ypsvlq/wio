@@ -16,7 +16,7 @@ pub fn defaultOutput(device: wio.AudioDevice) void {
     log.info("output: {s} / {s}", .{ name, id });
 
     if (maybe_output) |*old| old.close();
-    maybe_output = device.openOutput(write, .{ .sample_rate = 48000, .channels = .initMany(&.{ .FL, .FR }) });
+    maybe_output = device.openOutput(write, .{ .sample_rate = 48000 });
 }
 
 pub fn defaultInput(device: wio.AudioDevice) void {
@@ -29,7 +29,7 @@ pub fn defaultInput(device: wio.AudioDevice) void {
     log.info("input: {s} / {s}", .{ name, id });
 
     if (maybe_input) |*old| old.close();
-    maybe_input = device.openInput(read, .{ .sample_rate = 48000, .channels = .initOne(.FL) });
+    maybe_input = device.openInput(read, .{ .sample_rate = 48000, .channels = 1 });
 }
 
 pub fn close() void {

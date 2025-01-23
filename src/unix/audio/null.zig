@@ -37,10 +37,6 @@ pub const AudioDevice = struct {
     pub fn getName(_: AudioDevice, _: std.mem.Allocator) ![]u8 {
         return error.Unexpected;
     }
-
-    pub fn getChannelOrder(_: AudioDevice) []const wio.Channel {
-        return &.{};
-    }
 };
 
 pub const AudioOutput = struct {
