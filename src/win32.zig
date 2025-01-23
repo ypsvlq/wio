@@ -181,7 +181,7 @@ pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []cons
     const message_w = std.unicode.utf8ToUtf16LeAllocZ(wio.allocator, message) catch return;
     defer wio.allocator.free(message_w);
 
-    var flags: u32 = w.MB_TASKMODAL;
+    var flags: u32 = w.MB_TASKMODAL | w.MB_TOPMOST;
     flags |= switch (style) {
         .info => w.MB_ICONINFORMATION,
         .warn => w.MB_ICONWARNING,
