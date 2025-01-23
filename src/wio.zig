@@ -128,6 +128,7 @@ pub const Window = struct {
         self.backend.makeContextCurrent();
     }
 
+    /// Must be called on the thread where the context is current.
     pub fn swapBuffers(self: *Window) void {
         self.backend.swapBuffers();
     }
@@ -138,6 +139,7 @@ pub const Window = struct {
     }
 };
 
+/// Must be called on the thread where the context is current.
 pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const fn () void {
     std.debug.assert(init_options.opengl);
     return @alignCast(@ptrCast(backend.glGetProcAddress(name)));
