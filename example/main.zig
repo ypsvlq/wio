@@ -104,8 +104,8 @@ fn action(button: wio.Button) void {
         .a => request_attention = true,
         .d => {
             wio.messageBox(.info, "wio", "info");
-            window.messageBox(.warn, "wio", "warning");
-            window.messageBox(.err, "wio", "error");
+            wio.messageBox(.warn, "wio", "warning");
+            wio.messageBox(.err, "wio", "error");
         },
         .c => window.setClipboardText("wio example"),
         .v => {

@@ -91,6 +91,13 @@ pub fn run(func: fn () anyerror!bool) !void {
     }
 }
 
+pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
+    switch (active) {
+        .x11 => x11.messageBox(style, title, message),
+        .wayland => wayland.messageBox(style, title, message),
+    }
+}
+
 pub fn createWindow(options: wio.CreateWindowOptions) !Window {
     switch (active) {
         .x11 => return .{ .x11 = try x11.createWindow(options) },
@@ -193,13 +200,6 @@ pub const Window = union {
         }
     }
 };
-
-pub fn messageBox(backend: ?Window, style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
-    switch (active) {
-        .x11 => x11.messageBox(if (backend) |self| self.x11 else null, style, title, message),
-        .wayland => wayland.messageBox(if (backend) |self| self.wayland else null, style, title, message),
-    }
-}
 
 pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
     switch (active) {

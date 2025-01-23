@@ -288,6 +288,14 @@ void wioLoop(void) {
     [NSApp updateWindows];
 }
 
+void wioMessageBox(uint8_t style, const char *ptr, size_t len) {
+    NSAlertStyle styles[] = {NSAlertStyleInformational, NSAlertStyleWarning, NSAlertStyleCritical};
+    NSAlert *alert = [[NSAlert alloc] init];
+    [alert setMessageText:string(ptr, len)];
+    [alert setAlertStyle:styles[style]];
+    [alert runModal];
+}
+
 void *wioCreateWindow(void *ptr, uint16_t width, uint16_t height) {
     NSWindow *window = [[NSWindow alloc]
         initWithContentRect:NSMakeRect(0, 0, width, height)
@@ -358,6 +366,18 @@ void wioRequestAttention(void) {
     [NSApp requestUserAttention:NSCriticalRequest];
 }
 
+void wioSetClipboardText(const char *ptr, size_t len) {
+    NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
+    [pasteboard declareTypes:@[NSPasteboardTypeString] owner:nil];
+    [pasteboard setString:string(ptr, len) forType:NSPasteboardTypeString];
+}
+
+char *wioGetClipboardText(const void *ptr, size_t *len) {
+    NSString *string = [[NSPasteboard generalPasteboard] stringForType:NSPasteboardTypeString];
+    if (!string) return NULL;
+    return wioDupeClipboardText(ptr, [string UTF8String], len);
+}
+
 void *wioCreateContext(NSWindow *window, NSOpenGLPixelFormatAttribute *attributes) {
     NSOpenGLPixelFormat *format = [[NSOpenGLPixelFormat alloc] initWithAttributes:attributes];
     NSOpenGLContext *context = [[NSOpenGLContext alloc] initWithFormat:format shareContext:nil];
@@ -383,24 +403,4 @@ void wioSwapBuffers(NSWindow *window, NSOpenGLContext *context) {
 
 void wioSwapInterval(NSOpenGLContext *context, int32_t interval) {
     [context setValues:&interval forParameter:NSOpenGLCPSwapInterval];
-}
-
-void wioMessageBox(uint8_t style, const char *ptr, size_t len) {
-    NSAlertStyle styles[] = {NSAlertStyleInformational, NSAlertStyleWarning, NSAlertStyleCritical};
-    NSAlert *alert = [[NSAlert alloc] init];
-    [alert setMessageText:string(ptr, len)];
-    [alert setAlertStyle:styles[style]];
-    [alert runModal];
-}
-
-void wioSetClipboardText(const char *ptr, size_t len) {
-    NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
-    [pasteboard declareTypes:@[NSPasteboardTypeString] owner:nil];
-    [pasteboard setString:string(ptr, len) forType:NSPasteboardTypeString];
-}
-
-char *wioGetClipboardText(const void *ptr, size_t *len) {
-    NSString *string = [[NSPasteboard generalPasteboard] stringForType:NSPasteboardTypeString];
-    if (!string) return NULL;
-    return wioDupeClipboardText(ptr, [string UTF8String], len);
 }

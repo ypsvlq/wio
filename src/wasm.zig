@@ -49,6 +49,10 @@ export fn wioLoop() bool {
     };
 }
 
+pub fn messageBox(_: wio.MessageBoxStyle, _: []const u8, message: []const u8) void {
+    js.messageBox(message.ptr, message.len);
+}
+
 pub fn createWindow(options: wio.CreateWindowOptions) !@This() {
     var self = @This(){};
     self.setCursor(options.cursor);
@@ -113,10 +117,6 @@ pub fn makeContextCurrent(_: *@This()) void {}
 pub fn swapBuffers(_: *@This()) void {}
 
 pub fn swapInterval(_: *@This(), _: i32) void {}
-
-pub fn messageBox(_: ?@This(), _: wio.MessageBoxStyle, _: []const u8, message: []const u8) void {
-    js.messageBox(message.ptr, message.len);
-}
 
 pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
     return if (@hasDecl(gl, name)) @field(gl, name) else null;

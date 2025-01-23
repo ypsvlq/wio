@@ -46,6 +46,12 @@ pub fn run(func: fn () anyerror!bool) !void {
     return backend.run(func);
 }
 
+pub const MessageBoxStyle = enum { info, warn, err };
+
+pub fn messageBox(style: MessageBoxStyle, title: []const u8, message: []const u8) void {
+    backend.messageBox(style, title, message);
+}
+
 pub const Size = struct {
     width: u16,
     height: u16,
@@ -78,10 +84,6 @@ pub const Window = struct {
 
     pub fn destroy(self: *Window) void {
         self.backend.destroy();
-    }
-
-    pub fn messageBox(self: *Window, style: MessageBoxStyle, title: []const u8, message: []const u8) void {
-        backend.messageBox(self.backend, style, title, message);
     }
 
     pub fn getEvent(self: *Window) ?Event {
@@ -135,12 +137,6 @@ pub const Window = struct {
         self.backend.swapInterval(interval);
     }
 };
-
-pub const MessageBoxStyle = enum { info, warn, err };
-
-pub fn messageBox(style: MessageBoxStyle, title: []const u8, message: []const u8) void {
-    backend.messageBox(null, style, title, message);
-}
 
 pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const fn () void {
     std.debug.assert(init_options.opengl);

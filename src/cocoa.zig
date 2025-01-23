@@ -12,6 +12,7 @@ const log = std.log.scoped(.wio);
 extern fn wioInit() void;
 extern fn wioRun() void;
 extern fn wioLoop() void;
+extern fn wioMessageBox(u8, [*]const u8, usize) void;
 extern fn wioCreateWindow(*anyopaque, u16, u16) *anyopaque;
 extern fn wioDestroyWindow(*anyopaque, ?*anyopaque) void;
 extern fn wioSetTitle(*anyopaque, [*]const u8, usize) void;
@@ -19,13 +20,12 @@ extern fn wioSetMode(*anyopaque, u8) void;
 extern fn wioSetCursor(*anyopaque, u8) void;
 extern fn wioSetCursorMode(*anyopaque, u8) void;
 extern fn wioRequestAttention() void;
+extern fn wioSetClipboardText([*]const u8, usize) void;
+extern fn wioGetClipboardText(*const anyopaque, *usize) ?[*]u8;
 extern fn wioCreateContext(*anyopaque, [*]const c.CGLPixelFormatAttribute) ?*anyopaque;
 extern fn wioMakeContextCurrent(?*anyopaque) void;
 extern fn wioSwapBuffers(*anyopaque, ?*anyopaque) void;
 extern fn wioSwapInterval(?*anyopaque, i32) void;
-extern fn wioMessageBox(u8, [*]const u8, usize) void;
-extern fn wioSetClipboardText([*]const u8, usize) void;
-extern fn wioGetClipboardText(*const anyopaque, *usize) ?[*]u8;
 extern const wioHIDDeviceUsagePageKey: c.CFStringRef;
 extern const wioHIDDeviceUsageKey: c.CFStringRef;
 extern const wioHIDVendorIDKey: c.CFStringRef;
@@ -104,6 +104,10 @@ pub fn run(func: fn () anyerror!bool) !void {
     while (try func()) {
         wioLoop();
     }
+}
+
+pub fn messageBox(style: wio.MessageBoxStyle, _: []const u8, message: []const u8) void {
+    wioMessageBox(@intFromEnum(style), message.ptr, message.len);
 }
 
 events: std.fifo.LinearFifo(wio.Event, .Dynamic),
@@ -190,10 +194,6 @@ pub fn swapBuffers(self: *@This()) void {
 
 pub fn swapInterval(self: *@This(), interval: i32) void {
     wioSwapInterval(self.context, interval);
-}
-
-pub fn messageBox(_: ?*@This(), style: wio.MessageBoxStyle, _: []const u8, message: []const u8) void {
-    wioMessageBox(@intFromEnum(style), message.ptr, message.len);
 }
 
 pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {

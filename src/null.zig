@@ -12,6 +12,12 @@ pub fn run(func: fn () anyerror!bool) !void {
     _ = func;
 }
 
+pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
+    _ = style;
+    _ = title;
+    _ = message;
+}
+
 pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     const self = try wio.allocator.create(@This());
     _ = options;
@@ -74,13 +80,6 @@ pub fn swapBuffers(self: *@This()) void {
 pub fn swapInterval(self: *@This(), interval: i32) void {
     _ = self;
     _ = interval;
-}
-
-pub fn messageBox(backend: ?*@This(), style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
-    _ = backend;
-    _ = style;
-    _ = title;
-    _ = message;
 }
 
 pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {

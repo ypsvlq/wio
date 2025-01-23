@@ -162,6 +162,12 @@ pub fn update() void {
     }
 }
 
+pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
+    _ = style;
+    _ = title;
+    _ = message;
+}
+
 events: std.fifo.LinearFifo(wio.Event, .Dynamic),
 window: h.Window,
 ic: h.XIC,
@@ -393,13 +399,6 @@ pub fn swapInterval(self: *@This(), interval: i32) void {
     if (glx.swapIntervalEXT) |swapIntervalEXT| {
         swapIntervalEXT(display, self.window, interval);
     }
-}
-
-pub fn messageBox(backend: ?*@This(), style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
-    _ = backend;
-    _ = style;
-    _ = title;
-    _ = message;
 }
 
 pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {

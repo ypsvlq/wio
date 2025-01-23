@@ -175,6 +175,21 @@ pub fn run(func: fn () anyerror!bool) !void {
     }
 }
 
+pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
+    const title_w = std.unicode.utf8ToUtf16LeAllocZ(wio.allocator, title) catch return;
+    defer wio.allocator.free(title_w);
+    const message_w = std.unicode.utf8ToUtf16LeAllocZ(wio.allocator, message) catch return;
+    defer wio.allocator.free(message_w);
+
+    var flags: u32 = w.MB_TASKMODAL;
+    flags |= switch (style) {
+        .info => w.MB_ICONINFORMATION,
+        .warn => w.MB_ICONWARNING,
+        .err => w.MB_ICONERROR,
+    };
+    _ = w.MessageBoxW(null, message_w, title_w, flags);
+}
+
 events: std.fifo.LinearFifo(wio.Event, .Dynamic),
 window: w.HWND,
 cursor: w.HCURSOR,
@@ -421,21 +436,6 @@ pub fn swapInterval(_: @This(), interval: i32) void {
     if (wgl.swapIntervalEXT) |swapIntervalEXT| {
         _ = swapIntervalEXT(interval);
     }
-}
-
-pub fn messageBox(backend: ?*@This(), style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
-    const window = if (backend) |self| self.window else null;
-
-    const title_w = std.unicode.utf8ToUtf16LeAllocZ(wio.allocator, title) catch return;
-    defer wio.allocator.free(title_w);
-    const message_w = std.unicode.utf8ToUtf16LeAllocZ(wio.allocator, message) catch return;
-    defer wio.allocator.free(message_w);
-
-    _ = w.MessageBoxW(window, message_w, title_w, switch (style) {
-        .info => w.MB_ICONINFORMATION,
-        .warn => w.MB_ICONWARNING,
-        .err => w.MB_ICONERROR,
-    });
 }
 
 pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {

@@ -220,6 +220,12 @@ pub fn update() void {
     _ = c.wl_display_dispatch(display);
 }
 
+pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
+    _ = style;
+    _ = title;
+    _ = message;
+}
+
 events: std.fifo.LinearFifo(wio.Event, .Dynamic),
 surface: *h.wl_surface,
 viewport: *h.wp_viewport,
@@ -394,13 +400,6 @@ pub fn swapBuffers(self: *@This()) void {
 
 pub fn swapInterval(_: *@This(), interval: i32) void {
     _ = c.eglSwapInterval(egl_display, interval);
-}
-
-pub fn messageBox(backend: ?*@This(), style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
-    _ = backend;
-    _ = style;
-    _ = title;
-    _ = message;
 }
 
 pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
