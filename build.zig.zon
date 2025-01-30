@@ -1,6 +1,7 @@
 .{
     .name = "wio",
     .version = "0.0.0",
+    .minimum_zig_version = "0.14.0-dev.2577+271452d22",
     .dependencies = .{
         .win32 = .{
             .url = "https://github.com/ypsvlq/win32/archive/33c710871dd132b9ded3dd2a4a7ad17413246ec6.tar.gz",
