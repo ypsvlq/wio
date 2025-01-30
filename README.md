@@ -23,6 +23,9 @@ and `COINIT_DISABLE_OLE1DDE`.
 
 Versions 10.15 and above are supported.
 
+The example directory contains an application bundle, which can be adapted by
+changing the `CFBundleExecutable` and `CFBundleName` values in Info.plist.
+
 ### Unix
 
 Unix-like systems support different backends in the same executable, with the
