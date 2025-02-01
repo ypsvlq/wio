@@ -77,6 +77,7 @@ pub fn init(options: wio.InitOptions) !void {
             var size: u32 = @sizeOf(c.AudioObjectID);
             try succeed(c.AudioObjectGetPropertyData(c.kAudioObjectSystemObject, &address, 0, null, &size, &id), "GetProperty(DefaultOutputDevice)");
             callback(.{ .backend = .{ .id = id } });
+            try succeed(c.AudioObjectAddPropertyListener(c.kAudioObjectSystemObject, &address, defaultOutputChanged, null), "AddPropertyListener");
         }
         if (options.audioDefaultInputFn) |callback| {
             const address = c.AudioObjectPropertyAddress{
@@ -88,6 +89,7 @@ pub fn init(options: wio.InitOptions) !void {
             var size: u32 = @sizeOf(c.AudioObjectID);
             try succeed(c.AudioObjectGetPropertyData(c.kAudioObjectSystemObject, &address, 0, null, &size, &id), "GetProperty(DefaultInputDevice)");
             callback(.{ .backend = .{ .id = id } });
+            try succeed(c.AudioObjectAddPropertyListener(c.kAudioObjectSystemObject, &address, defaultInputChanged, null), "AddPropertyListener");
         }
     }
 }
@@ -608,6 +610,32 @@ fn joystickConnected(_: ?*anyopaque, _: c.IOReturn, _: ?*anyopaque, device: c.IO
 
 fn joystickRemoved(_: ?*anyopaque, _: c.IOReturn, _: ?*anyopaque, device: c.IOHIDDeviceRef) callconv(.c) void {
     if (removed_joysticks.getPtr(device)) |removed| removed.* = true;
+}
+
+fn defaultOutputChanged(_: c.AudioObjectID, _: u32, _: [*c]const c.AudioObjectPropertyAddress, _: ?*anyopaque) callconv(.c) c.OSStatus {
+    const address = c.AudioObjectPropertyAddress{
+        .mSelector = c.kAudioHardwarePropertyDefaultOutputDevice,
+        .mScope = c.kAudioObjectPropertyScopeGlobal,
+        .mElement = c.kAudioObjectPropertyElementMain,
+    };
+    var id: c.AudioObjectID = undefined;
+    var size: u32 = @sizeOf(c.AudioObjectID);
+    succeed(c.AudioObjectGetPropertyData(c.kAudioObjectSystemObject, &address, 0, null, &size, &id), "GetProperty(DefaultOutputDevice)") catch return c.noErr;
+    wio.init_options.audioDefaultOutputFn.?(.{ .backend = .{ .id = id } });
+    return c.noErr;
+}
+
+fn defaultInputChanged(_: c.AudioObjectID, _: u32, _: [*c]const c.AudioObjectPropertyAddress, _: ?*anyopaque) callconv(.c) c.OSStatus {
+    const address = c.AudioObjectPropertyAddress{
+        .mSelector = c.kAudioHardwarePropertyDefaultInputDevice,
+        .mScope = c.kAudioObjectPropertyScopeGlobal,
+        .mElement = c.kAudioObjectPropertyElementMain,
+    };
+    var id: c.AudioObjectID = undefined;
+    var size: u32 = @sizeOf(c.AudioObjectID);
+    succeed(c.AudioObjectGetPropertyData(c.kAudioObjectSystemObject, &address, 0, null, &size, &id), "GetProperty(DefaultInputDevice)") catch return c.noErr;
+    wio.init_options.audioDefaultInputFn.?(.{ .backend = .{ .id = id } });
+    return c.noErr;
 }
 
 fn succeed(status: c.OSStatus, name: []const u8) !void {
