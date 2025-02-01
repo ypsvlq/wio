@@ -370,8 +370,9 @@ pub const Joystick = struct {
 pub const AudioDeviceIterator = struct {
     devices: []c.AudioObjectID = &.{},
     index: usize = 0,
+    mode: wio.AudioDeviceType = undefined,
 
-    pub fn init(_: wio.AudioDeviceType) AudioDeviceIterator {
+    pub fn init(mode: wio.AudioDeviceType) AudioDeviceIterator {
         const address = c.AudioObjectPropertyAddress{
             .mSelector = c.kAudioHardwarePropertyDevices,
             .mScope = c.kAudioObjectPropertyScopeGlobal,
@@ -381,7 +382,7 @@ pub const AudioDeviceIterator = struct {
         succeed(c.AudioObjectGetPropertyDataSize(c.kAudioObjectSystemObject, &address, 0, null, &size), "GetPropertySize(Devices)") catch return .{};
         const devices = wio.allocator.alloc(c.AudioObjectID, size / @sizeOf(c.AudioObjectID)) catch return .{};
         succeed(c.AudioObjectGetPropertyData(c.kAudioObjectSystemObject, &address, 0, null, &size, devices.ptr), "GetProperty(Devices)") catch return .{};
-        return .{ .devices = devices };
+        return .{ .devices = devices, .mode = mode };
     }
 
     pub fn deinit(self: *AudioDeviceIterator) void {
@@ -390,8 +391,20 @@ pub const AudioDeviceIterator = struct {
 
     pub fn next(self: *AudioDeviceIterator) ?AudioDevice {
         if (self.index == self.devices.len) return null;
-        defer self.index += 1;
-        return .{ .id = self.devices[self.index] };
+
+        const id = self.devices[self.index];
+        self.index += 1;
+
+        var address = c.AudioObjectPropertyAddress{
+            .mSelector = c.kAudioDevicePropertyStreams,
+            .mScope = if (self.mode == .output) c.kAudioDevicePropertyScopeOutput else c.kAudioDevicePropertyScopeInput,
+            .mElement = c.kAudioObjectPropertyElementMain,
+        };
+        var size: u32 = undefined;
+        _ = c.AudioObjectGetPropertyDataSize(id, &address, 0, null, &size);
+        if (size == 0) return self.next();
+
+        return .{ .id = id };
     }
 };
 
