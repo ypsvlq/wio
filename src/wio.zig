@@ -150,6 +150,7 @@ pub const JoystickDeviceIterator = struct {
 
     /// Invalidated on the next iteration of the main loop.
     pub fn init() JoystickDeviceIterator {
+        std.debug.assert(init_options.joystick);
         return .{ .backend = backend.JoystickDeviceIterator.init() };
     }
 
@@ -215,6 +216,7 @@ pub const AudioDeviceIterator = struct {
     backend: backend.AudioDeviceIterator,
 
     pub fn init(mode: AudioDeviceType) AudioDeviceIterator {
+        std.debug.assert(init_options.audio);
         return .{ .backend = backend.AudioDeviceIterator.init(mode) };
     }
 
