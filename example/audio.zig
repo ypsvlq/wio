@@ -16,7 +16,7 @@ pub fn defaultOutput(device: wio.AudioDevice) void {
     log.info("output: {s} / {s}", .{ name, id });
 
     if (maybe_output) |*old| old.close();
-    maybe_output = device.openOutput(write, .{ .sample_rate = 48000 });
+    maybe_output = device.openOutput(write, .{ .sample_rate = 48000, .channels = 2 });
     if (maybe_output == null) log.info("lost", .{});
 }
 

@@ -275,7 +275,7 @@ pub const AudioInput = struct {
 
 pub const AudioFormat = struct {
     sample_rate: u32,
-    channels: u8 = 2,
+    channels: u8,
 };
 
 pub const Event = union(enum) {
