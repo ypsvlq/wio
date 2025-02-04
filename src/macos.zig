@@ -4,6 +4,7 @@ const c = @cImport({
     @cInclude("IOKit/hid/IOHIDLib.h");
     @cInclude("CoreAudio/CoreAudio.h");
     @cInclude("AudioUnit/AudioUnit.h");
+    @cInclude("AudioToolbox/AudioToolbox.h");
     @cInclude("OpenGL/OpenGL.h");
     @cInclude("mach-o/dyld.h");
 });
@@ -445,17 +446,63 @@ pub const AudioDevice = struct {
             .inputProcRefCon = @constCast(writeFn),
         };
         try succeed(c.AudioUnitSetProperty(unit, c.kAudioUnitProperty_SetRenderCallback, c.kAudioUnitScope_Global, 0, &callback, @sizeOf(c.AURenderCallbackStruct)), "SetProperty(RenderCallback)");
-
         try succeed(c.AudioUnitInitialize(unit), "AudioUnitInitialize");
         try succeed(c.AudioOutputUnitStart(unit), "AudioOutputUnitStart");
         return .{ .unit = unit };
     }
 
-    pub fn openInput(self: AudioDevice, readFn: *const fn ([]const f32) void, format: wio.AudioFormat) !AudioInput {
-        _ = self;
-        _ = readFn;
-        _ = format;
-        return error.Unexpected;
+    pub fn openInput(self: AudioDevice, readFn: *const fn ([]const f32) void, format: wio.AudioFormat) !*AudioInput {
+        const component_desc = c.AudioComponentDescription{
+            .componentType = c.kAudioUnitType_Output,
+            .componentSubType = c.kAudioUnitSubType_HALOutput,
+            .componentManufacturer = c.kAudioUnitManufacturer_Apple,
+            .componentFlags = 0,
+            .componentFlagsMask = 0,
+        };
+        const component = c.AudioComponentFindNext(null, &component_desc);
+        var unit: c.AudioComponentInstance = undefined;
+        try succeed(c.AudioComponentInstanceNew(component, &unit), "AudioComponentInstanceNew");
+
+        var enable_io: u32 = 1;
+        try succeed(c.AudioUnitSetProperty(unit, c.kAudioOutputUnitProperty_EnableIO, c.kAudioUnitScope_Input, 1, &enable_io, @sizeOf(u32)), "SetProperty(EnableIO)");
+        enable_io = 0;
+        try succeed(c.AudioUnitSetProperty(unit, c.kAudioOutputUnitProperty_EnableIO, c.kAudioUnitScope_Output, 0, &enable_io, @sizeOf(u32)), "SetProperty(EnableIO)");
+        try succeed(c.AudioUnitSetProperty(unit, c.kAudioOutputUnitProperty_CurrentDevice, c.kAudioUnitScope_Global, 0, &self.id, @sizeOf(c.AudioDeviceID)), "SetProperty(CurrentDevice)");
+
+        var native_sample_rate: f32 = undefined;
+        var size: u32 = undefined;
+        try succeed(c.AudioUnitGetProperty(unit, c.kAudioUnitProperty_SampleRate, c.kAudioUnitScope_Output, 1, &native_sample_rate, &size), "GetProperty(SampleRate)");
+        var source_format = c.AudioStreamBasicDescription{
+            .mSampleRate = native_sample_rate,
+            .mFormatID = c.kAudioFormatLinearPCM,
+            .mFormatFlags = c.kAudioFormatFlagIsFloat,
+            .mBytesPerPacket = @sizeOf(f32) * format.channels,
+            .mFramesPerPacket = 1,
+            .mBytesPerFrame = @sizeOf(f32) * format.channels,
+            .mChannelsPerFrame = format.channels,
+            .mBitsPerChannel = @bitSizeOf(f32),
+        };
+        try succeed(c.AudioUnitSetProperty(unit, c.kAudioUnitProperty_StreamFormat, c.kAudioUnitScope_Output, 1, &source_format, @sizeOf(c.AudioStreamBasicDescription)), "SetProperty(StreamFormat)");
+        var dest_format = source_format;
+        dest_format.mSampleRate = @floatFromInt(format.sample_rate);
+        var converter: c.AudioConverterRef = undefined;
+        try succeed(c.AudioConverterNew(&source_format, &dest_format, &converter), "AudioConverterNew");
+
+        const input = try wio.allocator.create(AudioInput);
+        errdefer wio.allocator.destroy(input);
+        input.* = .{
+            .unit = unit,
+            .converter = converter,
+            .readFn = readFn,
+        };
+        const callback = c.AURenderCallbackStruct{
+            .inputProc = AudioInput.callback,
+            .inputProcRefCon = input,
+        };
+        try succeed(c.AudioUnitSetProperty(unit, c.kAudioOutputUnitProperty_SetInputCallback, c.kAudioUnitScope_Global, 0, &callback, @sizeOf(c.AURenderCallbackStruct)), "SetProperty(InputCallback)");
+        try succeed(c.AudioUnitInitialize(unit), "AudioUnitInitialize");
+        try succeed(c.AudioOutputUnitStart(unit), "AudioOutputUnitStart");
+        return input;
     }
 
     pub fn getId(self: AudioDevice, allocator: std.mem.Allocator) ![]u8 {
@@ -492,9 +539,9 @@ pub const AudioOutput = struct {
         _ = c.AudioUnitUninitialize(self.unit);
     }
 
-    fn callback(data: ?*anyopaque, _: [*c]c.AudioUnitRenderActionFlags, _: [*c]const c.AudioTimeStamp, _: u32, _: u32, buffer_list: [*c]c.AudioBufferList) callconv(.c) c.OSStatus {
+    fn callback(data: ?*anyopaque, _: [*c]c.AudioUnitRenderActionFlags, _: [*c]const c.AudioTimeStamp, _: u32, _: u32, list: [*c]c.AudioBufferList) callconv(.c) c.OSStatus {
         const writeFn: *const fn ([]f32) void = @alignCast(@ptrCast(data));
-        const buffer = buffer_list.*.mBuffers[0];
+        const buffer = list.*.mBuffers[0];
         const ptr: [*]f32 = @alignCast(@ptrCast(buffer.mData));
         writeFn(ptr[0 .. buffer.mDataByteSize / @sizeOf(f32)]);
         return c.noErr;
@@ -502,8 +549,56 @@ pub const AudioOutput = struct {
 };
 
 pub const AudioInput = struct {
+    unit: c.AudioUnit,
+    converter: c.AudioConverterRef,
+    readFn: *const fn ([]const f32) void,
+    buffer: [1024]f32 = undefined,
+
     pub fn close(self: *AudioInput) void {
-        _ = self;
+        _ = c.AudioConverterDispose(self.converter);
+        _ = c.AudioUnitUninitialize(self.unit);
+        wio.allocator.destroy(self);
+    }
+
+    fn callback(data: ?*anyopaque, flags: [*c]c.AudioUnitRenderActionFlags, timestamp: [*c]const c.AudioTimeStamp, bus: u32, frames: u32, _: [*c]c.AudioBufferList) callconv(.c) c.OSStatus {
+        const self: *AudioInput = @alignCast(@ptrCast(data));
+
+        var list = c.AudioBufferList{
+            .mNumberBuffers = 1,
+            .mBuffers = .{.{
+                .mNumberChannels = 0,
+                .mDataByteSize = 0,
+                .mData = null,
+            }},
+        };
+        succeed(c.AudioUnitRender(self.unit, flags, timestamp, bus, frames, &list), "AudioUnitRender") catch return c.noErr;
+
+        var remaining = frames;
+        while (remaining > 0) {
+            var output = c.AudioBufferList{
+                .mNumberBuffers = 1,
+                .mBuffers = .{.{
+                    .mNumberChannels = list.mBuffers[0].mNumberChannels,
+                    .mDataByteSize = self.buffer.len * @sizeOf(f32),
+                    .mData = &self.buffer,
+                }},
+            };
+            var packets = remaining;
+            succeed(c.AudioConverterFillComplexBuffer(self.converter, inputProc, &list.mBuffers[0], &packets, &output, null), "AudioConverterFillComplexBuffer") catch return c.noErr;
+            self.readFn(self.buffer[0 .. packets * list.mBuffers[0].mNumberChannels]);
+            remaining -= packets;
+            list.mBuffers[0].mData = @ptrFromInt(@intFromPtr(list.mBuffers[0].mData) + output.mBuffers[0].mDataByteSize);
+            list.mBuffers[0].mDataByteSize -= output.mBuffers[0].mDataByteSize;
+        }
+
+        return c.noErr;
+    }
+
+    fn inputProc(_: c.AudioConverterRef, packets: [*c]u32, list: [*c]c.AudioBufferList, _: [*c][*c]c.AudioStreamPacketDescription, data: ?*anyopaque) callconv(.c) c.OSStatus {
+        const buffer: *c.AudioBuffer = @alignCast(@ptrCast(data));
+        list.*.mBuffers[0] = buffer.*;
+        packets.* = buffer.mDataByteSize / buffer.mNumberChannels / @sizeOf(f32);
+        return c.noErr;
     }
 };
 
