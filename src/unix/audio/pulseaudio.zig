@@ -1,6 +1,6 @@
 const std = @import("std");
 const wio = @import("../../wio.zig");
-const common = @import("../common.zig");
+const dynlib = @import("../dynlib.zig");
 const h = @cImport(@cInclude("pulse/pulseaudio.h"));
 const log = std.log.scoped(.wio);
 
@@ -47,7 +47,7 @@ var loop: *h.pa_threaded_mainloop = undefined;
 var context: *h.pa_context = undefined;
 
 pub fn init() !void {
-    try common.loadLibs(&c, &.{.{ .handle = &libpulse, .name = "libpulse.so.0" }});
+    try dynlib.load(&c, &.{.{ .handle = &libpulse, .name = "libpulse.so.0" }});
 
     loop = c.pa_threaded_mainloop_new() orelse return error.Unexpected;
     errdefer c.pa_threaded_mainloop_free(loop);

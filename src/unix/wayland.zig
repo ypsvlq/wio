@@ -1,6 +1,6 @@
 const std = @import("std");
 const wio = @import("../wio.zig");
-const common = @import("common.zig");
+const dynlib = @import("dynlib.zig");
 const log = std.log.scoped(.wio);
 const h = @cImport({
     @cInclude("wio-wayland.h");
@@ -120,7 +120,7 @@ export var wio_wl_proxy_set_user_data: *const @TypeOf(h.wl_proxy_set_user_data) 
 export var wio_wl_proxy_get_user_data: *const @TypeOf(h.wl_proxy_get_user_data) = undefined;
 
 pub fn init(options: wio.InitOptions) !void {
-    common.loadLibs(&c, &.{
+    dynlib.load(&c, &.{
         .{ .handle = &libxkbcommon, .name = "libxkbcommon.so.0", .prefix = "xkb" },
         .{ .handle = &libdecor, .name = "libdecor-0.so.0", .prefix = "libdecor" },
         .{ .handle = &libwayland_egl, .name = "libwayland-egl.so.1", .prefix = "wl_egl", .predicate = options.opengl },

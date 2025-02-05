@@ -9,16 +9,19 @@ pub const Lib = struct {
     predicate: bool = true,
 };
 
-const sonames = if (builtin.os.tag == .openbsd or builtin.os.tag == .netbsd) false else true;
-
-pub fn loadLibs(c: anytype, libs: []const Lib) !void {
+pub fn load(c: anytype, libs: []const Lib) !void {
     var succeeded: usize = 0;
     errdefer for (0..succeeded) |i| {
         if (libs[i].predicate) libs[i].handle.close();
     };
     for (libs) |lib| {
         if (lib.predicate) {
-            lib.handle.* = try std.DynLib.open(if (sonames) lib.name else lib.name[0..std.mem.lastIndexOfScalar(u8, lib.name, '.').?]);
+            lib.handle.* = try std.DynLib.open(
+                if (builtin.os.tag == .openbsd or builtin.os.tag == .netbsd)
+                    lib.name[0 .. std.mem.indexOfScalar(u8, lib.name, '.').? + 3]
+                else
+                    lib.name,
+            );
         }
         succeeded += 1;
     }

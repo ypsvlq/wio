@@ -1,7 +1,7 @@
 const std = @import("std");
 const wio = @import("../wio.zig");
 const unix = @import("../unix.zig");
-const common = @import("common.zig");
+const dynlib = @import("dynlib.zig");
 const h = @cImport({
     @cInclude("X11/Xlib.h");
     @cInclude("X11/Xatom.h");
@@ -86,7 +86,7 @@ var scale: f32 = 1;
 var clipboard_text: []const u8 = "";
 
 pub fn init(options: wio.InitOptions) !void {
-    common.loadLibs(&c, &.{
+    dynlib.load(&c, &.{
         .{ .handle = &libXcursor, .name = "libXcursor.so.1", .prefix = "Xcursor" },
         .{ .handle = &libGL, .name = "libGL.so.1", .prefix = "glX", .predicate = options.opengl },
         .{ .handle = &libX11, .name = "libX11.so.6" },
