@@ -10,6 +10,7 @@ const joystick = switch (builtin.os.tag) {
 };
 const audio = switch (builtin.os.tag) {
     .linux => @import("unix/audio/pulseaudio.zig"),
+    .openbsd => @import("unix/audio/sndio.zig"),
     else => @import("unix/audio/null.zig"),
 };
 const log = std.log.scoped(.wio);

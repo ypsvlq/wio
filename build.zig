@@ -29,12 +29,13 @@ pub fn build(b: *std.Build) void {
             module.linkFramework("AudioUnit", .{});
             module.linkFramework("AudioToolbox", .{});
         },
-        .linux, .openbsd, .netbsd, .freebsd, .dragonfly => {
+        .linux, .openbsd, .netbsd, .freebsd, .dragonfly => |tag| {
             module.link_libc = true;
             if (b.lazyDependency("unix_headers", .{})) |unix_headers| {
                 module.addIncludePath(unix_headers.path("."));
             }
             module.addCSourceFile(.{ .file = b.path("src/unix/wayland.c") });
+            if (tag == .openbsd) module.linkSystemLibrary("sndio", .{});
         },
         else => {
             if (target.result.isWasm()) {
