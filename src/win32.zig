@@ -34,47 +34,49 @@ pub fn init(options: wio.InitOptions) !void {
     });
     if (w.RegisterClassW(&class) == 0) return logLastError("RegisterClassW");
 
-    helper_window = w.CreateWindowExW(
-        0,
-        class_name,
-        w.L("wio"),
-        0,
-        w.CW_USEDEFAULT,
-        w.CW_USEDEFAULT,
-        w.CW_USEDEFAULT,
-        w.CW_USEDEFAULT,
-        null,
-        null,
-        instance,
-        null,
-    ) orelse return logLastError("CreateWindowExW");
-    errdefer _ = w.DestroyWindow(helper_window);
-    _ = w.SetWindowLongPtrW(helper_window, w.GWLP_WNDPROC, @bitCast(@intFromPtr(&helperWindowProc)));
-
-    var rid = [_]w.RAWINPUTDEVICE{
-        .{
-            .usUsagePage = w.HID_USAGE_PAGE_GENERIC,
-            .usUsage = w.HID_USAGE_GENERIC_MOUSE,
-            .dwFlags = 0,
-            .hwndTarget = null,
-        },
-        .{
-            .usUsagePage = w.HID_USAGE_PAGE_GENERIC,
-            .usUsage = w.HID_USAGE_GENERIC_JOYSTICK,
-            .dwFlags = w.RIDEV_DEVNOTIFY,
-            .hwndTarget = helper_window,
-        },
-        .{
-            .usUsagePage = w.HID_USAGE_PAGE_GENERIC,
-            .usUsage = w.HID_USAGE_GENERIC_GAMEPAD,
-            .dwFlags = w.RIDEV_DEVNOTIFY,
-            .hwndTarget = helper_window,
-        },
+    var mouse = w.RAWINPUTDEVICE{
+        .usUsagePage = w.HID_USAGE_PAGE_GENERIC,
+        .usUsage = w.HID_USAGE_GENERIC_MOUSE,
+        .dwFlags = 0,
+        .hwndTarget = null,
     };
-    if (w.RegisterRawInputDevices(&rid, rid.len, @sizeOf(w.RAWINPUTDEVICE)) == w.FALSE) return logLastError("RegisterRawInputDevices");
+    if (w.RegisterRawInputDevices(&mouse, 1, @sizeOf(w.RAWINPUTDEVICE)) == w.FALSE) return logLastError("RegisterRawInputDevices");
 
     if (options.joystick) {
         joysticks = .init(wio.allocator);
+
+        helper_window = w.CreateWindowExW(
+            0,
+            class_name,
+            w.L("wio"),
+            0,
+            w.CW_USEDEFAULT,
+            w.CW_USEDEFAULT,
+            w.CW_USEDEFAULT,
+            w.CW_USEDEFAULT,
+            null,
+            null,
+            instance,
+            null,
+        ) orelse return logLastError("CreateWindowExW");
+        errdefer _ = w.DestroyWindow(helper_window);
+        _ = w.SetWindowLongPtrW(helper_window, w.GWLP_WNDPROC, @bitCast(@intFromPtr(&helperWindowProc)));
+
+        var devices = [_]w.RAWINPUTDEVICE{
+            .{
+                .usUsagePage = w.HID_USAGE_PAGE_GENERIC,
+                .usUsage = w.HID_USAGE_GENERIC_JOYSTICK,
+                .dwFlags = w.RIDEV_DEVNOTIFY,
+                .hwndTarget = helper_window,
+            },
+            .{
+                .usUsagePage = w.HID_USAGE_PAGE_GENERIC,
+                .usUsage = w.HID_USAGE_GENERIC_GAMEPAD,
+                .dwFlags = w.RIDEV_DEVNOTIFY,
+                .hwndTarget = helper_window,
+            },
+        };
+        if (w.RegisterRawInputDevices(&devices, devices.len, @sizeOf(w.RAWINPUTDEVICE)) == w.FALSE) return logLastError("RegisterRawInputDevices");
     }
 
     if (options.audio) {
@@ -137,12 +139,13 @@ pub fn deinit() void {
         w.CoUninitialize();
     }
     if (wio.init_options.joystick) {
+        _ = w.DestroyWindow(helper_window);
+        wio.allocator.free(helper_input);
+
         var iter = joysticks.valueIterator();
         while (iter.next()) |info| wio.allocator.free(info.interface);
         joysticks.deinit();
     }
-    wio.allocator.free(helper_input);
-    _ = w.DestroyWindow(helper_window);
 }
 
 pub fn run(func: fn () anyerror!bool) !void {
@@ -1011,115 +1014,110 @@ fn pushEvent(self: *@This(), event: wio.Event) void {
 fn helperWindowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) callconv(.winapi) w.LRESULT {
     switch (msg) {
         w.WM_INPUT_DEVICE_CHANGE => {
-            if (wio.init_options.joystick) {
-                const device: w.HANDLE = @ptrFromInt(@as(usize, @bitCast(lParam)));
-                switch (wParam) {
-                    w.GIDC_ARRIVAL => {
-                        var interface_size: u32 = undefined;
-                        if (w.GetRawInputDeviceInfoW(device, w.RIDI_DEVICENAME, null, &interface_size) < 0) return 0;
-                        const interface = wio.allocator.alloc(u16, interface_size) catch return 0;
-                        if (w.GetRawInputDeviceInfoW(device, w.RIDI_DEVICENAME, interface.ptr, &interface_size) < 0) {
-                            wio.allocator.free(interface);
-                            return 0;
-                        }
+            const device: w.HANDLE = @ptrFromInt(@as(usize, @bitCast(lParam)));
+            switch (wParam) {
+                w.GIDC_ARRIVAL => {
+                    var interface_size: u32 = undefined;
+                    if (w.GetRawInputDeviceInfoW(device, w.RIDI_DEVICENAME, null, &interface_size) < 0) return 0;
+                    const interface = wio.allocator.alloc(u16, interface_size) catch return 0;
+                    if (w.GetRawInputDeviceInfoW(device, w.RIDI_DEVICENAME, interface.ptr, &interface_size) < 0) {
+                        wio.allocator.free(interface);
+                        return 0;
+                    }
 
-                        if (std.mem.indexOf(u16, interface, w.L("IG_"))) |_| {
-                            var iter = xinput.iterator(.{ .kind = .unset });
-                            while (iter.next()) |i| {
-                                var state: w.XINPUT_STATE = undefined;
-                                if (w.XInputGetState(@intCast(i), &state) == w.ERROR_SUCCESS) {
-                                    xinput.set(i);
-                                    if (wio.init_options.joystickConnectedFn) |callback| callback(.{ .backend = .{ .xinput = @intCast(i) } });
-                                }
-                            }
-                            wio.allocator.free(interface);
-                            return 0;
-                        }
-
-                        joysticks.put(device, .{ .interface = interface }) catch {
-                            wio.allocator.free(interface);
-                            return 0;
-                        };
-
-                        if (wio.init_options.joystickConnectedFn) |callback| callback(.{ .backend = .{ .rawinput = device } });
-                    },
-                    w.GIDC_REMOVAL => {
-                        var iter = xinput.iterator(.{});
+                    if (std.mem.indexOf(u16, interface, w.L("IG_"))) |_| {
+                        var iter = xinput.iterator(.{ .kind = .unset });
                         while (iter.next()) |i| {
                             var state: w.XINPUT_STATE = undefined;
-                            if (w.XInputGetState(@intCast(i), &state) == w.ERROR_DEVICE_NOT_CONNECTED) {
-                                xinput.unset(i);
+                            if (w.XInputGetState(@intCast(i), &state) == w.ERROR_SUCCESS) {
+                                xinput.set(i);
+                                if (wio.init_options.joystickConnectedFn) |callback| callback(.{ .backend = .{ .xinput = @intCast(i) } });
                             }
                         }
+                        wio.allocator.free(interface);
+                        return 0;
+                    }
 
-                        if (joysticks.get(device)) |info| {
-                            if (info.joystick) |joystick| {
-                                joystick.disconnected = true;
-                            }
-                            wio.allocator.free(info.interface);
-                            _ = joysticks.remove(device);
+                    joysticks.put(device, .{ .interface = interface }) catch {
+                        wio.allocator.free(interface);
+                        return 0;
+                    };
+
+                    if (wio.init_options.joystickConnectedFn) |callback| callback(.{ .backend = .{ .rawinput = device } });
+                },
+                w.GIDC_REMOVAL => {
+                    var iter = xinput.iterator(.{});
+                    while (iter.next()) |i| {
+                        var state: w.XINPUT_STATE = undefined;
+                        if (w.XInputGetState(@intCast(i), &state) == w.ERROR_DEVICE_NOT_CONNECTED) {
+                            xinput.unset(i);
                         }
-                    },
-                    else => {},
-                }
-                return 0;
+                    }
+
+                    if (joysticks.get(device)) |info| {
+                        if (info.joystick) |joystick| {
+                            joystick.disconnected = true;
+                        }
+                        wio.allocator.free(info.interface);
+                        _ = joysticks.remove(device);
+                    }
+                },
+                else => {},
             }
+            return 0;
         },
         w.WM_INPUT => {
-            if (wio.init_options.joystick) {
-                const handle: w.HRAWINPUT = @ptrFromInt(@as(usize, @bitCast(lParam)));
-                var size: u32 = undefined;
-                if (w.GetRawInputData(handle, w.RID_INPUT, null, &size, @sizeOf(w.RAWINPUTHEADER)) == -1) return 0;
-                if (size > helper_input.len) helper_input = wio.allocator.realloc(helper_input, size) catch return 0;
-                if (w.GetRawInputData(handle, w.RID_INPUT, helper_input.ptr, &size, @sizeOf(w.RAWINPUTHEADER)) == -1) return 0;
-                const raw: *w.RAWINPUT = @alignCast(@ptrCast(helper_input));
+            const handle: w.HRAWINPUT = @ptrFromInt(@as(usize, @bitCast(lParam)));
+            var size: u32 = undefined;
+            if (w.GetRawInputData(handle, w.RID_INPUT, null, &size, @sizeOf(w.RAWINPUTHEADER)) == -1) return 0;
+            if (size > helper_input.len) helper_input = wio.allocator.realloc(helper_input, size) catch return 0;
+            if (w.GetRawInputData(handle, w.RID_INPUT, helper_input.ptr, &size, @sizeOf(w.RAWINPUTHEADER)) == -1) return 0;
+            const raw: *w.RAWINPUT = @alignCast(@ptrCast(helper_input));
 
-                if (joysticks.get(raw.header.hDevice)) |info| {
-                    const joystick = info.joystick orelse return 0;
-                    const report = raw.data.hid.bRawData()[0 .. raw.data.hid.dwSizeHid * raw.data.hid.dwCount];
-                    var data_len: u32 = @intCast(joystick.data.len);
-                    if (w.HidP_GetData(w.HidP_Input, joystick.data.ptr, &data_len, @bitCast(@intFromPtr(joystick.preparsed.ptr)), report.ptr, @intCast(report.len)) == w.HIDP_STATUS_SUCCESS) {
-                        @memset(joystick.buttons, false);
-                        for (joystick.data[0..data_len]) |data| {
-                            switch (joystick.indices[data.DataIndex]) {
-                                .none => {},
-                                .axis => |axis| {
-                                    const caps = &joystick.value_caps[axis.caps_index];
-                                    if (data.Anonymous.RawValue >= caps.LogicalMin and data.Anonymous.RawValue <= caps.LogicalMax) {
-                                        var float: f32 = @floatFromInt(data.Anonymous.RawValue);
-                                        float -= @floatFromInt(caps.LogicalMin);
-                                        float /= @floatFromInt(caps.LogicalMax - caps.LogicalMin);
-                                        float *= 0xFFFF;
-                                        joystick.axes[axis.index] = @intFromFloat(float);
-                                    } else {
-                                        // broken report descriptor, probably a u16
-                                        joystick.axes[axis.index] = @truncate(data.Anonymous.RawValue);
-                                    }
-                                },
-                                .hat => |index| {
-                                    joystick.hats[index] = switch (data.Anonymous.RawValue) {
-                                        0 => .{ .up = true },
-                                        1 => .{ .up = true, .right = true },
-                                        2 => .{ .right = true },
-                                        3 => .{ .right = true, .down = true },
-                                        4 => .{ .down = true },
-                                        5 => .{ .down = true, .left = true },
-                                        6 => .{ .left = true },
-                                        7 => .{ .left = true, .up = true },
-                                        else => .{},
-                                    };
-                                },
-                                .button => |index| joystick.buttons[index] = (data.Anonymous.On == w.TRUE),
-                            }
+            if (joysticks.get(raw.header.hDevice)) |info| {
+                const joystick = info.joystick orelse return 0;
+                const report = raw.data.hid.bRawData()[0 .. raw.data.hid.dwSizeHid * raw.data.hid.dwCount];
+                var data_len: u32 = @intCast(joystick.data.len);
+                if (w.HidP_GetData(w.HidP_Input, joystick.data.ptr, &data_len, @bitCast(@intFromPtr(joystick.preparsed.ptr)), report.ptr, @intCast(report.len)) == w.HIDP_STATUS_SUCCESS) {
+                    @memset(joystick.buttons, false);
+                    for (joystick.data[0..data_len]) |data| {
+                        switch (joystick.indices[data.DataIndex]) {
+                            .none => {},
+                            .axis => |axis| {
+                                const caps = &joystick.value_caps[axis.caps_index];
+                                if (data.Anonymous.RawValue >= caps.LogicalMin and data.Anonymous.RawValue <= caps.LogicalMax) {
+                                    var float: f32 = @floatFromInt(data.Anonymous.RawValue);
+                                    float -= @floatFromInt(caps.LogicalMin);
+                                    float /= @floatFromInt(caps.LogicalMax - caps.LogicalMin);
+                                    float *= 0xFFFF;
+                                    joystick.axes[axis.index] = @intFromFloat(float);
+                                } else {
+                                    // broken report descriptor, probably a u16
+                                    joystick.axes[axis.index] = @truncate(data.Anonymous.RawValue);
+                                }
+                            },
+                            .hat => |index| {
+                                joystick.hats[index] = switch (data.Anonymous.RawValue) {
+                                    0 => .{ .up = true },
+                                    1 => .{ .up = true, .right = true },
+                                    2 => .{ .right = true },
+                                    3 => .{ .right = true, .down = true },
+                                    4 => .{ .down = true },
+                                    5 => .{ .down = true, .left = true },
+                                    6 => .{ .left = true },
+                                    7 => .{ .left = true, .up = true },
+                                    else => .{},
+                                };
+                            },
+                            .button => |index| joystick.buttons[index] = (data.Anonymous.On == w.TRUE),
                         }
                     }
                 }
-                return 0;
             }
+            return 0;
         },
-        else => {},
+        else => return w.DefWindowProcW(window, msg, wParam, lParam),
     }
-    return w.DefWindowProcW(window, msg, wParam, lParam);
 }
 
 fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) callconv(.winapi) w.LRESULT {
