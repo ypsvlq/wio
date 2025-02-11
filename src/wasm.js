@@ -6,6 +6,7 @@ const wio = {
     log: "",
     events: [],
     cursor: undefined,
+    cursor_mode: undefined,
     gamepads: undefined,
     gamepad_ids: undefined,
     gl: undefined,
@@ -18,7 +19,7 @@ const wio = {
         module.exports._start();
         requestAnimationFrame(wio.loop);
 
-        new ResizeObserver(() => wio.resize()).observe(canvas);
+        new ResizeObserver(wio.resize).observe(canvas);
         wio.resize();
         wio.events.push(1);
 
@@ -44,7 +45,11 @@ const wio = {
             if (button != undefined) wio.events.push(12, button);
         });
         canvas.addEventListener("mousemove", event => {
-            wio.events.push(13, event.offsetX, event.offsetY);
+            if (wio.cursor_mode != 2) {
+                wio.events.push(13, event.offsetX, event.offsetY);
+            } else {
+                wio.events.push(14, event.movementX, event.movementY);
+            }
         });
         canvas.addEventListener("wheel", event => {
             if (event.deltaY != 0) wio.events.push(15, event.deltaY * 0.01);
@@ -113,18 +118,25 @@ const wio = {
             10: "nesw-resize",
             11: "nwse-resize",
         }[cursor];
-        wio.canvas.style.cursor = wio.cursor;
+
+        if (wio.cursor_mode == 0) {
+            wio.canvas.style.cursor = wio.cursor;
+        }
     },
 
     setCursorMode(mode) {
-        switch (mode) {
-            case 0:
-                wio.canvas.style.cursor = wio.cursor;
-                break;
-            case 1:
-                wio.cursor = wio.canvas.style.cursor;
-                wio.canvas.style.cursor = "none";
-                break;
+        wio.cursor_mode = mode;
+
+        if (mode == 0) {
+            wio.canvas.style.cursor = wio.cursor;
+        } else {
+            wio.canvas.style.cursor = "none";
+        }
+
+        if (mode == 2) {
+            wio.canvas.requestPointerLock({ unadjustedMovement: true });
+        } else {
+            document.exitPointerLock();
         }
     },
 

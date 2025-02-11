@@ -78,6 +78,7 @@ pub fn getEvent(_: *@This()) ?wio.Event {
         .button_repeat => .{ .button_repeat = @enumFromInt(js.shift()) },
         .button_release => .{ .button_release = @enumFromInt(js.shift()) },
         .mouse => .{ .mouse = .{ .x = @intCast(js.shift()), .y = @intCast(js.shift()) } },
+        .mouse_relative => .{ .mouse_relative = .{ .x = @intCast(@as(i32, @bitCast(js.shift()))), .y = @intCast(@as(i32, @bitCast(js.shift()))) } },
         .scroll_vertical => .{ .scroll_vertical = js.shiftFloat() },
         .scroll_horizontal => .{ .scroll_horizontal = js.shiftFloat() },
         else => unreachable,
