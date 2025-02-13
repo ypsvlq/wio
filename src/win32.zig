@@ -255,7 +255,6 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     self.setMode(options.mode);
     if (options.cursor != .arrow) self.setCursor(options.cursor);
 
-    self.pushEvent(.create);
     return self;
 }
 

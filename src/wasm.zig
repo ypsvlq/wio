@@ -66,7 +66,6 @@ pub fn getEvent(_: *@This()) ?wio.Event {
     const event: wio.EventType = @enumFromInt(js.shift());
     return switch (event) {
         .close => null, // never sent, EventType 0 is reused to indicate empty queue
-        .create => .create,
         .focused => .focused,
         .unfocused => .unfocused,
         .size => .{ .size = .{ .width = @intCast(js.shift()), .height = @intCast(js.shift()) } },

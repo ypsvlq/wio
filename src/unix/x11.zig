@@ -229,7 +229,6 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     try self.events.writeItem(.{ .size = size });
     try self.events.writeItem(.{ .framebuffer = size });
     try self.events.writeItem(.{ .scale = scale });
-    try self.events.writeItem(.create);
 
     try windows.put(window, self);
     return self;

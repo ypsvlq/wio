@@ -274,7 +274,6 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     self.pushEvent(.{ .scale = options.scale });
     self.pushEvent(.{ .size = options.size });
     self.pushEvent(.{ .framebuffer = options.size });
-    self.pushEvent(.create);
 
     self.setMode(options.mode);
 

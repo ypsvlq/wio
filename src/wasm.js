@@ -20,40 +20,38 @@ const wio = {
         requestAnimationFrame(wio.loop);
 
         new ResizeObserver(wio.resize).observe(canvas);
-        wio.resize();
-        wio.events.push(1);
 
         canvas.addEventListener("contextmenu", event => event.preventDefault());
-        canvas.addEventListener("focus", () => wio.events.push(2));
-        canvas.addEventListener("blur", () => wio.events.push(3));
+        canvas.addEventListener("focus", () => wio.events.push(1));
+        canvas.addEventListener("blur", () => wio.events.push(2));
         canvas.addEventListener("keydown", event => {
             event.preventDefault();
             const key = wio.keys[event.code];
-            if (key) wio.events.push(event.repeat ? 11 : 10, key);
-            if ([...event.key].length == 1) wio.events.push(9, event.key.codePointAt(0));
+            if (key) wio.events.push(event.repeat ? 10 : 9, key);
+            if ([...event.key].length == 1) wio.events.push(8, event.key.codePointAt(0));
         });
         canvas.addEventListener("keyup", event => {
             const key = wio.keys[event.code];
-            if (key) wio.events.push(12, key);
+            if (key) wio.events.push(11, key);
         });
         canvas.addEventListener("mousedown", event => {
             const button = wio.buttons[event.button];
-            if (button != undefined) wio.events.push(10, button);
+            if (button != undefined) wio.events.push(9, button);
         });
         canvas.addEventListener("mouseup", event => {
             const button = wio.buttons[event.button];
-            if (button != undefined) wio.events.push(12, button);
+            if (button != undefined) wio.events.push(11, button);
         });
         canvas.addEventListener("mousemove", event => {
             if (wio.cursor_mode != 2) {
-                wio.events.push(13, event.offsetX, event.offsetY);
+                wio.events.push(12, event.offsetX, event.offsetY);
             } else {
-                wio.events.push(14, event.movementX, event.movementY);
+                wio.events.push(13, event.movementX, event.movementY);
             }
         });
         canvas.addEventListener("wheel", event => {
-            if (event.deltaY != 0) wio.events.push(15, event.deltaY * 0.01);
-            if (event.deltaX != 0) wio.events.push(16, event.deltaX * 0.01);
+            if (event.deltaY != 0) wio.events.push(14, event.deltaY * 0.01);
+            if (event.deltaX != 0) wio.events.push(15, event.deltaX * 0.01);
         });
 
         addEventListener("gamepadconnected", event => wio.module.exports.wioJoystick(event.gamepad.index));
@@ -71,10 +69,10 @@ const wio = {
         canvas.width = width * devicePixelRatio;
         canvas.height = height * devicePixelRatio;
         wio.events.push(
-            8, (document.fullscreenElement == wio.canvas) ? 2 : 0,
-            5, width, height,
-            6, canvas.width, canvas.height,
-            7, devicePixelRatio,
+            7, (document.fullscreenElement == wio.canvas) ? 2 : 0,
+            4, width, height,
+            5, canvas.width, canvas.height,
+            6, devicePixelRatio,
         );
     },
 

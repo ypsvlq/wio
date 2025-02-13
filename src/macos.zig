@@ -610,10 +610,6 @@ export fn wioClose(self: *@This()) void {
     self.pushEvent(.close);
 }
 
-export fn wioCreate(self: *@This()) void {
-    self.pushEvent(.create);
-}
-
 export fn wioFocus(self: *@This()) void {
     self.pushEvent(.focused);
 }

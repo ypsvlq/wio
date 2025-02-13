@@ -2,7 +2,6 @@
 #include <IOKit/hid/IOHIDKeys.h>
 
 extern void wioClose(void *);
-extern void wioCreate(void *);
 extern void wioFocus(void *);
 extern void wioUnfocus(void *);
 extern void wioSize(void *, uint8_t, UInt16, UInt16, UInt16, UInt16);
@@ -318,7 +317,6 @@ void *wioCreateWindow(void *ptr, uint16_t width, uint16_t height) {
     NSRect framebuffer = [view convertRectToBacking:rect];
     wioSize(ptr, false, rect.size.width, rect.size.height, framebuffer.size.width, framebuffer.size.height);
     wioScale(ptr, [window backingScaleFactor]);
-    wioCreate(ptr);
 
     return (void*)CFBridgingRetain(window);
 }

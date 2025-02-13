@@ -280,8 +280,6 @@ pub const AudioFormat = struct {
 
 pub const Event = union(enum) {
     close: void,
-    /// Sent on window creation, after `size`, `framebuffer`, and `scale`.
-    create: void,
     focused: void,
     unfocused: void,
     draw: void,
