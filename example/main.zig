@@ -6,7 +6,10 @@ const audio = @import("audio.zig");
 
 pub const std_options = std.Options{
     .log_level = .info,
-    .logFn = wio.logFn,
+    .logFn = if (@import("builtin").cpu.arch.isWasm())
+        @import("wasm.zig").logFn
+    else
+        std.log.defaultLog,
 };
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};

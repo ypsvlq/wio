@@ -10,8 +10,6 @@ pub const backend = switch (builtin.os.tag) {
 pub var allocator: std.mem.Allocator = undefined;
 pub var init_options: InitOptions = undefined;
 
-pub const logFn = if (@hasDecl(backend, "logFn")) backend.logFn else std.log.defaultLog;
-
 pub const InitOptions = struct {
     joystick: bool = false,
     /// Free with `JoystickDevice.release()`.

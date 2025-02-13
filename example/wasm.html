@@ -14,6 +14,7 @@
     <body>
         <canvas id="canvas" tabindex="-1"></canvas>
         <script src="../src/wasm.js"></script>
-        <script>WebAssembly.instantiateStreaming(fetch("../zig-out/bin/wio.wasm"), { wio: wio }).then(result => wio.run(result.instance, document.getElementById("canvas")));</script>
+        <script src="wasm.js"></script>
+        <script>WebAssembly.instantiateStreaming(fetch("../zig-out/bin/wio.wasm"), { wio: wio, log: log, gl: gl }).then(result => wio.run(result.instance, document.getElementById("canvas")));</script>
     </body>
 </html>
