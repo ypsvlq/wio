@@ -37,7 +37,7 @@ const wio = {
 
     createWindow() {
         const canvas = wio.canvases.shift();
-        if (canvas == undefined) throw new Error("no canvas available");
+        if (canvas === undefined) throw new Error("no canvas available");
 
         const events = [];
         const window = {
@@ -53,7 +53,7 @@ const wio = {
             canvas.width = width * devicePixelRatio;
             canvas.height = height * devicePixelRatio;
             events.push(
-                7, (document.fullscreenElement == canvas) ? 2 : 0,
+                7, (document.fullscreenElement === canvas) ? 2 : 0,
                 4, width, height,
                 5, canvas.width, canvas.height,
                 6, devicePixelRatio,
@@ -66,7 +66,7 @@ const wio = {
             event.preventDefault();
             const key = wio.keys[event.code];
             if (key) events.push(event.repeat ? 10 : 9, key);
-            if ([...event.key].length == 1) events.push(8, event.key.codePointAt(0));
+            if ([...event.key].length === 1) events.push(8, event.key.codePointAt(0));
         });
         canvas.addEventListener("keyup", event => {
             const key = wio.keys[event.code];
@@ -74,22 +74,22 @@ const wio = {
         });
         canvas.addEventListener("mousedown", event => {
             const button = wio.buttons[event.button];
-            if (button != undefined) events.push(9, button);
+            if (button !== undefined) events.push(9, button);
         });
         canvas.addEventListener("mouseup", event => {
             const button = wio.buttons[event.button];
-            if (button != undefined) events.push(11, button);
+            if (button !== undefined) events.push(11, button);
         });
         canvas.addEventListener("mousemove", event => {
-            if (window.cursor_mode != 2) {
+            if (window.cursor_mode !== 2) {
                 events.push(12, event.offsetX, event.offsetY);
             } else {
                 events.push(13, event.movementX, event.movementY);
             }
         });
         canvas.addEventListener("wheel", event => {
-            if (event.deltaY != 0) events.push(14, event.deltaY * 0.01);
-            if (event.deltaX != 0) events.push(15, event.deltaX * 0.01);
+            if (event.deltaY !== 0) events.push(14, event.deltaY * 0.01);
+            if (event.deltaX !== 0) events.push(15, event.deltaX * 0.01);
         });
 
         wio.windows.push(window);
@@ -120,7 +120,7 @@ const wio = {
             11: "nwse-resize",
         }[cursor];
 
-        if (wio.windows[id].cursor_mode == 0) {
+        if (wio.windows[id].cursor_mode === 0) {
             wio.windows[id].canvas.style.cursor = wio.windows[id].cursor;
         }
     },
@@ -128,13 +128,13 @@ const wio = {
     setCursorMode(id, mode) {
         wio.windows[id].cursor_mode = mode;
 
-        if (mode == 0) {
+        if (mode === 0) {
             wio.windows[id].canvas.style.cursor = wio.windows[id].cursor;
         } else {
             wio.windows[id].canvas.style.cursor = "none";
         }
 
-        if (mode == 2) {
+        if (mode === 2) {
             wio.windows[id].canvas.requestPointerLock({ unadjustedMovement: true });
         } else {
             document.exitPointerLock();
@@ -150,7 +150,7 @@ const wio = {
         wio.gamepad_ids = [];
         const encoder = new TextEncoder();
         for (let i = 0; i < wio.gamepads.length; i++) {
-            if (wio.gamepads[i] != null) {
+            if (wio.gamepads[i] !== null) {
                 wio.gamepad_ids[i] = encoder.encode(wio.gamepads[i].id);
             } else {
                 wio.gamepad_ids[i] = { length: 0 };
@@ -168,7 +168,7 @@ const wio = {
     },
 
     openJoystick(i, ptr) {
-        if (wio.gamepads[i] == null || !wio.gamepads[i].connected) return false;
+        if (wio.gamepads[i] === null || !wio.gamepads[i].connected) return false;
         const lengths = new Uint32Array(wio.module.exports.memory.buffer, ptr, 2);
         lengths[0] = wio.gamepads[i].axes.length;
         lengths[1] = wio.gamepads[i].buttons.length;
@@ -176,7 +176,7 @@ const wio = {
     },
 
     getJoystickState(index, axes_ptr, axes_len, buttons_ptr, buttons_len) {
-        if (wio.gamepads[index] == null || !wio.gamepads[index].connected) return false;
+        if (wio.gamepads[index] === null || !wio.gamepads[index].connected) return false;
         const axes = new Uint16Array(wio.module.exports.memory.buffer, axes_ptr, axes_len);
         const buttons = new Uint8Array(wio.module.exports.memory.buffer, buttons_ptr, buttons_len);
         for (let i = 0; i < axes_len; i++) {

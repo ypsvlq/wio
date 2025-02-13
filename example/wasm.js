@@ -32,14 +32,14 @@ const gl = {
         const buffer = new Uint8Array(wio.module.exports.memory.buffer, ptr);
         const result = new TextEncoder().encodeInto(string, buffer.subarray(0, max - 1));
         buffer[result.written] = 0;
-        if (length != 0) {
+        if (length !== 0) {
             new Int32Array(wio.module.exports.memory.buffer, length)[0] = result.written;
         }
     },
 
     setParams(Array, ptr, value) {
         const buffer = new Array(wio.module.exports.memory.buffer, ptr);
-        if (typeof value[Symbol.iterator] == "function") {
+        if (typeof value[Symbol.iterator] === "function") {
             buffer.set(value);
         } else {
             buffer[0] = value;
@@ -48,7 +48,7 @@ const gl = {
 
     pushObject(object) {
         const index = gl.objects.indexOf(null);
-        if (index != -1) {
+        if (index !== -1) {
             gl.objects[index] = object;
             return index;
         } else {
@@ -295,7 +295,7 @@ const gl = {
 
     getActiveAttrib(program, index, bufSize, length, size, type, name) {
         const info = gl.context.getActiveAttrib(gl.objects[program], index);
-        if (info == null) return;
+        if (info === null) return;
         new Int32Array(wio.module.exports.memory.buffer, size)[0] = info.size;
         new Uint32Array(wio.module.exports.memory.buffer, type)[0] = info.type;
         gl.setStringZ(name, bufSize, length, info.name);
@@ -303,7 +303,7 @@ const gl = {
 
     getActiveUniform(program, index, bufSize, length, size, type, name) {
         const info = gl.context.getActiveUniform(gl.objects[program], index);
-        if (info == null) return;
+        if (info === null) return;
         new Int32Array(wio.module.exports.memory.buffer, size)[0] = info.size;
         new Uint32Array(wio.module.exports.memory.buffer, type)[0] = info.type;
         gl.setStringZ(name, bufSize, length, info.name);
@@ -315,7 +315,7 @@ const gl = {
         for (var i = 0; i < maxCount && i < indices.length; i++) {
             buffer[i] = indices[i];
         }
-        if (count != 0) {
+        if (count !== 0) {
             new Int32Array(wio.module.exports.memory.buffer, count)[0] = i;
         }
     },
@@ -342,7 +342,7 @@ const gl = {
 
     getFramebufferAttachmentParameteriv(target, attachment, pname, params) {
         const value = gl.context.getFramebufferAttachmentParameter(target, attachment, pname);
-        if (typeof value == "object") {
+        if (typeof value === "object") {
             value = gl.objects.indexOf(value);
         }
         new Int32Array(wio.module.exports.memory.buffer, params)[0] = value;
@@ -485,7 +485,7 @@ const gl = {
         const lengths = new Int32Array(wio.module.exports.memory.buffer, lengths_ptr, count);
         var string = "";
         for (let i = 0; i < count; i++) {
-            string += (lengths_ptr != 0 && lengths[i] >= 0) ? wio.getString(strings[i], lengths[i]) : gl.getStringZ(strings[i]);
+            string += (lengths_ptr !== 0 && lengths[i] >= 0) ? wio.getString(strings[i], lengths[i]) : gl.getStringZ(strings[i]);
         }
         gl.context.shaderSource(gl.objects[shader], string);
     },
