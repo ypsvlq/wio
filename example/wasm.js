@@ -1,3 +1,5 @@
+"use strict";
+
 const log = {
     buffer: "",
 
@@ -16,7 +18,7 @@ const gl = {
     objects: [,],
 
     init() {
-        gl.context = wio.canvas.getContext("webgl");
+        gl.context = document.getElementById("canvas").getContext("webgl");
     },
 
     getStringZ(ptr) {

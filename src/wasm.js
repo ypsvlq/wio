@@ -2,54 +2,17 @@
 
 const wio = {
     module: undefined,
-    canvas: undefined,
-    events: [],
-    cursor: undefined,
-    cursor_mode: undefined,
+    canvases: undefined,
+    windows: [],
     gamepads: undefined,
     gamepad_ids: undefined,
 
-    run(module, canvas) {
+    run(module, canvases) {
         wio.module = module;
-        wio.canvas = canvas;
+        wio.canvases = canvases;
 
         module.exports._start();
         requestAnimationFrame(wio.loop);
-
-        new ResizeObserver(wio.resize).observe(canvas);
-
-        canvas.addEventListener("contextmenu", event => event.preventDefault());
-        canvas.addEventListener("focus", () => wio.events.push(1));
-        canvas.addEventListener("blur", () => wio.events.push(2));
-        canvas.addEventListener("keydown", event => {
-            event.preventDefault();
-            const key = wio.keys[event.code];
-            if (key) wio.events.push(event.repeat ? 10 : 9, key);
-            if ([...event.key].length == 1) wio.events.push(8, event.key.codePointAt(0));
-        });
-        canvas.addEventListener("keyup", event => {
-            const key = wio.keys[event.code];
-            if (key) wio.events.push(11, key);
-        });
-        canvas.addEventListener("mousedown", event => {
-            const button = wio.buttons[event.button];
-            if (button != undefined) wio.events.push(9, button);
-        });
-        canvas.addEventListener("mouseup", event => {
-            const button = wio.buttons[event.button];
-            if (button != undefined) wio.events.push(11, button);
-        });
-        canvas.addEventListener("mousemove", event => {
-            if (wio.cursor_mode != 2) {
-                wio.events.push(12, event.offsetX, event.offsetY);
-            } else {
-                wio.events.push(13, event.movementX, event.movementY);
-            }
-        });
-        canvas.addEventListener("wheel", event => {
-            if (event.deltaY != 0) wio.events.push(14, event.deltaY * 0.01);
-            if (event.deltaX != 0) wio.events.push(15, event.deltaX * 0.01);
-        });
 
         addEventListener("gamepadconnected", event => wio.module.exports.wioJoystick(event.gamepad.index));
     },
@@ -60,37 +23,89 @@ const wio = {
         }
     },
 
-    resize() {
-        const width = parseInt(canvas.scrollWidth);
-        const height = parseInt(canvas.scrollHeight);
-        canvas.width = width * devicePixelRatio;
-        canvas.height = height * devicePixelRatio;
-        wio.events.push(
-            7, (document.fullscreenElement == wio.canvas) ? 2 : 0,
-            4, width, height,
-            5, canvas.width, canvas.height,
-            6, devicePixelRatio,
-        );
+    shift(id) {
+        return wio.windows[id].events.shift();
     },
 
-    shift() {
-        return wio.events.shift();
+    shiftFloat(id) {
+        return wio.windows[id].events.shift();
     },
 
-    shiftFloat() {
-        return wio.events.shift();
+    messageBox(ptr, len) {
+        alert(wio.getString(ptr, len));
     },
 
-    setFullscreen(fullscreen) {
+    createWindow() {
+        const canvas = wio.canvases.shift();
+        if (canvas == undefined) throw new Error("no canvas available");
+
+        const events = [];
+        const window = {
+            canvas: canvas,
+            events: events,
+            cursor: undefined,
+            cursor_mode: undefined,
+        };
+
+        new ResizeObserver(() => {
+            const width = parseInt(canvas.scrollWidth);
+            const height = parseInt(canvas.scrollHeight);
+            canvas.width = width * devicePixelRatio;
+            canvas.height = height * devicePixelRatio;
+            events.push(
+                7, (document.fullscreenElement == canvas) ? 2 : 0,
+                4, width, height,
+                5, canvas.width, canvas.height,
+                6, devicePixelRatio,
+            );
+        }).observe(canvas);
+        canvas.addEventListener("contextmenu", event => event.preventDefault());
+        canvas.addEventListener("focus", () => events.push(1));
+        canvas.addEventListener("blur", () => events.push(2));
+        canvas.addEventListener("keydown", event => {
+            event.preventDefault();
+            const key = wio.keys[event.code];
+            if (key) events.push(event.repeat ? 10 : 9, key);
+            if ([...event.key].length == 1) events.push(8, event.key.codePointAt(0));
+        });
+        canvas.addEventListener("keyup", event => {
+            const key = wio.keys[event.code];
+            if (key) events.push(11, key);
+        });
+        canvas.addEventListener("mousedown", event => {
+            const button = wio.buttons[event.button];
+            if (button != undefined) events.push(9, button);
+        });
+        canvas.addEventListener("mouseup", event => {
+            const button = wio.buttons[event.button];
+            if (button != undefined) events.push(11, button);
+        });
+        canvas.addEventListener("mousemove", event => {
+            if (window.cursor_mode != 2) {
+                events.push(12, event.offsetX, event.offsetY);
+            } else {
+                events.push(13, event.movementX, event.movementY);
+            }
+        });
+        canvas.addEventListener("wheel", event => {
+            if (event.deltaY != 0) events.push(14, event.deltaY * 0.01);
+            if (event.deltaX != 0) events.push(15, event.deltaX * 0.01);
+        });
+
+        wio.windows.push(window);
+        return wio.windows.length - 1;
+    },
+
+    setFullscreen(id, fullscreen) {
         if (fullscreen) {
-            wio.canvas.requestFullscreen().catch(() => { });
+            wio.windows[id].canvas.requestFullscreen().catch(() => { });
         } else {
             document.exitFullscreen().catch(() => { });
         }
     },
 
-    setCursor(cursor) {
-        wio.cursor = {
+    setCursor(id, cursor) {
+        wio.windows[id].cursor = {
             0: "default",
             1: "progress",
             2: "wait",
@@ -105,25 +120,29 @@ const wio = {
             11: "nwse-resize",
         }[cursor];
 
-        if (wio.cursor_mode == 0) {
-            wio.canvas.style.cursor = wio.cursor;
+        if (wio.windows[id].cursor_mode == 0) {
+            wio.windows[id].canvas.style.cursor = wio.windows[id].cursor;
         }
     },
 
-    setCursorMode(mode) {
-        wio.cursor_mode = mode;
+    setCursorMode(id, mode) {
+        wio.windows[id].cursor_mode = mode;
 
         if (mode == 0) {
-            wio.canvas.style.cursor = wio.cursor;
+            wio.windows[id].canvas.style.cursor = wio.windows[id].cursor;
         } else {
-            wio.canvas.style.cursor = "none";
+            wio.windows[id].canvas.style.cursor = "none";
         }
 
         if (mode == 2) {
-            wio.canvas.requestPointerLock({ unadjustedMovement: true });
+            wio.windows[id].canvas.requestPointerLock({ unadjustedMovement: true });
         } else {
             document.exitPointerLock();
         }
+    },
+
+    setClipboardText(ptr, len) {
+        navigator.clipboard.writeText(wio.getString(ptr, len));
     },
 
     getJoysticks() {
@@ -167,14 +186,6 @@ const wio = {
             buttons[i] = wio.gamepads[index].buttons[i].pressed;
         }
         return true;
-    },
-
-    messageBox(ptr, len) {
-        alert(wio.getString(ptr, len));
-    },
-
-    setClipboardText(ptr, len) {
-        navigator.clipboard.writeText(wio.getString(ptr, len));
     },
 
     getString(ptr, len) {

@@ -2,18 +2,19 @@ const std = @import("std");
 const wio = @import("wio.zig");
 
 const js = struct {
-    pub extern "wio" fn shift() u32;
-    pub extern "wio" fn shiftFloat() f32;
-    pub extern "wio" fn setFullscreen(bool) void;
-    pub extern "wio" fn setCursor(u8) void;
-    pub extern "wio" fn setCursorMode(u8) void;
-    pub extern "wio" fn getJoysticks() u32;
-    pub extern "wio" fn getJoystickIdLen(u32) u32;
-    pub extern "wio" fn getJoystickId(u32, [*]u8) void;
-    pub extern "wio" fn openJoystick(u32, *[2]u32) bool;
-    pub extern "wio" fn getJoystickState(u32, [*]u16, usize, [*]bool, usize) bool;
-    pub extern "wio" fn messageBox([*]const u8, usize) void;
-    pub extern "wio" fn setClipboardText([*]const u8, usize) void;
+    extern "wio" fn shift(u32) u32;
+    extern "wio" fn shiftFloat(u32) f32;
+    extern "wio" fn messageBox([*]const u8, usize) void;
+    extern "wio" fn createWindow() u32;
+    extern "wio" fn setFullscreen(u32, bool) void;
+    extern "wio" fn setCursor(u32, u8) void;
+    extern "wio" fn setCursorMode(u32, u8) void;
+    extern "wio" fn setClipboardText([*]const u8, usize) void;
+    extern "wio" fn getJoysticks() u32;
+    extern "wio" fn getJoystickIdLen(u32) u32;
+    extern "wio" fn getJoystickId(u32, [*]u8) void;
+    extern "wio" fn openJoystick(u32, *[2]u32) bool;
+    extern "wio" fn getJoystickState(u32, [*]u16, usize, [*]bool, usize) bool;
 };
 
 pub fn init(_: wio.InitOptions) !void {}
@@ -37,8 +38,10 @@ pub fn messageBox(_: wio.MessageBoxStyle, _: []const u8, message: []const u8) vo
     js.messageBox(message.ptr, message.len);
 }
 
+id: u32,
+
 pub fn createWindow(options: wio.CreateWindowOptions) !@This() {
-    var self = @This(){};
+    var self = @This(){ .id = js.createWindow() };
     self.setCursor(options.cursor);
     self.setCursorMode(options.cursor_mode);
     return self;
@@ -46,40 +49,40 @@ pub fn createWindow(options: wio.CreateWindowOptions) !@This() {
 
 pub fn destroy(_: *@This()) void {}
 
-pub fn getEvent(_: *@This()) ?wio.Event {
-    const event: wio.EventType = @enumFromInt(js.shift());
+pub fn getEvent(self: *@This()) ?wio.Event {
+    const event: wio.EventType = @enumFromInt(js.shift(self.id));
     return switch (event) {
         .close => null, // never sent, EventType 0 is reused to indicate empty queue
         .focused => .focused,
         .unfocused => .unfocused,
-        .size => .{ .size = .{ .width = @intCast(js.shift()), .height = @intCast(js.shift()) } },
-        .framebuffer => .{ .framebuffer = .{ .width = @intCast(js.shift()), .height = @intCast(js.shift()) } },
-        .scale => .{ .scale = js.shiftFloat() },
-        .mode => .{ .mode = @enumFromInt(js.shift()) },
-        .char => .{ .char = @intCast(js.shift()) },
-        .button_press => .{ .button_press = @enumFromInt(js.shift()) },
-        .button_repeat => .{ .button_repeat = @enumFromInt(js.shift()) },
-        .button_release => .{ .button_release = @enumFromInt(js.shift()) },
-        .mouse => .{ .mouse = .{ .x = @intCast(js.shift()), .y = @intCast(js.shift()) } },
-        .mouse_relative => .{ .mouse_relative = .{ .x = @intCast(@as(i32, @bitCast(js.shift()))), .y = @intCast(@as(i32, @bitCast(js.shift()))) } },
-        .scroll_vertical => .{ .scroll_vertical = js.shiftFloat() },
-        .scroll_horizontal => .{ .scroll_horizontal = js.shiftFloat() },
+        .size => .{ .size = .{ .width = @intCast(js.shift(self.id)), .height = @intCast(js.shift(self.id)) } },
+        .framebuffer => .{ .framebuffer = .{ .width = @intCast(js.shift(self.id)), .height = @intCast(js.shift(self.id)) } },
+        .scale => .{ .scale = js.shiftFloat(self.id) },
+        .mode => .{ .mode = @enumFromInt(js.shift(self.id)) },
+        .char => .{ .char = @intCast(js.shift(self.id)) },
+        .button_press => .{ .button_press = @enumFromInt(js.shift(self.id)) },
+        .button_repeat => .{ .button_repeat = @enumFromInt(js.shift(self.id)) },
+        .button_release => .{ .button_release = @enumFromInt(js.shift(self.id)) },
+        .mouse => .{ .mouse = .{ .x = @intCast(js.shift(self.id)), .y = @intCast(js.shift(self.id)) } },
+        .mouse_relative => .{ .mouse_relative = .{ .x = @intCast(@as(i32, @bitCast(js.shift(self.id)))), .y = @intCast(@as(i32, @bitCast(js.shift(self.id)))) } },
+        .scroll_vertical => .{ .scroll_vertical = js.shiftFloat(self.id) },
+        .scroll_horizontal => .{ .scroll_horizontal = js.shiftFloat(self.id) },
         else => unreachable,
     };
 }
 
 pub fn setTitle(_: *@This(), _: []const u8) void {}
 
-pub fn setMode(_: *@This(), mode: wio.WindowMode) void {
-    js.setFullscreen(mode == .fullscreen);
+pub fn setMode(self: *@This(), mode: wio.WindowMode) void {
+    js.setFullscreen(self.id, mode == .fullscreen);
 }
 
-pub fn setCursor(_: *@This(), shape: wio.Cursor) void {
-    js.setCursor(@intFromEnum(shape));
+pub fn setCursor(self: *@This(), shape: wio.Cursor) void {
+    js.setCursor(self.id, @intFromEnum(shape));
 }
 
-pub fn setCursorMode(_: *@This(), mode: wio.CursorMode) void {
-    js.setCursorMode(@intFromEnum(mode));
+pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
+    js.setCursorMode(self.id, @intFromEnum(mode));
 }
 
 pub fn requestAttention(_: *@This()) void {}
