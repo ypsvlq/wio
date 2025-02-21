@@ -160,16 +160,16 @@ pub const JoystickDevice = struct {
         return .{ .fd = fd, .abs_map = abs_map, .key_map = key_map, .axis_info = axis_info, .axes = axes, .hats = hats, .buttons = buttons };
     }
 
-    pub fn getId(self: JoystickDevice, allocator: std.mem.Allocator) !?[]u8 {
+    pub fn getId(self: JoystickDevice, allocator: std.mem.Allocator) ![]u8 {
         var info: c.input_id = undefined;
-        if (std.os.linux.ioctl(self.fd, c.EVIOCGID, @intFromPtr(&info)) != 0) return null;
-        return try std.fmt.allocPrint(allocator, "{x:0>4}{x:0>4}", .{ info.vendor, info.product });
+        if (std.os.linux.ioctl(self.fd, c.EVIOCGID, @intFromPtr(&info)) != 0) return error.Unexpected;
+        return std.fmt.allocPrint(allocator, "{x:0>4}{x:0>4}", .{ info.vendor, info.product });
     }
 
     pub fn getName(self: JoystickDevice, allocator: std.mem.Allocator) ![]u8 {
         var buf: [512]u8 = undefined;
         const count = std.os.linux.ioctl(self.fd, c.EVIOCGNAME(buf.len), @intFromPtr(&buf));
-        if (std.os.linux.E.init(count) != .SUCCESS) return "";
+        if (std.os.linux.E.init(count) != .SUCCESS) return error.Unexpected;
         return allocator.dupe(u8, buf[0..count]);
     }
 };

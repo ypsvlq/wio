@@ -143,8 +143,8 @@ pub const JoystickDevice = struct {
         return .{ .index = self.index, .axes = axes, .buttons = buttons };
     }
 
-    pub fn getId(_: JoystickDevice, _: std.mem.Allocator) !?[]u8 {
-        return null;
+    pub fn getId(_: JoystickDevice, _: std.mem.Allocator) ![]u8 {
+        return error.Unexpected;
     }
 
     pub fn getName(self: JoystickDevice, allocator: std.mem.Allocator) ![]u8 {

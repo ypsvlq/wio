@@ -26,12 +26,12 @@ pub const JoystickDevice = struct {
         return error.Unexpected;
     }
 
-    pub fn getId(_: JoystickDevice, _: std.mem.Allocator) !?[]u8 {
-        return null;
+    pub fn getId(_: JoystickDevice, _: std.mem.Allocator) ![]u8 {
+        return error.Unexpected;
     }
 
     pub fn getName(_: JoystickDevice, _: std.mem.Allocator) ![]u8 {
-        return "";
+        return error.Unexpected;
     }
 };
 

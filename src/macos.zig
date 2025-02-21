@@ -301,14 +301,14 @@ pub const JoystickDevice = struct {
         };
     }
 
-    pub fn getId(self: JoystickDevice, allocator: std.mem.Allocator) !?[]u8 {
-        const vendor_cf = c.IOHIDDeviceGetProperty(self.device, wioHIDVendorIDKey) orelse return null;
-        const product_cf = c.IOHIDDeviceGetProperty(self.device, wioHIDProductIDKey) orelse return null;
+    pub fn getId(self: JoystickDevice, allocator: std.mem.Allocator) ![]u8 {
+        const vendor_cf = c.IOHIDDeviceGetProperty(self.device, wioHIDVendorIDKey) orelse return error.Unexpected;
+        const product_cf = c.IOHIDDeviceGetProperty(self.device, wioHIDProductIDKey) orelse return error.Unexpected;
         var vendor: u32 = undefined;
         var product: u32 = undefined;
         _ = c.CFNumberGetValue(@ptrCast(vendor_cf), c.kCFNumberSInt32Type, &vendor);
         _ = c.CFNumberGetValue(@ptrCast(product_cf), c.kCFNumberSInt32Type, &product);
-        return try std.fmt.allocPrint(allocator, "{x:0>4}{x:0>4}", .{ vendor, product });
+        return std.fmt.allocPrint(allocator, "{x:0>4}{x:0>4}", .{ vendor, product });
     }
 
     pub fn getName(self: JoystickDevice, allocator: std.mem.Allocator) ![]u8 {

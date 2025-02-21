@@ -592,25 +592,25 @@ pub const JoystickDevice = union(enum) {
         }
     }
 
-    pub fn getId(self: JoystickDevice, allocator: std.mem.Allocator) !?[]u8 {
+    pub fn getId(self: JoystickDevice, allocator: std.mem.Allocator) ![]u8 {
         switch (self) {
             .rawinput => |device| {
-                const info = joysticks.get(device) orelse return null;
-                return try std.unicode.utf16LeToUtf8Alloc(allocator, info.interface[0 .. info.interface.len - 1]);
+                const info = joysticks.get(device) orelse return error.Unexpected;
+                return std.unicode.utf16LeToUtf8Alloc(allocator, info.interface[0 .. info.interface.len - 1]);
             },
-            .xinput => return try allocator.dupe(u8, "xinput"),
+            .xinput => return allocator.dupe(u8, "xinput"),
         }
     }
 
     pub fn getName(self: JoystickDevice, allocator: std.mem.Allocator) ![]u8 {
         switch (self) {
             .rawinput => |device| {
-                const info = joysticks.get(device) orelse return "";
-                const collection = w.CreateFileW(info.interface.ptr, 0, w.FILE_SHARE_READ | w.FILE_SHARE_WRITE, null, w.OPEN_EXISTING, 0, null) orelse return "";
+                const info = joysticks.get(device) orelse return error.Unexpected;
+                const collection = w.CreateFileW(info.interface.ptr, 0, w.FILE_SHARE_READ | w.FILE_SHARE_WRITE, null, w.OPEN_EXISTING, 0, null) orelse return error.Unexpected;
                 defer std.os.windows.CloseHandle(collection);
                 var product: [2046]u16 = undefined;
                 product[0] = 0;
-                if (w.HidD_GetProductString(collection, &product, product.len * @sizeOf(u16)) == w.FALSE) return "";
+                if (w.HidD_GetProductString(collection, &product, product.len * @sizeOf(u16)) == w.FALSE) return error.Unexpected;
                 return std.unicode.utf16LeToUtf8Alloc(allocator, std.mem.sliceTo(&product, 0));
             },
             .xinput => return allocator.dupe(u8, "Xbox Controller"),
