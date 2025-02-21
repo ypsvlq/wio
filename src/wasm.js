@@ -4,8 +4,7 @@ const wio = {
     module: undefined,
     canvases: undefined,
     windows: [],
-    gamepads: undefined,
-    gamepad_ids: undefined,
+    gamepads: navigator.getGamepads(),
 
     run(module, canvases) {
         wio.module = module;
@@ -14,7 +13,10 @@ const wio = {
         module.exports._start();
         requestAnimationFrame(wio.loop);
 
-        addEventListener("gamepadconnected", event => wio.module.exports.wioJoystick(event.gamepad.index));
+        addEventListener("gamepadconnected", event => {
+            wio.gamepads = navigator.getGamepads();
+            wio.module.exports.wioJoystick(event.gamepad.index)
+        });
     },
 
     loop() {
@@ -145,26 +147,16 @@ const wio = {
         navigator.clipboard.writeText(wio.getString(ptr, len));
     },
 
-    getJoysticks() {
-        wio.gamepads = navigator.getGamepads();
-        wio.gamepad_ids = [];
-        const encoder = new TextEncoder();
-        for (let i = 0; i < wio.gamepads.length; i++) {
-            if (wio.gamepads[i] !== null) {
-                wio.gamepad_ids[i] = encoder.encode(wio.gamepads[i].id);
-            } else {
-                wio.gamepad_ids[i] = { length: 0 };
-            }
-        }
+    getJoystickCount() {
         return wio.gamepads.length;
     },
 
     getJoystickIdLen(i) {
-        return wio.gamepad_ids[i].length;
+        return (wio.gamepads[i] !== null) ? new TextEncoder().encode(wio.gamepads[i].id).length : 0;
     },
 
     getJoystickId(i, ptr) {
-        new Uint8Array(wio.module.exports.memory.buffer, ptr).set(wio.gamepad_ids[i]);
+        new TextEncoder().encodeInto(wio.gamepads[i].id, new Uint8Array(wio.module.exports.memory.buffer, ptr));
     },
 
     openJoystick(i, ptr) {

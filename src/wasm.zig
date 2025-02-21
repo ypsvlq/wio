@@ -10,7 +10,7 @@ const js = struct {
     extern "wio" fn setCursor(u32, u8) void;
     extern "wio" fn setCursorMode(u32, u8) void;
     extern "wio" fn setClipboardText([*]const u8, usize) void;
-    extern "wio" fn getJoysticks() u32;
+    extern "wio" fn getJoystickCount() u32;
     extern "wio" fn getJoystickIdLen(u32) u32;
     extern "wio" fn getJoystickId(u32, [*]u8) void;
     extern "wio" fn openJoystick(u32, *[2]u32) bool;
@@ -112,7 +112,7 @@ pub const JoystickDeviceIterator = struct {
     count: u32,
 
     pub fn init() JoystickDeviceIterator {
-        return .{ .count = js.getJoysticks() };
+        return .{ .count = js.getJoystickCount() };
     }
 
     pub fn deinit(_: *JoystickDeviceIterator) void {}
@@ -143,15 +143,16 @@ pub const JoystickDevice = struct {
         return .{ .index = self.index, .axes = axes, .buttons = buttons };
     }
 
-    pub fn getId(_: JoystickDevice, _: std.mem.Allocator) ![]u8 {
-        return error.Unexpected;
-    }
-
-    pub fn getName(self: JoystickDevice, allocator: std.mem.Allocator) ![]u8 {
+    pub fn getId(self: JoystickDevice, allocator: std.mem.Allocator) ![]u8 {
         const len = js.getJoystickIdLen(self.index);
+        if (len == 0) return error.Unexpected;
         const name = try allocator.alloc(u8, len);
         js.getJoystickId(self.index, name.ptr);
         return name;
+    }
+
+    pub fn getName(self: JoystickDevice, allocator: std.mem.Allocator) ![]u8 {
+        return self.getId(allocator);
     }
 };
 
