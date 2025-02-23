@@ -173,6 +173,7 @@ pub const JoystickDevice = struct {
         return .{ .backend = self.backend.open() catch return null };
     }
 
+    /// May not be unique.
     pub fn getId(self: JoystickDevice, ally: std.mem.Allocator) ?[]u8 {
         return self.backend.getId(ally) catch null;
     }
@@ -245,6 +246,7 @@ pub const AudioDevice = struct {
         return .{ .backend = self.backend.openInput(readFn, format) catch return null };
     }
 
+    /// May not be unique.
     pub fn getId(self: AudioDevice, ally: std.mem.Allocator) ?[]u8 {
         return self.backend.getId(ally) catch null;
     }
