@@ -100,17 +100,21 @@ static void warpCursor(NSWindow *window) {
 
 - (void)windowDidEndLiveResize:notification {
     NSWindow *window = [notification object];
-    NSView *view = [window contentView];
+    View *view = [window contentView];
     NSRect rect = [view frame];
     NSRect framebuffer = [view convertRectToBacking:rect];
+
+    if ([view cursorMode] == 2) {
+        warpCursor(window);
+    }
 
     uint8_t mode = 0;
     if ([window isZoomed])
         mode = 1;
     else if ([window styleMask] & NSWindowStyleMaskFullScreen)
         mode = 2;
-
     wioSize(ptr, mode, rect.size.width, rect.size.height, framebuffer.size.width, framebuffer.size.height);
+
     [context update];
 }
 
