@@ -46,7 +46,10 @@ For Wayland, the following libraries are loaded:
 - `libwayland-egl.so.1` (if OpenGL is enabled)
 - `libEGL.so.1` (if OpenGL is enabled)
 
-When building for Linux with audio enabled, `libpulse.so.0` is loaded.
+Additionally, the following libraries are loaded for Linux:
+
+- `libudev.so.1` (if joysticks are enabled)
+- `libpulse.so.0` (if audio is enabled)
 
 ## Platform-specific API
 
