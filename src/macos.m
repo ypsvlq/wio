@@ -19,6 +19,8 @@ const CFStringRef wioHIDDeviceUsagePageKey = CFSTR(kIOHIDDeviceUsagePageKey);
 const CFStringRef wioHIDDeviceUsageKey = CFSTR(kIOHIDDeviceUsageKey);
 const CFStringRef wioHIDVendorIDKey = CFSTR(kIOHIDVendorIDKey);
 const CFStringRef wioHIDProductIDKey = CFSTR(kIOHIDProductIDKey);
+const CFStringRef wioHIDVersionNumberKey = CFSTR(kIOHIDVersionNumberKey);
+const CFStringRef wioHIDSerialNumberKey = CFSTR(kIOHIDSerialNumberKey);
 const CFStringRef wioHIDProductKey = CFSTR(kIOHIDProductKey);
 
 static NSString *string(const char *ptr, size_t len) {

@@ -31,6 +31,8 @@ extern const wioHIDDeviceUsagePageKey: c.CFStringRef;
 extern const wioHIDDeviceUsageKey: c.CFStringRef;
 extern const wioHIDVendorIDKey: c.CFStringRef;
 extern const wioHIDProductIDKey: c.CFStringRef;
+extern const wioHIDVersionNumberKey: c.CFStringRef;
+extern const wioHIDSerialNumberKey: c.CFStringRef;
 extern const wioHIDProductKey: c.CFStringRef;
 
 var hid: c.IOHIDManagerRef = undefined;
@@ -304,11 +306,17 @@ pub const JoystickDevice = struct {
     pub fn getId(self: JoystickDevice, allocator: std.mem.Allocator) ![]u8 {
         const vendor_cf = c.IOHIDDeviceGetProperty(self.device, wioHIDVendorIDKey) orelse return error.Unexpected;
         const product_cf = c.IOHIDDeviceGetProperty(self.device, wioHIDProductIDKey) orelse return error.Unexpected;
+        const version_cf = c.IOHIDDeviceGetProperty(self.device, wioHIDVersionNumberKey) orelse return error.Unexpected;
+        const serial_cf = c.IOHIDDeviceGetProperty(self.device, wioHIDSerialNumberKey);
         var vendor: u32 = undefined;
-        var product: u32 = undefined;
         _ = c.CFNumberGetValue(@ptrCast(vendor_cf), c.kCFNumberSInt32Type, &vendor);
+        var product: u32 = undefined;
         _ = c.CFNumberGetValue(@ptrCast(product_cf), c.kCFNumberSInt32Type, &product);
-        return std.fmt.allocPrint(allocator, "{x:0>4}{x:0>4}", .{ vendor, product });
+        var version: u32 = undefined;
+        _ = c.CFNumberGetValue(@ptrCast(version_cf), c.kCFNumberSInt32Type, &version);
+        const serial = if (serial_cf) |_| try cfStringToUtf8(allocator, @ptrCast(serial_cf)) else "";
+        defer allocator.free(serial);
+        return std.fmt.allocPrint(allocator, "{x:0>4}{x:0>4}{x:0>4}{s}", .{ vendor, product, version, serial });
     }
 
     pub fn getName(self: JoystickDevice, allocator: std.mem.Allocator) ![]u8 {
