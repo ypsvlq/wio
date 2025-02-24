@@ -42,6 +42,8 @@ var c: extern struct {
     XFreeGC: *const @TypeOf(h.XFreeGC),
     XDrawPoint: *const @TypeOf(h.XDrawPoint),
     XCreatePixmapCursor: *const @TypeOf(h.XCreatePixmapCursor),
+    XGrabPointer: *const @TypeOf(h.XGrabPointer),
+    XUngrabPointer: *const @TypeOf(h.XUngrabPointer),
     XWarpPointer: *const @TypeOf(h.XWarpPointer),
     XSetSelectionOwner: *const @TypeOf(h.XSetSelectionOwner),
     XConvertSelection: *const @TypeOf(h.XConvertSelection),
@@ -301,7 +303,12 @@ pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
         const cursor = c.XCreatePixmapCursor(display, pixmap, pixmap, &color, &color, 0, 0);
         _ = c.XDefineCursor(display, self.window, cursor);
     }
-    if (mode == .relative) self.warped = false;
+    if (mode == .relative) {
+        _ = c.XGrabPointer(display, self.window, h.True, 0, h.GrabModeAsync, h.GrabModeAsync, self.window, h.None, h.CurrentTime);
+        self.warped = false;
+    } else {
+        _ = c.XUngrabPointer(display, h.CurrentTime);
+    }
 }
 
 pub fn setClipboardText(self: *@This(), text: []const u8) void {
