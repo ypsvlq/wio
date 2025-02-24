@@ -8,7 +8,6 @@ const h = @cImport({
     @cInclude("X11/XKBlib.h");
     @cInclude("X11/Xcursor/Xcursor.h");
     @cInclude("GL/glx.h");
-    @cInclude("locale.h");
 });
 const log = std.log.scoped(.wio);
 
@@ -105,7 +104,7 @@ pub fn init(options: wio.InitOptions) !void {
     windows = .init(wio.allocator);
     errdefer windows.deinit();
 
-    _ = h.setlocale(h.LC_CTYPE, "");
+    _ = std.c.setlocale(.CTYPE, "");
     im = c.XOpenIM(display, null, null, null) orelse return error.Unexpected;
     errdefer _ = c.XCloseIM(im);
 
