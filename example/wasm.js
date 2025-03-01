@@ -1,4 +1,4 @@
-"use strict";
+import wio from "../src/wasm/wio.js";
 
 const log = {
     buffer: "",
@@ -654,3 +654,5 @@ const gl = {
         gl.context.viewport(x, y, width, height);
     },
 };
+
+export { log, gl };

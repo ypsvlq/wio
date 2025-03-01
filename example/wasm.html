@@ -13,9 +13,9 @@
     </head>
     <body>
         <canvas id="canvas" tabindex="-1"></canvas>
-        <script src="../src/wasm.js"></script>
-        <script src="wasm.js"></script>
-        <script>
+        <script type="module">
+            import wio from "../src/wasm/wio.js";
+            import { log, gl } from "./wasm.js";
             WebAssembly.instantiateStreaming(fetch("../zig-out/bin/wio.wasm"), { wio: wio, log: log, gl: gl })
                 .then(result => wio.run(result.instance, [document.getElementById("canvas")]));
         </script>

@@ -1,5 +1,3 @@
-"use strict";
-
 const wio = {
     module: undefined,
     canvases: undefined,
@@ -321,3 +319,5 @@ const wio = {
         4: 4,
     },
 };
+
+export default wio;
