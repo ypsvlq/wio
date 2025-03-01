@@ -75,6 +75,7 @@ const wio = {
         canvas.addEventListener("mousedown", event => {
             const button = wio.buttons[event.button];
             if (button !== undefined) events.push(9, button);
+            if (window.cursor_mode === 2) canvas.requestPointerLock({ unadjustedMovement: true });
         });
         canvas.addEventListener("mouseup", event => {
             const button = wio.buttons[event.button];
