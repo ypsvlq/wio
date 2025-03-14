@@ -108,6 +108,8 @@ var libdecor_context: *h.libdecor = undefined;
 var focus: ?*@This() = null;
 var last_serial: u32 = 0;
 var pointer_enter_serial: u32 = 0;
+var repeat_period: i32 = undefined;
+var repeat_delay: i32 = undefined;
 var clipboard_text: []const u8 = "";
 
 var egl_display: h.EGLDisplay = undefined;
@@ -234,6 +236,8 @@ fractional_scale: ?*h.wp_fractional_scale_v1 = null,
 egl_window: ?*h.wl_egl_window = null,
 egl_surface: h.EGLSurface = null,
 egl_context: h.EGLContext = null,
+repeat_key: u32 = 0,
+repeat_timestamp: i64 = undefined,
 size: wio.Size,
 scale: f32,
 cursor: u32 = undefined,
@@ -294,6 +298,11 @@ pub fn destroy(self: *@This()) void {
 }
 
 pub fn getEvent(self: *@This()) ?wio.Event {
+    const now = std.time.milliTimestamp();
+    if (self.repeat_key != 0 and now > self.repeat_timestamp) {
+        self.pushKeyEvent(self.repeat_key, .button_repeat);
+        self.repeat_timestamp = now + repeat_period;
+    }
     return self.events.readItem();
 }
 
@@ -409,6 +418,25 @@ fn pushEvent(self: *@This(), event: wio.Event) void {
     self.events.writeItem(event) catch return;
 }
 
+fn pushKeyEvent(self: *@This(), key: u32, comptime event: wio.EventType) void {
+    if (keyToButton(key)) |button| {
+        self.pushEvent(@unionInit(wio.Event, @tagName(event), button));
+    }
+
+    var sym = c.xkb_state_key_get_one_sym(xkb_state, key + 8);
+    if (compose_state) |_| {
+        if (c.xkb_compose_state_feed(compose_state, sym) == h.XKB_COMPOSE_FEED_ACCEPTED) {
+            switch (c.xkb_compose_state_get_status(compose_state)) {
+                h.XKB_COMPOSE_COMPOSED => sym = c.xkb_compose_state_get_one_sym(compose_state),
+                h.XKB_COMPOSE_COMPOSING, h.XKB_COMPOSE_CANCELLED => return,
+                else => {},
+            }
+        }
+    }
+    const char: u21 = @intCast(c.xkb_keysym_to_utf32(sym));
+    if (char >= ' ' and char != 0x7F) self.pushEvent(.{ .char = char });
+}
+
 fn applyCursor(self: *@This()) void {
     if (self.cursor_mode == .normal) {
         if (cursor_shape_device) |_| {
@@ -429,7 +457,7 @@ fn registryGlobal(_: ?*anyopaque, _: ?*h.wl_registry, name: u32, interface_ptr: 
     if (std.mem.eql(u8, interface, "wl_compositor")) {
         compositor = @ptrCast(h.wl_registry_bind(registry, name, &h.wl_compositor_interface, 3));
     } else if (std.mem.eql(u8, interface, "wl_seat")) {
-        seat = @ptrCast(h.wl_registry_bind(registry, name, &h.wl_seat_interface, 3));
+        seat = @ptrCast(h.wl_registry_bind(registry, name, &h.wl_seat_interface, 4));
         _ = h.wl_seat_add_listener(seat, &seat_listener, null);
     } else if (std.mem.eql(u8, interface, "wp_viewporter")) {
         viewporter = @ptrCast(h.wl_registry_bind(registry, name, &h.wp_viewporter_interface, 1));
@@ -486,6 +514,7 @@ const keyboard_listener = h.wl_keyboard_listener{
     .leave = keyboardLeave,
     .key = keyboardKey,
     .modifiers = keyboardModifiers,
+    .repeat_info = keyboardRepeatInfo,
 };
 
 fn keyboardKeymap(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, fd: i32, size: u32) callconv(.c) void {
@@ -516,23 +545,16 @@ fn keyboardLeave(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, surface: ?*h.wl_sur
 fn keyboardKey(_: ?*anyopaque, _: ?*h.wl_keyboard, serial: u32, _: u32, key: u32, state: u32) callconv(.c) void {
     last_serial = serial;
     if (focus) |window| {
-        if (keyToButton(key)) |button| {
-            if (state == h.WL_KEYBOARD_KEY_STATE_PRESSED) {
-                window.pushEvent(.{ .button_press = button });
-                var sym = c.xkb_state_key_get_one_sym(xkb_state, key + 8);
-                if (compose_state) |_| {
-                    if (c.xkb_compose_state_feed(compose_state, sym) == h.XKB_COMPOSE_FEED_ACCEPTED) {
-                        switch (c.xkb_compose_state_get_status(compose_state)) {
-                            h.XKB_COMPOSE_COMPOSED => sym = c.xkb_compose_state_get_one_sym(compose_state),
-                            h.XKB_COMPOSE_COMPOSING, h.XKB_COMPOSE_CANCELLED => return,
-                            else => {},
-                        }
-                    }
-                }
-                const char: u21 = @intCast(c.xkb_keysym_to_utf32(sym));
-                if (char >= ' ' and char != 0x7F) window.pushEvent(.{ .char = char });
-            } else {
+        if (state == h.WL_KEYBOARD_KEY_STATE_PRESSED) {
+            window.pushKeyEvent(key, .button_press);
+            window.repeat_key = key;
+            window.repeat_timestamp = std.time.milliTimestamp() + repeat_delay;
+        } else {
+            if (keyToButton(key)) |button| {
                 window.pushEvent(.{ .button_release = button });
+            }
+            if (key == window.repeat_key) {
+                window.repeat_key = 0;
             }
         }
     }
@@ -540,6 +562,11 @@ fn keyboardKey(_: ?*anyopaque, _: ?*h.wl_keyboard, serial: u32, _: u32, key: u32
 
 fn keyboardModifiers(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, mods_depressed: u32, mods_latched: u32, mods_locked: u32, _: u32) callconv(.c) void {
     _ = c.xkb_state_update_mask(xkb_state, mods_depressed, mods_latched, mods_locked, 0, 0, 0);
+}
+
+fn keyboardRepeatInfo(_: ?*anyopaque, _: ?*h.wl_keyboard, rate: i32, delay: i32) callconv(.c) void {
+    repeat_period = @divTrunc(1000, rate);
+    repeat_delay = delay;
 }
 
 const pointer_listener = h.wl_pointer_listener{
