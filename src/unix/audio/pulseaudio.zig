@@ -21,6 +21,8 @@ var c: extern struct {
     pa_context_disconnect: *const @TypeOf(h.pa_context_disconnect),
     pa_context_set_state_callback: *const @TypeOf(h.pa_context_set_state_callback),
     pa_context_get_state: *const @TypeOf(h.pa_context_get_state),
+    pa_context_set_subscribe_callback: *const @TypeOf(h.pa_context_set_subscribe_callback),
+    pa_context_subscribe: *const @TypeOf(h.pa_context_subscribe),
     pa_context_get_server_info: *const @TypeOf(h.pa_context_get_server_info),
     pa_context_get_sink_info_by_name: *const @TypeOf(h.pa_context_get_sink_info_by_name),
     pa_context_get_source_info_by_name: *const @TypeOf(h.pa_context_get_source_info_by_name),
@@ -59,30 +61,21 @@ pub fn init() !void {
     context = c.pa_context_new(api, null) orelse return error.Unexpected;
     errdefer c.pa_context_unref(context);
     if (c.pa_context_connect(context, null, h.PA_CONTEXT_NOFLAGS, null) < 0) return error.Unexpected;
-    c.pa_context_set_state_callback(context, contextStateCallback, null);
+    c.pa_context_set_state_callback(context, notifyCallback, null);
     while (c.pa_context_get_state(context) != h.PA_CONTEXT_READY) c.pa_threaded_mainloop_wait(loop);
 
     if (wio.init_options.audioDefaultOutputFn != null or wio.init_options.audioDefaultInputFn != null) {
-        var maybe_info: ?*const h.pa_server_info = null;
-        const operation = c.pa_context_get_server_info(context, serverInfoCallback, @ptrCast(&maybe_info));
+        c.pa_context_set_subscribe_callback(context, subscribeCallback, null);
+        const operation = c.pa_context_subscribe(context, h.PA_SUBSCRIPTION_MASK_SERVER, successCallback, null);
         defer c.pa_operation_unref(operation);
-        while (c.pa_operation_get_state(operation) == h.PA_OPERATION_RUNNING and maybe_info == null) c.pa_threaded_mainloop_wait(loop);
-        var sink: [:0]const u8 = "";
-        var source: [:0]const u8 = "";
-        if (maybe_info) |info| {
-            if (wio.init_options.audioDefaultOutputFn != null) sink = wio.allocator.dupeZ(u8, std.mem.sliceTo(info.default_sink_name, 0)) catch "";
-            if (wio.init_options.audioDefaultInputFn != null) source = wio.allocator.dupeZ(u8, std.mem.sliceTo(info.default_source_name, 0)) catch "";
-        }
-        c.pa_threaded_mainloop_accept(loop);
-        c.pa_threaded_mainloop_unlock(loop);
-        if (wio.init_options.audioDefaultOutputFn) |callback| if (sink.len > 0) callback(.{ .backend = .{ .id = sink, .type = .output } });
-        if (wio.init_options.audioDefaultInputFn) |callback| if (source.len > 0) callback(.{ .backend = .{ .id = source, .type = .input } });
-    } else {
-        c.pa_threaded_mainloop_unlock(loop);
+        while (c.pa_operation_get_state(operation) == h.PA_OPERATION_RUNNING) c.pa_threaded_mainloop_wait(loop);
     }
+    c.pa_threaded_mainloop_unlock(loop);
 }
 
 pub fn deinit() void {
+    wio.allocator.free(last_default_source);
+    wio.allocator.free(last_default_sink);
     c.pa_threaded_mainloop_lock(loop);
     c.pa_context_disconnect(context);
     c.pa_context_unref(context);
@@ -92,7 +85,64 @@ pub fn deinit() void {
     libpulse.close();
 }
 
-pub fn update() void {}
+var server_info_changed: bool = true;
+var last_default_sink: []const u8 = "";
+var last_default_source: []const u8 = "";
+
+pub fn update() void {
+    if (wio.init_options.audioDefaultOutputFn != null or wio.init_options.audioDefaultInputFn != null) {
+        if (server_info_changed) {
+            var sink: bool = false;
+            var source: bool = false;
+            {
+                c.pa_threaded_mainloop_lock(loop);
+                defer c.pa_threaded_mainloop_unlock(loop);
+
+                server_info_changed = false;
+
+                var maybe_info: ?*const h.pa_server_info = null;
+                const operation = c.pa_context_get_server_info(context, serverInfoCallback, @ptrCast(&maybe_info));
+                defer c.pa_operation_unref(operation);
+                while (c.pa_operation_get_state(operation) == h.PA_OPERATION_RUNNING and maybe_info == null) c.pa_threaded_mainloop_wait(loop);
+                defer c.pa_threaded_mainloop_accept(loop);
+
+                if (maybe_info) |info| {
+                    if (wio.init_options.audioDefaultOutputFn != null) {
+                        const default_sink = std.mem.sliceTo(info.default_sink_name, 0);
+                        if (!std.mem.eql(u8, default_sink, last_default_sink)) {
+                            wio.allocator.free(last_default_sink);
+                            last_default_sink = wio.allocator.dupe(u8, default_sink) catch "";
+                            sink = true;
+                        }
+                    }
+                    if (wio.init_options.audioDefaultInputFn != null) {
+                        const default_source = std.mem.sliceTo(info.default_source_name, 0);
+                        if (!std.mem.eql(u8, default_source, last_default_source)) {
+                            wio.allocator.free(last_default_source);
+                            last_default_source = wio.allocator.dupe(u8, default_source) catch "";
+                            source = true;
+                        }
+                    }
+                }
+            }
+
+            if (wio.init_options.audioDefaultOutputFn) |callback| {
+                if (sink) {
+                    if (wio.allocator.dupeZ(u8, last_default_sink)) |id| {
+                        callback(.{ .backend = .{ .id = id, .type = .output } });
+                    } else |_| {}
+                }
+            }
+            if (wio.init_options.audioDefaultInputFn) |callback| {
+                if (source) {
+                    if (wio.allocator.dupeZ(u8, last_default_source)) |id| {
+                        callback(.{ .backend = .{ .id = id, .type = .input } });
+                    } else |_| {}
+                }
+            }
+        }
+    }
+}
 
 pub const AudioDeviceIterator = struct {
     list: std.ArrayList(AudioDevice),
@@ -249,7 +299,15 @@ pub const AudioInput = struct {
     }
 };
 
-fn contextStateCallback(_: ?*h.pa_context, _: ?*anyopaque) callconv(.c) void {
+fn notifyCallback(_: ?*h.pa_context, _: ?*anyopaque) callconv(.c) void {
+    c.pa_threaded_mainloop_signal(loop, 0);
+}
+
+fn subscribeCallback(_: ?*h.pa_context, _: h.pa_subscription_event_type_t, _: u32, _: ?*anyopaque) callconv(.c) void {
+    server_info_changed = true;
+}
+
+fn successCallback(_: ?*h.pa_context, _: c_int, _: ?*anyopaque) callconv(.c) void {
     c.pa_threaded_mainloop_signal(loop, 0);
 }
 
