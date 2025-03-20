@@ -262,7 +262,7 @@ fn serverInfoCallback(_: ?*h.pa_context, info: ?*const h.pa_server_info, data: ?
 fn sinkNameCallback(_: ?*h.pa_context, info: ?*const h.pa_sink_info, eol: c_int, data: ?*anyopaque) callconv(.c) void {
     const result: *?[*:0]const u8 = @alignCast(@ptrCast(data));
     if (eol == 0) {
-        result.* = info.?.name;
+        result.* = info.?.description;
         c.pa_threaded_mainloop_signal(loop, 1);
     } else {
         c.pa_threaded_mainloop_signal(loop, 0);
@@ -272,7 +272,7 @@ fn sinkNameCallback(_: ?*h.pa_context, info: ?*const h.pa_sink_info, eol: c_int,
 fn sourceNameCallback(_: ?*h.pa_context, info: ?*const h.pa_source_info, eol: c_int, data: ?*anyopaque) callconv(.c) void {
     const result: *?[*:0]const u8 = @alignCast(@ptrCast(data));
     if (eol == 0) {
-        result.* = info.?.name;
+        result.* = info.?.description;
         c.pa_threaded_mainloop_signal(loop, 1);
     } else {
         c.pa_threaded_mainloop_signal(loop, 0);
