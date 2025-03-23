@@ -9,6 +9,15 @@ pub const Lib = struct {
     predicate: bool = true,
 };
 
+pub fn open(name: []const u8) !std.DynLib {
+    return std.DynLib.open(
+        if (builtin.os.tag == .openbsd or builtin.os.tag == .netbsd)
+            name[0 .. std.mem.indexOfScalar(u8, name, '.').? + 3]
+        else
+            name,
+    );
+}
+
 pub fn load(c: anytype, libs: []const Lib) !void {
     var succeeded: usize = 0;
     errdefer for (0..succeeded) |i| {
@@ -16,12 +25,7 @@ pub fn load(c: anytype, libs: []const Lib) !void {
     };
     for (libs) |lib| {
         if (lib.predicate) {
-            lib.handle.* = try std.DynLib.open(
-                if (builtin.os.tag == .openbsd or builtin.os.tag == .netbsd)
-                    lib.name[0 .. std.mem.indexOfScalar(u8, lib.name, '.').? + 3]
-                else
-                    lib.name,
-            );
+            lib.handle.* = try open(lib.name);
         }
         succeeded += 1;
     }

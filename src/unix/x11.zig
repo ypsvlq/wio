@@ -406,8 +406,35 @@ pub fn swapInterval(self: *@This(), interval: i32) void {
     }
 }
 
+pub fn createSurface(self: @This(), instance: usize, allocator: ?*const anyopaque, surface: *u64) i32 {
+    const VkXlibSurfaceCreateInfoKHR = extern struct {
+        sType: i32 = 1000004000,
+        pNext: ?*const anyopaque = null,
+        flags: u32 = 0,
+        dpy: *h.Display,
+        window: h.Window,
+    };
+
+    const vkCreateXlibSurfaceKHR: *const fn (usize, *const VkXlibSurfaceCreateInfoKHR, ?*const anyopaque, *u64) callconv(.c) i32 =
+        @ptrCast(unix.vkGetInstanceProcAddr(instance, "vkCreateXlibSurfaceKHR"));
+
+    return vkCreateXlibSurfaceKHR(
+        instance,
+        &.{
+            .dpy = display,
+            .window = self.window,
+        },
+        allocator,
+        surface,
+    );
+}
+
 pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
     return c.glXGetProcAddress(name);
+}
+
+pub fn getVulkanExtensions() []const [*:0]const u8 {
+    return &.{ "VK_KHR_surface", "VK_KHR_xlib_surface" };
 }
 
 fn pushEvent(self: *@This(), event: wio.Event) void {

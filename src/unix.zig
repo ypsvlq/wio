@@ -2,6 +2,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 const build_options = @import("build_options");
 const wio = @import("wio.zig");
+const dynlib = @import("unix/dynlib.zig");
 pub const x11 = @import("unix/x11.zig");
 pub const wayland = @import("unix/wayland.zig");
 const joystick = switch (builtin.os.tag) {
@@ -20,8 +21,18 @@ pub var active: enum {
     wayland,
 } = undefined;
 
+pub var libvulkan: std.DynLib = undefined;
+
 pub fn init(options: wio.InitOptions) !void {
     if (builtin.os.tag == .linux and builtin.output_mode == .Exe and builtin.link_mode == .static) @compileError("dynamic link required");
+
+    if (options.vulkan) {
+        libvulkan = try dynlib.open("libvulkan.so.1");
+        vkGetInstanceProcAddr = libvulkan.lookup(@TypeOf(vkGetInstanceProcAddr), "vkGetInstanceProcAddr") orelse {
+            log.err("could not load {s}", .{"vkGetInstanceProcAddr"});
+            return error.Unexpected;
+        };
+    }
 
     if (options.joystick) try joystick.init();
     if (options.audio) try audio.init();
@@ -75,6 +86,7 @@ pub fn init(options: wio.InitOptions) !void {
 pub fn deinit() void {
     if (wio.init_options.audio) audio.deinit();
     if (wio.init_options.joystick) joystick.deinit();
+    if (wio.init_options.vulkan) libvulkan.close();
     switch (active) {
         .x11 => return x11.deinit(),
         .wayland => return wayland.deinit(),
@@ -200,12 +212,28 @@ pub const Window = union {
             .wayland => self.wayland.swapInterval(interval),
         }
     }
+
+    pub fn createSurface(self: @This(), instance: usize, allocator: ?*const anyopaque, surface: *u64) i32 {
+        switch (active) {
+            .x11 => return self.x11.createSurface(instance, allocator, surface),
+            .wayland => return self.wayland.createSurface(instance, allocator, surface),
+        }
+    }
 };
 
 pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
     switch (active) {
         .x11 => return x11.glGetProcAddress(name),
         .wayland => return wayland.glGetProcAddress(name),
+    }
+}
+
+pub var vkGetInstanceProcAddr: *const fn (usize, [*:0]const u8) callconv(.c) ?*const fn () void = undefined;
+
+pub fn getVulkanExtensions() []const [*:0]const u8 {
+    switch (active) {
+        .x11 => return x11.getVulkanExtensions(),
+        .wayland => return wayland.getVulkanExtensions(),
     }
 }
 

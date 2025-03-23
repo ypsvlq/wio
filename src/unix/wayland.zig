@@ -1,5 +1,6 @@
 const std = @import("std");
 const wio = @import("../wio.zig");
+const unix = @import("../unix.zig");
 const dynlib = @import("dynlib.zig");
 const log = std.log.scoped(.wio);
 const h = @cImport({
@@ -410,8 +411,35 @@ pub fn swapInterval(_: *@This(), interval: i32) void {
     _ = c.eglSwapInterval(egl_display, interval);
 }
 
+pub fn createSurface(self: @This(), instance: usize, allocator: ?*const anyopaque, surface: *u64) i32 {
+    const VkWaylandSurfaceCreateInfoKHR = extern struct {
+        sType: i32 = 1000006000,
+        pNext: ?*const anyopaque = null,
+        flags: u32 = 0,
+        display: *h.wl_display,
+        surface: *h.wl_surface,
+    };
+
+    const vkCreateWaylandSurfaceKHR: *const fn (usize, *const VkWaylandSurfaceCreateInfoKHR, ?*const anyopaque, *u64) callconv(.c) i32 =
+        @ptrCast(unix.vkGetInstanceProcAddr(instance, "vkCreateWaylandSurfaceKHR"));
+
+    return vkCreateWaylandSurfaceKHR(
+        instance,
+        &.{
+            .display = display,
+            .surface = self.surface,
+        },
+        allocator,
+        surface,
+    );
+}
+
 pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
     return c.eglGetProcAddress(name);
+}
+
+pub fn getVulkanExtensions() []const [*:0]const u8 {
+    return &.{ "VK_KHR_surface", "VK_KHR_wayland_surface" };
 }
 
 fn pushEvent(self: *@This(), event: wio.Event) void {
