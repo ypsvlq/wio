@@ -480,8 +480,11 @@ pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
     return w.wglGetProcAddress(name);
 }
 
-pub const vk_extensions: []const [*:0]const u8 = &.{ "VK_KHR_surface", "VK_KHR_win32_surface" };
 pub var vkGetInstanceProcAddr: *const fn (usize, [*:0]const u8) callconv(.winapi) ?*const fn () void = undefined;
+
+pub fn getVulkanExtensions() []const [*:0]const u8 {
+    return &.{ "VK_KHR_surface", "VK_KHR_win32_surface" };
+}
 
 pub const JoystickDeviceIterator = struct {
     joysticks: @TypeOf(joysticks).KeyIterator,

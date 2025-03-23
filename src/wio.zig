@@ -149,11 +149,13 @@ pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const fn () void {
     return @alignCast(@ptrCast(backend.glGetProcAddress(name)));
 }
 
-pub const vk_extensions: []const [*:0]const u8 = backend.vk_extensions;
-
 pub fn vkGetInstanceProcAddr(instance: usize, name: [*:0]const u8) ?*const fn () void {
     std.debug.assert(init_options.vulkan);
     return backend.vkGetInstanceProcAddr(instance, name);
+}
+
+pub fn getVulkanExtensions() []const [*:0]const u8 {
+    return backend.getVulkanExtensions();
 }
 
 pub const JoystickDeviceIterator = struct {
