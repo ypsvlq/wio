@@ -24,6 +24,8 @@ var wgl: struct {
     choosePixelFormatARB: ?*const fn (w.HDC, ?[*]const i32, ?[*]const f32, u32, [*c]i32, *u32) callconv(.winapi) w.BOOL = null,
 } = .{};
 
+var vulkan: w.HMODULE = undefined;
+
 pub fn init(options: wio.InitOptions) !void {
     const instance = w.GetModuleHandleW(null);
 
@@ -131,9 +133,17 @@ pub fn init(options: wio.InitOptions) !void {
             }
         }
     }
+
+    if (options.vulkan) {
+        vulkan = w.LoadLibraryW(w.L("vulkan-1.dll")) orelse return logLastError("LoadLibraryW");
+        vkGetInstanceProcAddr = @ptrCast(w.GetProcAddress(vulkan, "vkGetInstanceProcAddr") orelse return logLastError("GetProcAddress"));
+    }
 }
 
 pub fn deinit() void {
+    if (wio.init_options.vulkan) {
+        _ = w.FreeLibrary(vulkan);
+    }
     if (wio.init_options.joystick) {
         _ = w.DestroyWindow(helper_window);
         wio.allocator.free(helper_input);
@@ -440,12 +450,38 @@ pub fn swapInterval(_: @This(), interval: i32) void {
     }
 }
 
+pub fn createSurface(self: @This(), instance: usize, allocator: ?*const anyopaque, surface: *u64) i32 {
+    const VkWin32SurfaceCreateInfoKHR = extern struct {
+        sType: i32 = 1000009000,
+        pNext: ?*const anyopaque = null,
+        flags: u32 = 0,
+        hinstance: w.HINSTANCE,
+        hwnd: w.HWND,
+    };
+
+    const vkCreateWin32SurfaceKHR: *const fn (usize, *const VkWin32SurfaceCreateInfoKHR, ?*const anyopaque, *u64) callconv(.winapi) i32 =
+        @ptrCast(vkGetInstanceProcAddr(instance, "vkCreateWin32SurfaceKHR"));
+
+    return vkCreateWin32SurfaceKHR(
+        instance,
+        &.{
+            .hinstance = w.GetModuleHandleW(null),
+            .hwnd = self.window,
+        },
+        allocator,
+        surface,
+    );
+}
+
 pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
     if (@hasDecl(w, name)) {
         return &@field(w, name);
     }
     return w.wglGetProcAddress(name);
 }
+
+pub const vk_extensions: []const [*:0]const u8 = &.{ "VK_KHR_surface", "VK_KHR_win32_surface" };
+pub var vkGetInstanceProcAddr: *const fn (usize, [*:0]const u8) callconv(.winapi) ?*const fn () void = undefined;
 
 pub const JoystickDeviceIterator = struct {
     joysticks: @TypeOf(joysticks).KeyIterator,

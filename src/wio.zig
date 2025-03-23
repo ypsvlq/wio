@@ -11,6 +11,9 @@ pub var allocator: std.mem.Allocator = undefined;
 pub var init_options: InitOptions = undefined;
 
 pub const InitOptions = struct {
+    opengl: bool = false,
+    vulkan: bool = false,
+
     joystick: bool = false,
     /// Free with `JoystickDevice.release()`.
     joystickConnectedFn: ?*const fn (JoystickDevice) void = null,
@@ -20,8 +23,6 @@ pub const InitOptions = struct {
     audioDefaultOutputFn: ?*const fn (AudioDevice) void = null,
     /// Free with `AudioDevice.release()`.
     audioDefaultInputFn: ?*const fn (AudioDevice) void = null,
-
-    opengl: bool = false,
 };
 
 /// Unless otherwise noted, all calls to wio functions must be made on the same thread.
@@ -135,12 +136,24 @@ pub const Window = struct {
     pub fn swapInterval(self: *Window, interval: i32) void {
         self.backend.swapInterval(interval);
     }
+
+    pub fn createSurface(self: *Window, instance: usize, vk_allocator: ?*const anyopaque, surface: *u64) i32 {
+        std.debug.assert(init_options.vulkan);
+        return self.backend.createSurface(instance, vk_allocator, surface);
+    }
 };
 
 /// Must be called on the thread where the context is current.
 pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const fn () void {
     std.debug.assert(init_options.opengl);
     return @alignCast(@ptrCast(backend.glGetProcAddress(name)));
+}
+
+pub const vk_extensions: []const [*:0]const u8 = backend.vk_extensions;
+
+pub fn vkGetInstanceProcAddr(instance: usize, name: [*:0]const u8) ?*const fn () void {
+    std.debug.assert(init_options.vulkan);
+    return backend.vkGetInstanceProcAddr(instance, name);
 }
 
 pub const JoystickDeviceIterator = struct {
