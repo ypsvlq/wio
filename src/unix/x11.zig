@@ -227,9 +227,12 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     self.setCursor(options.cursor);
     if (options.cursor_mode != .normal) self.setCursorMode(options.cursor_mode);
 
-    try self.events.writeItem(.{ .size = size });
-    try self.events.writeItem(.{ .framebuffer = size });
-    try self.events.writeItem(.{ .scale = scale });
+    try self.events.write(&.{
+        .visible,
+        .{ .scale = scale },
+        .{ .size = size },
+        .{ .framebuffer = size },
+    });
 
     try windows.put(window, self);
     return self;

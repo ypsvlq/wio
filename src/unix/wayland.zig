@@ -273,13 +273,15 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
         }
     }
 
+    try self.events.write(&.{
+        .visible,
+        .{ .scale = options.scale },
+        .{ .size = options.size },
+        .{ .framebuffer = options.size },
+    });
+
     self.setTitle(options.title);
     self.setCursor(options.cursor);
-
-    self.pushEvent(.{ .scale = options.scale });
-    self.pushEvent(.{ .size = options.size });
-    self.pushEvent(.{ .framebuffer = options.size });
-
     self.setMode(options.mode);
 
     return self;
