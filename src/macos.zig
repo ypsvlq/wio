@@ -626,6 +626,14 @@ export fn wioUnfocus(self: *@This()) void {
     self.pushEvent(.unfocused);
 }
 
+export fn wioVisible(self: *@This()) void {
+    self.pushEvent(.visible);
+}
+
+export fn wioHide(self: *@This()) void {
+    self.pushEvent(.hidden);
+}
+
 export fn wioSize(self: *@This(), mode: u8, width: u16, height: u16, fb_width: u16, fb_height: u16) void {
     self.pushEvent(.{ .mode = @enumFromInt(mode) });
     self.pushEvent(.{ .size = .{ .width = width, .height = height } });

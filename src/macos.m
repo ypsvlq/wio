@@ -4,6 +4,8 @@
 extern void wioClose(void *);
 extern void wioFocus(void *);
 extern void wioUnfocus(void *);
+extern void wioVisible(void *);
+extern void wioHide(void *);
 extern void wioSize(void *, uint8_t, UInt16, UInt16, UInt16, UInt16);
 extern void wioScale(void *, Float32);
 extern void wioChars(void *, const char *);
@@ -98,6 +100,14 @@ static void warpCursor(NSWindow *window) {
 
 - (void)windowDidResignKey:notification {
     wioUnfocus(ptr);
+}
+
+- (void)windowDidDeminiaturize:notification {
+    wioVisible(ptr);
+}
+
+- (void)windowDidMiniaturize:notification {
+    wioHide(ptr);
 }
 
 - (void)windowDidEndLiveResize:notification {
@@ -319,10 +329,12 @@ void *wioCreateWindow(void *ptr, uint16_t width, uint16_t height) {
     [window makeKeyAndOrderFront:nil];
     [window center];
 
+    wioVisible(ptr);
+    wioScale(ptr, [window backingScaleFactor]);
+
     NSRect rect = [view frame];
     NSRect framebuffer = [view convertRectToBacking:rect];
     wioSize(ptr, false, rect.size.width, rect.size.height, framebuffer.size.width, framebuffer.size.height);
-    wioScale(ptr, [window backingScaleFactor]);
 
     return (void*)CFBridgingRetain(window);
 }
