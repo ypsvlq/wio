@@ -297,6 +297,8 @@ pub const Event = union(enum) {
     close: void,
     focused: void,
     unfocused: void,
+    visible: void,
+    hidden: void,
     draw: void,
     size: Size,
     framebuffer: Size,

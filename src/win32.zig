@@ -1222,14 +1222,19 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
             if (self.cursor_mode == .relative) {
                 self.clipCursor();
             }
-            if (wParam == w.SIZE_RESTORED or wParam == w.SIZE_MAXIMIZED) {
-                const fullscreen = self.isFullscreen();
-                if (wParam == w.SIZE_RESTORED and !fullscreen) {
-                    _ = w.GetWindowRect(window, &self.rect);
-                }
-                self.pushEvent(.{ .mode = if (fullscreen) .fullscreen else if (wParam == w.SIZE_MAXIMIZED) .maximized else .normal });
-                self.pushEvent(.{ .size = size });
-                self.pushEvent(.{ .framebuffer = size });
+            switch (wParam) {
+                w.SIZE_RESTORED, w.SIZE_MAXIMIZED => {
+                    const fullscreen = self.isFullscreen();
+                    if (wParam == w.SIZE_RESTORED and !fullscreen) {
+                        _ = w.GetWindowRect(window, &self.rect);
+                    }
+                    self.pushEvent(.visible);
+                    self.pushEvent(.{ .mode = if (fullscreen) .fullscreen else if (wParam == w.SIZE_MAXIMIZED) .maximized else .normal });
+                    self.pushEvent(.{ .size = size });
+                    self.pushEvent(.{ .framebuffer = size });
+                },
+                w.SIZE_MINIMIZED => self.pushEvent(.hidden),
+                else => {},
             }
             return 0;
         },

@@ -55,6 +55,7 @@ pub fn getEvent(self: *@This()) ?wio.Event {
         .close => null, // never sent, EventType 0 is reused to indicate empty queue
         .focused => .focused,
         .unfocused => .unfocused,
+        .visible => .visible,
         .size => .{ .size = .{ .width = @intCast(js.shift(self.id)), .height = @intCast(js.shift(self.id)) } },
         .framebuffer => .{ .framebuffer = .{ .width = @intCast(js.shift(self.id)), .height = @intCast(js.shift(self.id)) } },
         .scale => .{ .scale = js.shiftFloat(self.id) },

@@ -39,7 +39,7 @@ const wio = {
         const canvas = wio.canvases.shift();
         if (canvas === undefined) throw new Error("no canvas available");
 
-        const events = [];
+        const events = [3];
         const window = {
             canvas: canvas,
             events: events,
@@ -53,10 +53,10 @@ const wio = {
             canvas.width = width * devicePixelRatio;
             canvas.height = height * devicePixelRatio;
             events.push(
-                7, (document.fullscreenElement === canvas) ? 2 : 0,
-                4, width, height,
-                5, canvas.width, canvas.height,
-                6, devicePixelRatio,
+                9, (document.fullscreenElement === canvas) ? 2 : 0,
+                6, width, height,
+                7, canvas.width, canvas.height,
+                8, devicePixelRatio,
             );
         }).observe(canvas);
         canvas.addEventListener("contextmenu", event => event.preventDefault());
@@ -65,32 +65,32 @@ const wio = {
         canvas.addEventListener("keydown", event => {
             event.preventDefault();
             const key = wio.keys[event.code];
-            if (key) events.push(event.repeat ? 10 : 9, key);
-            if ([...event.key].length === 1) events.push(8, event.key.codePointAt(0));
+            if (key) events.push(event.repeat ? 12 : 11, key);
+            if ([...event.key].length === 1) events.push(10, event.key.codePointAt(0));
         });
         canvas.addEventListener("keyup", event => {
             const key = wio.keys[event.code];
-            if (key) events.push(11, key);
+            if (key) events.push(13, key);
         });
         canvas.addEventListener("mousedown", event => {
             const button = wio.buttons[event.button];
-            if (button !== undefined) events.push(9, button);
+            if (button !== undefined) events.push(11, button);
             if (window.cursor_mode === 2) canvas.requestPointerLock({ unadjustedMovement: true });
         });
         canvas.addEventListener("mouseup", event => {
             const button = wio.buttons[event.button];
-            if (button !== undefined) events.push(11, button);
+            if (button !== undefined) events.push(13, button);
         });
         canvas.addEventListener("mousemove", event => {
             if (window.cursor_mode !== 2) {
-                events.push(12, event.offsetX, event.offsetY);
+                events.push(14, event.offsetX, event.offsetY);
             } else {
-                events.push(13, event.movementX, event.movementY);
+                events.push(15, event.movementX, event.movementY);
             }
         });
         canvas.addEventListener("wheel", event => {
-            if (event.deltaY !== 0) events.push(14, event.deltaY * 0.01);
-            if (event.deltaX !== 0) events.push(15, event.deltaX * 0.01);
+            if (event.deltaY !== 0) events.push(16, event.deltaY * 0.01);
+            if (event.deltaX !== 0) events.push(17, event.deltaX * 0.01);
         });
 
         wio.windows.push(window);
