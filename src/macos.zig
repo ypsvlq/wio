@@ -27,6 +27,7 @@ extern fn wioCreateContext(*anyopaque, [*]const c.CGLPixelFormatAttribute) ?*any
 extern fn wioMakeContextCurrent(?*anyopaque) void;
 extern fn wioSwapBuffers(*anyopaque, ?*anyopaque) void;
 extern fn wioSwapInterval(?*anyopaque, i32) void;
+extern fn wioCreateMetalLayer(*anyopaque) *anyopaque;
 extern const wioHIDDeviceUsagePageKey: c.CFStringRef;
 extern const wioHIDDeviceUsageKey: c.CFStringRef;
 extern const wioHIDVendorIDKey: c.CFStringRef;
@@ -35,11 +36,18 @@ extern const wioHIDVersionNumberKey: c.CFStringRef;
 extern const wioHIDSerialNumberKey: c.CFStringRef;
 extern const wioHIDProductKey: c.CFStringRef;
 
+var libvulkan: std.DynLib = undefined;
+
 var hid: c.IOHIDManagerRef = undefined;
 var removed_joysticks: std.AutoHashMap(c.IOHIDDeviceRef, bool) = undefined;
 
 pub fn init(options: wio.InitOptions) !void {
     wioInit();
+
+    if (options.vulkan) {
+        libvulkan = try std.DynLib.openZ("libvulkan.1.dylib");
+        vkGetInstanceProcAddr = libvulkan.lookup(@TypeOf(vkGetInstanceProcAddr), "vkGetInstanceProcAddr") orelse return error.Unexpected;
+    }
 
     if (options.joystick) {
         hid = c.IOHIDManagerCreate(c.kCFAllocatorDefault, c.kIOHIDOptionsTypeNone);
@@ -101,6 +109,9 @@ pub fn deinit() void {
     if (wio.init_options.joystick) {
         removed_joysticks.deinit();
         c.CFRelease(hid);
+    }
+    if (wio.init_options.vulkan) {
+        libvulkan.close();
     }
 }
 
@@ -201,8 +212,33 @@ pub fn swapInterval(self: *@This(), interval: i32) void {
     wioSwapInterval(self.context, interval);
 }
 
+pub fn createSurface(self: @This(), instance: usize, allocator: ?*const anyopaque, surface: *u64) i32 {
+    const VkMetalSurfaceCreateInfoEXT = extern struct {
+        sType: i32 = 1000217000,
+        pNext: ?*const anyopaque = null,
+        flags: u32 = 0,
+        pLayer: ?*const anyopaque,
+    };
+
+    const vkCreateMetalSurfaceEXT: *const fn (usize, *const VkMetalSurfaceCreateInfoEXT, ?*const anyopaque, *u64) callconv(.c) i32 =
+        @ptrCast(vkGetInstanceProcAddr(instance, "vkCreateMetalSurfaceEXT"));
+
+    return vkCreateMetalSurfaceEXT(
+        instance,
+        &.{ .pLayer = wioCreateMetalLayer(self.window) },
+        allocator,
+        surface,
+    );
+}
+
 pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
     return if (c.NSLookupAndBindSymbol("_" ++ name)) |symbol| c.NSAddressOfSymbol(symbol) else null;
+}
+
+pub var vkGetInstanceProcAddr: *const fn (usize, [*:0]const u8) callconv(.c) ?*const fn () void = undefined;
+
+pub fn getVulkanExtensions() []const [*:0]const u8 {
+    return &.{ "VK_KHR_surface", "VK_EXT_metal_surface" };
 }
 
 pub const JoystickDeviceIterator = struct {

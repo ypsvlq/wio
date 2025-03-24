@@ -24,6 +24,7 @@ pub fn build(b: *std.Build) void {
                 module.addLibraryPath(xcode_frameworks.path("lib"));
             }
             module.linkFramework("Cocoa", .{});
+            module.linkFramework("QuartzCore", .{});
             module.linkFramework("IOKit", .{});
             module.linkFramework("CoreAudio", .{});
             module.linkFramework("AudioUnit", .{});

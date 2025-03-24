@@ -1,4 +1,5 @@
 #import <Cocoa/Cocoa.h>
+#import <QuartzCore/QuartzCore.h>
 #include <IOKit/hid/IOHIDKeys.h>
 
 extern void wioClose(void *);
@@ -419,4 +420,13 @@ void wioSwapBuffers(NSWindow *window, NSOpenGLContext *context) {
 
 void wioSwapInterval(NSOpenGLContext *context, int32_t interval) {
     [context setValues:&interval forParameter:NSOpenGLCPSwapInterval];
+}
+
+void *wioCreateMetalLayer(NSWindow *window) {
+    CAMetalLayer *layer = [CAMetalLayer layer];
+    [layer setContentsScale:[window backingScaleFactor]];
+    NSView *view = [window contentView];
+    [view setWantsLayer:YES];
+    [view setLayer:layer];
+    return (__bridge void*)layer;
 }
