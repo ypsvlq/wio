@@ -4,13 +4,13 @@ const log = std.log.scoped(.wio);
 
 pub const Lib = struct {
     handle: *std.DynLib,
-    name: []const u8,
+    name: [:0]const u8,
     prefix: []const u8 = "",
     predicate: bool = true,
 };
 
-pub fn open(name: []const u8) !std.DynLib {
-    return std.DynLib.open(
+pub fn open(name: [:0]const u8) !std.DynLib {
+    return std.DynLib.openZ(
         if (builtin.os.tag == .openbsd or builtin.os.tag == .netbsd)
             name[0 .. std.mem.indexOfScalar(u8, name, '.').? + 3]
         else
