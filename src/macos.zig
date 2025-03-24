@@ -670,10 +670,13 @@ export fn wioHide(self: *@This()) void {
     self.pushEvent(.hidden);
 }
 
-export fn wioSize(self: *@This(), mode: u8, width: u16, height: u16, fb_width: u16, fb_height: u16) void {
+export fn wioSize(self: *@This(), mode: u8, width: u16, height: u16) void {
     self.pushEvent(.{ .mode = @enumFromInt(mode) });
     self.pushEvent(.{ .size = .{ .width = width, .height = height } });
-    self.pushEvent(.{ .framebuffer = .{ .width = fb_width, .height = fb_height } });
+}
+
+export fn wioFramebuffer(self: *@This(), width: u16, height: u16) void {
+    self.pushEvent(.{ .framebuffer = .{ .width = width, .height = height } });
 }
 
 export fn wioScale(self: *@This(), scale: f32) void {

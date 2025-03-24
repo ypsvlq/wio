@@ -7,7 +7,8 @@ extern void wioFocus(void *);
 extern void wioUnfocus(void *);
 extern void wioVisible(void *);
 extern void wioHide(void *);
-extern void wioSize(void *, uint8_t, UInt16, UInt16, UInt16, UInt16);
+extern void wioSize(void *, UInt8, UInt16, UInt16);
+extern void wioFramebuffer(void *, UInt16, UInt16);
 extern void wioScale(void *, Float32);
 extern void wioChars(void *, const char *);
 extern void wioKey(void *, UInt16, UInt8);
@@ -114,8 +115,6 @@ static void warpCursor(NSWindow *window) {
 - (void)windowDidEndLiveResize:notification {
     NSWindow *window = [notification object];
     View *view = [window contentView];
-    NSRect rect = [view frame];
-    NSRect framebuffer = [view convertRectToBacking:rect];
 
     if ([view cursorMode] == 2) {
         warpCursor(window);
@@ -126,9 +125,27 @@ static void warpCursor(NSWindow *window) {
         mode = 1;
     else if ([window styleMask] & NSWindowStyleMaskFullScreen)
         mode = 2;
-    wioSize(ptr, mode, rect.size.width, rect.size.height, framebuffer.size.width, framebuffer.size.height);
+
+    NSRect rect = [view frame];
+    wioSize(ptr, mode, rect.size.width, rect.size.height);
+    NSRect framebuffer = [view convertRectToBacking:rect];
+    wioFramebuffer(ptr, framebuffer.size.width, framebuffer.size.height);
 
     [context update];
+}
+
+- (void)windowDidChangeBackingProperties:notification {
+    NSWindow *window = [notification object];
+    NSView *view = [window contentView];
+    CGFloat scale = [window backingScaleFactor];
+
+    NSRect rect = [view frame];
+    wioScale(ptr, scale);
+    NSRect framebuffer = [view convertRectToBacking:rect];
+    wioFramebuffer(ptr, framebuffer.size.width, framebuffer.size.height);
+
+    [context update];
+    [[view layer] setContentsScale:scale];
 }
 
 @end
@@ -334,8 +351,9 @@ void *wioCreateWindow(void *ptr, uint16_t width, uint16_t height) {
     wioScale(ptr, [window backingScaleFactor]);
 
     NSRect rect = [view frame];
+    wioSize(ptr, 0, rect.size.width, rect.size.height);
     NSRect framebuffer = [view convertRectToBacking:rect];
-    wioSize(ptr, false, rect.size.width, rect.size.height, framebuffer.size.width, framebuffer.size.height);
+    wioFramebuffer(ptr, framebuffer.size.width, framebuffer.size.height);
 
     return (void*)CFBridgingRetain(window);
 }
