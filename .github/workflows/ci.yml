@@ -8,10 +8,10 @@ jobs:
       fail-fast: false
       matrix:
         target:
-        - [x86-windows, true]
-        - [aarch64-macos, true]
-        - [arm-linux-gnueabihf, true]
-        - [wasm32-freestanding, false]
+        - x86-windows
+        - aarch64-macos
+        - arm-linux-gnueabihf
+        - wasm32-freestanding
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
@@ -22,8 +22,8 @@ jobs:
         version: 2024.11.0-mach
         mirror: 'https://pkg.machengine.org/zig'
     - name: Build
-      run: zig build -Dtarget=${{ matrix.target[0] }}
-    - if: ${{ matrix.target[1] }}
+      run: zig build -Dtarget=${{ matrix.target }}
+    - if: ${{ matrix.target != 'wasm32-freestanding' }}
       name: Build Vulkan
-      run: zig build -Dtarget=${{ matrix.target[0] }}
+      run: zig build -Dtarget=${{ matrix.target }}
       working-directory: example/vulkan
