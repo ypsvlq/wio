@@ -240,6 +240,7 @@ egl_surface: h.EGLSurface = null,
 egl_context: h.EGLContext = null,
 repeat_key: u32 = 0,
 repeat_timestamp: i64 = undefined,
+repeat_ignore: bool = false,
 size: wio.Size,
 scale: f32,
 cursor: u32 = undefined,
@@ -305,12 +306,27 @@ pub fn destroy(self: *@This()) void {
 }
 
 pub fn getEvent(self: *@This()) ?wio.Event {
-    const now = std.time.milliTimestamp();
-    if (self.repeat_key != 0 and now > self.repeat_timestamp) {
-        self.pushKeyEvent(self.repeat_key, .button_repeat);
-        self.repeat_timestamp = now + repeat_period;
+    const maybe_event = self.events.readItem();
+
+    if (!self.repeat_ignore) {
+        const now = std.time.milliTimestamp();
+        if (self.repeat_key != 0 and now > self.repeat_timestamp) {
+            self.pushKeyEvent(self.repeat_key, .button_repeat);
+            self.repeat_timestamp = now + repeat_period;
+            self.repeat_ignore = true;
+        }
+    } else {
+        if (maybe_event) |event| {
+            switch (event) {
+                .button_repeat, .char => {},
+                else => self.repeat_ignore = false,
+            }
+        } else {
+            self.repeat_ignore = false;
+        }
     }
-    return self.events.readItem();
+
+    return maybe_event;
 }
 
 pub fn setTitle(self: *@This(), title: []const u8) void {
