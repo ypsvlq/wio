@@ -1,0 +1,23 @@
+.{
+    .name = "vulkan",
+    .version = "0.0.0",
+    .minimum_zig_version = "0.14.0-dev.2577+271452d22",
+    .dependencies = .{
+        .wio = .{
+            .path = "../..",
+        },
+        .vulkan = .{
+            .url = "https://github.com/Snektron/vulkan-zig/archive/bb470f16dabd8195155ba9e3714dc62d7ad69add.tar.gz",
+            .hash = "12205f4e25c7102242d99dfc4f022a9c667bf4c5058b3919364f89fd882b6845d721",
+        },
+        .vulkan_headers = .{
+            .url = "https://github.com/KhronosGroup/Vulkan-Headers/archive/v1.4.304.tar.gz",
+            .hash = "1220e439f44d3a6ce1112d00d3002cb442f3806f8674dbbeb941398a2ec03e717c8f",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}
