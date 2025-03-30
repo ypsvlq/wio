@@ -42,19 +42,19 @@ fn createInstance() !void {
     defer enabled_extensions.deinit();
     try enabled_extensions.appendSlice(wio.getVulkanExtensions());
 
-    var have_portability = false;
+    var has_portability = false;
     const extensions = try vkb.enumerateInstanceExtensionPropertiesAlloc(null, allocator);
     defer allocator.free(extensions);
     for (extensions) |extension| {
         const name = std.mem.sliceTo(&extension.extension_name, 0);
         if (std.mem.eql(u8, name, "VK_KHR_portability_enumeration")) {
             try enabled_extensions.append("VK_KHR_portability_enumeration");
-            have_portability = true;
+            has_portability = true;
         }
     }
 
     const handle = try vkb.createInstance(&.{
-        .flags = .{ .enumerate_portability_bit_khr = have_portability },
+        .flags = .{ .enumerate_portability_bit_khr = has_portability },
         .p_application_info = &.{
             .application_version = 0,
             .engine_version = 0,
@@ -84,9 +84,9 @@ fn pickPhysicalDevice() !void {
     defer allocator.free(physical_devices);
 
     for (physical_devices) |handle| {
+        var has_swapchain = false;
         const extensions = try instance.enumerateDeviceExtensionPropertiesAlloc(handle, null, allocator);
         defer allocator.free(extensions);
-        var has_swapchain = false;
         for (extensions) |extension| {
             if (std.mem.eql(u8, std.mem.sliceTo(&extension.extension_name, 0), "VK_KHR_swapchain")) {
                 has_swapchain = true;
@@ -100,10 +100,10 @@ fn pickPhysicalDevice() !void {
         _ = try instance.getPhysicalDeviceSurfacePresentModesKHR(handle, surface, &present_mode_count, null);
         if (surface_format_count == 0 or present_mode_count == 0) continue;
 
-        const queue_families = try instance.getPhysicalDeviceQueueFamilyPropertiesAlloc(handle, allocator);
-        defer allocator.free(queue_families);
         var has_graphics = false;
         var has_present = false;
+        const queue_families = try instance.getPhysicalDeviceQueueFamilyPropertiesAlloc(handle, allocator);
+        defer allocator.free(queue_families);
         for (queue_families, 0..) |queue_family, i| {
             const index: u32 = @intCast(i);
             if (!has_graphics and queue_family.queue_flags.graphics_bit) {
