@@ -146,10 +146,10 @@ pub fn init(options: wio.InitOptions) !void {
 }
 
 pub fn deinit() void {
+    if (wio.init_options.opengl) libGL.close();
     wio.allocator.free(clipboard_text);
     _ = c.XCloseIM(im);
     _ = c.XCloseDisplay(display);
-    libGL.close();
     libXcursor.close();
     libX11.close();
     windows.deinit();
