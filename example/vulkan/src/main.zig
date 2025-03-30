@@ -446,6 +446,12 @@ fn destroySwapchain() void {
     device.destroySwapchainKHR(swapchain, null);
 }
 
+fn recreateSwapchain() !void {
+    try device.deviceWaitIdle();
+    destroySwapchain();
+    try createSwapchain();
+}
+
 fn loop() !bool {
     var resized = false;
 
@@ -480,12 +486,12 @@ fn loop() !bool {
     }
 
     if (visible) {
-        if (resized) {
-            try device.deviceWaitIdle();
-            destroySwapchain();
-            try createSwapchain();
-        }
-        try drawFrame();
+        if (resized) try recreateSwapchain();
+
+        drawFrame() catch |err| switch (err) {
+            error.OutOfDateKHR => try recreateSwapchain(),
+            else => return err,
+        };
     }
 
     return true;
