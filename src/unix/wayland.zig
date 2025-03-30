@@ -233,6 +233,7 @@ events: std.fifo.LinearFifo(wio.Event, .Dynamic),
 surface: *h.wl_surface,
 viewport: *h.wp_viewport,
 frame: *h.libdecor_frame,
+configured: bool = false,
 fractional_scale: ?*h.wp_fractional_scale_v1 = null,
 egl_window: ?*h.wl_egl_window = null,
 egl_surface: h.EGLSurface = null,
@@ -276,13 +277,16 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     try self.events.write(&.{
         .visible,
         .{ .scale = options.scale },
-        .{ .size = options.size },
-        .{ .framebuffer = options.size },
     });
 
     self.setTitle(options.title);
     self.setCursor(options.cursor);
     self.setMode(options.mode);
+
+    h.wl_surface_commit(surface);
+    while (!self.configured) {
+        if (c.wl_display_dispatch(display) == -1) return error.Unexpected;
+    }
 
     return self;
 }
@@ -719,6 +723,7 @@ var libdecor_frame_interface = h.libdecor_frame_interface{
 
 fn frameConfigure(frame: ?*h.libdecor_frame, configuration: ?*h.libdecor_configuration, data: ?*anyopaque) callconv(.c) void {
     const self: *@This() = @alignCast(@ptrCast(data));
+    self.configured = true;
 
     var mode = wio.WindowMode.normal;
     var focused = false;
