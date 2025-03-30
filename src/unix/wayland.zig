@@ -783,7 +783,7 @@ fn frameCommit(_: ?*h.libdecor_frame, _: ?*anyopaque) callconv(.c) void {}
 fn frameDismissPopup(_: ?*h.libdecor_frame, _: [*c]const u8, _: ?*anyopaque) callconv(.c) void {}
 
 fn keyToButton(key: u32) ?wio.Button {
-    comptime var table: [126]wio.Button = undefined;
+    comptime var table: [127]wio.Button = undefined;
     comptime for (&table, 1..) |*ptr, i| {
         ptr.* = switch (i) {
             1 => .escape,
@@ -879,6 +879,7 @@ fn keyToButton(key: u32) ?wio.Button {
             96 => .kp_enter,
             97 => .right_control,
             98 => .kp_slash,
+            99 => .print_screen,
             100 => .right_alt,
             102 => .home,
             103 => .up,
@@ -898,6 +899,7 @@ fn keyToButton(key: u32) ?wio.Button {
             124 => .international3,
             125 => .left_gui,
             126 => .right_gui,
+            127 => .application,
             else => .mouse_left,
         };
     };
