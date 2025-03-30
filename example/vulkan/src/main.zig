@@ -38,10 +38,30 @@ var vki: vk.InstanceWrapper(apis) = undefined;
 var instance: vk.InstanceProxy(apis) = undefined;
 
 fn createInstance() !void {
-    const extensions = wio.getVulkanExtensions();
+    var enabled_extensions = std.ArrayList([*:0]const u8).init(allocator);
+    defer enabled_extensions.deinit();
+    try enabled_extensions.appendSlice(wio.getVulkanExtensions());
+
+    var have_portability = false;
+    const extensions = try vkb.enumerateInstanceExtensionPropertiesAlloc(null, allocator);
+    defer allocator.free(extensions);
+    for (extensions) |extension| {
+        const name = std.mem.sliceTo(&extension.extension_name, 0);
+        if (std.mem.eql(u8, name, "VK_KHR_portability_enumeration")) {
+            try enabled_extensions.append("VK_KHR_portability_enumeration");
+            have_portability = true;
+        }
+    }
+
     const handle = try vkb.createInstance(&.{
-        .enabled_extension_count = @intCast(extensions.len),
-        .pp_enabled_extension_names = extensions.ptr,
+        .flags = .{ .enumerate_portability_bit_khr = have_portability },
+        .p_application_info = &.{
+            .application_version = 0,
+            .engine_version = 0,
+            .api_version = vk.API_VERSION_1_1,
+        },
+        .enabled_extension_count = @intCast(enabled_extensions.items.len),
+        .pp_enabled_extension_names = enabled_extensions.items.ptr,
     }, null);
 
     vki = try .load(handle, vkb.dispatch.vkGetInstanceProcAddr);
@@ -110,7 +130,19 @@ var graphics_queue: vk.Queue = undefined;
 var present_queue: vk.Queue = undefined;
 
 fn createLogicalDevice() !void {
-    const extensions = [_][*:0]const u8{"VK_KHR_swapchain"};
+    var enabled_extensions = std.ArrayList([*:0]const u8).init(allocator);
+    defer enabled_extensions.deinit();
+    try enabled_extensions.append("VK_KHR_swapchain");
+
+    const extensions = try instance.enumerateDeviceExtensionPropertiesAlloc(physical_device, null, allocator);
+    defer allocator.free(extensions);
+    for (extensions) |extension| {
+        const name = std.mem.sliceTo(&extension.extension_name, 0);
+        if (std.mem.eql(u8, name, "VK_KHR_portability_subset")) {
+            try enabled_extensions.append("VK_KHR_portability_subset");
+        }
+    }
+
     const handle = try instance.createDevice(physical_device, &.{
         .queue_create_info_count = if (graphics_queue_index == present_queue_index) 1 else 2,
         .p_queue_create_infos = &.{
@@ -125,8 +157,8 @@ fn createLogicalDevice() !void {
                 .p_queue_priorities = &.{1},
             },
         },
-        .enabled_extension_count = extensions.len,
-        .pp_enabled_extension_names = &extensions,
+        .enabled_extension_count = @intCast(enabled_extensions.items.len),
+        .pp_enabled_extension_names = enabled_extensions.items.ptr,
     }, null);
 
     vkd = try .load(handle, vki.dispatch.vkGetDeviceProcAddr);
