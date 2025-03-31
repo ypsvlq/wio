@@ -407,12 +407,12 @@ fn recordCommandBuffer(image_index: u32) !void {
 
 fn drawFrame() !void {
     _ = try device.waitForFences(1, &.{in_flight_fence}, vk.TRUE, std.math.maxInt(u64));
-    try device.resetFences(1, &.{in_flight_fence});
 
     const image_index = (try device.acquireNextImageKHR(swapchain, std.math.maxInt(u64), image_available_semaphore, .null_handle)).image_index;
     try device.resetCommandBuffer(command_buffer, .{});
     try recordCommandBuffer(image_index);
 
+    try device.resetFences(1, &.{in_flight_fence});
     try device.queueSubmit(
         graphics_queue,
         1,
