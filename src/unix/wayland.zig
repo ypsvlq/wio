@@ -169,13 +169,17 @@ pub fn init(options: wio.InitOptions) !void {
 
     _ = c.wl_display_roundtrip(display);
     errdefer destroyProxies();
-    if (compositor == null or seat == null or viewporter == null or data_device_manager == null) return error.Unexpected;
-
-    data_device = h.wl_data_device_manager_get_data_device(data_device_manager, seat) orelse return error.Unexpected;
-    _ = h.wl_data_device_add_listener(data_device, &data_device_listener, null);
+    if (compositor == null or seat == null) return error.Unexpected;
 
     libdecor_context = c.libdecor_new(display, &libdecor_interface) orelse return error.Unexpected;
     errdefer c.libdecor_unref(libdecor_context);
+
+    if (data_device_manager) |_| {
+        data_device = h.wl_data_device_manager_get_data_device(data_device_manager, seat);
+        if (data_device) |_| {
+            _ = h.wl_data_device_add_listener(data_device, &data_device_listener, null);
+        }
+    }
 
     if (options.opengl) {
         egl_display = c.eglGetDisplay(display) orelse {
@@ -244,9 +248,9 @@ pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []cons
 
 events: std.fifo.LinearFifo(wio.Event, .Dynamic),
 surface: *h.wl_surface,
-viewport: *h.wp_viewport,
 frame: *h.libdecor_frame,
 configured: bool = false,
+viewport: ?*h.wp_viewport = null,
 fractional_scale: ?*h.wp_fractional_scale_v1 = null,
 locked_pointer: ?*h.zwp_locked_pointer_v1 = null,
 egl_window: ?*h.wl_egl_window = null,
@@ -256,7 +260,7 @@ repeat_key: u32 = 0,
 repeat_timestamp: i64 = undefined,
 repeat_ignore: bool = false,
 size: wio.Size,
-scale: f32,
+scale: f32 = 1,
 cursor: u32 = undefined,
 cursor_mode: wio.CursorMode,
 
@@ -267,32 +271,34 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     errdefer h.wl_surface_destroy(surface);
     h.wl_surface_set_user_data(surface, self);
 
-    const viewport = h.wp_viewporter_get_viewport(viewporter, surface) orelse return error.Unexpected;
-    errdefer h.wp_viewport_destroy(viewport);
-
     const frame = c.libdecor_decorate(libdecor_context, surface, &libdecor_frame_interface, self) orelse return error.Unexpected;
+    errdefer c.libdecor_frame_unref(frame);
 
     self.* = .{
         .events = .init(wio.allocator),
         .surface = surface,
-        .viewport = viewport,
         .frame = frame,
         .size = options.size,
-        .scale = options.scale,
         .cursor_mode = options.cursor_mode,
     };
 
-    if (fractional_scale_manager) |_| {
-        if (h.wp_fractional_scale_manager_v1_get_fractional_scale(fractional_scale_manager, surface)) |fractional_scale| {
-            self.fractional_scale = fractional_scale;
-            _ = h.wp_fractional_scale_v1_add_listener(fractional_scale, &fractional_scale_listener, self);
+    if (viewporter) |_| {
+        self.viewport = h.wp_viewporter_get_viewport(viewporter, surface);
+    }
+    errdefer if (self.viewport) |_| h.wp_viewport_destroy(self.viewport);
+
+    if (self.viewport) |_| {
+        if (fractional_scale_manager) |_| {
+            if (h.wp_fractional_scale_manager_v1_get_fractional_scale(fractional_scale_manager, surface)) |fractional_scale| {
+                self.fractional_scale = fractional_scale;
+                _ = h.wp_fractional_scale_v1_add_listener(fractional_scale, &fractional_scale_listener, self);
+            }
         }
     }
+    errdefer if (self.fractional_scale) |_| h.wp_fractional_scale_v1_destroy(self.fractional_scale);
 
-    try self.events.write(&.{
-        .visible,
-        .{ .scale = options.scale },
-    });
+    try self.events.writeItem(.visible);
+    if (self.fractional_scale == null) try self.events.writeItem(.{ .scale = 1 });
 
     self.setTitle(options.title);
     self.setMode(options.mode);
@@ -313,9 +319,9 @@ pub fn destroy(self: *@This()) void {
     if (self.egl_surface) |_| _ = c.eglDestroySurface(egl_display, self.egl_surface);
     if (self.egl_window) |_| c.wl_egl_window_destroy(self.egl_window);
     if (self.fractional_scale) |_| h.wp_fractional_scale_v1_destroy(self.fractional_scale);
+    if (self.viewport) |_| h.wp_viewport_destroy(self.viewport);
     self.events.deinit();
     c.libdecor_frame_unref(self.frame);
-    h.wp_viewport_destroy(self.viewport);
     h.wl_surface_destroy(self.surface);
     wio.allocator.destroy(self);
 }
@@ -401,6 +407,8 @@ pub fn requestAttention(self: *@This()) void {
 }
 
 pub fn setClipboardText(_: *@This(), text: []const u8) void {
+    if (data_device_manager == null or data_device == null) return;
+
     wio.allocator.free(clipboard_text);
     clipboard_text = wio.allocator.dupe(u8, text) catch "";
 
@@ -810,8 +818,11 @@ fn frameConfigure(frame: ?*h.libdecor_frame, configuration: ?*h.libdecor_configu
     const size = wio.Size{ .width = @intCast(width), .height = @intCast(height) };
     const framebuffer = size.multiply(self.scale);
 
-    h.wp_viewport_set_source(self.viewport, 0, 0, @as(i32, framebuffer.width) << 8, @as(i32, framebuffer.height) << 8);
-    h.wp_viewport_set_destination(self.viewport, size.width, size.height);
+    if (self.viewport) |_| {
+        h.wp_viewport_set_source(self.viewport, 0, 0, @as(i32, framebuffer.width) << 8, @as(i32, framebuffer.height) << 8);
+        h.wp_viewport_set_destination(self.viewport, size.width, size.height);
+    }
+
     if (self.egl_window != null) c.wl_egl_window_resize(self.egl_window, framebuffer.width, framebuffer.height, 0, 0);
 
     const state = c.libdecor_state_new(width, height);
