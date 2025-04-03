@@ -620,6 +620,7 @@ fn keyboardLeave(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, surface: ?*h.wl_sur
     if (focus) |window| {
         if (window.surface == surface) {
             focus = null;
+            window.repeat_key = 0;
         }
     }
     if (compose_state) |_| c.xkb_compose_state_reset(compose_state);
