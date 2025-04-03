@@ -6,27 +6,25 @@ pub const Lib = struct {
     handle: *std.DynLib,
     name: [:0]const u8,
     prefix: []const u8 = "",
-    predicate: bool = true,
+    exclude: []const u8 = "",
 };
 
-pub fn open(name: [:0]const u8) !std.DynLib {
+pub fn open(comptime name: [:0]const u8) !std.DynLib {
     return std.DynLib.openZ(
         if (builtin.os.tag == .openbsd or builtin.os.tag == .netbsd)
-            name[0 .. std.mem.indexOfScalar(u8, name, '.').? + 3]
+            name[0..comptime std.mem.lastIndexOfScalar(u8, name, '.').?] ++ ""
         else
             name,
     );
 }
 
-pub fn load(c: anytype, libs: []const Lib) !void {
+pub fn load(c: anytype, comptime libs: []const Lib) !void {
     var succeeded: usize = 0;
     errdefer for (0..succeeded) |i| {
-        if (libs[i].predicate) libs[i].handle.close();
+        libs[i].handle.close();
     };
-    for (libs) |lib| {
-        if (lib.predicate) {
-            lib.handle.* = try open(lib.name);
-        }
+    inline for (libs) |lib| {
+        lib.handle.* = try open(lib.name);
         succeeded += 1;
     }
 
@@ -34,8 +32,8 @@ pub fn load(c: anytype, libs: []const Lib) !void {
     const table: *[names.len]?*const fn () void = @ptrCast(c);
     for (names, table) |name, *out| {
         for (libs) |lib| {
+            if (lib.exclude.len > 0 and std.mem.startsWith(u8, name, lib.exclude)) continue;
             if (std.mem.startsWith(u8, name, lib.prefix)) {
-                if (!lib.predicate) break;
                 out.* = lib.handle.lookup(*const fn () void, name) orelse {
                     log.err("could not load {s}", .{name});
                     return error.Unexpected;

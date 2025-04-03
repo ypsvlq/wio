@@ -129,14 +129,19 @@ export var wio_wl_proxy_get_user_data: *const @TypeOf(h.wl_proxy_get_user_data) 
 
 pub fn init(options: wio.InitOptions) !void {
     dynlib.load(&c, &.{
+        .{ .handle = &libwayland_client, .name = "libwayland-client.so.0", .prefix = "wl", .exclude = "wl_egl" },
         .{ .handle = &libxkbcommon, .name = "libxkbcommon.so.0", .prefix = "xkb" },
         .{ .handle = &libdecor, .name = "libdecor-0.so.0", .prefix = "libdecor" },
-        .{ .handle = &libwayland_egl, .name = "libwayland-egl.so.1", .prefix = "wl_egl", .predicate = options.opengl },
-        .{ .handle = &libEGL, .name = "libEGL.so.1", .prefix = "egl", .predicate = options.opengl },
-        .{ .handle = &libwayland_client, .name = "libwayland-client.so.0" },
     }) catch return error.Unavailable;
     errdefer libwayland_client.close();
     errdefer libxkbcommon.close();
+
+    if (options.opengl) {
+        dynlib.load(&c, &.{
+            .{ .handle = &libwayland_egl, .name = "libwayland-egl.so.1", .prefix = "wl_egl" },
+            .{ .handle = &libEGL, .name = "libEGL.so.1", .prefix = "egl" },
+        }) catch return error.Unavailable;
+    }
     errdefer if (options.opengl) libwayland_egl.close();
     errdefer if (options.opengl) libEGL.close();
 

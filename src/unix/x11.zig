@@ -89,11 +89,14 @@ var clipboard_text: []const u8 = "";
 pub fn init(options: wio.InitOptions) !void {
     dynlib.load(&c, &.{
         .{ .handle = &libXcursor, .name = "libXcursor.so.1", .prefix = "Xcursor" },
-        .{ .handle = &libGL, .name = "libGL.so.1", .prefix = "glX", .predicate = options.opengl },
-        .{ .handle = &libX11, .name = "libX11.so.6" },
+        .{ .handle = &libX11, .name = "libX11.so.6", .prefix = "X" },
     }) catch return error.Unavailable;
     errdefer libX11.close();
     errdefer libXcursor.close();
+
+    if (options.opengl) {
+        dynlib.load(&c, &.{.{ .handle = &libGL, .name = "libGL.so.1", .prefix = "glX" }}) catch return error.Unavailable;
+    }
     errdefer if (options.opengl) libGL.close();
 
     display = c.XkbOpenDisplay(null, null, null, null, null, null) orelse return error.Unavailable;
