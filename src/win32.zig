@@ -250,7 +250,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     self.* = .{
         .events = .init(wio.allocator),
         .window = window,
-        .cursor = w.LoadCursorW(null, w.IDC_ARROW),
+        .cursor = loadCursor(options.cursor),
         .cursor_mode = options.cursor_mode,
     };
     _ = w.SetWindowLongPtrW(window, w.GWLP_USERDATA, @bitCast(@intFromPtr(self)));
@@ -263,7 +263,6 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     _ = w.SetWindowPos(window, null, 0, 0, size_scaled.width, size_scaled.height, w.SWP_NOMOVE | w.SWP_NOZORDER);
 
     self.setMode(options.mode);
-    if (options.cursor != .arrow) self.setCursor(options.cursor);
 
     return self;
 }
@@ -330,20 +329,7 @@ pub fn setMode(self: *@This(), mode: wio.WindowMode) void {
 }
 
 pub fn setCursor(self: *@This(), shape: wio.Cursor) void {
-    self.cursor = w.LoadCursorW(null, switch (shape) {
-        .arrow => w.IDC_ARROW,
-        .arrow_busy => w.IDC_APPSTARTING,
-        .busy => w.IDC_WAIT,
-        .text => w.IDC_IBEAM,
-        .hand => w.IDC_HAND,
-        .crosshair => w.IDC_CROSS,
-        .forbidden => w.IDC_NO,
-        .move => w.IDC_SIZEALL,
-        .size_ns => w.IDC_SIZENS,
-        .size_ew => w.IDC_SIZEWE,
-        .size_nesw => w.IDC_SIZENESW,
-        .size_nwse => w.IDC_SIZENWSE,
-    });
+    self.cursor = loadCursor(shape);
 
     // trigger WM_SETCURSOR
     var pos: w.POINT = undefined;
@@ -1018,6 +1004,23 @@ fn clientToWindow(size: wio.Size, style: u32) wio.Size {
     };
     _ = w.AdjustWindowRect(&rect, style, w.FALSE);
     return .{ .width = @intCast(rect.right - rect.left), .height = @intCast(rect.bottom - rect.top) };
+}
+
+fn loadCursor(shape: wio.Cursor) w.HCURSOR {
+    return w.LoadCursorW(null, switch (shape) {
+        .arrow => w.IDC_ARROW,
+        .arrow_busy => w.IDC_APPSTARTING,
+        .busy => w.IDC_WAIT,
+        .text => w.IDC_IBEAM,
+        .hand => w.IDC_HAND,
+        .crosshair => w.IDC_CROSS,
+        .forbidden => w.IDC_NO,
+        .move => w.IDC_SIZEALL,
+        .size_ns => w.IDC_SIZENS,
+        .size_ew => w.IDC_SIZEWE,
+        .size_nesw => w.IDC_SIZENESW,
+        .size_nwse => w.IDC_SIZENWSE,
+    });
 }
 
 fn logLastError(name: []const u8) error{Unexpected} {
