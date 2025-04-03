@@ -89,8 +89,8 @@ const wio = {
             }
         });
         canvas.addEventListener("wheel", event => {
-            if (event.deltaY !== 0) events.push(16, event.deltaY * 0.01);
-            if (event.deltaX !== 0) events.push(17, event.deltaX * 0.01);
+            if (event.deltaY !== 0) events.push(16, event.deltaY);
+            if (event.deltaX !== 0) events.push(17, event.deltaX);
         });
 
         wio.windows.push(window);
