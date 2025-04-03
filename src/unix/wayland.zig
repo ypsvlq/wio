@@ -614,6 +614,7 @@ fn keyboardKeymap(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, fd: i32, size: u32
 
 fn keyboardEnter(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, surface: ?*h.wl_surface, _: ?*h.wl_array) callconv(.c) void {
     focus = @alignCast(@ptrCast(h.wl_surface_get_user_data(surface)));
+    if (focus) |window| window.pushEvent(.focused);
 }
 
 fn keyboardLeave(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, surface: ?*h.wl_surface) callconv(.c) void {
@@ -621,6 +622,7 @@ fn keyboardLeave(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, surface: ?*h.wl_sur
         if (window.surface == surface) {
             focus = null;
             window.repeat_key = 0;
+            window.pushEvent(.unfocused);
         }
     }
     if (compose_state) |_| c.xkb_compose_state_reset(compose_state);
@@ -788,11 +790,8 @@ fn frameConfigure(frame: ?*h.libdecor_frame, configuration: ?*h.libdecor_configu
     self.configured = true;
 
     var mode = wio.WindowMode.normal;
-    var focused = false;
-
     var window_state: h.libdecor_window_state = 0;
     if (c.libdecor_configuration_get_window_state(configuration, &window_state)) {
-        if (window_state & h.LIBDECOR_WINDOW_STATE_ACTIVE != 0) focused = true;
         if (window_state & h.LIBDECOR_WINDOW_STATE_MAXIMIZED != 0) mode = .maximized;
         if (window_state & h.LIBDECOR_WINDOW_STATE_FULLSCREEN != 0) mode = .fullscreen;
     }
@@ -814,7 +813,6 @@ fn frameConfigure(frame: ?*h.libdecor_frame, configuration: ?*h.libdecor_configu
     defer c.libdecor_state_free(state);
     c.libdecor_frame_commit(frame, state, configuration);
 
-    self.pushEvent(if (focused) .focused else .unfocused);
     self.pushEvent(.{ .mode = mode });
     self.pushEvent(.{ .size = size });
     self.pushEvent(.{ .framebuffer = framebuffer });
