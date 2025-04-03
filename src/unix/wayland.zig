@@ -9,6 +9,8 @@ const h = @cImport({
     @cInclude("viewporter-client-protocol.h");
     @cInclude("fractional-scale-v1-client-protocol.h");
     @cInclude("cursor-shape-v1-client-protocol.h");
+    @cInclude("pointer-constraints-v1-client-protocol.h");
+    @cInclude("relative-pointer-v1-client-protocol.h");
     @cInclude("xdg-activation-v1-client-protocol.h");
     @cInclude("xkbcommon/xkbcommon.h");
     @cInclude("xkbcommon/xkbcommon-compose.h");
@@ -91,10 +93,13 @@ var pointer: ?*h.wl_pointer = null;
 var viewporter: ?*h.wp_viewporter = null;
 var fractional_scale_manager: ?*h.wp_fractional_scale_manager_v1 = null;
 var cursor_shape_manager: ?*h.wp_cursor_shape_manager_v1 = null;
+var pointer_constraints: ?*h.zwp_pointer_constraints_v1 = null;
+var relative_pointer_manager: ?*h.zwp_relative_pointer_manager_v1 = null;
 var data_device_manager: ?*h.wl_data_device_manager = null;
 var activation: ?*h.xdg_activation_v1 = null;
 
 var cursor_shape_device: ?*h.wp_cursor_shape_device_v1 = null;
+var relative_pointer: ?*h.zwp_relative_pointer_v1 = null;
 var data_device: ?*h.wl_data_device = null;
 var data_offer: ?*h.wl_data_offer = null;
 var data_source: ?*h.wl_data_source = null;
@@ -206,9 +211,12 @@ fn destroyProxies() void {
     if (data_source) |_| h.wl_data_source_destroy(data_source);
     if (data_offer) |_| h.wl_data_offer_destroy(data_offer);
     if (data_device) |_| h.wl_data_device_destroy(data_device);
+    if (relative_pointer) |_| h.zwp_relative_pointer_v1_destroy(relative_pointer);
     if (cursor_shape_device) |_| h.wp_cursor_shape_device_v1_destroy(cursor_shape_device);
     if (activation) |_| h.xdg_activation_v1_destroy(activation);
     if (data_device_manager) |_| h.wl_data_device_manager_destroy(data_device_manager);
+    if (relative_pointer_manager) |_| h.zwp_relative_pointer_manager_v1_destroy(relative_pointer_manager);
+    if (pointer_constraints) |_| h.zwp_pointer_constraints_v1_destroy(pointer_constraints);
     if (cursor_shape_manager) |_| h.wp_cursor_shape_manager_v1_destroy(cursor_shape_manager);
     if (fractional_scale_manager) |_| h.wp_fractional_scale_manager_v1_destroy(fractional_scale_manager);
     if (viewporter) |_| h.wp_viewporter_destroy(viewporter);
@@ -235,6 +243,7 @@ viewport: *h.wp_viewport,
 frame: *h.libdecor_frame,
 configured: bool = false,
 fractional_scale: ?*h.wp_fractional_scale_v1 = null,
+locked_pointer: ?*h.zwp_locked_pointer_v1 = null,
 egl_window: ?*h.wl_egl_window = null,
 egl_surface: h.EGLSurface = null,
 egl_context: h.EGLContext = null,
@@ -281,8 +290,9 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     });
 
     self.setTitle(options.title);
-    self.setCursor(options.cursor);
     self.setMode(options.mode);
+    self.setCursor(options.cursor);
+    self.setCursorMode(options.cursor_mode);
 
     h.wl_surface_commit(surface);
     while (!self.configured) {
@@ -365,6 +375,17 @@ pub fn setCursor(self: *@This(), shape: wio.Cursor) void {
 pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
     self.cursor_mode = mode;
     if (focus == self) self.applyCursor();
+
+    if (mode == .relative) {
+        if (self.locked_pointer == null) {
+            self.locked_pointer = h.zwp_pointer_constraints_v1_lock_pointer(pointer_constraints, self.surface, pointer, null, h.ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
+        }
+    } else {
+        if (self.locked_pointer != null) {
+            h.zwp_locked_pointer_v1_destroy(self.locked_pointer);
+            self.locked_pointer = null;
+        }
+    }
 }
 
 pub fn requestAttention(self: *@This()) void {
@@ -515,6 +536,10 @@ fn registryGlobal(_: ?*anyopaque, _: ?*h.wl_registry, name: u32, interface_ptr: 
         fractional_scale_manager = @ptrCast(h.wl_registry_bind(registry, name, &h.wp_fractional_scale_manager_v1_interface, 1));
     } else if (std.mem.eql(u8, interface, "wp_cursor_shape_manager_v1")) {
         cursor_shape_manager = @ptrCast(h.wl_registry_bind(registry, name, &h.wp_cursor_shape_manager_v1_interface, 1));
+    } else if (std.mem.eql(u8, interface, "zwp_pointer_constraints_v1")) {
+        pointer_constraints = @ptrCast(h.wl_registry_bind(registry, name, &h.zwp_pointer_constraints_v1_interface, 1));
+    } else if (std.mem.eql(u8, interface, "zwp_relative_pointer_manager_v1")) {
+        relative_pointer_manager = @ptrCast(h.wl_registry_bind(registry, name, &h.zwp_relative_pointer_manager_v1_interface, 1));
     } else if (std.mem.eql(u8, interface, "wl_data_device_manager")) {
         data_device_manager = @ptrCast(h.wl_registry_bind(registry, name, &h.wl_data_device_manager_interface, 1));
     } else if (std.mem.eql(u8, interface, "xdg_activation_v1")) {
@@ -530,17 +555,21 @@ const seat_listener = h.wl_seat_listener{
 };
 
 fn seatCapabilities(_: ?*anyopaque, _: ?*h.wl_seat, capabilities: u32) callconv(.c) void {
-    if (keyboard) |_| {
-        h.wl_keyboard_release(keyboard);
-        keyboard = null;
+    if (relative_pointer) |_| {
+        h.zwp_relative_pointer_v1_destroy(relative_pointer);
+        relative_pointer = null;
+    }
+    if (cursor_shape_device) |_| {
+        h.wp_cursor_shape_device_v1_destroy(cursor_shape_device);
+        cursor_shape_device = null;
     }
     if (pointer) |_| {
         h.wl_pointer_release(pointer);
         pointer = null;
     }
-    if (cursor_shape_device) |_| {
-        h.wp_cursor_shape_device_v1_destroy(cursor_shape_device);
-        cursor_shape_device = null;
+    if (keyboard) |_| {
+        h.wl_keyboard_release(keyboard);
+        keyboard = null;
     }
 
     if (capabilities & h.WL_SEAT_CAPABILITY_KEYBOARD != 0) {
@@ -552,6 +581,10 @@ fn seatCapabilities(_: ?*anyopaque, _: ?*h.wl_seat, capabilities: u32) callconv(
         _ = h.wl_pointer_add_listener(pointer, &pointer_listener, null);
         if (cursor_shape_manager) |_| {
             cursor_shape_device = h.wp_cursor_shape_manager_v1_get_pointer(cursor_shape_manager, pointer);
+        }
+        if (relative_pointer_manager) |_| {
+            relative_pointer = h.zwp_relative_pointer_manager_v1_get_relative_pointer(relative_pointer_manager, pointer);
+            _ = h.zwp_relative_pointer_v1_add_listener(relative_pointer, &relative_pointer_listener, null);
         }
     }
 }
@@ -662,6 +695,18 @@ fn pointerAxis(_: ?*anyopaque, _: ?*h.wl_pointer, _: u32, axis: u32, value: i32)
             h.WL_POINTER_AXIS_VERTICAL_SCROLL => window.pushEvent(.{ .scroll_vertical = float }),
             h.WL_POINTER_AXIS_HORIZONTAL_SCROLL => window.pushEvent(.{ .scroll_horizontal = float }),
             else => {},
+        }
+    }
+}
+
+const relative_pointer_listener = h.zwp_relative_pointer_v1_listener{
+    .relative_motion = relativePointerMotion,
+};
+
+fn relativePointerMotion(_: ?*anyopaque, _: ?*h.zwp_relative_pointer_v1, _: u32, _: u32, _: i32, _: i32, dx_unaccel: i32, dy_unaccel: i32) callconv(.c) void {
+    if (focus) |window| {
+        if (window.cursor_mode == .relative) {
+            window.pushEvent(.{ .mouse_relative = .{ .x = @intCast(dx_unaccel >> 8), .y = @intCast(dy_unaccel >> 8) } });
         }
     }
 }
