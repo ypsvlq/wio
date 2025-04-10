@@ -86,6 +86,8 @@ pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
     js.setCursorMode(self.id, @intFromEnum(mode));
 }
 
+pub fn setParent(_: *@This(), _: usize) void {}
+
 pub fn requestAttention(_: *@This()) void {}
 
 pub fn setClipboardText(_: *@This(), text: []const u8) void {

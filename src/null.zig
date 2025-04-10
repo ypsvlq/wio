@@ -53,6 +53,11 @@ pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
     _ = mode;
 }
 
+pub fn setParent(self: *@This(), parent: usize) void {
+    _ = self;
+    _ = parent;
+}
+
 pub fn setClipboardText(self: *@This(), text: []const u8) void {
     _ = self;
     _ = text;

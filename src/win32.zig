@@ -244,7 +244,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
         w.CW_USEDEFAULT,
         size.width,
         size.height,
-        null,
+        @ptrFromInt(options.parent),
         null,
         w.GetModuleHandleW(null),
         null,
@@ -352,6 +352,10 @@ pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
     var pos: w.POINT = undefined;
     _ = w.GetCursorPos(&pos);
     _ = w.SetCursorPos(pos.x, pos.y);
+}
+
+pub fn setParent(self: *@This(), parent: usize) void {
+    _ = w.SetParent(self.window, @ptrFromInt(parent));
 }
 
 pub fn requestAttention(self: *@This()) void {

@@ -45,6 +45,7 @@ var c: extern struct {
     XGrabPointer: *const @TypeOf(h.XGrabPointer),
     XUngrabPointer: *const @TypeOf(h.XUngrabPointer),
     XWarpPointer: *const @TypeOf(h.XWarpPointer),
+    XReparentWindow: *const @TypeOf(h.XReparentWindow),
     XSetSelectionOwner: *const @TypeOf(h.XSetSelectionOwner),
     XConvertSelection: *const @TypeOf(h.XConvertSelection),
     XCheckTypedWindowEvent: *const @TypeOf(h.XCheckTypedWindowEvent),
@@ -190,7 +191,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     attributes.event_mask = h.PropertyChangeMask | h.FocusChangeMask | h.ExposureMask | h.StructureNotifyMask | h.KeyPressMask | h.KeyReleaseMask | h.ButtonPressMask | h.ButtonReleaseMask | h.PointerMotionMask;
     const window = c.XCreateWindow(
         display,
-        h.DefaultRootWindow(display),
+        if (options.parent != 0) options.parent else h.DefaultRootWindow(display),
         0,
         0,
         size.width,
@@ -317,6 +318,28 @@ pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
     }
 }
 
+pub fn setParent(self: *@This(), parent: usize) void {
+    _ = c.XReparentWindow(display, self.window, parent, 0, 0);
+}
+
+pub fn requestAttention(self: *@This()) void {
+    var event = h.XEvent{
+        .xclient = .{
+            .type = h.ClientMessage,
+            .serial = undefined,
+            .send_event = undefined,
+            .display = undefined,
+            .window = self.window,
+            .message_type = atoms._NET_WM_STATE,
+            .format = 32,
+            .data = .{
+                .l = .{ 1, @as(c_long, @bitCast(atoms._NET_WM_STATE_DEMANDS_ATTENTION)), 0, 1, 0 },
+            },
+        },
+    };
+    _ = c.XSendEvent(display, h.DefaultRootWindow(display), h.False, h.SubstructureRedirectMask | h.SubstructureNotifyMask, &event);
+}
+
 pub fn setClipboardText(self: *@This(), text: []const u8) void {
     wio.allocator.free(clipboard_text);
     clipboard_text = wio.allocator.dupe(u8, text) catch "";
@@ -357,24 +380,6 @@ pub fn getClipboardText(self: *@This(), allocator: std.mem.Allocator) ?[]u8 {
     } else {
         return allocator.dupe(u8, property[0..nitems]) catch null;
     }
-}
-
-pub fn requestAttention(self: *@This()) void {
-    var event = h.XEvent{
-        .xclient = .{
-            .type = h.ClientMessage,
-            .serial = undefined,
-            .send_event = undefined,
-            .display = undefined,
-            .window = self.window,
-            .message_type = atoms._NET_WM_STATE,
-            .format = 32,
-            .data = .{
-                .l = .{ 1, @as(c_long, @bitCast(atoms._NET_WM_STATE_DEMANDS_ATTENTION)), 0, 1, 0 },
-            },
-        },
-    };
-    _ = c.XSendEvent(display, h.DefaultRootWindow(display), h.False, h.SubstructureRedirectMask | h.SubstructureNotifyMask, &event);
 }
 
 pub fn createContext(self: *@This(), options: wio.CreateContextOptions) !void {

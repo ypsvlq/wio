@@ -399,6 +399,11 @@ pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
     }
 }
 
+pub fn setParent(self: *@This(), parent: usize) void {
+    _ = self;
+    _ = parent;
+}
+
 pub fn requestAttention(self: *@This()) void {
     if (activation == null) return;
     const token = h.xdg_activation_v1_get_activation_token(activation);

@@ -168,6 +168,13 @@ pub const Window = union {
         }
     }
 
+    pub fn setParent(self: *@This(), parent: usize) void {
+        switch (active) {
+            .x11 => self.x11.setParent(parent),
+            .wayland => self.wayland.setParent(parent),
+        }
+    }
+
     pub fn requestAttention(self: *@This()) void {
         switch (active) {
             .x11 => self.x11.requestAttention(),

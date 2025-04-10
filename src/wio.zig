@@ -79,6 +79,7 @@ pub const CreateWindowOptions = struct {
     mode: WindowMode = .normal,
     cursor: Cursor = .arrow,
     cursor_mode: CursorMode = .normal,
+    parent: usize = 0,
 };
 
 pub fn createWindow(options: CreateWindowOptions) !Window {
@@ -110,6 +111,10 @@ pub const Window = struct {
 
     pub fn setCursorMode(self: *Window, mode: CursorMode) void {
         self.backend.setCursorMode(mode);
+    }
+
+    pub fn setParent(self: *Window, parent: usize) void {
+        self.backend.setParent(parent);
     }
 
     pub fn requestAttention(self: *Window) void {
