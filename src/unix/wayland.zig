@@ -135,6 +135,7 @@ pub fn init(options: wio.InitOptions) !void {
     }) catch return error.Unavailable;
     errdefer libwayland_client.close();
     errdefer libxkbcommon.close();
+    errdefer libdecor.close();
 
     if (options.opengl) {
         dynlib.load(&c, &.{
