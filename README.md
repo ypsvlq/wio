@@ -1,6 +1,13 @@
 # wio
 
-wio is a window system abstraction library.
+wio is a platform abstraction library. It provides:
+
+- window management and events
+- clipboard access
+- alert dialogs
+- joystick input
+- audio
+- OpenGL and Vulkan WSI
 
 ## Getting started
 
