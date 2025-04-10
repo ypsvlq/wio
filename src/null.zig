@@ -58,6 +58,10 @@ pub fn setParent(self: *@This(), parent: usize) void {
     _ = parent;
 }
 
+pub fn requestAttention(self: *@This()) void {
+    _ = self;
+}
+
 pub fn setClipboardText(self: *@This(), text: []const u8) void {
     _ = self;
     _ = text;
