@@ -45,6 +45,13 @@ pub fn run(func: fn () anyerror!bool) !void {
     return backend.run(func);
 }
 
+/// Alternative to `run`, providing user control over the main loop.
+///
+/// Not available on all platforms.
+pub fn update() void {
+    backend.update();
+}
+
 pub const MessageBoxStyle = enum { info, warn, err };
 
 pub fn messageBox(style: MessageBoxStyle, title: []const u8, message: []const u8) void {

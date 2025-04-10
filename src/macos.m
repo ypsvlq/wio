@@ -304,7 +304,7 @@ void wioRun(void) {
     [NSApp activateIgnoringOtherApps:YES];
 }
 
-void wioLoop(void) {
+void wioUpdate(void) {
     NSEvent *event;
     do {
         event = [NSApp nextEventMatchingMask:NSEventMaskAny

@@ -95,13 +95,17 @@ pub fn deinit() void {
 
 pub fn run(func: fn () anyerror!bool) !void {
     while (try func()) {
-        switch (active) {
-            .x11 => x11.update(),
-            .wayland => wayland.update(),
-        }
-        if (wio.init_options.joystick) joystick.update();
-        if (wio.init_options.audio) audio.update();
+        update();
     }
+}
+
+pub fn update() void {
+    switch (active) {
+        .x11 => x11.update(),
+        .wayland => wayland.update(),
+    }
+    if (wio.init_options.joystick) joystick.update();
+    if (wio.init_options.audio) audio.update();
 }
 
 pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {

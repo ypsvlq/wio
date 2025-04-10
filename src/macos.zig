@@ -12,7 +12,7 @@ const log = std.log.scoped(.wio);
 
 extern fn wioInit() void;
 extern fn wioRun() void;
-extern fn wioLoop() void;
+extern fn wioUpdate() void;
 extern fn wioMessageBox(u8, [*]const u8, usize) void;
 extern fn wioCreateWindow(*anyopaque, u16, u16) *anyopaque;
 extern fn wioDestroyWindow(*anyopaque, ?*anyopaque) void;
@@ -118,8 +118,12 @@ pub fn deinit() void {
 pub fn run(func: fn () anyerror!bool) !void {
     wioRun();
     while (try func()) {
-        wioLoop();
+        update();
     }
+}
+
+pub fn update() void {
+    wioUpdate();
 }
 
 pub fn messageBox(style: wio.MessageBoxStyle, _: []const u8, message: []const u8) void {

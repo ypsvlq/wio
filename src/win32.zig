@@ -159,31 +159,34 @@ pub fn deinit() void {
 }
 
 pub fn run(func: fn () anyerror!bool) !void {
+    while (try func()) {
+        update();
+    }
+}
+
+pub fn update() void {
     var msg: w.MSG = undefined;
-    while (true) {
-        while (w.PeekMessageW(&msg, null, 0, 0, w.PM_REMOVE) != 0) {
-            _ = w.TranslateMessage(&msg);
-            _ = w.DispatchMessageW(&msg);
+
+    while (w.PeekMessageW(&msg, null, 0, 0, w.PM_REMOVE) != 0) {
+        _ = w.TranslateMessage(&msg);
+        _ = w.DispatchMessageW(&msg);
+    }
+
+    if (wio.init_options.audio) {
+        var maybe_device: ?*w.IMMDevice = undefined;
+        if (wio.init_options.audioDefaultOutputFn) |callback| {
+            mm_notification_client.mutex.lock();
+            maybe_device = mm_notification_client.default_output;
+            mm_notification_client.default_output = null;
+            mm_notification_client.mutex.unlock();
+            if (maybe_device) |device| callback(.{ .backend = .{ .device = device } });
         }
-
-        if (!try func()) return;
-
-        if (wio.init_options.audio) {
-            var maybe_device: ?*w.IMMDevice = undefined;
-            if (wio.init_options.audioDefaultOutputFn) |callback| {
-                mm_notification_client.mutex.lock();
-                maybe_device = mm_notification_client.default_output;
-                mm_notification_client.default_output = null;
-                mm_notification_client.mutex.unlock();
-                if (maybe_device) |device| callback(.{ .backend = .{ .device = device } });
-            }
-            if (wio.init_options.audioDefaultInputFn) |callback| {
-                mm_notification_client.mutex.lock();
-                maybe_device = mm_notification_client.default_input;
-                mm_notification_client.default_input = null;
-                mm_notification_client.mutex.unlock();
-                if (maybe_device) |device| callback(.{ .backend = .{ .device = device } });
-            }
+        if (wio.init_options.audioDefaultInputFn) |callback| {
+            mm_notification_client.mutex.lock();
+            maybe_device = mm_notification_client.default_input;
+            mm_notification_client.default_input = null;
+            mm_notification_client.mutex.unlock();
+            if (maybe_device) |device| callback(.{ .backend = .{ .device = device } });
         }
     }
 }
