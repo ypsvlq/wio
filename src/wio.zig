@@ -113,6 +113,11 @@ pub const Window = struct {
         self.backend.setCursorMode(mode);
     }
 
+    // TODO: macos, wasm
+    pub fn setSize(self: *Window, size: Size) void {
+        self.backend.setSize(size);
+    }
+
     pub fn setParent(self: *Window, parent: usize) void {
         self.backend.setParent(parent);
     }

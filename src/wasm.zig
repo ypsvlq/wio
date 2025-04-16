@@ -86,6 +86,11 @@ pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
     js.setCursorMode(self.id, @intFromEnum(mode));
 }
 
+pub fn setSize(self: *@This(), size: wio.Size) void {
+    _ = self;
+    _ = size;
+}
+
 pub fn setParent(_: *@This(), _: usize) void {}
 
 pub fn requestAttention(_: *@This()) void {}

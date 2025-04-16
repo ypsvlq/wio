@@ -354,6 +354,11 @@ pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
     _ = w.SetCursorPos(pos.x, pos.y);
 }
 
+pub fn setSize(self: *@This(), size: wio.Size) void {
+    const scaled = clientToWindow(size, w.WS_TILED);
+    _ = w.SetWindowPos(self.window, null, 0, 0, scaled.width, scaled.height, w.SWP_NOMOVE | w.SWP_NOZORDER);
+}
+
 pub fn setParent(self: *@This(), parent: usize) void {
     _ = w.SetParent(self.window, @ptrFromInt(parent));
 }

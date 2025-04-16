@@ -400,6 +400,24 @@ pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
     }
 }
 
+pub fn setSize(self: *@This(), size: wio.Size) void {
+    const framebuffer = size.multiply(self.scale);
+
+    if (self.viewport) |_| {
+        h.wp_viewport_set_source(self.viewport, 0, 0, @as(i32, framebuffer.width) << 8, @as(i32, framebuffer.height) << 8);
+        h.wp_viewport_set_destination(self.viewport, size.width, size.height);
+    }
+
+    if (self.egl_window != null) c.wl_egl_window_resize(self.egl_window, framebuffer.width, framebuffer.height, 0, 0);
+
+    const state = c.libdecor_state_new(size.width, size.height);
+    defer c.libdecor_state_free(state);
+    c.libdecor_frame_commit(self.frame, state, null);
+
+    self.pushEvent(.{ .size = size });
+    self.pushEvent(.{ .framebuffer = framebuffer });
+}
+
 pub fn setParent(self: *@This(), parent: usize) void {
     _ = self;
     _ = parent;
@@ -822,22 +840,10 @@ fn frameConfigure(frame: ?*h.libdecor_frame, configuration: ?*h.libdecor_configu
         height = self.size.height;
     }
     const size = wio.Size{ .width = @intCast(width), .height = @intCast(height) };
-    const framebuffer = size.multiply(self.scale);
 
-    if (self.viewport) |_| {
-        h.wp_viewport_set_source(self.viewport, 0, 0, @as(i32, framebuffer.width) << 8, @as(i32, framebuffer.height) << 8);
-        h.wp_viewport_set_destination(self.viewport, size.width, size.height);
-    }
-
-    if (self.egl_window != null) c.wl_egl_window_resize(self.egl_window, framebuffer.width, framebuffer.height, 0, 0);
-
-    const state = c.libdecor_state_new(width, height);
-    defer c.libdecor_state_free(state);
-    c.libdecor_frame_commit(frame, state, configuration);
+    self.setSize(size);
 
     self.pushEvent(.{ .mode = mode });
-    self.pushEvent(.{ .size = size });
-    self.pushEvent(.{ .framebuffer = framebuffer });
 }
 
 fn frameClose(_: ?*h.libdecor_frame, data: ?*anyopaque) callconv(.c) void {
