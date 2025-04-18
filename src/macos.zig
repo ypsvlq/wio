@@ -174,6 +174,11 @@ pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
     wioSetCursorMode(self.window, @intFromEnum(mode));
 }
 
+pub fn setSize(self: *@This(), size: wio.Size) void {
+    _ = self;
+    _ = size;
+}
+
 pub fn setParent(self: *@This(), parent: usize) void {
     _ = self;
     _ = parent;

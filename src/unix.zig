@@ -168,6 +168,13 @@ pub const Window = union {
         }
     }
 
+    pub fn setSize(self: *@This(), size: wio.Size) void {
+        switch (active) {
+            .x11 => self.x11.setSize(size),
+            .wayland => self.wayland.setSize(size),
+        }
+    }
+
     pub fn setParent(self: *@This(), parent: usize) void {
         switch (active) {
             .x11 => self.x11.setParent(parent),

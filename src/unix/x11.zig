@@ -45,6 +45,7 @@ var c: extern struct {
     XGrabPointer: *const @TypeOf(h.XGrabPointer),
     XUngrabPointer: *const @TypeOf(h.XUngrabPointer),
     XWarpPointer: *const @TypeOf(h.XWarpPointer),
+    XResizeWindow: *const @TypeOf(h.XResizeWindow),
     XReparentWindow: *const @TypeOf(h.XReparentWindow),
     XSetSelectionOwner: *const @TypeOf(h.XSetSelectionOwner),
     XConvertSelection: *const @TypeOf(h.XConvertSelection),
@@ -316,6 +317,10 @@ pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
     } else {
         _ = c.XUngrabPointer(display, h.CurrentTime);
     }
+}
+
+pub fn setSize(self: *@This(), size: wio.Size) void {
+    _ = c.XResizeWindow(display, self.window, size.width, size.height);
 }
 
 pub fn setParent(self: *@This(), parent: usize) void {
