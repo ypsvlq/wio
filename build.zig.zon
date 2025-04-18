@@ -1,16 +1,17 @@
 .{
-    .name = "wio",
+    .name = .wio,
     .version = "0.0.0",
-    .minimum_zig_version = "0.14.0-dev.2577+271452d22",
+    .minimum_zig_version = "0.14.0",
+    .fingerprint = 0xc7cd0be0afeb11f3,
     .dependencies = .{
         .win32 = .{
             .url = "https://github.com/ypsvlq/win32/archive/33c710871dd132b9ded3dd2a4a7ad17413246ec6.tar.gz",
-            .hash = "1220434b5106481956b6e692d347dd6f6365fd421f3a345bd5f5c15052952a4dabf1",
+            .hash = "win32-0.0.0-AAAAAGHkhQJDS1EGSBlWtuaS00fdb2Nl_UIfOjRb1fXB",
             .lazy = true,
         },
         .xcode_frameworks = .{
             .url = "https://pkg.machengine.org/xcode-frameworks/9a45f3ac977fd25dff77e58c6de1870b6808c4a7.tar.gz",
-            .hash = "122098b9174895f9708bc824b0f9e550c401892c40a900006459acf2cbf78acd99bb",
+            .hash = "N-V-__8AABHMqAWYuRdIlflwi8gksPnlUMQBiSxAqQAAZFms",
             .lazy = true,
         },
         .unix_headers = .{
