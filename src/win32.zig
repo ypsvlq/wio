@@ -355,8 +355,9 @@ pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
 }
 
 pub fn setSize(self: *@This(), size: wio.Size) void {
-    const scaled = clientToWindow(size, w.WS_TILED);
-    _ = w.SetWindowPos(self.window, null, 0, 0, scaled.width, scaled.height, w.SWP_NOMOVE | w.SWP_NOZORDER);
+    const style: u32 = @bitCast(@as(i32, @intCast(w.GetWindowLongPtrW(self.window, w.GWL_STYLE))));
+    const window_size = clientToWindow(size, style);
+    _ = w.SetWindowPos(self.window, null, 0, 0, window_size.width, window_size.height, w.SWP_NOMOVE | w.SWP_NOZORDER);
 }
 
 pub fn setParent(self: *@This(), parent: usize) void {
