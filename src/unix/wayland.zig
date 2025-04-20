@@ -401,21 +401,7 @@ pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
 }
 
 pub fn setSize(self: *@This(), size: wio.Size) void {
-    const framebuffer = size.multiply(self.scale);
-
-    if (self.viewport) |_| {
-        h.wp_viewport_set_source(self.viewport, 0, 0, @as(i32, framebuffer.width) << 8, @as(i32, framebuffer.height) << 8);
-        h.wp_viewport_set_destination(self.viewport, size.width, size.height);
-    }
-
-    if (self.egl_window != null) c.wl_egl_window_resize(self.egl_window, framebuffer.width, framebuffer.height, 0, 0);
-
-    const state = c.libdecor_state_new(size.width, size.height);
-    defer c.libdecor_state_free(state);
-    c.libdecor_frame_commit(self.frame, state, null);
-
-    self.pushEvent(.{ .size = size });
-    self.pushEvent(.{ .framebuffer = framebuffer });
+    self.resize(size, null);
 }
 
 pub fn setParent(self: *@This(), parent: usize) void {
@@ -524,6 +510,24 @@ pub fn getVulkanExtensions() []const [*:0]const u8 {
 
 fn pushEvent(self: *@This(), event: wio.Event) void {
     self.events.writeItem(event) catch return;
+}
+
+fn resize(self: *@This(), size: wio.Size, configuration: ?*h.libdecor_configuration) void {
+    const framebuffer = size.multiply(self.scale);
+
+    if (self.viewport) |_| {
+        h.wp_viewport_set_source(self.viewport, 0, 0, @as(i32, framebuffer.width) << 8, @as(i32, framebuffer.height) << 8);
+        h.wp_viewport_set_destination(self.viewport, size.width, size.height);
+    }
+
+    if (self.egl_window != null) c.wl_egl_window_resize(self.egl_window, framebuffer.width, framebuffer.height, 0, 0);
+
+    const state = c.libdecor_state_new(size.width, size.height);
+    defer c.libdecor_state_free(state);
+    c.libdecor_frame_commit(self.frame, state, configuration);
+
+    self.pushEvent(.{ .size = size });
+    self.pushEvent(.{ .framebuffer = framebuffer });
 }
 
 fn pushKeyEvent(self: *@This(), key: u32, comptime event: wio.EventType) void {
@@ -832,6 +836,7 @@ fn frameConfigure(frame: ?*h.libdecor_frame, configuration: ?*h.libdecor_configu
         if (window_state & h.LIBDECOR_WINDOW_STATE_MAXIMIZED != 0) mode = .maximized;
         if (window_state & h.LIBDECOR_WINDOW_STATE_FULLSCREEN != 0) mode = .fullscreen;
     }
+    self.pushEvent(.{ .mode = mode });
 
     var width: c_int = undefined;
     var height: c_int = undefined;
@@ -839,11 +844,7 @@ fn frameConfigure(frame: ?*h.libdecor_frame, configuration: ?*h.libdecor_configu
         width = self.size.width;
         height = self.size.height;
     }
-    const size = wio.Size{ .width = @intCast(width), .height = @intCast(height) };
-
-    self.setSize(size);
-
-    self.pushEvent(.{ .mode = mode });
+    self.resize(.{ .width = @intCast(width), .height = @intCast(height) }, configuration);
 }
 
 fn frameClose(_: ?*h.libdecor_frame, data: ?*anyopaque) callconv(.c) void {
