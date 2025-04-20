@@ -74,11 +74,18 @@ pub const Size = struct {
 
 pub const CreateWindowOptions = struct {
     title: []const u8 = "wio",
-    size: Size = .{ .width = 640, .height = 480 },
-    scale: f32 = 1,
     mode: WindowMode = .normal,
     cursor: Cursor = .arrow,
     cursor_mode: CursorMode = .normal,
+
+    size: Size = .{ .width = 640, .height = 480 },
+    /// Base scale factor for `size`. If set, adjusts for high-DPI on
+    /// relevant platforms.
+    ///
+    /// Recommended to set to 1 initially, or the last `Event.scale` when
+    /// restoring dimensions.
+    scale: ?f32 = null,
+
     parent: usize = 0,
 };
 

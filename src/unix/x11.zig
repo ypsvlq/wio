@@ -187,7 +187,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     const self = try wio.allocator.create(@This());
     errdefer wio.allocator.destroy(self);
 
-    const size = options.size.multiply(scale / options.scale);
+    const size = if (options.scale) |base| options.size.multiply(scale / base) else options.size;
     var attributes: h.XSetWindowAttributes = undefined;
     attributes.event_mask = h.PropertyChangeMask | h.FocusChangeMask | h.ExposureMask | h.StructureNotifyMask | h.KeyPressMask | h.KeyReleaseMask | h.ButtonPressMask | h.ButtonReleaseMask | h.PointerMotionMask;
     const window = c.XCreateWindow(

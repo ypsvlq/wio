@@ -25,7 +25,7 @@ pub fn main() !void {
         .audioDefaultInputFn = audio.defaultInput,
         .opengl = true,
     });
-    window = try wio.createWindow(.{ .title = "wio example" });
+    window = try wio.createWindow(.{ .title = "wio example", .scale = 1 });
     try window.createContext(.{ .samples = 4 });
     window.makeContextCurrent();
     window.swapInterval(1);

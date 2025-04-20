@@ -262,8 +262,10 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     const scale = dpi / w.USER_DEFAULT_SCREEN_DPI;
     self.pushEvent(.{ .scale = scale });
 
-    const size_scaled = clientToWindow(options.size.multiply(scale / options.scale), style);
-    _ = w.SetWindowPos(window, null, 0, 0, size_scaled.width, size_scaled.height, w.SWP_NOMOVE | w.SWP_NOZORDER);
+    if (options.scale) |base| {
+        const scaled = clientToWindow(options.size.multiply(scale / base), style);
+        _ = w.SetWindowPos(window, null, 0, 0, scaled.width, scaled.height, w.SWP_NOMOVE | w.SWP_NOZORDER);
+    }
 
     self.setMode(options.mode);
 
