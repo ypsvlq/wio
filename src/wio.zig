@@ -86,6 +86,7 @@ pub const CreateWindowOptions = struct {
     /// restoring dimensions.
     scale: ?f32 = null,
 
+    /// Window handle, for embedding.
     parent: usize = 0,
 };
 
