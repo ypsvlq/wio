@@ -397,6 +397,10 @@ void wioSetCursorMode(NSWindow *window, uint8_t mode) {
     }
 }
 
+void wioSetSize(NSWindow *window, uint16_t width, uint16_t height) {
+    [window setContentSize:NSMakeSize(width, height)];
+}
+
 void wioRequestAttention(void) {
     [NSApp requestUserAttention:NSCriticalRequest];
 }

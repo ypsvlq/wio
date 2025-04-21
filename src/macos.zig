@@ -20,6 +20,7 @@ extern fn wioSetTitle(*anyopaque, [*]const u8, usize) void;
 extern fn wioSetMode(*anyopaque, u8) void;
 extern fn wioSetCursor(*anyopaque, u8) void;
 extern fn wioSetCursorMode(*anyopaque, u8) void;
+extern fn wioSetSize(*anyopaque, u16, u16) void;
 extern fn wioRequestAttention() void;
 extern fn wioSetClipboardText([*]const u8, usize) void;
 extern fn wioGetClipboardText(*const anyopaque, *usize) ?[*]u8;
@@ -175,8 +176,7 @@ pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
 }
 
 pub fn setSize(self: *@This(), size: wio.Size) void {
-    _ = self;
-    _ = size;
+    wioSetSize(self.window, size.width, size.height);
 }
 
 pub fn setParent(self: *@This(), parent: usize) void {
