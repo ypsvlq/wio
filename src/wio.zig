@@ -79,11 +79,9 @@ pub const CreateWindowOptions = struct {
     cursor_mode: CursorMode = .normal,
 
     size: Size = .{ .width = 640, .height = 480 },
-    /// Base scale factor for `size`. If set, adjusts for high-DPI on
-    /// relevant platforms.
+    /// Base scale factor for `size`. If set, adjusts for high-DPI on relevant platforms.
     ///
-    /// Recommended to set to 1 initially, or the last `Event.scale` when
-    /// restoring dimensions.
+    /// Recommended to set to 1 initially, or the last `Event.scale` when restoring dimensions.
     scale: ?f32 = null,
 
     /// Window handle, for embedding.
@@ -162,6 +160,7 @@ pub const Window = struct {
         self.backend.swapInterval(interval);
     }
 
+    /// Not available on all platforms.
     pub fn createSurface(self: *Window, instance: usize, vk_allocator: ?*const anyopaque, surface: *u64) i32 {
         std.debug.assert(init_options.vulkan);
         return self.backend.createSurface(instance, vk_allocator, surface);
@@ -174,11 +173,13 @@ pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const fn () void {
     return @alignCast(@ptrCast(backend.glGetProcAddress(name)));
 }
 
+/// Not available on all platforms.
 pub fn vkGetInstanceProcAddr(instance: usize, name: [*:0]const u8) ?*const fn () void {
     std.debug.assert(init_options.vulkan);
     return backend.vkGetInstanceProcAddr(instance, name);
 }
 
+/// Not available on all platforms.
 pub fn getVulkanExtensions() []const [*:0]const u8 {
     return backend.getVulkanExtensions();
 }
@@ -186,7 +187,7 @@ pub fn getVulkanExtensions() []const [*:0]const u8 {
 pub const JoystickDeviceIterator = struct {
     backend: backend.JoystickDeviceIterator,
 
-    /// Invalidated on the next iteration of the main loop.
+    /// Invalidated on the next iteration of the main loop (or call to `update`).
     pub fn init() JoystickDeviceIterator {
         std.debug.assert(init_options.joystick);
         return .{ .backend = backend.JoystickDeviceIterator.init() };
@@ -254,6 +255,7 @@ pub const AudioDeviceType = enum { output, input };
 pub const AudioDeviceIterator = struct {
     backend: backend.AudioDeviceIterator,
 
+    /// Invalidated on the next iteration of the main loop (or call to `update`).
     pub fn init(mode: AudioDeviceType) AudioDeviceIterator {
         std.debug.assert(init_options.audio);
         return .{ .backend = backend.AudioDeviceIterator.init(mode) };
