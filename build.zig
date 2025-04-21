@@ -32,36 +32,38 @@ pub fn build(b: *std.Build) void {
         },
         .linux, .openbsd, .netbsd, .freebsd, .dragonfly => |tag| {
             module.link_libc = true;
+            module.addCSourceFile(.{ .file = b.path("src/unix/wayland.c") });
             if (b.lazyDependency("unix_headers", .{})) |unix_headers| {
                 module.addIncludePath(unix_headers.path("."));
             }
-            module.addCSourceFile(.{ .file = b.path("src/unix/wayland.c") });
+
             if (tag == .openbsd) module.linkSystemLibrary("sndio", .{});
 
             if (b.systemIntegrationOption("x11", .{})) {
                 module.linkSystemLibrary("x11", .{});
                 module.linkSystemLibrary("xcursor", .{});
             }
-
-            if (b.systemIntegrationOption("gl", .{})) module.linkSystemLibrary("gl", .{});
-
+            if (b.systemIntegrationOption("gl", .{})) {
+                module.linkSystemLibrary("gl", .{});
+            }
             if (b.systemIntegrationOption("wayland", .{})) {
                 module.linkSystemLibrary("wayland-client", .{});
                 module.linkSystemLibrary("xkbcommon", .{});
-                module.linkSystemLibrary("decor-0", .{});
+                module.linkSystemLibrary("libdecor-0", .{});
             }
-
             if (b.systemIntegrationOption("egl", .{})) {
                 module.linkSystemLibrary("wayland-egl", .{});
                 module.linkSystemLibrary("egl", .{});
             }
-
-            if (b.systemIntegrationOption("udev", .{}))
+            if (b.systemIntegrationOption("vulkan", .{})) {
+                module.linkSystemLibrary("vulkan", .{});
+            }
+            if (b.systemIntegrationOption("udev", .{})) {
                 module.linkSystemLibrary("libudev", .{});
-
-            if (b.systemIntegrationOption("pulse", .{})) module.linkSystemLibrary("pulse", .{});
-
-            if (b.systemIntegrationOption("vulkan", .{})) module.linkSystemLibrary("vulkan", .{});
+            }
+            if (b.systemIntegrationOption("pulse", .{})) {
+                module.linkSystemLibrary("libpulse", .{});
+            }
         },
         else => {
             if (target.result.isWasm()) {
