@@ -37,6 +37,31 @@ pub fn build(b: *std.Build) void {
             }
             module.addCSourceFile(.{ .file = b.path("src/unix/wayland.c") });
             if (tag == .openbsd) module.linkSystemLibrary("sndio", .{});
+
+            if (b.systemIntegrationOption("x11", .{})) {
+                module.linkSystemLibrary("x11", .{});
+                module.linkSystemLibrary("xcursor", .{});
+            }
+
+            if (b.systemIntegrationOption("gl", .{})) module.linkSystemLibrary("gl", .{});
+
+            if (b.systemIntegrationOption("wayland", .{})) {
+                module.linkSystemLibrary("wayland-client", .{});
+                module.linkSystemLibrary("xkbcommon", .{});
+                module.linkSystemLibrary("decor-0", .{});
+            }
+
+            if (b.systemIntegrationOption("egl", .{})) {
+                module.linkSystemLibrary("wayland-egl", .{});
+                module.linkSystemLibrary("egl", .{});
+            }
+
+            if (b.systemIntegrationOption("udev", .{}))
+                module.linkSystemLibrary("libudev", .{});
+
+            if (b.systemIntegrationOption("pulse", .{})) module.linkSystemLibrary("pulse", .{});
+
+            if (b.systemIntegrationOption("vulkan", .{})) module.linkSystemLibrary("vulkan", .{});
         },
         else => {
             if (target.result.isWasm()) {
