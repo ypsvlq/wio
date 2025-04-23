@@ -1,5 +1,6 @@
 const std = @import("std");
 const builtin = @import("builtin");
+const build_options = @import("build_options");
 pub const backend = switch (builtin.os.tag) {
     .windows => @import("win32.zig"),
     .macos => @import("macos.zig"),
@@ -11,14 +12,9 @@ pub var allocator: std.mem.Allocator = undefined;
 pub var init_options: InitOptions = undefined;
 
 pub const InitOptions = struct {
-    opengl: bool = false,
-    vulkan: bool = false,
-
-    joystick: bool = false,
     /// Free with `JoystickDevice.release()`.
     joystickConnectedFn: ?*const fn (JoystickDevice) void = null,
 
-    audio: bool = false,
     /// Free with `AudioDevice.release()`.
     audioDefaultOutputFn: ?*const fn (AudioDevice) void = null,
     /// Free with `AudioDevice.release()`.
@@ -29,7 +25,7 @@ pub const InitOptions = struct {
 pub fn init(ally: std.mem.Allocator, options: InitOptions) !void {
     allocator = ally;
     init_options = options;
-    try backend.init(options);
+    try backend.init();
 }
 
 /// All windows and devices must be closed before deinit is called.
@@ -140,7 +136,7 @@ pub const Window = struct {
     }
 
     pub fn createContext(self: *Window, options: CreateContextOptions) !void {
-        std.debug.assert(init_options.opengl);
+        assertFeature(.opengl);
         return self.backend.createContext(options);
     }
 
@@ -161,20 +157,20 @@ pub const Window = struct {
 
     /// Not available on all platforms.
     pub fn createSurface(self: *Window, instance: usize, vk_allocator: ?*const anyopaque, surface: *u64) i32 {
-        std.debug.assert(init_options.vulkan);
+        assertFeature(.vulkan);
         return self.backend.createSurface(instance, vk_allocator, surface);
     }
 };
 
 /// Must be called on the thread where the context is current.
 pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const fn () void {
-    std.debug.assert(init_options.opengl);
+    assertFeature(.opengl);
     return @alignCast(@ptrCast(backend.glGetProcAddress(name)));
 }
 
 /// Not available on all platforms.
 pub fn vkGetInstanceProcAddr(instance: usize, name: [*:0]const u8) ?*const fn () void {
-    std.debug.assert(init_options.vulkan);
+    assertFeature(.vulkan);
     return backend.vkGetInstanceProcAddr(instance, name);
 }
 
@@ -188,7 +184,7 @@ pub const JoystickDeviceIterator = struct {
 
     /// Invalidated on the next iteration of the main loop (or call to `update`).
     pub fn init() JoystickDeviceIterator {
-        std.debug.assert(init_options.joystick);
+        assertFeature(.joystick);
         return .{ .backend = backend.JoystickDeviceIterator.init() };
     }
 
@@ -256,7 +252,7 @@ pub const AudioDeviceIterator = struct {
 
     /// Invalidated on the next iteration of the main loop (or call to `update`).
     pub fn init(mode: AudioDeviceType) AudioDeviceIterator {
-        std.debug.assert(init_options.audio);
+        assertFeature(.audio);
         return .{ .backend = backend.AudioDeviceIterator.init(mode) };
     }
 
@@ -514,3 +510,9 @@ pub const Button = enum {
     right_alt,
     right_gui,
 };
+
+fn assertFeature(feature: anytype) void {
+    if (!@field(build_options, @tagName(feature))) {
+        @compileError("feature '" ++ @tagName(feature) ++ "' is disabled");
+    }
+}

@@ -1,13 +1,14 @@
 const std = @import("std");
+const build_options = @import("build_options");
 const wio = @import("../../wio.zig");
-const dynlib = @import("../dynlib.zig");
+const DynLib = @import("../DynLib.zig");
 const h = @cImport({
     @cInclude("linux/input.h");
     @cInclude("libudev.h");
 });
 const log = std.log.scoped(.wio);
 
-var c: extern struct {
+var imports: extern struct {
     udev_new: *const @TypeOf(h.udev_new),
     udev_unref: *const @TypeOf(h.udev_unref),
     udev_enumerate_new: *const @TypeOf(h.udev_enumerate_new),
@@ -26,13 +27,14 @@ var c: extern struct {
     udev_device_get_property_value: *const @TypeOf(h.udev_device_get_property_value),
     udev_device_get_devpath: *const @TypeOf(h.udev_device_get_devpath),
 } = undefined;
+const c = if (build_options.system_integration) h else &imports;
 
-var libudev: std.DynLib = undefined;
+var libudev: DynLib = undefined;
 var udev: *h.udev = undefined;
 var monitor: *h.udev_monitor = undefined;
 
 pub fn init() !void {
-    try dynlib.load(&c, &.{.{ .handle = &libudev, .name = "libudev.so.1" }});
+    try DynLib.load(&imports, &.{.{ .handle = &libudev, .name = "libudev.so.1" }});
     udev = c.udev_new() orelse return error.Unexpected;
     errdefer _ = c.udev_unref(udev);
 

@@ -2,7 +2,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 const build_options = @import("build_options");
 const wio = @import("wio.zig");
-const dynlib = @import("unix/dynlib.zig");
+const DynLib = @import("unix/DynLib.zig");
 pub const x11 = @import("unix/x11.zig");
 pub const wayland = @import("unix/wayland.zig");
 const joystick = switch (builtin.os.tag) {
@@ -21,39 +21,27 @@ pub var active: enum {
     wayland,
 } = undefined;
 
-pub var libvulkan: std.DynLib = undefined;
+pub var libvulkan: DynLib = undefined;
 
-pub fn init(options: wio.InitOptions) !void {
-    if (builtin.os.tag == .linux and builtin.output_mode == .Exe and builtin.link_mode == .static) @compileError("dynamic link required");
+pub fn init() !void {
+    if (!build_options.system_integration and builtin.os.tag == .linux and builtin.output_mode == .Exe and builtin.link_mode == .static) @compileError("dynamic link required");
 
-    if (options.vulkan) {
-        libvulkan = try dynlib.open("libvulkan.so.1");
-        vkGetInstanceProcAddr = libvulkan.lookup(@TypeOf(vkGetInstanceProcAddr), "vkGetInstanceProcAddr") orelse {
-            log.err("could not load {s}", .{"vkGetInstanceProcAddr"});
-            return error.Unexpected;
-        };
+    if (build_options.vulkan) {
+        libvulkan = try .open("libvulkan.so.1");
+        vkGetInstanceProcAddr = if (build_options.system_integration)
+            @extern(@TypeOf(vkGetInstanceProcAddr), .{ .name = "vkGetInstanceProcAddr" })
+        else
+            libvulkan.lookup(@TypeOf(vkGetInstanceProcAddr), "vkGetInstanceProcAddr") orelse {
+                log.err("could not load {s}", .{"vkGetInstanceProcAddr"});
+                return error.Unexpected;
+            };
     }
 
-    if (options.joystick) try joystick.init();
-    if (options.audio) try audio.init();
+    if (build_options.joystick) try joystick.init();
+    if (build_options.audio) try audio.init();
 
-    comptime var enable_x11 = false;
-    comptime var enable_wayland = false;
-    comptime {
-        var iter = std.mem.splitScalar(u8, build_options.unix_backends, ',');
-        while (iter.next()) |name| {
-            if (std.mem.eql(u8, name, "x11")) {
-                enable_x11 = true;
-            } else if (std.mem.eql(u8, name, "wayland")) {
-                enable_wayland = true;
-            } else {
-                @compileError("unknown unix backend '" ++ name ++ "'");
-            }
-        }
-    }
-
-    var try_x11 = enable_x11;
-    var try_wayland = enable_wayland;
+    var try_x11 = build_options.x11;
+    var try_wayland = build_options.wayland;
     if (try_x11 and try_wayland) {
         if (std.c.getenv("XDG_SESSION_TYPE")) |value| {
             const session_type = std.mem.sliceTo(value, 0);
@@ -66,14 +54,14 @@ pub fn init(options: wio.InitOptions) !void {
     }
 
     if (try_wayland) {
-        if (wayland.init(options)) {
+        if (wayland.init()) {
             active = .wayland;
             return;
         } else |err| if (err != error.Unavailable) return err;
     }
 
     if (try_x11) {
-        if (x11.init(options)) {
+        if (x11.init()) {
             active = .x11;
             return;
         } else |err| if (err != error.Unavailable) return err;
@@ -84,9 +72,9 @@ pub fn init(options: wio.InitOptions) !void {
 }
 
 pub fn deinit() void {
-    if (wio.init_options.audio) audio.deinit();
-    if (wio.init_options.joystick) joystick.deinit();
-    if (wio.init_options.vulkan) libvulkan.close();
+    if (build_options.audio) audio.deinit();
+    if (build_options.joystick) joystick.deinit();
+    if (build_options.vulkan) libvulkan.close();
     switch (active) {
         .x11 => return x11.deinit(),
         .wayland => return wayland.deinit(),
@@ -104,8 +92,8 @@ pub fn update() void {
         .x11 => x11.update(),
         .wayland => wayland.update(),
     }
-    if (wio.init_options.joystick) joystick.update();
-    if (wio.init_options.audio) audio.update();
+    if (build_options.joystick) joystick.update();
+    if (build_options.audio) audio.update();
 }
 
 pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {

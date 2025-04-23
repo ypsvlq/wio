@@ -58,16 +58,8 @@ Additionally, the following libraries are loaded for Linux:
 - `libudev.so.1` (if joysticks are enabled)
 - `libpulse.so.0` (if audio is enabled)
 
-When building a project that uses wio, you may pass any of the following flags
-to `zig build` to attempt to find the relevant libraries with pkg-config:
-
-- `-fsys=x11`
-- `-fsys=gl`
-- `-fsys=wayland`
-- `-fsys=egl`
-- `-fsys=vulkan`
-- `-fsys=udev`
-- `-fsys=pulse`
+When building a project that uses wio, passing `-fsys=wio` to `zig build` will
+link libraries explicitly (instead of using dlopen).
 
 ## Platform-specific API
 

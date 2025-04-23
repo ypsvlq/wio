@@ -18,12 +18,9 @@ var window: wio.Window = undefined;
 
 pub fn main() !void {
     try wio.init(allocator, .{
-        .joystick = true,
         .joystickConnectedFn = joystick.connected,
-        .audio = true,
         .audioDefaultOutputFn = audio.defaultOutput,
         .audioDefaultInputFn = audio.defaultInput,
-        .opengl = true,
     });
     window = try wio.createWindow(.{ .title = "wio example", .scale = 1 });
     try window.createContext(.{ .samples = 4 });

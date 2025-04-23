@@ -17,7 +17,7 @@ const apis: []const vk.ApiInfo = &.{
 var vkb: vk.BaseWrapper(apis) = undefined;
 
 pub fn main() !void {
-    try wio.init(allocator, .{ .vulkan = true });
+    try wio.init(allocator, .{});
     window = try wio.createWindow(.{ .title = "Vulkan", .size = size, .scale = 1 });
 
     vkb = try .load(@as(*const fn (vk.Instance, [*:0]const u8) ?*const fn () void, @ptrCast(&wio.vkGetInstanceProcAddr)));

@@ -1,24 +1,40 @@
 const std = @import("std");
 const builtin = @import("builtin");
+const build_options = @import("build_options");
 const log = std.log.scoped(.wio);
+const DynLib = @This();
+
+handle: if (build_options.system_integration) void else std.DynLib,
+
+pub fn open(comptime name: [:0]const u8) !DynLib {
+    return .{
+        .handle = if (build_options.system_integration) {} else try std.DynLib.openZ(
+            if (builtin.os.tag == .openbsd or builtin.os.tag == .netbsd)
+                name[0..comptime std.mem.lastIndexOfScalar(u8, name, '.').?] ++ ""
+            else
+                name,
+        ),
+    };
+}
+
+pub fn close(self: *DynLib) void {
+    if (!build_options.system_integration) self.handle.close();
+}
+
+pub fn lookup(self: *DynLib, comptime T: type, name: [:0]const u8) ?T {
+    return self.handle.lookup(T, name);
+}
 
 pub const Lib = struct {
-    handle: *std.DynLib,
+    handle: *DynLib,
     name: [:0]const u8,
     prefix: []const u8 = "",
     exclude: []const u8 = "",
 };
 
-pub fn open(comptime name: [:0]const u8) !std.DynLib {
-    return std.DynLib.openZ(
-        if (builtin.os.tag == .openbsd or builtin.os.tag == .netbsd)
-            name[0..comptime std.mem.lastIndexOfScalar(u8, name, '.').?] ++ ""
-        else
-            name,
-    );
-}
-
 pub fn load(c: anytype, comptime libs: []const Lib) !void {
+    if (build_options.system_integration) return;
+
     var succeeded: usize = 0;
     errdefer for (0..succeeded) |i| {
         libs[i].handle.close();

@@ -1,7 +1,8 @@
 const std = @import("std");
+const build_options = @import("build_options");
 const wio = @import("../wio.zig");
 const unix = @import("../unix.zig");
-const dynlib = @import("dynlib.zig");
+const DynLib = @import("DynLib.zig");
 const log = std.log.scoped(.wio);
 const h = @cImport({
     @cInclude("wio-wayland.h");
@@ -19,7 +20,7 @@ const h = @cImport({
     @cInclude("EGL/egl.h");
 });
 
-var c: extern struct {
+var imports: extern struct {
     wl_display_connect: *const @TypeOf(h.wl_display_connect),
     wl_display_disconnect: *const @TypeOf(h.wl_display_disconnect),
     wl_display_roundtrip: *const @TypeOf(h.wl_display_roundtrip),
@@ -77,12 +78,13 @@ var c: extern struct {
     eglSwapInterval: *const @TypeOf(h.eglSwapInterval),
     eglGetProcAddress: *const @TypeOf(h.eglGetProcAddress),
 } = undefined;
+const c = if (build_options.system_integration) h else &imports;
 
-var libwayland_client: std.DynLib = undefined;
-var libxkbcommon: std.DynLib = undefined;
-var libdecor: std.DynLib = undefined;
-var libwayland_egl: std.DynLib = undefined;
-var libEGL: std.DynLib = undefined;
+var libwayland_client: DynLib = undefined;
+var libxkbcommon: DynLib = undefined;
+var libdecor: DynLib = undefined;
+var libwayland_egl: DynLib = undefined;
+var libEGL: DynLib = undefined;
 
 pub var display: *h.wl_display = undefined;
 var registry: *h.wl_registry = undefined;
@@ -127,8 +129,8 @@ export var wio_wl_proxy_destroy: *const @TypeOf(h.wl_proxy_destroy) = undefined;
 export var wio_wl_proxy_set_user_data: *const @TypeOf(h.wl_proxy_set_user_data) = undefined;
 export var wio_wl_proxy_get_user_data: *const @TypeOf(h.wl_proxy_get_user_data) = undefined;
 
-pub fn init(options: wio.InitOptions) !void {
-    dynlib.load(&c, &.{
+pub fn init() !void {
+    DynLib.load(&imports, &.{
         .{ .handle = &libwayland_client, .name = "libwayland-client.so.0", .prefix = "wl", .exclude = "wl_egl" },
         .{ .handle = &libxkbcommon, .name = "libxkbcommon.so.0", .prefix = "xkb" },
         .{ .handle = &libdecor, .name = "libdecor-0.so.0", .prefix = "libdecor" },
@@ -137,14 +139,14 @@ pub fn init(options: wio.InitOptions) !void {
     errdefer libxkbcommon.close();
     errdefer libdecor.close();
 
-    if (options.opengl) {
-        dynlib.load(&c, &.{
+    if (build_options.opengl) {
+        DynLib.load(&imports, &.{
             .{ .handle = &libwayland_egl, .name = "libwayland-egl.so.1", .prefix = "wl_egl" },
             .{ .handle = &libEGL, .name = "libEGL.so.1", .prefix = "egl" },
         }) catch return error.Unavailable;
     }
-    errdefer if (options.opengl) libwayland_egl.close();
-    errdefer if (options.opengl) libEGL.close();
+    errdefer if (build_options.opengl) libwayland_egl.close();
+    errdefer if (build_options.opengl) libEGL.close();
 
     wio_wl_proxy_get_version = c.wl_proxy_get_version;
     wio_wl_proxy_marshal_flags = c.wl_proxy_marshal_flags;
@@ -182,7 +184,7 @@ pub fn init(options: wio.InitOptions) !void {
         }
     }
 
-    if (options.opengl) {
+    if (build_options.opengl) {
         egl_display = c.eglGetDisplay(display) orelse {
             log.err("{s} failed", .{"eglGetDisplay"});
             return error.Unexpected;
@@ -195,7 +197,7 @@ pub fn init(options: wio.InitOptions) !void {
 }
 
 pub fn deinit() void {
-    if (wio.init_options.opengl) {
+    if (build_options.opengl) {
         _ = c.eglTerminate(egl_display);
         libEGL.close();
         libwayland_egl.close();
@@ -316,9 +318,13 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
 
 pub fn destroy(self: *@This()) void {
     if (focus == self) focus = null;
-    if (self.egl_context) |_| _ = c.eglDestroyContext(egl_display, self.egl_context);
-    if (self.egl_surface) |_| _ = c.eglDestroySurface(egl_display, self.egl_surface);
-    if (self.egl_window) |_| c.wl_egl_window_destroy(self.egl_window);
+
+    if (build_options.opengl) {
+        if (self.egl_context) |_| _ = c.eglDestroyContext(egl_display, self.egl_context);
+        if (self.egl_surface) |_| _ = c.eglDestroySurface(egl_display, self.egl_surface);
+        if (self.egl_window) |_| c.wl_egl_window_destroy(self.egl_window);
+    }
+
     if (self.fractional_scale) |_| h.wp_fractional_scale_v1_destroy(self.fractional_scale);
     if (self.viewport) |_| h.wp_viewport_destroy(self.viewport);
     self.events.deinit();
@@ -520,7 +526,7 @@ fn resize(self: *@This(), size: wio.Size, configuration: ?*h.libdecor_configurat
         h.wp_viewport_set_destination(self.viewport, size.width, size.height);
     }
 
-    if (self.egl_window != null) c.wl_egl_window_resize(self.egl_window, framebuffer.width, framebuffer.height, 0, 0);
+    if (build_options.opengl) if (self.egl_window != null) c.wl_egl_window_resize(self.egl_window, framebuffer.width, framebuffer.height, 0, 0);
 
     const state = c.libdecor_state_new(size.width, size.height);
     defer c.libdecor_state_free(state);

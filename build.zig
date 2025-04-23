@@ -10,6 +10,57 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    var enable_opengl = false;
+    var enable_vulkan = false;
+    var enable_joystick = false;
+    var enable_audio = false;
+
+    const features = b.option([]const u8, "features", "Comma-separated list of enabled features (default: opengl,vulkan,joystick,audio)") orelse "opengl,vulkan,joystick,audio";
+    var feature_iter = std.mem.splitScalar(u8, features, ',');
+    while (feature_iter.next()) |feature| {
+        if (std.mem.eql(u8, feature, "opengl")) {
+            enable_opengl = true;
+        } else if (std.mem.eql(u8, feature, "vulkan")) {
+            enable_vulkan = true;
+        } else if (std.mem.eql(u8, feature, "joystick")) {
+            enable_joystick = true;
+        } else if (std.mem.eql(u8, feature, "audio")) {
+            enable_audio = true;
+        } else {
+            @panic("option 'features' is invalid");
+        }
+    }
+
+    var enable_x11 = false;
+    var enable_wayland = false;
+
+    const unix_backends = b.option([]const u8, "unix_backends", "Comma-separated list of enabled backends (default: x11,wayland)") orelse "x11,wayland";
+    var backend_iter = std.mem.splitScalar(u8, unix_backends, ',');
+    while (backend_iter.next()) |feature| {
+        if (std.mem.eql(u8, feature, "x11")) {
+            enable_x11 = true;
+        } else if (std.mem.eql(u8, feature, "wayland")) {
+            enable_wayland = true;
+        } else {
+            @panic("option 'unix_backends' is invalid");
+        }
+    }
+
+    const system_integration = b.systemIntegrationOption("wio", .{});
+    const options = b.addOptions();
+    options.addOption(bool, "opengl", enable_opengl);
+    options.addOption(bool, "vulkan", enable_vulkan);
+    options.addOption(bool, "joystick", enable_joystick);
+    options.addOption(bool, "audio", enable_audio);
+    options.addOption(bool, "x11", enable_x11);
+    options.addOption(bool, "wayland", enable_wayland);
+    options.addOption(bool, "system_integration", system_integration);
+    module.addOptions("build_options", options);
+
+    if (b.option(bool, "win32_manifest", "Embed application manifest (default: true)") orelse true) {
+        module.addWin32ResourceFile(.{ .file = b.path("src/win32.rc") });
+    }
+
     switch (target.result.os.tag) {
         .windows => {
             if (b.lazyDependency("win32", .{ .target = target, .optimize = optimize })) |win32| {
@@ -39,30 +90,34 @@ pub fn build(b: *std.Build) void {
 
             if (tag == .openbsd) module.linkSystemLibrary("sndio", .{});
 
-            if (b.systemIntegrationOption("x11", .{})) {
-                module.linkSystemLibrary("x11", .{});
-                module.linkSystemLibrary("xcursor", .{});
-            }
-            if (b.systemIntegrationOption("gl", .{})) {
-                module.linkSystemLibrary("gl", .{});
-            }
-            if (b.systemIntegrationOption("wayland", .{})) {
-                module.linkSystemLibrary("wayland-client", .{});
-                module.linkSystemLibrary("xkbcommon", .{});
-                module.linkSystemLibrary("libdecor-0", .{});
-            }
-            if (b.systemIntegrationOption("egl", .{})) {
-                module.linkSystemLibrary("wayland-egl", .{});
-                module.linkSystemLibrary("egl", .{});
-            }
-            if (b.systemIntegrationOption("vulkan", .{})) {
-                module.linkSystemLibrary("vulkan", .{});
-            }
-            if (b.systemIntegrationOption("udev", .{})) {
-                module.linkSystemLibrary("libudev", .{});
-            }
-            if (b.systemIntegrationOption("pulse", .{})) {
-                module.linkSystemLibrary("libpulse", .{});
+            if (system_integration) {
+                if (enable_x11) {
+                    module.linkSystemLibrary("x11", .{});
+                    module.linkSystemLibrary("xcursor", .{});
+                    if (enable_opengl) {
+                        module.linkSystemLibrary("gl", .{});
+                    }
+                }
+                if (enable_wayland) {
+                    module.linkSystemLibrary("wayland-client", .{});
+                    module.linkSystemLibrary("xkbcommon", .{});
+                    module.linkSystemLibrary("libdecor-0", .{});
+                    if (enable_opengl) {
+                        module.linkSystemLibrary("wayland-egl", .{});
+                        module.linkSystemLibrary("egl", .{});
+                    }
+                }
+                if (enable_vulkan) {
+                    module.linkSystemLibrary("vulkan", .{});
+                }
+                if (tag == .linux) {
+                    if (enable_joystick) {
+                        module.linkSystemLibrary("libudev", .{});
+                    }
+                    if (enable_audio) {
+                        module.linkSystemLibrary("libpulse", .{});
+                    }
+                }
             }
         },
         else => {
@@ -71,14 +126,6 @@ pub fn build(b: *std.Build) void {
             }
         },
     }
-
-    if (b.option(bool, "win32_manifest", "Embed application manifest (default: true)") orelse true) {
-        module.addWin32ResourceFile(.{ .file = b.path("src/win32.rc") });
-    }
-
-    const options = b.addOptions();
-    options.addOption([]const u8, "unix_backends", b.option([]const u8, "unix_backends", "Comma-separated list of backends (default: x11,wayland)") orelse "x11,wayland");
-    module.addOptions("build_options", options);
 
     const exe = b.addExecutable(.{
         .name = "wio",

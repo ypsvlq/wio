@@ -10,7 +10,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    const wio = b.dependency("wio", .{ .target = target, .optimize = optimize });
+    const wio = b.dependency("wio", .{ .target = target, .optimize = optimize, .features = @as([]const u8, "vulkan") });
     exe_mod.addImport("wio", wio.module("wio"));
 
     const vulkan_headers = b.dependency("vulkan_headers", .{});

@@ -1,4 +1,5 @@
 const std = @import("std");
+const build_options = @import("build_options");
 const w = @import("win32");
 const wio = @import("wio.zig");
 const log = std.log.scoped(.wio);
@@ -26,7 +27,7 @@ var wgl: struct {
 
 var vulkan: w.HMODULE = undefined;
 
-pub fn init(options: wio.InitOptions) !void {
+pub fn init() !void {
     const instance = w.GetModuleHandleW(null);
 
     const class = std.mem.zeroInit(w.WNDCLASSW, .{
@@ -44,7 +45,7 @@ pub fn init(options: wio.InitOptions) !void {
     };
     if (w.RegisterRawInputDevices(&mouse, 1, @sizeOf(w.RAWINPUTDEVICE)) == w.FALSE) return logLastError("RegisterRawInputDevices");
 
-    if (options.joystick) {
+    if (build_options.joystick) {
         joysticks = .init(wio.allocator);
 
         helper_window = w.CreateWindowExW(
@@ -81,7 +82,7 @@ pub fn init(options: wio.InitOptions) !void {
         if (w.RegisterRawInputDevices(&devices, devices.len, @sizeOf(w.RAWINPUTDEVICE)) == w.FALSE) return logLastError("RegisterRawInputDevices");
     }
 
-    if (options.audio) {
+    if (build_options.audio) {
         try SUCCEED(w.CoInitializeEx(null, w.COINIT_MULTITHREADED | w.COINIT_DISABLE_OLE1DDE), "CoInitializeEx");
         try SUCCEED(w.CoCreateInstance(&w.CLSID_MMDeviceEnumerator, null, w.CLSCTX_ALL, &w.IID_IMMDeviceEnumerator, @ptrCast(&mm_device_enumerator)), "CoCreateInstance");
 
@@ -102,7 +103,7 @@ pub fn init(options: wio.InitOptions) !void {
         }
     }
 
-    if (options.opengl) {
+    if (build_options.opengl) {
         const dc = w.GetDC(helper_window);
         defer _ = w.ReleaseDC(helper_window, dc);
 
@@ -134,17 +135,17 @@ pub fn init(options: wio.InitOptions) !void {
         }
     }
 
-    if (options.vulkan) {
+    if (build_options.vulkan) {
         vulkan = w.LoadLibraryW(w.L("vulkan-1.dll")) orelse return logLastError("LoadLibraryW");
         vkGetInstanceProcAddr = @ptrCast(w.GetProcAddress(vulkan, "vkGetInstanceProcAddr") orelse return logLastError("GetProcAddress"));
     }
 }
 
 pub fn deinit() void {
-    if (wio.init_options.vulkan) {
+    if (build_options.vulkan) {
         _ = w.FreeLibrary(vulkan);
     }
-    if (wio.init_options.joystick) {
+    if (build_options.joystick) {
         _ = w.DestroyWindow(helper_window);
         wio.allocator.free(helper_input);
 
@@ -152,7 +153,7 @@ pub fn deinit() void {
         while (iter.next()) |info| wio.allocator.free(info.interface);
         joysticks.deinit();
     }
-    if (wio.init_options.audio) {
+    if (build_options.audio) {
         _ = mm_device_enumerator.Release();
         w.CoUninitialize();
     }
@@ -172,7 +173,7 @@ pub fn update() void {
         _ = w.DispatchMessageW(&msg);
     }
 
-    if (wio.init_options.audio) {
+    if (build_options.audio) {
         var maybe_device: ?*w.IMMDevice = undefined;
         if (wio.init_options.audioDefaultOutputFn) |callback| {
             mm_notification_client.mutex.lock();
@@ -273,7 +274,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
 }
 
 pub fn destroy(self: *@This()) void {
-    if (wio.init_options.opengl) {
+    if (build_options.opengl) {
         _ = w.wglDeleteContext(self.rc);
         _ = w.ReleaseDC(self.window, self.dc);
     }

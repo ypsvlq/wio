@@ -17,7 +17,7 @@ const js = struct {
     extern "wio" fn getJoystickState(u32, [*]u16, usize, [*]bool, usize) bool;
 };
 
-pub fn init(_: wio.InitOptions) !void {}
+pub fn init() !void {}
 
 pub fn deinit() void {}
 

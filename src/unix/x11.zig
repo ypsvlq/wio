@@ -1,7 +1,8 @@
 const std = @import("std");
+const build_options = @import("build_options");
 const wio = @import("../wio.zig");
 const unix = @import("../unix.zig");
-const dynlib = @import("dynlib.zig");
+const DynLib = @import("DynLib.zig");
 const h = @cImport({
     @cInclude("X11/Xlib.h");
     @cInclude("X11/Xatom.h");
@@ -11,7 +12,7 @@ const h = @cImport({
 });
 const log = std.log.scoped(.wio);
 
-var c: extern struct {
+var imports: extern struct {
     XkbOpenDisplay: *const @TypeOf(h.XkbOpenDisplay),
     XCloseDisplay: *const @TypeOf(h.XCloseDisplay),
     XInternAtoms: *const @TypeOf(h.XInternAtoms),
@@ -58,6 +59,7 @@ var c: extern struct {
     glXMakeCurrent: *const @TypeOf(h.glXMakeCurrent),
     glXSwapBuffers: *const @TypeOf(h.glXSwapBuffers),
 } = undefined;
+const c = if (build_options.system_integration) h else &imports;
 
 var glx: struct {
     swapIntervalEXT: h.PFNGLXSWAPINTERVALEXTPROC = null,
@@ -78,9 +80,9 @@ var atoms: extern struct {
     SELECTION: h.Atom,
 } = undefined;
 
-var libX11: std.DynLib = undefined;
-var libXcursor: std.DynLib = undefined;
-var libGL: std.DynLib = undefined;
+var libX11: DynLib = undefined;
+var libXcursor: DynLib = undefined;
+var libGL: DynLib = undefined;
 var windows: std.AutoHashMap(h.Window, *@This()) = undefined;
 pub var display: *h.Display = undefined;
 var im: h.XIM = undefined;
@@ -88,18 +90,18 @@ var keycodes: [248]wio.Button = undefined;
 var scale: f32 = 1;
 var clipboard_text: []const u8 = "";
 
-pub fn init(options: wio.InitOptions) !void {
-    dynlib.load(&c, &.{
+pub fn init() !void {
+    DynLib.load(&imports, &.{
         .{ .handle = &libXcursor, .name = "libXcursor.so.1", .prefix = "Xcursor" },
         .{ .handle = &libX11, .name = "libX11.so.6", .prefix = "X" },
     }) catch return error.Unavailable;
     errdefer libX11.close();
     errdefer libXcursor.close();
 
-    if (options.opengl) {
-        dynlib.load(&c, &.{.{ .handle = &libGL, .name = "libGL.so.1", .prefix = "glX" }}) catch return error.Unavailable;
+    if (build_options.opengl) {
+        DynLib.load(&imports, &.{.{ .handle = &libGL, .name = "libGL.so.1", .prefix = "glX" }}) catch return error.Unavailable;
     }
-    errdefer if (options.opengl) libGL.close();
+    errdefer if (build_options.opengl) libGL.close();
 
     display = c.XkbOpenDisplay(null, null, null, null, null, null) orelse return error.Unavailable;
     errdefer _ = c.XCloseDisplay(display);
@@ -138,7 +140,7 @@ pub fn init(options: wio.InitOptions) !void {
         } else |_| {}
     }
 
-    if (options.opengl) {
+    if (build_options.opengl) {
         if (c.glXQueryExtensionsString(display, h.DefaultScreen(display))) |extensions| {
             var iter = std.mem.tokenizeScalar(u8, std.mem.sliceTo(extensions, 0), ' ');
             while (iter.next()) |name| {
@@ -154,7 +156,7 @@ pub fn deinit() void {
     wio.allocator.free(clipboard_text);
     _ = c.XCloseIM(im);
     _ = c.XCloseDisplay(display);
-    if (wio.init_options.opengl) libGL.close();
+    if (build_options.opengl) libGL.close();
     libXcursor.close();
     libX11.close();
     windows.deinit();
@@ -245,7 +247,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
 
 pub fn destroy(self: *@This()) void {
     _ = windows.remove(self.window);
-    if (self.context) |context| c.glXDestroyContext(display, context);
+    if (build_options.opengl) if (self.context) |context| c.glXDestroyContext(display, context);
     _ = c.XDestroyIC(self.ic);
     _ = c.XDestroyWindow(display, self.window);
     self.events.deinit();

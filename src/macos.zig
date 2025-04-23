@@ -1,4 +1,5 @@
 const std = @import("std");
+const build_options = @import("build_options");
 const wio = @import("wio.zig");
 const c = @cImport({
     @cInclude("IOKit/hid/IOHIDLib.h");
@@ -42,15 +43,15 @@ var libvulkan: std.DynLib = undefined;
 var hid: c.IOHIDManagerRef = undefined;
 var removed_joysticks: std.AutoHashMap(c.IOHIDDeviceRef, bool) = undefined;
 
-pub fn init(options: wio.InitOptions) !void {
+pub fn init() !void {
     wioInit();
 
-    if (options.vulkan) {
+    if (build_options.vulkan) {
         libvulkan = try std.DynLib.openZ("libvulkan.1.dylib");
         vkGetInstanceProcAddr = libvulkan.lookup(@TypeOf(vkGetInstanceProcAddr), "vkGetInstanceProcAddr") orelse return error.Unexpected;
     }
 
-    if (options.joystick) {
+    if (build_options.joystick) {
         hid = c.IOHIDManagerCreate(c.kCFAllocatorDefault, c.kIOHIDOptionsTypeNone);
         errdefer c.CFRelease(hid);
 
@@ -76,10 +77,10 @@ pub fn init(options: wio.InitOptions) !void {
         c.IOHIDManagerScheduleWithRunLoop(hid, c.CFRunLoopGetMain(), c.kCFRunLoopDefaultMode);
         try succeed(c.IOHIDManagerOpen(hid, c.kIOHIDOptionsTypeNone), "IOHIDManagerOpen");
     }
-    errdefer if (options.joystick) c.CFRelease(hid);
+    errdefer if (build_options.joystick) c.CFRelease(hid);
 
-    if (options.audio) {
-        if (options.audioDefaultOutputFn) |callback| {
+    if (build_options.audio) {
+        if (wio.init_options.audioDefaultOutputFn) |callback| {
             const address = c.AudioObjectPropertyAddress{
                 .mSelector = c.kAudioHardwarePropertyDefaultOutputDevice,
                 .mScope = c.kAudioObjectPropertyScopeGlobal,
@@ -91,7 +92,7 @@ pub fn init(options: wio.InitOptions) !void {
             callback(.{ .backend = .{ .id = id } });
             try succeed(c.AudioObjectAddPropertyListener(c.kAudioObjectSystemObject, &address, defaultOutputChanged, null), "AddPropertyListener");
         }
-        if (options.audioDefaultInputFn) |callback| {
+        if (wio.init_options.audioDefaultInputFn) |callback| {
             const address = c.AudioObjectPropertyAddress{
                 .mSelector = c.kAudioHardwarePropertyDefaultInputDevice,
                 .mScope = c.kAudioObjectPropertyScopeGlobal,
@@ -107,11 +108,11 @@ pub fn init(options: wio.InitOptions) !void {
 }
 
 pub fn deinit() void {
-    if (wio.init_options.joystick) {
+    if (build_options.joystick) {
         removed_joysticks.deinit();
         c.CFRelease(hid);
     }
-    if (wio.init_options.vulkan) {
+    if (build_options.vulkan) {
         libvulkan.close();
     }
 }

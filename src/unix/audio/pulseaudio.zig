@@ -1,10 +1,11 @@
 const std = @import("std");
+const build_options = @import("build_options");
 const wio = @import("../../wio.zig");
-const dynlib = @import("../dynlib.zig");
+const DynLib = @import("../DynLib.zig");
 const h = @cImport(@cInclude("pulse/pulseaudio.h"));
 const log = std.log.scoped(.wio);
 
-var c: extern struct {
+var imports: extern struct {
     pa_threaded_mainloop_new: *const @TypeOf(h.pa_threaded_mainloop_new),
     pa_threaded_mainloop_free: *const @TypeOf(h.pa_threaded_mainloop_free),
     pa_threaded_mainloop_start: *const @TypeOf(h.pa_threaded_mainloop_start),
@@ -43,13 +44,14 @@ var c: extern struct {
     pa_stream_peek: *const @TypeOf(h.pa_stream_peek),
     pa_stream_drop: *const @TypeOf(h.pa_stream_drop),
 } = undefined;
+const c = if (build_options.system_integration) h else &imports;
 
-var libpulse: std.DynLib = undefined;
+var libpulse: DynLib = undefined;
 var loop: *h.pa_threaded_mainloop = undefined;
 var context: *h.pa_context = undefined;
 
 pub fn init() !void {
-    try dynlib.load(&c, &.{.{ .handle = &libpulse, .name = "libpulse.so.0" }});
+    try DynLib.load(&imports, &.{.{ .handle = &libpulse, .name = "libpulse.so.0" }});
 
     loop = c.pa_threaded_mainloop_new() orelse return error.Unexpected;
     errdefer c.pa_threaded_mainloop_free(loop);
