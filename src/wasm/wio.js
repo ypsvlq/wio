@@ -142,6 +142,11 @@ const wio = {
         }
     },
 
+    setSize(id, width, height) {
+        wio.windows[id].canvas.style.width = `${width}px`;
+        wio.windows[id].canvas.style.height = `${height}px`;
+    },
+
     setClipboardText(ptr, len) {
         navigator.clipboard.writeText(wio.getString(ptr, len));
     },

@@ -9,6 +9,7 @@ const js = struct {
     extern "wio" fn setFullscreen(u32, bool) void;
     extern "wio" fn setCursor(u32, u8) void;
     extern "wio" fn setCursorMode(u32, u8) void;
+    extern "wio" fn setSize(u32, u16, u16) void;
     extern "wio" fn setClipboardText([*]const u8, usize) void;
     extern "wio" fn getJoystickCount() u32;
     extern "wio" fn getJoystickIdLen(u32) u32;
@@ -87,8 +88,7 @@ pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
 }
 
 pub fn setSize(self: *@This(), size: wio.Size) void {
-    _ = self;
-    _ = size;
+    js.setSize(self.id, size.width, size.height);
 }
 
 pub fn setParent(_: *@This(), _: usize) void {}
