@@ -25,6 +25,7 @@ pub fn main() !void {
     try createSurface();
     try pickPhysicalDevice();
     try createLogicalDevice();
+    try chooseSurfaceFormat();
     try createRenderPass();
     try createGraphicsPipeline();
     try createCommandBuffer();
@@ -168,13 +169,22 @@ fn createLogicalDevice() !void {
 }
 
 var surface_format: vk.SurfaceFormatKHR = undefined;
+
+fn chooseSurfaceFormat() !void {
+    const formats = try instance.getPhysicalDeviceSurfaceFormatsAllocKHR(physical_device, surface, allocator);
+    defer allocator.free(formats);
+    for (formats) |format| {
+        if (format.format == .b8g8r8a8_srgb and format.color_space == .srgb_nonlinear_khr) {
+            surface_format = format;
+            return;
+        }
+    }
+    surface_format = formats[0];
+}
+
 var render_pass: vk.RenderPass = undefined;
 
 fn createRenderPass() !void {
-    const surface_formats = try instance.getPhysicalDeviceSurfaceFormatsAllocKHR(physical_device, surface, allocator);
-    defer allocator.free(surface_formats);
-    surface_format = surface_formats[0];
-
     render_pass = try device.createRenderPass(&.{
         .attachment_count = 1,
         .p_attachments = &.{.{
