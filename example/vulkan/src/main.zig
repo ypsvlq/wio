@@ -318,11 +318,14 @@ fn createSyncObjects() !void {
 }
 
 var swapchain: vk.SwapchainKHR = .null_handle;
-var images: []vk.Image = undefined;
-var image_views: []vk.ImageView = undefined;
-var framebuffers: []vk.Framebuffer = undefined;
+var images: []vk.Image = &.{};
+var image_views: []vk.ImageView = &.{};
+var framebuffers: []vk.Framebuffer = &.{};
 
-fn createSwapchain() !void {
+fn recreateSwapchain() !void {
+    try device.deviceWaitIdle();
+    destroySwapchain();
+
     const capabilities = try instance.getPhysicalDeviceSurfaceCapabilitiesKHR(physical_device, surface);
     swapchain = try device.createSwapchainKHR(&.{
         .surface = surface,
@@ -385,12 +388,6 @@ fn destroySwapchain() void {
     allocator.free(image_views);
     allocator.free(images);
     device.destroySwapchainKHR(swapchain, null);
-}
-
-fn recreateSwapchain() !void {
-    try device.deviceWaitIdle();
-    destroySwapchain();
-    try createSwapchain();
 }
 
 fn recordCommandBuffer(image_index: u32) !void {
@@ -486,11 +483,7 @@ fn loop() !bool {
             },
             .framebuffer => |new_size| {
                 size = new_size;
-                if (swapchain == .null_handle) {
-                    try createSwapchain();
-                } else {
-                    resized = true;
-                }
+                resized = true;
             },
             .visible => visible = true,
             .hidden => visible = false,
@@ -498,7 +491,7 @@ fn loop() !bool {
         }
     }
 
-    if (visible and swapchain != .null_handle) {
+    if (visible) {
         if (resized) try recreateSwapchain();
 
         drawFrame() catch |err| switch (err) {
