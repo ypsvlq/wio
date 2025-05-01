@@ -76,10 +76,14 @@ pub fn build(b: *std.Build) void {
             }
             module.linkFramework("Cocoa", .{});
             module.linkFramework("QuartzCore", .{});
-            module.linkFramework("IOKit", .{});
-            module.linkFramework("CoreAudio", .{});
-            module.linkFramework("AudioUnit", .{});
-            module.linkFramework("AudioToolbox", .{});
+            if (enable_joystick) {
+                module.linkFramework("IOKit", .{});
+            }
+            if (enable_audio) {
+                module.linkFramework("CoreAudio", .{});
+                module.linkFramework("AudioUnit", .{});
+                module.linkFramework("AudioToolbox", .{});
+            }
         },
         .linux, .openbsd, .netbsd, .freebsd, .dragonfly => |tag| {
             module.link_libc = true;
