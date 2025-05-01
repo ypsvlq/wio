@@ -68,6 +68,7 @@ static void warpCursor(NSWindow *window) {
 @implementation WindowDelegate
 {
     void *ptr;
+    bool resizing;
     NSOpenGLContext *context;
 }
 
@@ -112,7 +113,9 @@ static void warpCursor(NSWindow *window) {
     wioHide(ptr);
 }
 
-- (void)windowDidEndLiveResize:notification {
+- (void)windowDidResize:notification {
+    if (resizing) return;
+
     NSWindow *window = [notification object];
     View *view = [window contentView];
 
@@ -132,6 +135,15 @@ static void warpCursor(NSWindow *window) {
     wioFramebuffer(ptr, framebuffer.size.width, framebuffer.size.height);
 
     [context update];
+}
+
+- (void)windowWillStartLiveResize:notification {
+    resizing = true;
+}
+
+- (void)windowDidEndLiveResize:notification {
+    resizing = false;
+    [self windowDidResize:notification];
 }
 
 - (void)windowDidChangeBackingProperties:notification {
