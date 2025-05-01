@@ -47,7 +47,23 @@ pub fn init() !void {
     wioInit();
 
     if (build_options.vulkan) {
-        libvulkan = try std.DynLib.openZ("libvulkan.1.dylib");
+        libvulkan = blk: {
+            if (c.CFBundleGetMainBundle()) |bundle| {
+                if (c.CFBundleCopyPrivateFrameworksURL(bundle)) |url| {
+                    var buf: [std.fs.max_path_bytes:0]u8 = undefined;
+                    if (c.CFURLGetFileSystemRepresentation(url, 1, &buf, buf.len) == 1) {
+                        _ = try std.fmt.bufPrintZ(buf[std.mem.indexOfScalar(u8, &buf, 0).?..], "/libvulkan.1.dylib", .{});
+                        if (std.DynLib.openZ(&buf)) |lib| {
+                            break :blk lib;
+                        } else |err| switch (err) {
+                            error.FileNotFound => {},
+                            else => return err,
+                        }
+                    }
+                }
+            }
+            break :blk try std.DynLib.openZ("libvulkan.1.dylib");
+        };
         vkGetInstanceProcAddr = libvulkan.lookup(@TypeOf(vkGetInstanceProcAddr), "vkGetInstanceProcAddr") orelse return error.Unexpected;
     }
 
