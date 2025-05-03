@@ -11,6 +11,14 @@ const wio = {
         module.exports._start();
         requestAnimationFrame(wio.loop);
 
+        addEventListener("pointerlockchange", () => {
+            for (const window of wio.windows) {
+                if (window.cursor_mode === 2) {
+                    window.canvas.style.cursor = (window.canvas === document.pointerLockElement) ? "none" : window.cursor;
+                }
+            }
+        });
+
         addEventListener("gamepadconnected", event => {
             wio.gamepads = navigator.getGamepads();
             wio.module.exports.wioJoystick(event.gamepad.index)
