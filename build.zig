@@ -125,7 +125,7 @@ pub fn build(b: *std.Build) void {
             }
         },
         else => {
-            if (target.result.isWasm()) {
+            if (target.result.cpu.arch.isWasm()) {
                 module.export_symbol_names = &.{ "wioLoop", "wioJoystick" };
             }
         },
