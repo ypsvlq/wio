@@ -17,10 +17,10 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
     - name: Set up Zig
-      uses: mlugg/setup-zig@v1
+      uses: mlugg/setup-zig@915f70607f6642da2dd36333035f4221a7bc8618
       with:
-        version: 2024.11.0-mach
         mirror: 'https://pkg.machengine.org/zig'
+        cache-key: ${{ matrix.target }}
     - name: Build
       run: zig build -Dtarget=${{ matrix.target }}
     - if: ${{ matrix.target != 'wasm32-freestanding' }}
