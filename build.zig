@@ -15,7 +15,7 @@ pub fn build(b: *std.Build) void {
     var enable_joystick = false;
     var enable_audio = false;
 
-    const features = b.option([]const u8, "features", "Comma-separated list of enabled features (default: opengl,vulkan,joystick,audio)") orelse "opengl,vulkan,joystick,audio";
+    const features = b.option([]const u8, "features", "List of enabled features (default: opengl,joystick,audio) (available: vulkan)") orelse "opengl,joystick,audio";
     var feature_iter = std.mem.splitScalar(u8, features, ',');
     while (feature_iter.next()) |feature| {
         if (std.mem.eql(u8, feature, "opengl")) {
@@ -34,7 +34,7 @@ pub fn build(b: *std.Build) void {
     var enable_x11 = false;
     var enable_wayland = false;
 
-    const unix_backends = b.option([]const u8, "unix_backends", "Comma-separated list of enabled backends (default: x11,wayland)") orelse "x11,wayland";
+    const unix_backends = b.option([]const u8, "unix_backends", "List of enabled backends (default: x11,wayland)") orelse "x11,wayland";
     var backend_iter = std.mem.splitScalar(u8, unix_backends, ',');
     while (backend_iter.next()) |feature| {
         if (std.mem.eql(u8, feature, "x11")) {

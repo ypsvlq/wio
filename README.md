@@ -16,6 +16,9 @@ wio follows the [Mach nominated Zig version][1].
 The public API can be browsed in [src/wio.zig][2]. The [example][3] directory
 contains a test program covering most features.
 
+The `features` build option can be used to disable optional functionality,
+or enable Vulkan support (which is not available on all platforms).
+
 ## Platform notes
 
 ### Windows
