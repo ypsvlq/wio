@@ -82,6 +82,8 @@ pub const CreateWindowOptions = struct {
 
     /// Window handle, for embedding.
     parent: usize = 0,
+
+    opengl: ?CreateContextOptions = null,
 };
 
 pub fn createWindow(options: CreateWindowOptions) !Window {
@@ -133,11 +135,6 @@ pub const Window = struct {
 
     pub fn getClipboardText(self: *Window, ally: std.mem.Allocator) ?[]u8 {
         return self.backend.getClipboardText(ally);
-    }
-
-    pub fn createContext(self: *Window, options: CreateContextOptions) !void {
-        assertFeature(.opengl);
-        return self.backend.createContext(options);
     }
 
     /// May be called on any thread.

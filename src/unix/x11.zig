@@ -51,9 +51,12 @@ var imports: extern struct {
     XSetSelectionOwner: *const @TypeOf(h.XSetSelectionOwner),
     XConvertSelection: *const @TypeOf(h.XConvertSelection),
     XCheckTypedWindowEvent: *const @TypeOf(h.XCheckTypedWindowEvent),
+    XCreateColormap: *const @TypeOf(h.XCreateColormap),
+    XFreeColormap: *const @TypeOf(h.XFreeColormap),
     glXQueryExtensionsString: *const @TypeOf(h.glXQueryExtensionsString),
     glXGetProcAddress: *const @TypeOf(h.glXGetProcAddress),
     glXChooseFBConfig: *const @TypeOf(h.glXChooseFBConfig),
+    glXGetVisualFromFBConfig: *const @TypeOf(h.glXGetVisualFromFBConfig),
     glXCreateNewContext: *const @TypeOf(h.glXCreateNewContext),
     glXDestroyContext: *const @TypeOf(h.glXDestroyContext),
     glXMakeCurrent: *const @TypeOf(h.glXMakeCurrent),
@@ -183,15 +186,67 @@ cursor: h.Cursor = h.None,
 cursor_mode: wio.CursorMode,
 size: wio.Size,
 warped: bool = false,
-context: h.GLXContext = null,
+colormap: h.Colormap,
+context: h.GLXContext,
 
 pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     const self = try wio.allocator.create(@This());
     errdefer wio.allocator.destroy(self);
 
-    const size = if (options.scale) |base| options.size.multiply(scale / base) else options.size;
     var attributes: h.XSetWindowAttributes = undefined;
     attributes.event_mask = h.PropertyChangeMask | h.FocusChangeMask | h.ExposureMask | h.StructureNotifyMask | h.KeyPressMask | h.KeyReleaseMask | h.ButtonPressMask | h.ButtonReleaseMask | h.PointerMotionMask;
+    attributes.colormap = h.CopyFromParent;
+
+    var depth: c_int = h.CopyFromParent;
+    var visual: ?*h.Visual = null;
+    var context: h.GLXContext = null;
+    if (build_options.opengl) {
+        if (options.opengl) |opengl| {
+            var count: c_int = undefined;
+            const configs = c.glXChooseFBConfig(display, h.DefaultScreen(display), &[_]c_int{
+                h.GLX_DOUBLEBUFFER,   if (opengl.doublebuffer) h.True else h.False,
+                h.GLX_RED_SIZE,       opengl.red_bits,
+                h.GLX_GREEN_SIZE,     opengl.green_bits,
+                h.GLX_BLUE_SIZE,      opengl.blue_bits,
+                h.GLX_ALPHA_SIZE,     opengl.alpha_bits,
+                h.GLX_DEPTH_SIZE,     opengl.depth_bits,
+                h.GLX_STENCIL_SIZE,   opengl.stencil_bits,
+                h.GLX_SAMPLE_BUFFERS, if (opengl.samples != 0) 1 else 0,
+                h.GLX_SAMPLES,        opengl.samples,
+                h.None,
+            }, &count) orelse {
+                log.err("{s} failed", .{"glXChooseFBConfig"});
+                return error.Unexpected;
+            };
+            defer _ = c.XFree(@ptrCast(configs));
+
+            const config = configs[0];
+
+            const info: *h.XVisualInfo = c.glXGetVisualFromFBConfig(display, config) orelse {
+                log.err("{s} failed", .{"glXGetVisualFromFBConfig"});
+                return error.Unexpected;
+            };
+            defer _ = c.XFree(info);
+            visual = info.visual;
+            depth = info.depth;
+
+            attributes.colormap = c.XCreateColormap(display, h.DefaultRootWindow(display), visual, h.AllocNone);
+            errdefer _ = c.XFreeColormap(display, attributes.colormap);
+
+            context = c.glXCreateNewContext(display, config, h.GLX_RGBA_TYPE, null, h.True) orelse {
+                log.err("{s} failed", .{"glXCreateNewContext"});
+                return error.Unexpected;
+            };
+        }
+    }
+    errdefer if (build_options.opengl) {
+        if (options.opengl != null) {
+            c.glXDestroyContext(display, context);
+            _ = c.XFreeColormap(display, attributes.colormap);
+        }
+    };
+
+    const size = if (options.scale) |base| options.size.multiply(scale / base) else options.size;
     const window = c.XCreateWindow(
         display,
         if (options.parent != 0) options.parent else h.DefaultRootWindow(display),
@@ -200,10 +255,10 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
         size.width,
         size.height,
         0,
-        0,
+        depth,
         h.InputOutput,
-        null,
-        h.CWEventMask,
+        visual,
+        h.CWEventMask | h.CWColormap,
         &attributes,
     );
     errdefer _ = c.XDestroyWindow(display, window);
@@ -228,6 +283,8 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
         .ic = ic,
         .cursor_mode = options.cursor_mode,
         .size = options.size,
+        .colormap = attributes.colormap,
+        .context = context,
     };
     self.setTitle(options.title);
     self.setMode(options.mode);
@@ -247,7 +304,10 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
 
 pub fn destroy(self: *@This()) void {
     _ = windows.remove(self.window);
-    if (build_options.opengl) if (self.context) |context| c.glXDestroyContext(display, context);
+    if (build_options.opengl) {
+        if (self.context) |context| c.glXDestroyContext(display, context);
+        if (self.colormap != h.CopyFromParent) _ = c.XFreeColormap(display, self.colormap);
+    }
     _ = c.XDestroyIC(self.ic);
     _ = c.XDestroyWindow(display, self.window);
     self.events.deinit();
@@ -387,27 +447,6 @@ pub fn getClipboardText(self: *@This(), allocator: std.mem.Allocator) ?[]u8 {
     } else {
         return allocator.dupe(u8, property[0..nitems]) catch null;
     }
-}
-
-pub fn createContext(self: *@This(), options: wio.CreateContextOptions) !void {
-    var count: c_int = undefined;
-    const configs = c.glXChooseFBConfig(display, h.DefaultScreen(display), &[_]c_int{
-        h.GLX_DOUBLEBUFFER,   if (options.doublebuffer) h.True else h.False,
-        h.GLX_RED_SIZE,       options.red_bits,
-        h.GLX_GREEN_SIZE,     options.green_bits,
-        h.GLX_BLUE_SIZE,      options.blue_bits,
-        h.GLX_ALPHA_SIZE,     options.alpha_bits,
-        h.GLX_DEPTH_SIZE,     options.depth_bits,
-        h.GLX_STENCIL_SIZE,   options.stencil_bits,
-        h.GLX_SAMPLE_BUFFERS, if (options.samples != 0) 1 else 0,
-        h.GLX_SAMPLES,        options.samples,
-        h.None,
-    }, &count) orelse {
-        log.err("{s} failed", .{"glXChooseFBConfig"});
-        return error.Unexpected;
-    };
-    defer _ = c.XFree(@ptrCast(configs));
-    self.context = c.glXCreateNewContext(display, configs[0], h.GLX_RGBA_TYPE, null, h.True) orelse return error.Unexpected;
 }
 
 pub fn makeContextCurrent(self: *@This()) void {

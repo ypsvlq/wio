@@ -159,10 +159,30 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
         .events = self.events,
         .window = wioCreateWindow(self, options.size.width, options.size.height),
     };
+
     self.setTitle(options.title);
     self.setMode(options.mode);
     self.setCursor(options.cursor);
     if (options.cursor_mode != .normal) self.setCursorMode(options.cursor_mode);
+
+    if (build_options.opengl) {
+        if (options.opengl) |opengl| {
+            self.context = wioCreateContext(self.window, &.{
+                c.kCGLPFAColorSize,     opengl.red_bits + opengl.green_bits + opengl.blue_bits,
+                c.kCGLPFAAlphaSize,     opengl.alpha_bits,
+                c.kCGLPFADepthSize,     opengl.depth_bits,
+                c.kCGLPFAStencilSize,   opengl.stencil_bits,
+                c.kCGLPFASampleBuffers, if (opengl.samples == 0) 0 else 1,
+                c.kCGLPFASamples,       opengl.samples,
+                if (opengl.doublebuffer)
+                    c.kCGLPFADoubleBuffer
+                else
+                    0,
+                0,
+            });
+        }
+    }
+
     return self;
 }
 
@@ -213,22 +233,6 @@ pub fn getClipboardText(_: *@This(), allocator: std.mem.Allocator) ?[]u8 {
     var len: usize = undefined;
     const text = wioGetClipboardText(&allocator, &len) orelse return null;
     return text[0..len];
-}
-
-pub fn createContext(self: *@This(), options: wio.CreateContextOptions) !void {
-    self.context = wioCreateContext(self.window, &.{
-        c.kCGLPFAColorSize,     options.red_bits + options.green_bits + options.blue_bits,
-        c.kCGLPFAAlphaSize,     options.alpha_bits,
-        c.kCGLPFADepthSize,     options.depth_bits,
-        c.kCGLPFAStencilSize,   options.stencil_bits,
-        c.kCGLPFASampleBuffers, if (options.samples == 0) 0 else 1,
-        c.kCGLPFASamples,       options.samples,
-        if (options.doublebuffer)
-            c.kCGLPFADoubleBuffer
-        else
-            0,
-        0,
-    });
 }
 
 pub fn makeContextCurrent(self: *@This()) void {

@@ -313,6 +313,32 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
         if (c.wl_display_dispatch(display) == -1) return error.Unexpected;
     }
 
+    if (build_options.opengl) {
+        if (options.opengl) |opengl| {
+            var config: h.EGLConfig = undefined;
+            var count: i32 = undefined;
+            _ = c.eglChooseConfig(egl_display, &[_]i32{
+                h.EGL_RENDERABLE_TYPE, h.EGL_OPENGL_BIT,
+                h.EGL_RED_SIZE,        opengl.red_bits,
+                h.EGL_GREEN_SIZE,      opengl.green_bits,
+                h.EGL_BLUE_SIZE,       opengl.blue_bits,
+                h.EGL_ALPHA_SIZE,      opengl.alpha_bits,
+                h.EGL_DEPTH_SIZE,      opengl.depth_bits,
+                h.EGL_STENCIL_SIZE,    opengl.stencil_bits,
+                h.EGL_SAMPLE_BUFFERS,  if (opengl.samples != 0) 1 else 0,
+                h.EGL_SAMPLES,         opengl.samples,
+                h.EGL_NONE,
+            }, &config, 1, &count);
+
+            self.egl_window = c.wl_egl_window_create(self.surface, 640, 480);
+            self.egl_surface = c.eglCreateWindowSurface(egl_display, config, self.egl_window, null);
+            self.egl_context = c.eglCreateContext(egl_display, config, h.EGL_NO_CONTEXT, &[_]i32{
+                h.EGL_CONTEXT_MAJOR_VERSION, 2,
+                h.EGL_NONE,
+            });
+        }
+    }
+
     return self;
 }
 
@@ -445,30 +471,6 @@ pub fn getClipboardText(_: *@This(), allocator: std.mem.Allocator) ?[]u8 {
     _ = std.c.close(pipe[1]);
     const file = std.fs.File{ .handle = pipe[0] };
     return file.readToEndAlloc(allocator, std.math.maxInt(usize)) catch null;
-}
-
-pub fn createContext(self: *@This(), options: wio.CreateContextOptions) !void {
-    var config: h.EGLConfig = undefined;
-    var count: i32 = undefined;
-    _ = c.eglChooseConfig(egl_display, &[_]i32{
-        h.EGL_RENDERABLE_TYPE, h.EGL_OPENGL_BIT,
-        h.EGL_RED_SIZE,        options.red_bits,
-        h.EGL_GREEN_SIZE,      options.green_bits,
-        h.EGL_BLUE_SIZE,       options.blue_bits,
-        h.EGL_ALPHA_SIZE,      options.alpha_bits,
-        h.EGL_DEPTH_SIZE,      options.depth_bits,
-        h.EGL_STENCIL_SIZE,    options.stencil_bits,
-        h.EGL_SAMPLE_BUFFERS,  if (options.samples != 0) 1 else 0,
-        h.EGL_SAMPLES,         options.samples,
-        h.EGL_NONE,
-    }, &config, 1, &count);
-
-    self.egl_window = c.wl_egl_window_create(self.surface, 640, 480);
-    self.egl_surface = c.eglCreateWindowSurface(egl_display, config, self.egl_window, null);
-    self.egl_context = c.eglCreateContext(egl_display, config, h.EGL_NO_CONTEXT, &[_]i32{
-        h.EGL_CONTEXT_MAJOR_VERSION, 2,
-        h.EGL_NONE,
-    });
 }
 
 pub fn makeContextCurrent(self: *@This()) void {

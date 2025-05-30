@@ -270,6 +270,48 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
 
     self.setMode(options.mode);
 
+    if (build_options.opengl) {
+        if (options.opengl) |opengl| {
+            self.dc = w.GetDC(self.window);
+
+            var format: i32 = undefined;
+            var pfd: w.PIXELFORMATDESCRIPTOR = undefined;
+            if (wgl.choosePixelFormatARB) |choosePixelFormatARB| {
+                var count: u32 = undefined;
+                _ = choosePixelFormatARB(self.dc, &.{
+                    0x2011, if (opengl.doublebuffer) 1 else 0,
+                    0x2015, opengl.red_bits,
+                    0x2017, opengl.green_bits,
+                    0x2019, opengl.blue_bits,
+                    0x201B, opengl.alpha_bits,
+                    0x2022, opengl.depth_bits,
+                    0x2023, opengl.stencil_bits,
+                    0x2041, if (opengl.samples != 0) 1 else 0,
+                    0x2042, opengl.samples,
+                    0,
+                }, null, 1, &format, &count);
+                if (count != 1) return logLastError("wglChoosePixelFormatARB");
+                _ = w.DescribePixelFormat(self.dc, format, @sizeOf(w.PIXELFORMATDESCRIPTOR), &pfd);
+            } else {
+                pfd = std.mem.zeroInit(w.PIXELFORMATDESCRIPTOR, .{
+                    .nSize = @sizeOf(w.PIXELFORMATDESCRIPTOR),
+                    .nVersion = 1,
+                    .dwFlags = w.PFD_DRAW_TO_WINDOW | w.PFD_SUPPORT_OPENGL | if (opengl.doublebuffer) w.PFD_DOUBLEBUFFER else @as(u32, 0),
+                    .iPixelType = w.PFD_TYPE_RGBA,
+                    .cColorBits = opengl.red_bits + opengl.green_bits + opengl.blue_bits,
+                    .cAlphaBits = opengl.alpha_bits,
+                    .cDepthBits = opengl.depth_bits,
+                    .cStencilBits = opengl.stencil_bits,
+                });
+                format = w.ChoosePixelFormat(self.dc, &pfd);
+                if (format == 0) return logLastError("ChoosePixelFormat");
+            }
+
+            _ = w.SetPixelFormat(self.dc, format, &pfd);
+            self.rc = w.wglCreateContext(self.dc) orelse return logLastError("wglCreateContext");
+        }
+    }
+
     return self;
 }
 
@@ -396,46 +438,6 @@ pub fn getClipboardText(_: *@This(), allocator: std.mem.Allocator) ?[]u8 {
     const text: [*:0]const u16 = @alignCast(@ptrCast(w.GlobalLock(mem) orelse return null));
     defer _ = w.GlobalUnlock(mem);
     return std.unicode.utf16LeToUtf8Alloc(allocator, std.mem.sliceTo(text, 0)) catch null;
-}
-
-pub fn createContext(self: *@This(), options: wio.CreateContextOptions) !void {
-    self.dc = w.GetDC(self.window);
-
-    var format: i32 = undefined;
-    var pfd: w.PIXELFORMATDESCRIPTOR = undefined;
-    if (wgl.choosePixelFormatARB) |choosePixelFormatARB| {
-        var count: u32 = undefined;
-        _ = choosePixelFormatARB(self.dc, &.{
-            0x2011, if (options.doublebuffer) 1 else 0,
-            0x2015, options.red_bits,
-            0x2017, options.green_bits,
-            0x2019, options.blue_bits,
-            0x201B, options.alpha_bits,
-            0x2022, options.depth_bits,
-            0x2023, options.stencil_bits,
-            0x2041, if (options.samples != 0) 1 else 0,
-            0x2042, options.samples,
-            0,
-        }, null, 1, &format, &count);
-        if (count != 1) return logLastError("wglChoosePixelFormatARB");
-        _ = w.DescribePixelFormat(self.dc, format, @sizeOf(w.PIXELFORMATDESCRIPTOR), &pfd);
-    } else {
-        pfd = std.mem.zeroInit(w.PIXELFORMATDESCRIPTOR, .{
-            .nSize = @sizeOf(w.PIXELFORMATDESCRIPTOR),
-            .nVersion = 1,
-            .dwFlags = w.PFD_DRAW_TO_WINDOW | w.PFD_SUPPORT_OPENGL | if (options.doublebuffer) w.PFD_DOUBLEBUFFER else @as(u32, 0),
-            .iPixelType = w.PFD_TYPE_RGBA,
-            .cColorBits = options.red_bits + options.green_bits + options.blue_bits,
-            .cAlphaBits = options.alpha_bits,
-            .cDepthBits = options.depth_bits,
-            .cStencilBits = options.stencil_bits,
-        });
-        format = w.ChoosePixelFormat(self.dc, &pfd);
-        if (format == 0) return logLastError("ChoosePixelFormat");
-    }
-
-    _ = w.SetPixelFormat(self.dc, format, &pfd);
-    self.rc = w.wglCreateContext(self.dc) orelse return logLastError("wglCreateContext");
 }
 
 pub fn makeContextCurrent(self: *@This()) void {

@@ -103,8 +103,6 @@ pub fn getClipboardText(_: *@This(), _: std.mem.Allocator) ?[]u8 {
     return null;
 }
 
-pub fn createContext(_: *@This(), _: wio.CreateContextOptions) !void {}
-
 pub fn makeContextCurrent(_: *@This()) void {}
 
 pub fn swapBuffers(_: *@This()) void {}

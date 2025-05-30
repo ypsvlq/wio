@@ -191,13 +191,6 @@ pub const Window = union {
         }
     }
 
-    pub fn createContext(self: *@This(), options: wio.CreateContextOptions) !void {
-        switch (active) {
-            .x11 => return self.x11.createContext(options),
-            .wayland => return self.wayland.createContext(options),
-        }
-    }
-
     pub fn makeContextCurrent(self: *@This()) void {
         switch (active) {
             .x11 => self.x11.makeContextCurrent(),
