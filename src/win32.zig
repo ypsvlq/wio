@@ -23,6 +23,7 @@ var mm_notification_client = MMNotificationClient{};
 var wgl: struct {
     swapIntervalEXT: ?*const fn (i32) callconv(.winapi) w.BOOL = null,
     choosePixelFormatARB: ?*const fn (w.HDC, ?[*]const i32, ?[*]const f32, u32, [*c]i32, *u32) callconv(.winapi) w.BOOL = null,
+    createContextAttribsARB: ?*const fn (w.HDC, w.HGLRC, [*]const i32) callconv(.winapi) w.HGLRC = null,
 } = .{};
 
 var vulkan: w.HMODULE = undefined;
@@ -129,6 +130,8 @@ pub fn init() !void {
                         wgl.swapIntervalEXT = @ptrCast(w.wglGetProcAddress("wglSwapIntervalEXT"));
                     } else if (std.mem.eql(u8, name, "WGL_ARB_pixel_format")) {
                         wgl.choosePixelFormatARB = @ptrCast(w.wglGetProcAddress("wglChoosePixelFormatARB"));
+                    } else if (std.mem.eql(u8, name, "WGL_ARB_create_context_profile")) {
+                        wgl.createContextAttribsARB = @ptrCast(w.wglGetProcAddress("wglCreateContextAttribsARB"));
                     }
                 }
             }
@@ -306,9 +309,18 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
                 format = w.ChoosePixelFormat(self.dc, &pfd);
                 if (format == 0) return logLastError("ChoosePixelFormat");
             }
-
             _ = w.SetPixelFormat(self.dc, format, &pfd);
-            self.rc = w.wglCreateContext(self.dc) orelse return logLastError("wglCreateContext");
+
+            self.rc = if (wgl.createContextAttribsARB) |createContextAttribsARB|
+                createContextAttribsARB(self.dc, null, &[_]i32{
+                    0x2091, opengl.major_version,
+                    0x2092, opengl.minor_version,
+                    0x2094, @as(i32, if (opengl.debug) 1 else 0) | @as(i32, if (opengl.forward_compatible) 2 else 0),
+                    0x9126, if (opengl.profile == .core) 1 else 2,
+                    0,
+                }) orelse return logLastError("wglCreateContextAttribsARB")
+            else
+                w.wglCreateContext(self.dc) orelse return logLastError("wglCreateContext");
         }
     }
 

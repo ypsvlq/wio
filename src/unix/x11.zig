@@ -66,6 +66,7 @@ const c = if (build_options.system_integration) h else &imports;
 
 var glx: struct {
     swapIntervalEXT: h.PFNGLXSWAPINTERVALEXTPROC = null,
+    createContextAttribsARB: h.PFNGLXCREATECONTEXTATTRIBSARBPROC = null,
 } = .{};
 
 var atoms: extern struct {
@@ -147,7 +148,9 @@ pub fn init() !void {
         if (c.glXQueryExtensionsString(display, h.DefaultScreen(display))) |extensions| {
             var iter = std.mem.tokenizeScalar(u8, std.mem.sliceTo(extensions, 0), ' ');
             while (iter.next()) |name| {
-                if (std.mem.eql(u8, name, "GLX_EXT_swap_control")) {
+                if (std.mem.eql(u8, name, "GLX_ARB_create_context_profile")) {
+                    glx.createContextAttribsARB = @ptrCast(c.glXGetProcAddress("glXCreateContextAttribsARB"));
+                } else if (std.mem.eql(u8, name, "GLX_EXT_swap_control")) {
                     glx.swapIntervalEXT = @ptrCast(c.glXGetProcAddress("glXSwapIntervalEXT"));
                 }
             }
@@ -233,10 +236,22 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
             attributes.colormap = c.XCreateColormap(display, h.DefaultRootWindow(display), visual, h.AllocNone);
             errdefer _ = c.XFreeColormap(display, attributes.colormap);
 
-            context = c.glXCreateNewContext(display, config, h.GLX_RGBA_TYPE, null, h.True) orelse {
-                log.err("{s} failed", .{"glXCreateNewContext"});
-                return error.Unexpected;
-            };
+            context = if (glx.createContextAttribsARB) |createContextAttribsARB|
+                createContextAttribsARB(display, config, null, h.True, &[_]c_int{
+                    h.GLX_CONTEXT_MAJOR_VERSION_ARB, opengl.major_version,
+                    h.GLX_CONTEXT_MINOR_VERSION_ARB, opengl.minor_version,
+                    h.GLX_CONTEXT_FLAGS_ARB,         (if (opengl.forward_compatible) h.GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB else 0) | (if (opengl.debug) h.GLX_CONTEXT_DEBUG_BIT_ARB else 0),
+                    h.GLX_CONTEXT_PROFILE_MASK_ARB,  if (opengl.profile == .core) h.GLX_CONTEXT_CORE_PROFILE_BIT_ARB else h.GLX_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
+                    h.None,
+                }) orelse {
+                    log.err("{s} failed", .{"glXCreateContextAttribsARB"});
+                    return error.Unexpected;
+                }
+            else
+                c.glXCreateNewContext(display, config, h.GLX_RGBA_TYPE, null, h.True) orelse {
+                    log.err("{s} failed", .{"glXCreateNewContext"});
+                    return error.Unexpected;
+                };
         }
     }
     errdefer if (build_options.opengl) {

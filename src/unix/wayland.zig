@@ -66,8 +66,10 @@ var imports: extern struct {
     wl_egl_window_destroy: *const @TypeOf(h.wl_egl_window_destroy),
     wl_egl_window_resize: *const @TypeOf(h.wl_egl_window_resize),
     eglGetDisplay: *const @TypeOf(h.eglGetDisplay),
+    eglGetError: *const @TypeOf(h.eglGetError),
     eglInitialize: *const @TypeOf(h.eglInitialize),
     eglTerminate: *const @TypeOf(h.eglTerminate),
+    eglBindAPI: *const @TypeOf(h.eglBindAPI),
     eglChooseConfig: *const @TypeOf(h.eglChooseConfig),
     eglCreateWindowSurface: *const @TypeOf(h.eglCreateWindowSurface),
     eglDestroySurface: *const @TypeOf(h.eglDestroySurface),
@@ -185,14 +187,8 @@ pub fn init() !void {
     }
 
     if (build_options.opengl) {
-        egl_display = c.eglGetDisplay(display) orelse {
-            log.err("{s} failed", .{"eglGetDisplay"});
-            return error.Unexpected;
-        };
-        if (c.eglInitialize(egl_display, null, null) == h.EGL_FALSE) {
-            log.err("{s} failed", .{"eglInitialize"});
-            return error.Unexpected;
-        }
+        egl_display = c.eglGetDisplay(display) orelse return logEglError("eglGetDisplay");
+        if (c.eglInitialize(egl_display, null, null) == h.EGL_FALSE) return logEglError("eglInitialize");
     }
 }
 
@@ -315,9 +311,11 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
 
     if (build_options.opengl) {
         if (options.opengl) |opengl| {
+            if (c.eglBindAPI(h.EGL_OPENGL_API) == h.EGL_FALSE) return logEglError("eglBindAPI");
+
             var config: h.EGLConfig = undefined;
             var count: i32 = undefined;
-            _ = c.eglChooseConfig(egl_display, &[_]i32{
+            if (c.eglChooseConfig(egl_display, &[_]i32{
                 h.EGL_RENDERABLE_TYPE, h.EGL_OPENGL_BIT,
                 h.EGL_RED_SIZE,        opengl.red_bits,
                 h.EGL_GREEN_SIZE,      opengl.green_bits,
@@ -328,14 +326,18 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
                 h.EGL_SAMPLE_BUFFERS,  if (opengl.samples != 0) 1 else 0,
                 h.EGL_SAMPLES,         opengl.samples,
                 h.EGL_NONE,
-            }, &config, 1, &count);
+            }, &config, 1, &count) == h.EGL_FALSE) return logEglError("eglChooseConfig");
 
             self.egl_window = c.wl_egl_window_create(self.surface, 640, 480);
-            self.egl_surface = c.eglCreateWindowSurface(egl_display, config, self.egl_window, null);
+            self.egl_surface = c.eglCreateWindowSurface(egl_display, config, self.egl_window, null) orelse return logEglError("eglCreateWindowSurface");
             self.egl_context = c.eglCreateContext(egl_display, config, h.EGL_NO_CONTEXT, &[_]i32{
-                h.EGL_CONTEXT_MAJOR_VERSION, 2,
+                h.EGL_CONTEXT_MAJOR_VERSION,             opengl.major_version,
+                h.EGL_CONTEXT_MINOR_VERSION,             opengl.minor_version,
+                h.EGL_CONTEXT_OPENGL_PROFILE_MASK,       if (opengl.profile == .core) h.EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT else h.EGL_CONTEXT_OPENGL_COMPATIBILITY_PROFILE_BIT,
+                h.EGL_CONTEXT_OPENGL_FORWARD_COMPATIBLE, if (opengl.forward_compatible) h.EGL_TRUE else h.EGL_FALSE,
+                h.EGL_CONTEXT_OPENGL_DEBUG,              if (opengl.debug) h.EGL_TRUE else h.EGL_FALSE,
                 h.EGL_NONE,
-            });
+            }) orelse return logEglError("eglCreateContext");
         }
     }
 
@@ -514,6 +516,11 @@ pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
 
 pub fn getVulkanExtensions() []const [*:0]const u8 {
     return &.{ "VK_KHR_surface", "VK_KHR_wayland_surface" };
+}
+
+fn logEglError(name: []const u8) error{Unexpected} {
+    log.err("{s} failed, error 0x{X}", .{ name, c.eglGetError() });
+    return error.Unexpected;
 }
 
 fn pushEvent(self: *@This(), event: wio.Event) void {

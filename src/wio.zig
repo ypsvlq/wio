@@ -364,6 +364,12 @@ pub const CursorMode = enum {
 };
 
 pub const CreateContextOptions = struct {
+    major_version: u8 = 1,
+    minor_version: u8 = 0,
+    profile: enum { core, compatibility } = .core,
+    forward_compatible: bool = false,
+    debug: bool = false,
+
     doublebuffer: bool = true,
     red_bits: u8 = 8,
     green_bits: u8 = 8,
