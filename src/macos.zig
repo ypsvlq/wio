@@ -167,7 +167,17 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
 
     if (build_options.opengl) {
         if (options.opengl) |opengl| {
+            const profile: c.CGLPixelFormatAttribute = if (opengl.major_version <= 2)
+                c.kCGLOGLPVersion_Legacy
+            else if (opengl.major_version == 3 and opengl.minor_version == 2 and opengl.profile == .core)
+                c.kCGLOGLPVersion_GL3_Core
+            else if (opengl.major_version == 4 and opengl.minor_version == 1 and opengl.profile == .core)
+                c.kCGLOGLPVersion_GL4_Core
+            else
+                return error.UnsupportedOpenGLVersion;
+
             self.context = wioCreateContext(self.window, &.{
+                c.kCGLPFAOpenGLProfile, profile,
                 c.kCGLPFAColorSize,     opengl.red_bits + opengl.green_bits + opengl.blue_bits,
                 c.kCGLPFAAlphaSize,     opengl.alpha_bits,
                 c.kCGLPFADepthSize,     opengl.depth_bits,
