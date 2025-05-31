@@ -65,14 +65,13 @@ static void warpCursor(NSWindow *window) {
 
 @end
 
-@implementation WindowDelegate
-{
+@implementation WindowDelegate {
     void *ptr;
     bool resizing;
     NSOpenGLContext *context;
 }
 
-- (instancetype)initWithPointer:(void*)value {
+- (instancetype)initWithPointer:(void *)value {
     self = [super init];
     ptr = value;
     return self;
@@ -162,8 +161,7 @@ static void warpCursor(NSWindow *window) {
 
 @end
 
-@implementation View
-{
+@implementation View {
     void *ptr;
     NSTrackingArea *area;
     NSCursor *cursor;
@@ -171,7 +169,7 @@ static void warpCursor(NSWindow *window) {
     BOOL cursorInside;
 }
 
-- (instancetype)initWithPointer:(void*)value {
+- (instancetype)initWithPointer:(void *)value {
     self = [super init];
     ptr = value;
     return self;
@@ -334,7 +332,7 @@ void wioUpdate(void) {
 }
 
 void wioMessageBox(uint8_t style, const char *ptr, size_t len) {
-    NSAlertStyle styles[] = {NSAlertStyleInformational, NSAlertStyleWarning, NSAlertStyleCritical};
+    NSAlertStyle styles[] = { NSAlertStyleInformational, NSAlertStyleWarning, NSAlertStyleCritical };
     NSAlert *alert = [[NSAlert alloc] init];
     [alert setMessageText:string(ptr, len)];
     [alert setAlertStyle:styles[style]];
@@ -367,7 +365,7 @@ void *wioCreateWindow(void *ptr, uint16_t width, uint16_t height) {
     NSRect framebuffer = [view convertRectToBacking:rect];
     wioFramebuffer(ptr, framebuffer.size.width, framebuffer.size.height);
 
-    return (void*)CFBridgingRetain(window);
+    return (void *)CFBridgingRetain(window);
 }
 
 void wioDestroyWindow(void *ptr, void *context) {
@@ -429,13 +427,13 @@ char *wioGetClipboardText(const void *ptr, size_t *len) {
     return wioDupeClipboardText(ptr, [string UTF8String], len);
 }
 
-void *wioCreateContext(NSWindow *window, NSOpenGLPixelFormatAttribute *attributes) {
+void *wioCreateContext(NSWindow *window, const NSOpenGLPixelFormatAttribute *attributes) {
     NSOpenGLPixelFormat *format = [[NSOpenGLPixelFormat alloc] initWithAttributes:attributes];
     NSOpenGLContext *context = [[NSOpenGLContext alloc] initWithFormat:format shareContext:nil];
     [context setView:[window contentView]];
     WindowDelegate *delegate = [window delegate];
     [delegate setContext:context];
-    return (void*)CFBridgingRetain(context);
+    return (void *)CFBridgingRetain(context);
 }
 
 void wioMakeContextCurrent(NSOpenGLContext *context) {
@@ -447,7 +445,7 @@ void wioSwapBuffers(NSWindow *window, NSOpenGLContext *context) {
         [context flushBuffer];
     } else {
         // vsync does not apply to occluded windows
-        struct timespec time = {0, 33333333};
+        struct timespec time = { 0, 33333333 };
         nanosleep(&time, NULL);
     }
 }
@@ -462,5 +460,5 @@ void *wioCreateMetalLayer(NSWindow *window) {
     NSView *view = [window contentView];
     [view setWantsLayer:YES];
     [view setLayer:layer];
-    return (__bridge void*)layer;
+    return (__bridge void *)layer;
 }
