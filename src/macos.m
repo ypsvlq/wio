@@ -37,17 +37,17 @@ static void warpCursor(NSWindow *window) {
     CGWarpMouseCursorPosition(CGPointMake(CGRectGetMidX(frame), CGRectGetMaxY(screen) - CGRectGetMidY(frame)));
 }
 
-@interface ApplicationDelegate : NSObject <NSApplicationDelegate>
+@interface WioApplicationDelegate : NSObject <NSApplicationDelegate>
 @end
 
-@interface WindowDelegate : NSObject <NSWindowDelegate>
+@interface WioWindowDelegate : NSObject <NSWindowDelegate>
 @end
 
-@interface View : NSView
+@interface WioView : NSView
 - (uint8_t)cursorMode;
 @end
 
-@implementation ApplicationDelegate
+@implementation WioApplicationDelegate
 
 - (void)applicationDidFinishLaunching:notification {
     [NSApp stop:nil];
@@ -65,7 +65,7 @@ static void warpCursor(NSWindow *window) {
 
 @end
 
-@implementation WindowDelegate {
+@implementation WioWindowDelegate {
     void *ptr;
     bool resizing;
     NSOpenGLContext *context;
@@ -94,7 +94,7 @@ static void warpCursor(NSWindow *window) {
     wioFocus(ptr);
 
     NSWindow *window = [notification object];
-    View *view = [window contentView];
+    WioView *view = [window contentView];
     if ([view cursorMode] == 2) {
         warpCursor(window);
     }
@@ -116,7 +116,7 @@ static void warpCursor(NSWindow *window) {
     if (resizing) return;
 
     NSWindow *window = [notification object];
-    View *view = [window contentView];
+    WioView *view = [window contentView];
 
     if ([view cursorMode] == 2) {
         warpCursor(window);
@@ -161,7 +161,7 @@ static void warpCursor(NSWindow *window) {
 
 @end
 
-@implementation View {
+@implementation WioView {
     void *ptr;
     NSTrackingArea *area;
     NSCursor *cursor;
@@ -304,7 +304,7 @@ static void warpCursor(NSWindow *window) {
 
 void wioInit() {
     [NSApplication sharedApplication];
-    [NSApp setDelegate:[[ApplicationDelegate alloc] init]];
+    [NSApp setDelegate:[[WioApplicationDelegate alloc] init]];
     [[NSBundle mainBundle] loadNibNamed:@"MainMenu" owner:NSApp topLevelObjects:nil];
 }
 
@@ -345,9 +345,9 @@ void *wioCreateWindow(void *ptr, uint16_t width, uint16_t height) {
         styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable
         backing:NSBackingStoreBuffered
         defer:NO];
-    [window setDelegate:[[WindowDelegate alloc] initWithPointer:ptr]];
+    [window setDelegate:[[WioWindowDelegate alloc] initWithPointer:ptr]];
 
-    View *view = [[View alloc] initWithPointer:ptr];
+    WioView *view = [[WioView alloc] initWithPointer:ptr];
     [window setContentView:view];
     [window makeFirstResponder:view];
 
@@ -431,7 +431,7 @@ void *wioCreateContext(NSWindow *window, const NSOpenGLPixelFormatAttribute *att
     NSOpenGLPixelFormat *format = [[NSOpenGLPixelFormat alloc] initWithAttributes:attributes];
     NSOpenGLContext *context = [[NSOpenGLContext alloc] initWithFormat:format shareContext:nil];
     [context setView:[window contentView]];
-    WindowDelegate *delegate = [window delegate];
+    WioWindowDelegate *delegate = [window delegate];
     [delegate setContext:context];
     return (void *)CFBridgingRetain(context);
 }
