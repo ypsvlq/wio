@@ -195,6 +195,10 @@ pub fn update() void {
     }
 }
 
+pub fn wait() void {
+    _ = w.MsgWaitForMultipleObjects(0, null, w.FALSE, w.INFINITE, w.QS_ALLINPUT);
+}
+
 pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
     const title_w = std.unicode.utf8ToUtf16LeAllocZ(wio.allocator, title) catch return;
     defer wio.allocator.free(title_w);

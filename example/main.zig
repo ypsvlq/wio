@@ -72,6 +72,7 @@ fn loop() !bool {
     joystick.update();
     renderer.draw();
     window.swapBuffers();
+    wio.wait();
     return true;
 }
 

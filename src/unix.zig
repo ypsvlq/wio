@@ -96,6 +96,8 @@ pub fn update() void {
     if (build_options.audio) audio.update();
 }
 
+pub fn wait() void {}
+
 pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
     switch (active) {
         .x11 => x11.messageBox(style, title, message),

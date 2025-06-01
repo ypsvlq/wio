@@ -28,6 +28,8 @@ pub fn run(func: fn () anyerror!bool) !void {
     loop = func;
 }
 
+pub fn wait() void {}
+
 export fn wioLoop() bool {
     return loop() catch |err| {
         std.log.err("{s}", .{@errorName(err)});

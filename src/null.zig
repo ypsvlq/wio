@@ -10,6 +10,8 @@ pub fn run(func: fn () anyerror!bool) !void {
     _ = func;
 }
 
+pub fn wait() void {}
+
 pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
     _ = style;
     _ = title;

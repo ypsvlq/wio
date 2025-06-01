@@ -48,6 +48,11 @@ pub fn update() void {
     backend.update();
 }
 
+/// Sleep until an event is received.
+pub fn wait() void {
+    backend.wait();
+}
+
 pub const MessageBoxStyle = enum { info, warn, err };
 
 pub fn messageBox(style: MessageBoxStyle, title: []const u8, message: []const u8) void {
