@@ -146,6 +146,8 @@ pub const Window = struct {
     }
 
     /// Must be called on the thread where the context is current.
+    ///
+    /// Should not be called when the window is hidden.
     pub fn swapBuffers(self: *Window) void {
         self.backend.swapBuffers();
     }
