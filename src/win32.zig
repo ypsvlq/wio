@@ -1266,6 +1266,7 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
                     self.events.push(.{ .mode = if (fullscreen) .fullscreen else if (wParam == w.SIZE_MAXIMIZED) .maximized else .normal });
                     self.events.push(.{ .size = size });
                     self.events.push(.{ .framebuffer = size });
+                    self.events.push(.draw);
                 },
                 w.SIZE_MINIMIZED => self.events.push(.hidden),
                 else => {},
