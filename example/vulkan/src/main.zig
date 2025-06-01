@@ -459,8 +459,6 @@ fn drawFrame() !void {
 }
 
 fn loop() !bool {
-    var resized = false;
-
     while (window.getEvent()) |event| {
         switch (event) {
             .close => {
@@ -483,7 +481,7 @@ fn loop() !bool {
             },
             .framebuffer => |new_size| {
                 size = new_size;
-                resized = true;
+                try recreateSwapchain();
             },
             .visible => visible = true,
             .hidden => visible = false,
@@ -492,8 +490,6 @@ fn loop() !bool {
     }
 
     if (visible) {
-        if (resized) try recreateSwapchain();
-
         drawFrame() catch |err| switch (err) {
             error.OutOfDateKHR => try recreateSwapchain(),
             else => return err,
