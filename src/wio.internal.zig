@@ -5,21 +5,41 @@ pub var allocator: std.mem.Allocator = undefined;
 pub var init_options: wio.InitOptions = undefined;
 
 pub const EventQueue = struct {
-    events: std.fifo.LinearFifo(wio.Event, .Dynamic),
+    events: std.ArrayListUnmanaged(wio.Event) = .empty,
+    head: usize = 0,
 
     pub fn init() EventQueue {
-        return .{ .events = .init(allocator) };
+        return .{};
     }
 
     pub fn deinit(self: *EventQueue) void {
-        self.events.deinit();
+        self.events.deinit(allocator);
     }
 
     pub fn push(self: *EventQueue, event: wio.Event) void {
-        self.events.writeItem(event) catch {};
+        if (self.head != 0) {
+            self.events.replaceRangeAssumeCapacity(0, self.head, &.{});
+            self.head = 0;
+        }
+
+        switch (std.meta.activeTag(event)) {
+            .draw, .framebuffer => |tag| {
+                for (self.events.items, 0..) |item, i| {
+                    if (item == tag) {
+                        _ = self.events.orderedRemove(i);
+                        break;
+                    }
+                }
+            },
+            else => {},
+        }
+
+        self.events.append(allocator, event) catch {};
     }
 
     pub fn pop(self: *EventQueue) ?wio.Event {
-        return self.events.readItem();
+        if (self.head == self.events.items.len) return null;
+        defer self.head += 1;
+        return self.events.items[self.head];
     }
 };
