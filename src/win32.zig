@@ -100,7 +100,7 @@ pub fn init() !void {
             } else |_| {}
         }
 
-        if (internal.init_options.audioDefaultOutputFn != null or wio.init_options.audioDefaultInputFn != null) {
+        if (internal.init_options.audioDefaultOutputFn != null or internal.init_options.audioDefaultInputFn != null) {
             try SUCCEED(mm_device_enumerator.RegisterEndpointNotificationCallback(&mm_notification_client.parent), "RegisterEndpointNotificationCallback");
         }
     }
