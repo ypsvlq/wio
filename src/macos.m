@@ -67,7 +67,6 @@ static void warpCursor(NSWindow *window) {
 
 @implementation WioWindowDelegate {
     void *ptr;
-    bool resizing;
     NSOpenGLContext *context;
 }
 
@@ -104,17 +103,15 @@ static void warpCursor(NSWindow *window) {
     wioUnfocus(ptr);
 }
 
-- (void)windowDidDeminiaturize:notification {
-    wioVisible(ptr);
-}
-
-- (void)windowDidMiniaturize:notification {
-    wioHide(ptr);
+- (void)windowDidChangeOcclusionState:notification {
+    if ([[notification object] occlusionState] & NSWindowOcclusionStateVisible) {
+        wioVisible(ptr);
+    } else {
+        wioHide(ptr);
+    }
 }
 
 - (void)windowDidResize:notification {
-    if (resizing) return;
-
     NSWindow *window = [notification object];
     WioView *view = [window contentView];
 
@@ -134,15 +131,6 @@ static void warpCursor(NSWindow *window) {
     wioFramebuffer(ptr, framebuffer.size.width, framebuffer.size.height);
 
     [context update];
-}
-
-- (void)windowWillStartLiveResize:notification {
-    resizing = true;
-}
-
-- (void)windowDidEndLiveResize:notification {
-    resizing = false;
-    [self windowDidResize:notification];
 }
 
 - (void)windowDidChangeBackingProperties:notification {
@@ -441,13 +429,7 @@ void wioMakeContextCurrent(NSOpenGLContext *context) {
 }
 
 void wioSwapBuffers(NSWindow *window, NSOpenGLContext *context) {
-    if ([window occlusionState] & NSApplicationOcclusionStateVisible) {
-        [context flushBuffer];
-    } else {
-        // vsync does not apply to occluded windows
-        struct timespec time = { 0, 33333333 };
-        nanosleep(&time, NULL);
-    }
+    [context flushBuffer];
 }
 
 void wioSwapInterval(NSOpenGLContext *context, int32_t interval) {

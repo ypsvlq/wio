@@ -721,6 +721,7 @@ export fn wioSize(self: *@This(), mode: u8, width: u16, height: u16) void {
 
 export fn wioFramebuffer(self: *@This(), width: u16, height: u16) void {
     self.events.push(.{ .framebuffer = .{ .width = width, .height = height } });
+    self.events.push(.draw);
 }
 
 export fn wioScale(self: *@This(), scale: f32) void {
