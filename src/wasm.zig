@@ -60,6 +60,7 @@ pub fn getEvent(self: *@This()) ?wio.Event {
         .focused => .focused,
         .unfocused => .unfocused,
         .visible => .visible,
+        .draw => .draw,
         .size => .{ .size = .{ .width = @intCast(js.shift(self.id)), .height = @intCast(js.shift(self.id)) } },
         .framebuffer => .{ .framebuffer = .{ .width = @intCast(js.shift(self.id)), .height = @intCast(js.shift(self.id)) } },
         .scale => .{ .scale = js.shiftFloat(self.id) },

@@ -65,6 +65,7 @@ const wio = {
                 6, width, height,
                 7, canvas.width, canvas.height,
                 8, devicePixelRatio,
+                5,
             );
         }).observe(canvas);
         canvas.addEventListener("contextmenu", event => event.preventDefault());
