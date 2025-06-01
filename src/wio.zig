@@ -9,9 +9,6 @@ pub const backend = switch (builtin.os.tag) {
     else => if (builtin.target.isWasm()) @import("wasm.zig") else @compileError("unsupported platform"),
 };
 
-// pub var allocator: std.mem.Allocator = undefined;
-// pub var init_options: InitOptions = undefined;
-
 pub const InitOptions = struct {
     /// Free with `JoystickDevice.release()`.
     joystickConnectedFn: ?*const fn (JoystickDevice) void = null,
