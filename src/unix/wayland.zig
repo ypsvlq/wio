@@ -543,6 +543,7 @@ fn resize(self: *@This(), size: wio.Size, configuration: ?*h.libdecor_configurat
 
     self.pushEvent(.{ .size = size });
     self.pushEvent(.{ .framebuffer = framebuffer });
+    self.pushEvent(.draw);
 }
 
 fn pushKeyEvent(self: *@This(), key: u32, comptime event: wio.EventType) void {
