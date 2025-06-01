@@ -594,6 +594,7 @@ fn handle(event: *h.XEvent) void {
                 window.size = wio.Size{ .width = @intCast(event.xconfigure.width), .height = @intCast(event.xconfigure.height) };
                 window.events.push(.{ .size = window.size });
                 window.events.push(.{ .framebuffer = window.size });
+                window.events.push(.draw);
             }
         },
         h.KeyPress => {
