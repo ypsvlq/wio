@@ -51,6 +51,10 @@ fn loop() !bool {
                 _ = gpa.deinit();
                 return false;
             },
+            .draw => {
+                renderer.draw();
+                window.swapBuffers();
+            },
             .framebuffer => |size| renderer.resize(size),
             .button_press, .button_repeat => |button| {
                 if (button == .left_control or button == .right_control) actions = true;
@@ -70,8 +74,6 @@ fn loop() !bool {
         }
     }
     joystick.update();
-    renderer.draw();
-    window.swapBuffers();
     wio.wait();
     return true;
 }
