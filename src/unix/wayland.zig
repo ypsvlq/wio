@@ -1,6 +1,7 @@
 const std = @import("std");
 const build_options = @import("build_options");
 const wio = @import("../wio.zig");
+const internal = @import("../wio.internal.zig");
 const unix = @import("../unix.zig");
 const DynLib = @import("DynLib.zig");
 const log = std.log.scoped(.wio);
@@ -199,7 +200,7 @@ pub fn deinit() void {
         libwayland_egl.close();
     }
 
-    wio.allocator.free(clipboard_text);
+    internal.allocator.free(clipboard_text);
 
     c.libdecor_unref(libdecor_context);
     libdecor.close();
@@ -264,7 +265,7 @@ cursor: u32 = undefined,
 cursor_mode: wio.CursorMode,
 
 pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
-    const self = try wio.allocator.create(@This());
+    const self = try internal.allocator.create(@This());
 
     const surface = h.wl_compositor_create_surface(compositor) orelse return error.Unexpected;
     errdefer h.wl_surface_destroy(surface);
@@ -274,7 +275,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     errdefer c.libdecor_frame_unref(frame);
 
     self.* = .{
-        .events = .init(wio.allocator),
+        .events = .init(internal.allocator),
         .surface = surface,
         .frame = frame,
         .size = options.size,
@@ -358,7 +359,7 @@ pub fn destroy(self: *@This()) void {
     self.events.deinit();
     c.libdecor_frame_unref(self.frame);
     h.wl_surface_destroy(self.surface);
-    wio.allocator.destroy(self);
+    internal.allocator.destroy(self);
 }
 
 pub fn getEvent(self: *@This()) ?wio.Event {
@@ -386,8 +387,8 @@ pub fn getEvent(self: *@This()) ?wio.Event {
 }
 
 pub fn setTitle(self: *@This(), title: []const u8) void {
-    const title_z = wio.allocator.dupeZ(u8, title) catch return;
-    defer wio.allocator.free(title_z);
+    const title_z = internal.allocator.dupeZ(u8, title) catch return;
+    defer internal.allocator.free(title_z);
     c.libdecor_frame_set_title(self.frame, title_z);
 }
 
@@ -453,8 +454,8 @@ pub fn requestAttention(self: *@This()) void {
 pub fn setClipboardText(_: *@This(), text: []const u8) void {
     if (data_device_manager == null or data_device == null) return;
 
-    wio.allocator.free(clipboard_text);
-    clipboard_text = wio.allocator.dupe(u8, text) catch "";
+    internal.allocator.free(clipboard_text);
+    clipboard_text = internal.allocator.dupe(u8, text) catch "";
 
     if (data_source) |_| h.wl_data_source_destroy(data_source);
     data_source = h.wl_data_device_manager_create_data_source(data_device_manager);

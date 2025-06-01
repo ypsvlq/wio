@@ -1,6 +1,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const build_options = @import("build_options");
+const internal = @import("wio.internal.zig");
 pub const backend = switch (builtin.os.tag) {
     .windows => @import("win32.zig"),
     .macos => @import("macos.zig"),
@@ -8,8 +9,8 @@ pub const backend = switch (builtin.os.tag) {
     else => if (builtin.target.isWasm()) @import("wasm.zig") else @compileError("unsupported platform"),
 };
 
-pub var allocator: std.mem.Allocator = undefined;
-pub var init_options: InitOptions = undefined;
+// pub var allocator: std.mem.Allocator = undefined;
+// pub var init_options: InitOptions = undefined;
 
 pub const InitOptions = struct {
     /// Free with `JoystickDevice.release()`.
@@ -23,8 +24,8 @@ pub const InitOptions = struct {
 
 /// Unless otherwise noted, all calls to wio functions must be made on the same thread.
 pub fn init(ally: std.mem.Allocator, options: InitOptions) !void {
-    allocator = ally;
-    init_options = options;
+    internal.allocator = ally;
+    internal.init_options = options;
     try backend.init();
 }
 

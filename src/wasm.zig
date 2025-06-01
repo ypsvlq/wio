@@ -1,5 +1,6 @@
 const std = @import("std");
 const wio = @import("wio.zig");
+const internal = @import("wio.internal.zig");
 
 const js = struct {
     extern "wio" fn shift(u32) u32;
@@ -144,10 +145,10 @@ pub const JoystickDevice = struct {
     pub fn open(self: JoystickDevice) !Joystick {
         var lengths: [2]u32 = undefined;
         if (!js.openJoystick(self.index, &lengths)) return error.Unexpected;
-        const axes = try wio.allocator.alloc(u16, lengths[0]);
-        errdefer wio.allocator.free(axes);
-        const buttons = try wio.allocator.alloc(bool, lengths[1]);
-        errdefer wio.allocator.free(buttons);
+        const axes = try internal.allocator.alloc(u16, lengths[0]);
+        errdefer internal.allocator.free(axes);
+        const buttons = try internal.allocator.alloc(bool, lengths[1]);
+        errdefer internal.allocator.free(buttons);
         return .{ .index = self.index, .axes = axes, .buttons = buttons };
     }
 
@@ -170,8 +171,8 @@ pub const Joystick = struct {
     buttons: []bool,
 
     pub fn close(self: *Joystick) void {
-        wio.allocator.free(self.axes);
-        wio.allocator.free(self.buttons);
+        internal.allocator.free(self.axes);
+        internal.allocator.free(self.buttons);
     }
 
     pub fn poll(self: *Joystick) ?wio.JoystickState {
@@ -241,7 +242,7 @@ pub const AudioInput = struct {
 };
 
 export fn wioJoystick(index: u32) void {
-    if (wio.init_options.joystickConnectedFn) |callback| {
+    if (internal.init_options.joystickConnectedFn) |callback| {
         callback(.{ .backend = .{ .index = index } });
     }
 }

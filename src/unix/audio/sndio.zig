@@ -1,10 +1,11 @@
 const std = @import("std");
 const wio = @import("../../wio.zig");
+const internal = @import("../../wio.internal.zig");
 const c = @cImport(@cInclude("sndio.h"));
 
 pub fn init() !void {
-    if (wio.init_options.audioDefaultOutputFn) |callback| callback(.{ .backend = .{} });
-    if (wio.init_options.audioDefaultInputFn) |callback| callback(.{ .backend = .{} });
+    if (internal.init_options.audioDefaultOutputFn) |callback| callback(.{ .backend = .{} });
+    if (internal.init_options.audioDefaultInputFn) |callback| callback(.{ .backend = .{} });
 }
 
 pub fn deinit() void {}
@@ -55,11 +56,11 @@ pub const AudioDevice = struct {
         if (c.sio_getpar(handle, &param) == 0) return error.Unexpected;
         if (c.sio_start(handle) == 0) return error.Unexpected;
 
-        const buffer = try wio.allocator.alloc(f32, param.appbufsz * format.channels);
-        errdefer wio.allocator.free(buffer);
+        const buffer = try internal.allocator.alloc(f32, param.appbufsz * format.channels);
+        errdefer internal.allocator.free(buffer);
 
-        const result = try wio.allocator.create(AudioSession);
-        errdefer wio.allocator.destroy(result);
+        const result = try internal.allocator.create(AudioSession);
+        errdefer internal.allocator.destroy(result);
         result.* = .{
             .handle = handle,
             .buffer = buffer,
@@ -91,8 +92,8 @@ const AudioSession = struct {
         self.thread.join();
 
         c.sio_close(self.handle);
-        wio.allocator.free(self.buffer);
-        wio.allocator.destroy(self);
+        internal.allocator.free(self.buffer);
+        internal.allocator.destroy(self);
     }
 
     fn outputThread(self: *AudioSession) void {

@@ -1,6 +1,7 @@
 const std = @import("std");
 const build_options = @import("build_options");
 const wio = @import("../../wio.zig");
+const internal = @import("../../wio.internal.zig");
 const DynLib = @import("../DynLib.zig");
 const h = @cImport(@cInclude("pulse/pulseaudio.h"));
 const log = std.log.scoped(.wio);
@@ -66,7 +67,7 @@ pub fn init() !void {
     c.pa_context_set_state_callback(context, notifyCallback, null);
     while (c.pa_context_get_state(context) != h.PA_CONTEXT_READY) c.pa_threaded_mainloop_wait(loop);
 
-    if (wio.init_options.audioDefaultOutputFn != null or wio.init_options.audioDefaultInputFn != null) {
+    if (internal.init_options.audioDefaultOutputFn != null or internal.init_options.audioDefaultInputFn != null) {
         c.pa_context_set_subscribe_callback(context, subscribeCallback, null);
         const operation = c.pa_context_subscribe(context, h.PA_SUBSCRIPTION_MASK_SERVER, successCallback, null);
         defer c.pa_operation_unref(operation);
@@ -76,8 +77,8 @@ pub fn init() !void {
 }
 
 pub fn deinit() void {
-    wio.allocator.free(last_default_source);
-    wio.allocator.free(last_default_sink);
+    internal.allocator.free(last_default_source);
+    internal.allocator.free(last_default_sink);
     c.pa_threaded_mainloop_lock(loop);
     c.pa_context_disconnect(context);
     c.pa_context_unref(context);
@@ -92,7 +93,7 @@ var last_default_sink: []const u8 = "";
 var last_default_source: []const u8 = "";
 
 pub fn update() void {
-    if (wio.init_options.audioDefaultOutputFn != null or wio.init_options.audioDefaultInputFn != null) {
+    if (internal.init_options.audioDefaultOutputFn != null or internal.init_options.audioDefaultInputFn != null) {
         if (server_info_changed) {
             var sink: bool = false;
             var source: bool = false;
@@ -109,35 +110,35 @@ pub fn update() void {
                 defer c.pa_threaded_mainloop_accept(loop);
 
                 if (maybe_info) |info| {
-                    if (wio.init_options.audioDefaultOutputFn != null) {
+                    if (internal.init_options.audioDefaultOutputFn != null) {
                         const default_sink = std.mem.sliceTo(info.default_sink_name, 0);
                         if (!std.mem.eql(u8, default_sink, last_default_sink)) {
-                            wio.allocator.free(last_default_sink);
-                            last_default_sink = wio.allocator.dupe(u8, default_sink) catch "";
+                            internal.allocator.free(last_default_sink);
+                            last_default_sink = internal.allocator.dupe(u8, default_sink) catch "";
                             sink = true;
                         }
                     }
-                    if (wio.init_options.audioDefaultInputFn != null) {
+                    if (internal.init_options.audioDefaultInputFn != null) {
                         const default_source = std.mem.sliceTo(info.default_source_name, 0);
                         if (!std.mem.eql(u8, default_source, last_default_source)) {
-                            wio.allocator.free(last_default_source);
-                            last_default_source = wio.allocator.dupe(u8, default_source) catch "";
+                            internal.allocator.free(last_default_source);
+                            last_default_source = internal.allocator.dupe(u8, default_source) catch "";
                             source = true;
                         }
                     }
                 }
             }
 
-            if (wio.init_options.audioDefaultOutputFn) |callback| {
+            if (internal.init_options.audioDefaultOutputFn) |callback| {
                 if (sink) {
-                    if (wio.allocator.dupeZ(u8, last_default_sink)) |id| {
+                    if (internal.allocator.dupeZ(u8, last_default_sink)) |id| {
                         callback(.{ .backend = .{ .id = id, .type = .output } });
                     } else |_| {}
                 }
             }
-            if (wio.init_options.audioDefaultInputFn) |callback| {
+            if (internal.init_options.audioDefaultInputFn) |callback| {
                 if (source) {
-                    if (wio.allocator.dupeZ(u8, last_default_source)) |id| {
+                    if (internal.allocator.dupeZ(u8, last_default_source)) |id| {
                         callback(.{ .backend = .{ .id = id, .type = .input } });
                     } else |_| {}
                 }
@@ -151,7 +152,7 @@ pub const AudioDeviceIterator = struct {
     index: usize = 0,
 
     pub fn init(mode: wio.AudioDeviceType) AudioDeviceIterator {
-        var self = AudioDeviceIterator{ .list = .init(wio.allocator) };
+        var self = AudioDeviceIterator{ .list = .init(internal.allocator) };
         c.pa_threaded_mainloop_lock(loop);
         defer c.pa_threaded_mainloop_unlock(loop);
         const operation = if (mode == .output)
@@ -180,7 +181,7 @@ pub const AudioDevice = struct {
     type: wio.AudioDeviceType,
 
     pub fn release(self: AudioDevice) void {
-        wio.allocator.free(self.id);
+        internal.allocator.free(self.id);
     }
 
     pub fn openOutput(self: AudioDevice, writeFn: *const fn ([]f32) void, format: wio.AudioFormat) !AudioOutput {
@@ -342,9 +343,9 @@ fn sourceNameCallback(_: ?*h.pa_context, info: ?*const h.pa_source_info, eol: c_
 fn sinkListCallback(_: ?*h.pa_context, info: ?*const h.pa_sink_info, eol: c_int, data: ?*anyopaque) callconv(.c) void {
     const list: *std.ArrayList(AudioDevice) = @alignCast(@ptrCast(data));
     if (eol == 0) {
-        const id = wio.allocator.dupeZ(u8, std.mem.sliceTo(info.?.name, 0)) catch return;
+        const id = internal.allocator.dupeZ(u8, std.mem.sliceTo(info.?.name, 0)) catch return;
         list.append(.{ .id = id, .type = .output }) catch {
-            wio.allocator.free(id);
+            internal.allocator.free(id);
             return;
         };
     } else {
@@ -355,9 +356,9 @@ fn sinkListCallback(_: ?*h.pa_context, info: ?*const h.pa_sink_info, eol: c_int,
 fn sourceListCallback(_: ?*h.pa_context, info: ?*const h.pa_source_info, eol: c_int, data: ?*anyopaque) callconv(.c) void {
     const list: *std.ArrayList(AudioDevice) = @alignCast(@ptrCast(data));
     if (eol == 0) {
-        const id = wio.allocator.dupeZ(u8, std.mem.sliceTo(info.?.name, 0)) catch return;
+        const id = internal.allocator.dupeZ(u8, std.mem.sliceTo(info.?.name, 0)) catch return;
         list.append(.{ .id = id, .type = .input }) catch {
-            wio.allocator.free(id);
+            internal.allocator.free(id);
             return;
         };
     } else {

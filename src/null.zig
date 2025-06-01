@@ -1,5 +1,6 @@
 const std = @import("std");
 const wio = @import("wio.zig");
+const internal = @import("wio.internal.zig");
 const log = std.log.scoped(.wio);
 
 pub fn init() !void {}
@@ -19,13 +20,13 @@ pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []cons
 }
 
 pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
-    const self = try wio.allocator.create(@This());
+    const self = try internal.allocator.create(@This());
     _ = options;
     return self;
 }
 
 pub fn destroy(self: *@This()) void {
-    wio.allocator.destroy(self);
+    internal.allocator.destroy(self);
 }
 
 pub fn getEvent(self: *@This()) ?wio.Event {

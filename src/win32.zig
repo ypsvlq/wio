@@ -2,6 +2,7 @@ const std = @import("std");
 const build_options = @import("build_options");
 const w = @import("win32");
 const wio = @import("wio.zig");
+const internal = @import("wio.internal.zig");
 const log = std.log.scoped(.wio);
 
 const class_name = w.L("wio");
@@ -47,7 +48,7 @@ pub fn init() !void {
     if (w.RegisterRawInputDevices(&mouse, 1, @sizeOf(w.RAWINPUTDEVICE)) == w.FALSE) return logLastError("RegisterRawInputDevices");
 
     if (build_options.joystick) {
-        joysticks = .init(wio.allocator);
+        joysticks = .init(internal.allocator);
 
         helper_window = w.CreateWindowExW(
             0,
@@ -88,18 +89,18 @@ pub fn init() !void {
         try SUCCEED(w.CoCreateInstance(&w.CLSID_MMDeviceEnumerator, null, w.CLSCTX_ALL, &w.IID_IMMDeviceEnumerator, @ptrCast(&mm_device_enumerator)), "CoCreateInstance");
 
         var device: *w.IMMDevice = undefined;
-        if (wio.init_options.audioDefaultOutputFn) |callback| {
+        if (internal.init_options.audioDefaultOutputFn) |callback| {
             if (SUCCEED(mm_device_enumerator.GetDefaultAudioEndpoint(w.eRender, w.eConsole, @ptrCast(&device)), "GetDefaultAudioEndpoint")) {
                 callback(.{ .backend = .{ .device = device } });
             } else |_| {}
         }
-        if (wio.init_options.audioDefaultInputFn) |callback| {
+        if (internal.init_options.audioDefaultInputFn) |callback| {
             if (SUCCEED(mm_device_enumerator.GetDefaultAudioEndpoint(w.eCapture, w.eConsole, @ptrCast(&device)), "GetDefaultAudioEndpoint")) {
                 callback(.{ .backend = .{ .device = device } });
             } else |_| {}
         }
 
-        if (wio.init_options.audioDefaultOutputFn != null or wio.init_options.audioDefaultInputFn != null) {
+        if (internal.init_options.audioDefaultOutputFn != null or wio.init_options.audioDefaultInputFn != null) {
             try SUCCEED(mm_device_enumerator.RegisterEndpointNotificationCallback(&mm_notification_client.parent), "RegisterEndpointNotificationCallback");
         }
     }
@@ -150,10 +151,10 @@ pub fn deinit() void {
     }
     if (build_options.joystick) {
         _ = w.DestroyWindow(helper_window);
-        wio.allocator.free(helper_input);
+        internal.allocator.free(helper_input);
 
         var iter = joysticks.valueIterator();
-        while (iter.next()) |info| wio.allocator.free(info.interface);
+        while (iter.next()) |info| internal.allocator.free(info.interface);
         joysticks.deinit();
     }
     if (build_options.audio) {
@@ -178,14 +179,14 @@ pub fn update() void {
 
     if (build_options.audio) {
         var maybe_device: ?*w.IMMDevice = undefined;
-        if (wio.init_options.audioDefaultOutputFn) |callback| {
+        if (internal.init_options.audioDefaultOutputFn) |callback| {
             mm_notification_client.mutex.lock();
             maybe_device = mm_notification_client.default_output;
             mm_notification_client.default_output = null;
             mm_notification_client.mutex.unlock();
             if (maybe_device) |device| callback(.{ .backend = .{ .device = device } });
         }
-        if (wio.init_options.audioDefaultInputFn) |callback| {
+        if (internal.init_options.audioDefaultInputFn) |callback| {
             mm_notification_client.mutex.lock();
             maybe_device = mm_notification_client.default_input;
             mm_notification_client.default_input = null;
@@ -200,10 +201,10 @@ pub fn wait() void {
 }
 
 pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
-    const title_w = std.unicode.utf8ToUtf16LeAllocZ(wio.allocator, title) catch return;
-    defer wio.allocator.free(title_w);
-    const message_w = std.unicode.utf8ToUtf16LeAllocZ(wio.allocator, message) catch return;
-    defer wio.allocator.free(message_w);
+    const title_w = std.unicode.utf8ToUtf16LeAllocZ(internal.allocator, title) catch return;
+    defer internal.allocator.free(title_w);
+    const message_w = std.unicode.utf8ToUtf16LeAllocZ(internal.allocator, message) catch return;
+    defer internal.allocator.free(message_w);
 
     var flags: u32 = w.MB_TASKMODAL | w.MB_TOPMOST;
     flags |= switch (style) {
@@ -236,11 +237,11 @@ dc: w.HDC = null,
 rc: w.HGLRC = null,
 
 pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
-    const self = try wio.allocator.create(@This());
-    errdefer wio.allocator.destroy(self);
+    const self = try internal.allocator.create(@This());
+    errdefer internal.allocator.destroy(self);
 
-    const title = try std.unicode.utf8ToUtf16LeAllocZ(wio.allocator, options.title);
-    defer wio.allocator.free(title);
+    const title = try std.unicode.utf8ToUtf16LeAllocZ(internal.allocator, options.title);
+    defer internal.allocator.free(title);
     const style: u32 = w.WS_OVERLAPPEDWINDOW;
     const size = clientToWindow(options.size, style);
     const window = w.CreateWindowExW(
@@ -259,7 +260,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     ) orelse return logLastError("CreateWindowExW");
 
     self.* = .{
-        .events = .init(wio.allocator),
+        .events = .init(internal.allocator),
         .window = window,
         .cursor = loadCursor(options.cursor),
         .cursor_mode = options.cursor_mode,
@@ -338,8 +339,8 @@ pub fn destroy(self: *@This()) void {
     }
     _ = w.DestroyWindow(self.window);
     self.events.deinit();
-    wio.allocator.free(self.input);
-    wio.allocator.destroy(self);
+    internal.allocator.free(self.input);
+    internal.allocator.destroy(self);
 }
 
 pub fn getEvent(self: *@This()) ?wio.Event {
@@ -347,8 +348,8 @@ pub fn getEvent(self: *@This()) ?wio.Event {
 }
 
 pub fn setTitle(self: *@This(), title: []const u8) void {
-    const title_w = std.unicode.utf8ToUtf16LeAllocZ(wio.allocator, title) catch return;
-    defer wio.allocator.free(title_w);
+    const title_w = std.unicode.utf8ToUtf16LeAllocZ(internal.allocator, title) catch return;
+    defer internal.allocator.free(title_w);
     _ = w.SetWindowTextW(self.window, title_w);
 }
 
@@ -432,8 +433,8 @@ pub fn requestAttention(self: *@This()) void {
 pub fn setClipboardText(_: *@This(), text: []const u8) void {
     if (w.OpenClipboard(null) == 0) return;
     defer _ = w.CloseClipboard();
-    const text_w = std.unicode.utf8ToUtf16LeAlloc(wio.allocator, text) catch return;
-    defer wio.allocator.free(text_w);
+    const text_w = std.unicode.utf8ToUtf16LeAlloc(internal.allocator, text) catch return;
+    defer internal.allocator.free(text_w);
     const mem = w.GlobalAlloc(w.GMEM_MOVEABLE, (text_w.len + 1) * @sizeOf(u16)) orelse return;
     const buf: [*]u16 = @alignCast(@ptrCast(w.GlobalLock(mem) orelse {
         _ = w.GlobalFree(mem);
@@ -533,8 +534,8 @@ pub const JoystickDevice = union(enum) {
     pub fn release(_: JoystickDevice) void {}
 
     pub fn open(self: JoystickDevice) !*Joystick {
-        const joystick = try wio.allocator.create(Joystick);
-        errdefer wio.allocator.destroy(joystick);
+        const joystick = try internal.allocator.create(Joystick);
+        errdefer internal.allocator.destroy(joystick);
         switch (self) {
             .rawinput => |device| {
                 const info = joysticks.getPtr(device) orelse return error.Unexpected;
@@ -542,29 +543,29 @@ pub const JoystickDevice = union(enum) {
 
                 var preparsed_size: u32 = undefined;
                 if (w.GetRawInputDeviceInfoW(device, w.RIDI_PREPARSEDDATA, null, &preparsed_size) < 0) return error.Unexpected;
-                const preparsed = try wio.allocator.alloc(u8, preparsed_size);
-                errdefer wio.allocator.free(preparsed);
+                const preparsed = try internal.allocator.alloc(u8, preparsed_size);
+                errdefer internal.allocator.free(preparsed);
                 if (w.GetRawInputDeviceInfoW(device, w.RIDI_PREPARSEDDATA, preparsed.ptr, &preparsed_size) < 0) return error.Unexpected;
 
                 var caps: w.HIDP_CAPS = undefined;
                 if (w.HidP_GetCaps(@bitCast(@intFromPtr(preparsed.ptr)), &caps) != w.HIDP_STATUS_SUCCESS) return error.Unexpected;
 
                 var value_caps_len = caps.NumberInputValueCaps;
-                const value_caps = try wio.allocator.alloc(w.HIDP_VALUE_CAPS, value_caps_len);
-                errdefer wio.allocator.free(value_caps);
+                const value_caps = try internal.allocator.alloc(w.HIDP_VALUE_CAPS, value_caps_len);
+                errdefer internal.allocator.free(value_caps);
                 if (w.HidP_GetValueCaps(w.HidP_Input, value_caps.ptr, &value_caps_len, @bitCast(@intFromPtr(preparsed.ptr))) != w.HIDP_STATUS_SUCCESS) return error.Unexpected;
 
                 var button_caps_len = caps.NumberInputButtonCaps;
-                const button_caps = try wio.allocator.alloc(w.HIDP_BUTTON_CAPS, button_caps_len);
-                defer wio.allocator.free(button_caps);
+                const button_caps = try internal.allocator.alloc(w.HIDP_BUTTON_CAPS, button_caps_len);
+                defer internal.allocator.free(button_caps);
                 if (w.HidP_GetButtonCaps(w.HidP_Input, button_caps.ptr, &button_caps_len, @bitCast(@intFromPtr(preparsed.ptr))) != w.HIDP_STATUS_SUCCESS) return error.Unexpected;
 
                 const data_len = w.HidP_MaxDataListLength(w.HidP_Input, @bitCast(@intFromPtr(preparsed.ptr)));
-                const data = try wio.allocator.alloc(w.HIDP_DATA, data_len);
-                errdefer wio.allocator.free(data);
+                const data = try internal.allocator.alloc(w.HIDP_DATA, data_len);
+                errdefer internal.allocator.free(data);
 
-                const indices = try wio.allocator.alloc(RawInputJoystick.DataIndex, data_len);
-                errdefer wio.allocator.free(indices);
+                const indices = try internal.allocator.alloc(RawInputJoystick.DataIndex, data_len);
+                errdefer internal.allocator.free(indices);
                 @memset(indices, .none);
 
                 var axis_count: u16 = 0;
@@ -617,16 +618,16 @@ pub const JoystickDevice = union(enum) {
                     }
                 }
 
-                const axes = try wio.allocator.alloc(u16, axis_count);
-                errdefer wio.allocator.free(axes);
+                const axes = try internal.allocator.alloc(u16, axis_count);
+                errdefer internal.allocator.free(axes);
                 @memset(axes, 0xFFFF / 2);
 
-                const hats = try wio.allocator.alloc(wio.Hat, hat_count);
-                errdefer wio.allocator.free(hats);
+                const hats = try internal.allocator.alloc(wio.Hat, hat_count);
+                errdefer internal.allocator.free(hats);
                 @memset(hats, .{});
 
-                const buttons = try wio.allocator.alloc(bool, button_count);
-                errdefer wio.allocator.free(buttons);
+                const buttons = try internal.allocator.alloc(bool, button_count);
+                errdefer internal.allocator.free(buttons);
                 @memset(buttons, false);
 
                 joystick.* = .{
@@ -685,7 +686,7 @@ pub const Joystick = union(enum) {
         switch (self.*) {
             inline else => |*joystick| joystick.close(),
         }
-        wio.allocator.destroy(self);
+        internal.allocator.destroy(self);
     }
 
     pub fn poll(self: *Joystick) ?wio.JoystickState {
@@ -720,13 +721,13 @@ const RawInputJoystick = struct {
         if (joysticks.getPtr(self.device)) |info| {
             info.joystick = null;
         }
-        wio.allocator.free(self.buttons);
-        wio.allocator.free(self.hats);
-        wio.allocator.free(self.axes);
-        wio.allocator.free(self.indices);
-        wio.allocator.free(self.data);
-        wio.allocator.free(self.value_caps);
-        wio.allocator.free(self.preparsed);
+        internal.allocator.free(self.buttons);
+        internal.allocator.free(self.hats);
+        internal.allocator.free(self.axes);
+        internal.allocator.free(self.indices);
+        internal.allocator.free(self.data);
+        internal.allocator.free(self.value_caps);
+        internal.allocator.free(self.preparsed);
     }
 
     pub fn poll(self: *RawInputJoystick) ?wio.JoystickState {
@@ -848,8 +849,8 @@ pub const AudioDevice = struct {
 
         try SUCCEED(client.Start(), "IAudioClient::Start");
 
-        const result = try wio.allocator.create(AudioClient);
-        errdefer wio.allocator.destroy(result);
+        const result = try internal.allocator.create(AudioClient);
+        errdefer internal.allocator.destroy(result);
         result.* = .{
             .thread = undefined,
             .client = client,
@@ -901,7 +902,7 @@ const AudioClient = struct {
         std.os.windows.CloseHandle(self.event.?);
         _ = self.service.Release();
         _ = self.client.Release();
-        wio.allocator.destroy(self);
+        internal.allocator.destroy(self);
     }
 
     fn outputThread(self: *AudioClient) void {
@@ -992,9 +993,9 @@ const MMNotificationClient = struct {
 
     fn OnDefaultDeviceChanged(_: *const anyopaque, flow: i32, role: i32, id: [*c]const u16) callconv(.winapi) w.HRESULT {
         if (role == w.eConsole) {
-            const maybe_device = if (flow == w.eRender and wio.init_options.audioDefaultOutputFn != null)
+            const maybe_device = if (flow == w.eRender and internal.init_options.audioDefaultOutputFn != null)
                 &mm_notification_client.default_output
-            else if (flow != w.eRender and wio.init_options.audioDefaultInputFn != null)
+            else if (flow != w.eRender and internal.init_options.audioDefaultInputFn != null)
                 &mm_notification_client.default_input
             else
                 null;
@@ -1094,9 +1095,9 @@ fn helperWindowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM
                 w.GIDC_ARRIVAL => {
                     var interface_size: u32 = undefined;
                     if (w.GetRawInputDeviceInfoW(device, w.RIDI_DEVICENAME, null, &interface_size) < 0) return 0;
-                    const interface = wio.allocator.alloc(u16, interface_size) catch return 0;
+                    const interface = internal.allocator.alloc(u16, interface_size) catch return 0;
                     if (w.GetRawInputDeviceInfoW(device, w.RIDI_DEVICENAME, interface.ptr, &interface_size) < 0) {
-                        wio.allocator.free(interface);
+                        internal.allocator.free(interface);
                         return 0;
                     }
 
@@ -1106,19 +1107,19 @@ fn helperWindowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM
                             var state: w.XINPUT_STATE = undefined;
                             if (w.XInputGetState(@intCast(i), &state) == w.ERROR_SUCCESS) {
                                 xinput.set(i);
-                                if (wio.init_options.joystickConnectedFn) |callback| callback(.{ .backend = .{ .xinput = @intCast(i) } });
+                                if (internal.init_options.joystickConnectedFn) |callback| callback(.{ .backend = .{ .xinput = @intCast(i) } });
                             }
                         }
-                        wio.allocator.free(interface);
+                        internal.allocator.free(interface);
                         return 0;
                     }
 
                     joysticks.put(device, .{ .interface = interface }) catch {
-                        wio.allocator.free(interface);
+                        internal.allocator.free(interface);
                         return 0;
                     };
 
-                    if (wio.init_options.joystickConnectedFn) |callback| callback(.{ .backend = .{ .rawinput = device } });
+                    if (internal.init_options.joystickConnectedFn) |callback| callback(.{ .backend = .{ .rawinput = device } });
                 },
                 w.GIDC_REMOVAL => {
                     var iter = xinput.iterator(.{});
@@ -1133,7 +1134,7 @@ fn helperWindowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM
                         if (info.joystick) |joystick| {
                             joystick.disconnected = true;
                         }
-                        wio.allocator.free(info.interface);
+                        internal.allocator.free(info.interface);
                         _ = joysticks.remove(device);
                     }
                 },
@@ -1145,7 +1146,7 @@ fn helperWindowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM
             const handle: w.HRAWINPUT = @ptrFromInt(@as(usize, @bitCast(lParam)));
             var size: u32 = undefined;
             if (w.GetRawInputData(handle, w.RID_INPUT, null, &size, @sizeOf(w.RAWINPUTHEADER)) == -1) return 0;
-            if (size > helper_input.len) helper_input = wio.allocator.realloc(helper_input, size) catch return 0;
+            if (size > helper_input.len) helper_input = internal.allocator.realloc(helper_input, size) catch return 0;
             if (w.GetRawInputData(handle, w.RID_INPUT, helper_input.ptr, &size, @sizeOf(w.RAWINPUTHEADER)) == -1) return 0;
             const raw: *w.RAWINPUT = @alignCast(@ptrCast(helper_input));
 
@@ -1386,7 +1387,7 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
                 const handle: w.HRAWINPUT = @ptrFromInt(@as(usize, @bitCast(lParam)));
                 var size: u32 = undefined;
                 if (w.GetRawInputData(handle, w.RID_INPUT, null, &size, @sizeOf(w.RAWINPUTHEADER)) == -1) return 0;
-                if (size > self.input.len) self.input = wio.allocator.realloc(self.input, size) catch return 0;
+                if (size > self.input.len) self.input = internal.allocator.realloc(self.input, size) catch return 0;
                 if (w.GetRawInputData(handle, w.RID_INPUT, self.input.ptr, &size, @sizeOf(w.RAWINPUTHEADER)) == -1) return 0;
                 const raw: *w.RAWINPUT = @alignCast(@ptrCast(self.input));
 

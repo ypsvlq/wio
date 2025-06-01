@@ -121,7 +121,7 @@ fn action(button: wio.Button) void {
         .c => window.setClipboardText("wio example"),
         .v => {
             if (window.getClipboardText(allocator)) |text| {
-                defer wio.allocator.free(text);
+                defer allocator.free(text);
                 std.log.scoped(.clipboard).info("{s}", .{text});
             }
         },

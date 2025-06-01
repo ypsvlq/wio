@@ -1,6 +1,7 @@
 const std = @import("std");
 const build_options = @import("build_options");
 const wio = @import("../../wio.zig");
+const internal = @import("../../wio.internal.zig");
 const DynLib = @import("../DynLib.zig");
 const h = @cImport({
     @cInclude("linux/input.h");
@@ -38,7 +39,7 @@ pub fn init() !void {
     udev = c.udev_new() orelse return error.Unexpected;
     errdefer _ = c.udev_unref(udev);
 
-    if (wio.init_options.joystickConnectedFn) |callback| {
+    if (internal.init_options.joystickConnectedFn) |callback| {
         var iter = JoystickDeviceIterator.init();
         while (iter.next()) |device| callback(.{ .backend = device });
 
@@ -50,13 +51,13 @@ pub fn init() !void {
 }
 
 pub fn deinit() void {
-    if (wio.init_options.joystickConnectedFn != null) _ = c.udev_monitor_unref(monitor);
+    if (internal.init_options.joystickConnectedFn != null) _ = c.udev_monitor_unref(monitor);
     _ = c.udev_unref(udev);
     libudev.close();
 }
 
 pub fn update() void {
-    if (wio.init_options.joystickConnectedFn) |callback| {
+    if (internal.init_options.joystickConnectedFn) |callback| {
         while (c.udev_monitor_receive_device(monitor)) |device| {
             defer _ = c.udev_device_unref(device);
             const joystick = std.mem.sliceTo(c.udev_device_get_property_value(device, "ID_INPUT_JOYSTICK") orelse continue, 0);
@@ -146,8 +147,8 @@ pub const JoystickDevice = struct {
             }
         }
 
-        const axis_info = try wio.allocator.alloc(h.input_absinfo, axis_count);
-        errdefer wio.allocator.free(axis_info);
+        const axis_info = try internal.allocator.alloc(h.input_absinfo, axis_count);
+        errdefer internal.allocator.free(axis_info);
         for (abs_map, 0..) |index, code| {
             if (index != 0) {
                 if (code < h.ABS_HAT0X or code > h.ABS_HAT3Y) {
@@ -166,14 +167,14 @@ pub const JoystickDevice = struct {
             key_map[i] = button_count;
         }
 
-        const axes = try wio.allocator.alloc(u16, axis_count);
-        errdefer wio.allocator.free(axes);
+        const axes = try internal.allocator.alloc(u16, axis_count);
+        errdefer internal.allocator.free(axes);
         @memset(axes, 0xFFFF / 2);
-        const hats = try wio.allocator.alloc(wio.Hat, hat_count);
-        errdefer wio.allocator.free(hats);
+        const hats = try internal.allocator.alloc(wio.Hat, hat_count);
+        errdefer internal.allocator.free(hats);
         @memset(hats, .{});
-        const buttons = try wio.allocator.alloc(bool, button_count);
-        errdefer wio.allocator.free(buttons);
+        const buttons = try internal.allocator.alloc(bool, button_count);
+        errdefer internal.allocator.free(buttons);
         @memset(buttons, false);
 
         return .{ .fd = fd, .abs_map = abs_map, .key_map = key_map, .axis_info = axis_info, .axes = axes, .hats = hats, .buttons = buttons };
@@ -203,10 +204,10 @@ pub const Joystick = struct {
     buttons: []bool,
 
     pub fn close(self: *Joystick) void {
-        wio.allocator.free(self.buttons);
-        wio.allocator.free(self.hats);
-        wio.allocator.free(self.axes);
-        wio.allocator.free(self.axis_info);
+        internal.allocator.free(self.buttons);
+        internal.allocator.free(self.hats);
+        internal.allocator.free(self.axes);
+        internal.allocator.free(self.axis_info);
         _ = std.os.linux.close(self.fd);
     }
 

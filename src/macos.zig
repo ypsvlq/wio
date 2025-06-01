@@ -1,6 +1,7 @@
 const std = @import("std");
 const build_options = @import("build_options");
 const wio = @import("wio.zig");
+const internal = @import("wio.internal.zig");
 const c = @cImport({
     @cInclude("IOKit/hid/IOHIDLib.h");
     @cInclude("CoreAudio/CoreAudio.h");
@@ -84,9 +85,9 @@ pub fn init() !void {
         defer c.CFRelease(matching);
         c.IOHIDManagerSetDeviceMatchingMultiple(hid, matching);
 
-        removed_joysticks = .init(wio.allocator);
+        removed_joysticks = .init(internal.allocator);
         c.IOHIDManagerRegisterDeviceRemovalCallback(hid, joystickRemoved, null);
-        if (wio.init_options.joystickConnectedFn != null) {
+        if (internal.init_options.joystickConnectedFn != null) {
             c.IOHIDManagerRegisterDeviceMatchingCallback(hid, joystickConnected, null);
         }
 
@@ -96,7 +97,7 @@ pub fn init() !void {
     errdefer if (build_options.joystick) c.CFRelease(hid);
 
     if (build_options.audio) {
-        if (wio.init_options.audioDefaultOutputFn) |callback| {
+        if (internal.init_options.audioDefaultOutputFn) |callback| {
             const address = c.AudioObjectPropertyAddress{
                 .mSelector = c.kAudioHardwarePropertyDefaultOutputDevice,
                 .mScope = c.kAudioObjectPropertyScopeGlobal,
@@ -108,7 +109,7 @@ pub fn init() !void {
             callback(.{ .backend = .{ .id = id } });
             try succeed(c.AudioObjectAddPropertyListener(c.kAudioObjectSystemObject, &address, defaultOutputChanged, null), "AddPropertyListener");
         }
-        if (wio.init_options.audioDefaultInputFn) |callback| {
+        if (internal.init_options.audioDefaultInputFn) |callback| {
             const address = c.AudioObjectPropertyAddress{
                 .mSelector = c.kAudioHardwarePropertyDefaultInputDevice,
                 .mScope = c.kAudioObjectPropertyScopeGlobal,
@@ -155,8 +156,8 @@ window: *anyopaque,
 context: ?*anyopaque = null,
 
 pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
-    const self = try wio.allocator.create(@This());
-    self.events = .init(wio.allocator); // must be valid in wioCreateWindow
+    const self = try internal.allocator.create(@This());
+    self.events = .init(internal.allocator); // must be valid in wioCreateWindow
     self.* = .{
         .events = self.events,
         .window = wioCreateWindow(self, options.size.width, options.size.height),
@@ -201,7 +202,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
 pub fn destroy(self: *@This()) void {
     wioDestroyWindow(self.window, self.context);
     self.events.deinit();
-    wio.allocator.destroy(self);
+    internal.allocator.destroy(self);
 }
 
 pub fn getEvent(self: *@This()) ?wio.Event {
@@ -296,13 +297,13 @@ pub const JoystickDeviceIterator = struct {
         const set = c.IOHIDManagerCopyDevices(hid) orelse return .{};
         defer c.CFRelease(set);
         const len: usize = @intCast(c.CFSetGetCount(set));
-        const devices = wio.allocator.alloc(c.IOHIDDeviceRef, len) catch return .{};
+        const devices = internal.allocator.alloc(c.IOHIDDeviceRef, len) catch return .{};
         c.CFSetGetValues(set, @ptrCast(devices.ptr));
         return .{ .devices = devices };
     }
 
     pub fn deinit(self: *JoystickDeviceIterator) void {
-        wio.allocator.free(self.devices);
+        internal.allocator.free(self.devices);
     }
 
     pub fn next(self: *JoystickDeviceIterator) ?JoystickDevice {
@@ -321,11 +322,11 @@ pub const JoystickDevice = struct {
         const elements = c.IOHIDDeviceCopyMatchingElements(self.device, null, c.kIOHIDOptionsTypeNone) orelse return error.Unexpected;
         defer c.CFRelease(elements);
 
-        var axis_elements = std.ArrayList(c.IOHIDElementRef).init(wio.allocator);
+        var axis_elements = std.ArrayList(c.IOHIDElementRef).init(internal.allocator);
         errdefer axis_elements.deinit();
-        var hat_elements = std.ArrayList(c.IOHIDElementRef).init(wio.allocator);
+        var hat_elements = std.ArrayList(c.IOHIDElementRef).init(internal.allocator);
         errdefer hat_elements.deinit();
-        var button_elements = std.ArrayList(c.IOHIDElementRef).init(wio.allocator);
+        var button_elements = std.ArrayList(c.IOHIDElementRef).init(internal.allocator);
         errdefer button_elements.deinit();
 
         const count = c.CFArrayGetCount(elements);
@@ -359,19 +360,19 @@ pub const JoystickDevice = struct {
             }
         }
 
-        const axes = try wio.allocator.alloc(u16, axis_elements.items.len);
-        errdefer wio.allocator.free(axes);
-        const hats = try wio.allocator.alloc(wio.Hat, hat_elements.items.len);
-        errdefer wio.allocator.free(hats);
-        const buttons = try wio.allocator.alloc(bool, button_elements.items.len);
-        errdefer wio.allocator.free(buttons);
+        const axes = try internal.allocator.alloc(u16, axis_elements.items.len);
+        errdefer internal.allocator.free(axes);
+        const hats = try internal.allocator.alloc(wio.Hat, hat_elements.items.len);
+        errdefer internal.allocator.free(hats);
+        const buttons = try internal.allocator.alloc(bool, button_elements.items.len);
+        errdefer internal.allocator.free(buttons);
 
         const axis_elements_slice = try axis_elements.toOwnedSlice();
-        errdefer wio.allocator.free(axis_elements_slice);
+        errdefer internal.allocator.free(axis_elements_slice);
         const hat_elements_slice = try hat_elements.toOwnedSlice();
-        errdefer wio.allocator.free(hat_elements_slice);
+        errdefer internal.allocator.free(hat_elements_slice);
         const button_elements_slice = try button_elements.toOwnedSlice();
-        errdefer wio.allocator.free(button_elements_slice);
+        errdefer internal.allocator.free(button_elements_slice);
 
         try removed_joysticks.put(self.device, false);
 
@@ -418,12 +419,12 @@ pub const Joystick = struct {
 
     pub fn close(self: *Joystick) void {
         _ = removed_joysticks.remove(self.device);
-        wio.allocator.free(self.buttons);
-        wio.allocator.free(self.hats);
-        wio.allocator.free(self.axes);
-        wio.allocator.free(self.button_elements);
-        wio.allocator.free(self.hat_elements);
-        wio.allocator.free(self.axis_elements);
+        internal.allocator.free(self.buttons);
+        internal.allocator.free(self.hats);
+        internal.allocator.free(self.axes);
+        internal.allocator.free(self.button_elements);
+        internal.allocator.free(self.hat_elements);
+        internal.allocator.free(self.axis_elements);
     }
 
     pub fn poll(self: *Joystick) ?wio.JoystickState {
@@ -474,13 +475,13 @@ pub const AudioDeviceIterator = struct {
         };
         var size: u32 = undefined;
         succeed(c.AudioObjectGetPropertyDataSize(c.kAudioObjectSystemObject, &address, 0, null, &size), "GetPropertySize(Devices)") catch return .{};
-        const devices = wio.allocator.alloc(c.AudioObjectID, size / @sizeOf(c.AudioObjectID)) catch return .{};
+        const devices = internal.allocator.alloc(c.AudioObjectID, size / @sizeOf(c.AudioObjectID)) catch return .{};
         succeed(c.AudioObjectGetPropertyData(c.kAudioObjectSystemObject, &address, 0, null, &size, devices.ptr), "GetProperty(Devices)") catch return .{};
         return .{ .devices = devices, .mode = mode };
     }
 
     pub fn deinit(self: *AudioDeviceIterator) void {
-        wio.allocator.free(self.devices);
+        internal.allocator.free(self.devices);
     }
 
     pub fn next(self: *AudioDeviceIterator) ?AudioDevice {
@@ -579,8 +580,8 @@ pub const AudioDevice = struct {
         var converter: c.AudioConverterRef = undefined;
         try succeed(c.AudioConverterNew(&source_format, &dest_format, &converter), "AudioConverterNew");
 
-        const input = try wio.allocator.create(AudioInput);
-        errdefer wio.allocator.destroy(input);
+        const input = try internal.allocator.create(AudioInput);
+        errdefer internal.allocator.destroy(input);
         input.* = .{
             .unit = unit,
             .converter = converter,
@@ -648,7 +649,7 @@ pub const AudioInput = struct {
     pub fn close(self: *AudioInput) void {
         _ = c.AudioConverterDispose(self.converter);
         _ = c.AudioUnitUninitialize(self.unit);
-        wio.allocator.destroy(self);
+        internal.allocator.destroy(self);
     }
 
     fn callback(data: ?*anyopaque, flags: [*c]c.AudioUnitRenderActionFlags, timestamp: [*c]const c.AudioTimeStamp, bus: u32, frames: u32, _: [*c]c.AudioBufferList) callconv(.c) c.OSStatus {
@@ -798,7 +799,7 @@ fn usageDictionary(page: i32, usage: i32) !c.CFDictionaryRef {
 }
 
 fn joystickConnected(_: ?*anyopaque, _: c.IOReturn, _: ?*anyopaque, device: c.IOHIDDeviceRef) callconv(.c) void {
-    wio.init_options.joystickConnectedFn.?(.{ .backend = .{ .device = device } });
+    internal.init_options.joystickConnectedFn.?(.{ .backend = .{ .device = device } });
 }
 
 fn joystickRemoved(_: ?*anyopaque, _: c.IOReturn, _: ?*anyopaque, device: c.IOHIDDeviceRef) callconv(.c) void {
@@ -814,7 +815,7 @@ fn defaultOutputChanged(_: c.AudioObjectID, _: u32, _: [*c]const c.AudioObjectPr
     var id: c.AudioObjectID = undefined;
     var size: u32 = @sizeOf(c.AudioObjectID);
     succeed(c.AudioObjectGetPropertyData(c.kAudioObjectSystemObject, &address, 0, null, &size, &id), "GetProperty(DefaultOutputDevice)") catch return c.noErr;
-    wio.init_options.audioDefaultOutputFn.?(.{ .backend = .{ .id = id } });
+    internal.init_options.audioDefaultOutputFn.?(.{ .backend = .{ .id = id } });
     return c.noErr;
 }
 
@@ -827,7 +828,7 @@ fn defaultInputChanged(_: c.AudioObjectID, _: u32, _: [*c]const c.AudioObjectPro
     var id: c.AudioObjectID = undefined;
     var size: u32 = @sizeOf(c.AudioObjectID);
     succeed(c.AudioObjectGetPropertyData(c.kAudioObjectSystemObject, &address, 0, null, &size, &id), "GetProperty(DefaultInputDevice)") catch return c.noErr;
-    wio.init_options.audioDefaultInputFn.?(.{ .backend = .{ .id = id } });
+    internal.init_options.audioDefaultInputFn.?(.{ .backend = .{ .id = id } });
     return c.noErr;
 }
 

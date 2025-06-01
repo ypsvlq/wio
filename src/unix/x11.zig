@@ -1,6 +1,7 @@
 const std = @import("std");
 const build_options = @import("build_options");
 const wio = @import("../wio.zig");
+const internal = @import("../wio.internal.zig");
 const unix = @import("../unix.zig");
 const DynLib = @import("DynLib.zig");
 const h = @cImport({
@@ -114,7 +115,7 @@ pub fn init() !void {
     for (&atom_names, std.meta.fieldNames(@TypeOf(atoms))) |*name_z, name| name_z.* = name;
     _ = c.XInternAtoms(display, @ptrCast(&atom_names), atom_names.len, h.False, @ptrCast(&atoms));
 
-    windows = .init(wio.allocator);
+    windows = .init(internal.allocator);
     errdefer windows.deinit();
 
     _ = std.c.setlocale(.CTYPE, "");
@@ -126,7 +127,7 @@ pub fn init() !void {
     _ = c.XkbGetNames(display, h.XkbKeyNamesMask | h.XkbKeyAliasesMask, xkb);
     const names: *h.XkbNamesRec = xkb.names;
 
-    var aliases = std.AutoHashMap([4]u8, wio.Button).init(wio.allocator);
+    var aliases = std.AutoHashMap([4]u8, wio.Button).init(internal.allocator);
     defer aliases.deinit();
     for (names.key_aliases[0..names.num_key_aliases]) |alias| {
         if (nameToButton(alias.alias)) |button| {
@@ -159,7 +160,7 @@ pub fn init() !void {
 }
 
 pub fn deinit() void {
-    wio.allocator.free(clipboard_text);
+    internal.allocator.free(clipboard_text);
     _ = c.XCloseIM(im);
     _ = c.XCloseDisplay(display);
     if (build_options.opengl) libGL.close();
@@ -193,8 +194,8 @@ colormap: h.Colormap,
 context: h.GLXContext,
 
 pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
-    const self = try wio.allocator.create(@This());
-    errdefer wio.allocator.destroy(self);
+    const self = try internal.allocator.create(@This());
+    errdefer internal.allocator.destroy(self);
 
     var attributes: h.XSetWindowAttributes = undefined;
     attributes.event_mask = h.PropertyChangeMask | h.FocusChangeMask | h.ExposureMask | h.StructureNotifyMask | h.KeyPressMask | h.KeyReleaseMask | h.ButtonPressMask | h.ButtonReleaseMask | h.PointerMotionMask;
@@ -293,7 +294,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     errdefer _ = c.XDestroyIC(ic);
 
     self.* = .{
-        .events = .init(wio.allocator),
+        .events = .init(internal.allocator),
         .window = window,
         .ic = ic,
         .cursor_mode = options.cursor_mode,
@@ -326,7 +327,7 @@ pub fn destroy(self: *@This()) void {
     _ = c.XDestroyIC(self.ic);
     _ = c.XDestroyWindow(display, self.window);
     self.events.deinit();
-    wio.allocator.destroy(self);
+    internal.allocator.destroy(self);
 }
 
 pub fn getEvent(self: *@This()) ?wio.Event {
@@ -423,8 +424,8 @@ pub fn requestAttention(self: *@This()) void {
 }
 
 pub fn setClipboardText(self: *@This(), text: []const u8) void {
-    wio.allocator.free(clipboard_text);
-    clipboard_text = wio.allocator.dupe(u8, text) catch "";
+    internal.allocator.free(clipboard_text);
+    clipboard_text = internal.allocator.dupe(u8, text) catch "";
     _ = c.XSetSelectionOwner(display, atoms.CLIPBOARD, self.window, h.CurrentTime);
 }
 
@@ -685,12 +686,12 @@ fn handleKeyPress(event: *h.XEvent, repeat: bool) void {
         const len = c.Xutf8LookupString(window.ic, &event.xkey, &stack, stack.len, null, null);
         var slice: []u8 = undefined;
         if (len > stack.len) {
-            slice = wio.allocator.alloc(u8, @intCast(len)) catch return;
+            slice = internal.allocator.alloc(u8, @intCast(len)) catch return;
             _ = c.Xutf8LookupString(window.ic, &event.xkey, slice.ptr, len, null, null);
         } else {
             slice = stack[0..@intCast(len)];
         }
-        defer if (len > stack.len) wio.allocator.free(slice);
+        defer if (len > stack.len) internal.allocator.free(slice);
 
         const view = std.unicode.Utf8View.init(slice) catch return;
         var iter = view.iterator();
