@@ -151,13 +151,13 @@ pub fn messageBox(style: wio.MessageBoxStyle, _: []const u8, message: []const u8
     wioMessageBox(@intFromEnum(style), message.ptr, message.len);
 }
 
-events: std.fifo.LinearFifo(wio.Event, .Dynamic),
+events: internal.EventQueue,
 window: *anyopaque,
 context: ?*anyopaque = null,
 
 pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     const self = try internal.allocator.create(@This());
-    self.events = .init(internal.allocator); // must be valid in wioCreateWindow
+    self.events = .init(); // must be valid in wioCreateWindow
     self.* = .{
         .events = self.events,
         .window = wioCreateWindow(self, options.size.width, options.size.height),
@@ -206,7 +206,7 @@ pub fn destroy(self: *@This()) void {
 }
 
 pub fn getEvent(self: *@This()) ?wio.Event {
-    return self.events.readItem();
+    return self.events.pop();
 }
 
 pub fn setTitle(self: *@This(), title: []const u8) void {
@@ -694,41 +694,37 @@ pub const AudioInput = struct {
     }
 };
 
-fn pushEvent(self: *@This(), event: wio.Event) void {
-    self.events.writeItem(event) catch {};
-}
-
 export fn wioClose(self: *@This()) void {
-    self.pushEvent(.close);
+    self.events.push(.close);
 }
 
 export fn wioFocus(self: *@This()) void {
-    self.pushEvent(.focused);
+    self.events.push(.focused);
 }
 
 export fn wioUnfocus(self: *@This()) void {
-    self.pushEvent(.unfocused);
+    self.events.push(.unfocused);
 }
 
 export fn wioVisible(self: *@This()) void {
-    self.pushEvent(.visible);
+    self.events.push(.visible);
 }
 
 export fn wioHide(self: *@This()) void {
-    self.pushEvent(.hidden);
+    self.events.push(.hidden);
 }
 
 export fn wioSize(self: *@This(), mode: u8, width: u16, height: u16) void {
-    self.pushEvent(.{ .mode = @enumFromInt(mode) });
-    self.pushEvent(.{ .size = .{ .width = width, .height = height } });
+    self.events.push(.{ .mode = @enumFromInt(mode) });
+    self.events.push(.{ .size = .{ .width = width, .height = height } });
 }
 
 export fn wioFramebuffer(self: *@This(), width: u16, height: u16) void {
-    self.pushEvent(.{ .framebuffer = .{ .width = width, .height = height } });
+    self.events.push(.{ .framebuffer = .{ .width = width, .height = height } });
 }
 
 export fn wioScale(self: *@This(), scale: f32) void {
-    self.pushEvent(.{ .scale = scale });
+    self.events.push(.{ .scale = scale });
 }
 
 export fn wioChars(self: *@This(), buf: [*:0]const u8) void {
@@ -736,7 +732,7 @@ export fn wioChars(self: *@This(), buf: [*:0]const u8) void {
     var iter = view.iterator();
     while (iter.nextCodepoint()) |codepoint| {
         if (codepoint >= ' ' and codepoint != 0x7F and (codepoint < 0xF700 or codepoint > 0xF7FF)) {
-            self.pushEvent(.{ .char = codepoint });
+            self.events.push(.{ .char = codepoint });
         }
     }
 }
@@ -744,33 +740,33 @@ export fn wioChars(self: *@This(), buf: [*:0]const u8) void {
 export fn wioKey(self: *@This(), key: u16, event: u8) void {
     if (keycodeToButton(key)) |button| {
         switch (event) {
-            0 => self.pushEvent(.{ .button_press = button }),
-            1 => self.pushEvent(.{ .button_repeat = button }),
-            2 => self.pushEvent(.{ .button_release = button }),
+            0 => self.events.push(.{ .button_press = button }),
+            1 => self.events.push(.{ .button_repeat = button }),
+            2 => self.events.push(.{ .button_release = button }),
             else => unreachable,
         }
     }
 }
 
 export fn wioButtonPress(self: *@This(), button: u8) void {
-    self.pushEvent(.{ .button_press = @enumFromInt(button) });
+    self.events.push(.{ .button_press = @enumFromInt(button) });
 }
 
 export fn wioButtonRelease(self: *@This(), button: u8) void {
-    self.pushEvent(.{ .button_release = @enumFromInt(button) });
+    self.events.push(.{ .button_release = @enumFromInt(button) });
 }
 
 export fn wioMouse(self: *@This(), x: u16, y: u16) void {
-    self.pushEvent(.{ .mouse = .{ .x = x, .y = y } });
+    self.events.push(.{ .mouse = .{ .x = x, .y = y } });
 }
 
 export fn wioMouseRelative(self: *@This(), x: i16, y: i16) void {
-    self.pushEvent(.{ .mouse_relative = .{ .x = x, .y = y } });
+    self.events.push(.{ .mouse_relative = .{ .x = x, .y = y } });
 }
 
 export fn wioScroll(self: *@This(), x: f32, y: f32) void {
-    if (x != 0) self.pushEvent(.{ .scroll_horizontal = x });
-    if (y != 0) self.pushEvent(.{ .scroll_vertical = -y });
+    if (x != 0) self.events.push(.{ .scroll_horizontal = x });
+    if (y != 0) self.events.push(.{ .scroll_vertical = -y });
 }
 
 export fn wioDupeClipboardText(allocator: *const std.mem.Allocator, bytes: [*:0]const u8, len: *usize) ?[*]u8 {

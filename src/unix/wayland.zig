@@ -246,7 +246,7 @@ pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []cons
     _ = message;
 }
 
-events: std.fifo.LinearFifo(wio.Event, .Dynamic),
+events: internal.EventQueue,
 surface: *h.wl_surface,
 frame: *h.libdecor_frame,
 configured: bool = false,
@@ -275,7 +275,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     errdefer c.libdecor_frame_unref(frame);
 
     self.* = .{
-        .events = .init(internal.allocator),
+        .events = .init(),
         .surface = surface,
         .frame = frame,
         .size = options.size,
@@ -297,8 +297,8 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     }
     errdefer if (self.fractional_scale) |_| h.wp_fractional_scale_v1_destroy(self.fractional_scale);
 
-    try self.events.writeItem(.visible);
-    if (self.fractional_scale == null) try self.events.writeItem(.{ .scale = 1 });
+    self.events.push(.visible);
+    if (self.fractional_scale == null) self.events.push(.{ .scale = 1 });
 
     self.setTitle(options.title);
     self.setMode(options.mode);
@@ -363,7 +363,7 @@ pub fn destroy(self: *@This()) void {
 }
 
 pub fn getEvent(self: *@This()) ?wio.Event {
-    const maybe_event = self.events.readItem();
+    const maybe_event = self.events.pop();
 
     if (!self.repeat_ignore) {
         const now = std.time.milliTimestamp();
@@ -524,10 +524,6 @@ fn logEglError(name: []const u8) error{Unexpected} {
     return error.Unexpected;
 }
 
-fn pushEvent(self: *@This(), event: wio.Event) void {
-    self.events.writeItem(event) catch return;
-}
-
 fn resize(self: *@This(), size: wio.Size, configuration: ?*h.libdecor_configuration) void {
     const framebuffer = size.multiply(self.scale);
 
@@ -542,14 +538,14 @@ fn resize(self: *@This(), size: wio.Size, configuration: ?*h.libdecor_configurat
     defer c.libdecor_state_free(state);
     c.libdecor_frame_commit(self.frame, state, configuration);
 
-    self.pushEvent(.{ .size = size });
-    self.pushEvent(.{ .framebuffer = framebuffer });
-    self.pushEvent(.draw);
+    self.events.push(.{ .size = size });
+    self.events.push(.{ .framebuffer = framebuffer });
+    self.events.push(.draw);
 }
 
 fn pushKeyEvent(self: *@This(), key: u32, comptime event: wio.EventType) void {
     if (keyToButton(key)) |button| {
-        self.pushEvent(@unionInit(wio.Event, @tagName(event), button));
+        self.events.push(@unionInit(wio.Event, @tagName(event), button));
     }
 
     var sym = c.xkb_state_key_get_one_sym(xkb_state, key + 8);
@@ -563,7 +559,7 @@ fn pushKeyEvent(self: *@This(), key: u32, comptime event: wio.EventType) void {
         }
     }
     const char: u21 = @intCast(c.xkb_keysym_to_utf32(sym));
-    if (char >= ' ' and char != 0x7F) self.pushEvent(.{ .char = char });
+    if (char >= ' ' and char != 0x7F) self.events.push(.{ .char = char });
 }
 
 fn applyCursor(self: *@This()) void {
@@ -672,7 +668,7 @@ fn keyboardKeymap(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, fd: i32, size: u32
 
 fn keyboardEnter(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, surface: ?*h.wl_surface, _: ?*h.wl_array) callconv(.c) void {
     focus = @alignCast(@ptrCast(h.wl_surface_get_user_data(surface)));
-    if (focus) |window| window.pushEvent(.focused);
+    if (focus) |window| window.events.push(.focused);
 }
 
 fn keyboardLeave(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, surface: ?*h.wl_surface) callconv(.c) void {
@@ -680,7 +676,7 @@ fn keyboardLeave(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, surface: ?*h.wl_sur
         if (window.surface == surface) {
             focus = null;
             window.repeat_key = 0;
-            window.pushEvent(.unfocused);
+            window.events.push(.unfocused);
         }
     }
     if (compose_state) |_| c.xkb_compose_state_reset(compose_state);
@@ -695,7 +691,7 @@ fn keyboardKey(_: ?*anyopaque, _: ?*h.wl_keyboard, serial: u32, _: u32, key: u32
             window.repeat_timestamp = std.time.milliTimestamp() + repeat_delay;
         } else {
             if (keyToButton(key)) |button| {
-                window.pushEvent(.{ .button_release = button });
+                window.events.push(.{ .button_release = button });
             }
             if (key == window.repeat_key) {
                 window.repeat_key = 0;
@@ -731,7 +727,7 @@ fn pointerEnter(_: ?*anyopaque, _: ?*h.wl_pointer, serial: u32, surface: ?*h.wl_
 fn pointerLeave(_: ?*anyopaque, _: ?*h.wl_pointer, _: u32, _: ?*h.wl_surface) callconv(.c) void {}
 
 fn pointerMotion(_: ?*anyopaque, _: ?*h.wl_pointer, _: u32, surface_x: i32, surface_y: i32) callconv(.c) void {
-    if (focus) |window| window.pushEvent(.{ .mouse = .{ .x = std.math.cast(u16, surface_x >> 8) orelse return, .y = std.math.cast(u16, surface_y >> 8) orelse return } });
+    if (focus) |window| window.events.push(.{ .mouse = .{ .x = std.math.cast(u16, surface_x >> 8) orelse return, .y = std.math.cast(u16, surface_y >> 8) orelse return } });
 }
 
 fn pointerButton(_: ?*anyopaque, _: ?*h.wl_pointer, serial: u32, _: u32, button: u32, state: u32) callconv(.c) void {
@@ -745,7 +741,7 @@ fn pointerButton(_: ?*anyopaque, _: ?*h.wl_pointer, serial: u32, _: u32, button:
             0x114 => .mouse_forward,
             else => return,
         };
-        window.pushEvent(if (state == h.WL_POINTER_BUTTON_STATE_PRESSED) .{ .button_press = wio_button } else .{ .button_release = wio_button });
+        window.events.push(if (state == h.WL_POINTER_BUTTON_STATE_PRESSED) .{ .button_press = wio_button } else .{ .button_release = wio_button });
     }
 }
 
@@ -753,8 +749,8 @@ fn pointerAxis(_: ?*anyopaque, _: ?*h.wl_pointer, _: u32, axis: u32, value: i32)
     if (focus) |window| {
         const float = @as(f32, @floatFromInt(value)) / 2560;
         switch (axis) {
-            h.WL_POINTER_AXIS_VERTICAL_SCROLL => window.pushEvent(.{ .scroll_vertical = float }),
-            h.WL_POINTER_AXIS_HORIZONTAL_SCROLL => window.pushEvent(.{ .scroll_horizontal = float }),
+            h.WL_POINTER_AXIS_VERTICAL_SCROLL => window.events.push(.{ .scroll_vertical = float }),
+            h.WL_POINTER_AXIS_HORIZONTAL_SCROLL => window.events.push(.{ .scroll_horizontal = float }),
             else => {},
         }
     }
@@ -767,7 +763,7 @@ const relative_pointer_listener = h.zwp_relative_pointer_v1_listener{
 fn relativePointerMotion(_: ?*anyopaque, _: ?*h.zwp_relative_pointer_v1, _: u32, _: u32, _: i32, _: i32, dx_unaccel: i32, dy_unaccel: i32) callconv(.c) void {
     if (focus) |window| {
         if (window.cursor_mode == .relative) {
-            window.pushEvent(.{ .mouse_relative = .{ .x = std.math.cast(i16, dx_unaccel >> 8) orelse return, .y = std.math.cast(i16, dy_unaccel >> 8) orelse return } });
+            window.events.push(.{ .mouse_relative = .{ .x = std.math.cast(i16, dx_unaccel >> 8) orelse return, .y = std.math.cast(i16, dy_unaccel >> 8) orelse return } });
         }
     }
 }
@@ -780,7 +776,7 @@ fn fractionalScalePreferredScale(data: ?*anyopaque, _: ?*h.wp_fractional_scale_v
     const self: *@This() = @alignCast(@ptrCast(data orelse return));
     self.scale = @floatFromInt(scale);
     self.scale /= 120;
-    self.pushEvent(.{ .scale = self.scale });
+    self.events.push(.{ .scale = self.scale });
 }
 
 const data_device_listener = h.wl_data_device_listener{
@@ -853,7 +849,7 @@ fn frameConfigure(frame: ?*h.libdecor_frame, configuration: ?*h.libdecor_configu
         if (window_state & h.LIBDECOR_WINDOW_STATE_MAXIMIZED != 0) mode = .maximized;
         if (window_state & h.LIBDECOR_WINDOW_STATE_FULLSCREEN != 0) mode = .fullscreen;
     }
-    self.pushEvent(.{ .mode = mode });
+    self.events.push(.{ .mode = mode });
 
     var width: c_int = undefined;
     var height: c_int = undefined;
@@ -866,7 +862,7 @@ fn frameConfigure(frame: ?*h.libdecor_frame, configuration: ?*h.libdecor_configu
 
 fn frameClose(_: ?*h.libdecor_frame, data: ?*anyopaque) callconv(.c) void {
     const self: *@This() = @alignCast(@ptrCast(data));
-    self.pushEvent(.close);
+    self.events.push(.close);
 }
 
 fn frameCommit(_: ?*h.libdecor_frame, _: ?*anyopaque) callconv(.c) void {}

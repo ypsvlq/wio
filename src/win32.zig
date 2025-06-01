@@ -215,7 +215,7 @@ pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []cons
     _ = w.MessageBoxW(null, message_w, title_w, flags);
 }
 
-events: std.fifo.LinearFifo(wio.Event, .Dynamic),
+events: internal.EventQueue,
 window: w.HWND,
 cursor: w.HCURSOR,
 cursor_mode: wio.CursorMode,
@@ -260,7 +260,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     ) orelse return logLastError("CreateWindowExW");
 
     self.* = .{
-        .events = .init(internal.allocator),
+        .events = .init(),
         .window = window,
         .cursor = loadCursor(options.cursor),
         .cursor_mode = options.cursor_mode,
@@ -269,7 +269,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
 
     const dpi: f32 = @floatFromInt(w.GetDpiForWindow(window));
     const scale = dpi / w.USER_DEFAULT_SCREEN_DPI;
-    self.pushEvent(.{ .scale = scale });
+    self.events.push(.{ .scale = scale });
 
     if (options.scale) |base| {
         const scaled = clientToWindow(options.size.multiply(scale / base), style);
@@ -344,7 +344,7 @@ pub fn destroy(self: *@This()) void {
 }
 
 pub fn getEvent(self: *@This()) ?wio.Event {
-    return self.events.readItem();
+    return self.events.pop();
 }
 
 pub fn setTitle(self: *@This(), title: []const u8) void {
@@ -1083,10 +1083,6 @@ fn HISHORT(x: anytype) i16 {
     return @bitCast(HIWORD(x));
 }
 
-fn pushEvent(self: *@This(), event: wio.Event) void {
-    self.events.writeItem(event) catch {};
-}
-
 fn helperWindowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) callconv(.winapi) w.LRESULT {
     switch (msg) {
         w.WM_INPUT_DEVICE_CHANGE => {
@@ -1207,11 +1203,11 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
         // when both shifts are pressed, only one keyup message is sent
         if (w.GetAsyncKeyState(w.VK_LSHIFT) == 0) {
             self.left_shift = false;
-            self.pushEvent(.{ .button_release = .left_shift });
+            self.events.push(.{ .button_release = .left_shift });
         }
         if (w.GetAsyncKeyState(w.VK_RSHIFT) == 0) {
             self.right_shift = false;
-            self.pushEvent(.{ .button_release = .right_shift });
+            self.events.push(.{ .button_release = .right_shift });
         }
     }
 
@@ -1236,22 +1232,22 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
             }
         },
         w.WM_CLOSE => {
-            self.pushEvent(.close);
+            self.events.push(.close);
             return 0;
         },
         w.WM_SETFOCUS => {
-            self.pushEvent(.focused);
+            self.events.push(.focused);
             if (self.cursor_mode == .relative) {
                 self.clipCursor();
             }
             return 0;
         },
         w.WM_KILLFOCUS => {
-            self.pushEvent(.unfocused);
+            self.events.push(.unfocused);
             return 0;
         },
         w.WM_PAINT => {
-            self.pushEvent(.draw);
+            self.events.push(.draw);
             _ = w.ValidateRgn(window, null);
             return 0;
         },
@@ -1266,12 +1262,12 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
                     if (wParam == w.SIZE_RESTORED and !fullscreen) {
                         _ = w.GetWindowRect(window, &self.rect);
                     }
-                    self.pushEvent(.visible);
-                    self.pushEvent(.{ .mode = if (fullscreen) .fullscreen else if (wParam == w.SIZE_MAXIMIZED) .maximized else .normal });
-                    self.pushEvent(.{ .size = size });
-                    self.pushEvent(.{ .framebuffer = size });
+                    self.events.push(.visible);
+                    self.events.push(.{ .mode = if (fullscreen) .fullscreen else if (wParam == w.SIZE_MAXIMIZED) .maximized else .normal });
+                    self.events.push(.{ .size = size });
+                    self.events.push(.{ .framebuffer = size });
                 },
-                w.SIZE_MINIMIZED => self.pushEvent(.hidden),
+                w.SIZE_MINIMIZED => self.events.push(.hidden),
                 else => {},
             }
             return 0;
@@ -1279,7 +1275,7 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
         w.WM_DPICHANGED => {
             const dpi: f32 = @floatFromInt(LOWORD(wParam));
             const scale = dpi / w.USER_DEFAULT_SCREEN_DPI;
-            self.pushEvent(.{ .scale = scale });
+            self.events.push(.{ .scale = scale });
             return 0;
         },
         w.WM_CHAR => {
@@ -1297,7 +1293,7 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
             var iter = std.unicode.Utf16LeIterator.init(chars);
             const codepoint = (iter.nextCodepoint() catch return 0).?; // never returns null on first call
             if (codepoint >= ' ') {
-                self.pushEvent(.{ .char = codepoint });
+                self.events.push(.{ .char = codepoint });
             }
             return 0;
         },
@@ -1307,7 +1303,7 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
             }
 
             if (msg == w.WM_SYSKEYDOWN and wParam == w.VK_F4) {
-                self.pushEvent(.close);
+                self.events.push(.close);
             }
 
             const flags = HIWORD(lParam);
@@ -1343,10 +1339,10 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
                         repeat = ptr.*;
                         ptr.* = true;
                     }
-                    self.pushEvent(if (repeat) .{ .button_repeat = button } else .{ .button_press = button });
+                    self.events.push(if (repeat) .{ .button_repeat = button } else .{ .button_press = button });
                 } else {
                     if (modifier) |ptr| ptr.* = false;
-                    self.pushEvent(.{ .button_release = button });
+                    self.events.push(.{ .button_release = button });
                 }
             }
             return 0;
@@ -1372,14 +1368,14 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
                 w.WM_MBUTTONDOWN,
                 w.WM_RBUTTONDOWN,
                 w.WM_XBUTTONDOWN,
-                => self.pushEvent(.{ .button_press = button }),
-                else => self.pushEvent(.{ .button_release = button }),
+                => self.events.push(.{ .button_press = button }),
+                else => self.events.push(.{ .button_release = button }),
             }
 
             return if (msg == w.WM_XBUTTONDOWN or msg == w.WM_XBUTTONUP) w.TRUE else 0;
         },
         w.WM_MOUSEMOVE => {
-            if (self.cursor_mode != .relative) self.pushEvent(.{ .mouse = .{ .x = LOWORD(lParam), .y = HIWORD(lParam) } });
+            if (self.cursor_mode != .relative) self.events.push(.{ .mouse = .{ .x = LOWORD(lParam), .y = HIWORD(lParam) } });
             return 0;
         },
         w.WM_INPUT => {
@@ -1394,13 +1390,13 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
                 if (raw.data.mouse.usFlags & w.MOUSE_MOVE_ABSOLUTE != 0) {
                     if (raw.data.mouse.lLastX != 0 or raw.data.mouse.lLastY != 0) { // prevent spurious (0,0)
                         if (raw.data.mouse.Anonymous.Anonymous.usButtonFlags == 0) { // prevent jumping on touch input
-                            self.pushEvent(.{ .mouse_relative = .{ .x = @intCast(raw.data.mouse.lLastX - self.last_x), .y = @intCast(raw.data.mouse.lLastY - self.last_y) } });
+                            self.events.push(.{ .mouse_relative = .{ .x = @intCast(raw.data.mouse.lLastX - self.last_x), .y = @intCast(raw.data.mouse.lLastY - self.last_y) } });
                         }
                         self.last_x = @intCast(raw.data.mouse.lLastX);
                         self.last_y = @intCast(raw.data.mouse.lLastY);
                     }
                 } else {
-                    self.pushEvent(.{ .mouse_relative = .{ .x = @intCast(raw.data.mouse.lLastX), .y = @intCast(raw.data.mouse.lLastY) } });
+                    self.events.push(.{ .mouse_relative = .{ .x = @intCast(raw.data.mouse.lLastX), .y = @intCast(raw.data.mouse.lLastY) } });
                 }
             }
             return 0;
@@ -1408,7 +1404,7 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
         w.WM_MOUSEWHEEL, w.WM_MOUSEHWHEEL => {
             const delta: f32 = @floatFromInt(HISHORT(wParam));
             const value = delta / w.WHEEL_DELTA;
-            self.pushEvent(if (msg == w.WM_MOUSEWHEEL) .{ .scroll_vertical = -value } else .{ .scroll_horizontal = value });
+            self.events.push(if (msg == w.WM_MOUSEWHEEL) .{ .scroll_vertical = -value } else .{ .scroll_horizontal = value });
             return 0;
         },
         else => return w.DefWindowProcW(window, msg, wParam, lParam),
