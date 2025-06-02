@@ -110,6 +110,7 @@ pub fn init() !void {
 
     display = c.XkbOpenDisplay(null, null, null, null, null, null) orelse return error.Unavailable;
     errdefer _ = c.XCloseDisplay(display);
+    try unix.pollfds.append(.{ .fd = h.ConnectionNumber(display), .events = std.c.POLL.IN, .revents = undefined });
 
     var atom_names: [@typeInfo(@TypeOf(atoms)).@"struct".fields.len][*:0]const u8 = undefined;
     for (&atom_names, std.meta.fieldNames(@TypeOf(atoms))) |*name_z, name| name_z.* = name;
@@ -311,6 +312,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     self.events.push(.{ .scale = scale });
     self.events.push(.{ .size = size });
     self.events.push(.{ .framebuffer = size });
+    self.events.push(.draw);
 
     try windows.put(window, self);
     return self;

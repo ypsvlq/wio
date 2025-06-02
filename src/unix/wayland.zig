@@ -24,6 +24,7 @@ const h = @cImport({
 var imports: extern struct {
     wl_display_connect: *const @TypeOf(h.wl_display_connect),
     wl_display_disconnect: *const @TypeOf(h.wl_display_disconnect),
+    wl_display_get_fd: *const @TypeOf(h.wl_display_get_fd),
     wl_display_roundtrip: *const @TypeOf(h.wl_display_roundtrip),
     wl_display_dispatch: *const @TypeOf(h.wl_display_dispatch),
     wl_proxy_get_version: *const @TypeOf(h.wl_proxy_get_version),
@@ -160,6 +161,7 @@ pub fn init() !void {
 
     display = c.wl_display_connect(null) orelse return error.Unavailable;
     errdefer c.wl_display_disconnect(display);
+    try unix.pollfds.append(.{ .fd = c.wl_display_get_fd(display), .events = std.c.POLL.IN, .revents = undefined });
 
     xkb = c.xkb_context_new(h.XKB_CONTEXT_NO_FLAGS) orelse return error.Unexpected;
     errdefer c.xkb_context_unref(xkb);
@@ -237,7 +239,7 @@ fn destroyProxies() void {
 }
 
 pub fn update() void {
-    _ = c.wl_display_dispatch(display);
+    _ = c.wl_display_roundtrip(display);
 }
 
 pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {

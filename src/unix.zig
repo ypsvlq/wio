@@ -2,6 +2,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 const build_options = @import("build_options");
 const wio = @import("wio.zig");
+const internal = @import("wio.internal.zig");
 const DynLib = @import("unix/DynLib.zig");
 pub const x11 = @import("unix/x11.zig");
 pub const wayland = @import("unix/wayland.zig");
@@ -21,10 +22,15 @@ pub var active: enum {
     wayland,
 } = undefined;
 
+pub var pollfds: std.ArrayList(std.c.pollfd) = undefined;
+
 pub var libvulkan: DynLib = undefined;
 
 pub fn init() !void {
     if (!build_options.system_integration and builtin.os.tag == .linux and builtin.output_mode == .Exe and builtin.link_mode == .static) @compileError("dynamic link required");
+
+    pollfds = .init(internal.allocator);
+    errdefer pollfds.deinit();
 
     if (build_options.vulkan) {
         libvulkan = try .open("libvulkan.so.1");
@@ -76,9 +82,10 @@ pub fn deinit() void {
     if (build_options.joystick) joystick.deinit();
     if (build_options.vulkan) libvulkan.close();
     switch (active) {
-        .x11 => return x11.deinit(),
-        .wayland => return wayland.deinit(),
+        .x11 => x11.deinit(),
+        .wayland => wayland.deinit(),
     }
+    pollfds.deinit();
 }
 
 pub fn run(func: fn () anyerror!bool) !void {
@@ -96,7 +103,9 @@ pub fn update() void {
     if (build_options.audio) audio.update();
 }
 
-pub fn wait() void {}
+pub fn wait() void {
+    _ = std.c.poll(pollfds.items.ptr, pollfds.items.len, -1);
+}
 
 pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
     switch (active) {

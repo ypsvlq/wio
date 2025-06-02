@@ -2,6 +2,7 @@ const std = @import("std");
 const build_options = @import("build_options");
 const wio = @import("../../wio.zig");
 const internal = @import("../../wio.internal.zig");
+const unix = @import("../../unix.zig");
 const DynLib = @import("../DynLib.zig");
 const h = @cImport({
     @cInclude("linux/input.h");
@@ -21,6 +22,7 @@ var imports: extern struct {
     udev_list_entry_get_name: *const @TypeOf(h.udev_list_entry_get_name),
     udev_monitor_new_from_netlink: *const @TypeOf(h.udev_monitor_new_from_netlink),
     udev_monitor_unref: *const @TypeOf(h.udev_monitor_unref),
+    udev_monitor_get_fd: *const @TypeOf(h.udev_monitor_get_fd),
     udev_monitor_filter_add_match_subsystem_devtype: *const @TypeOf(h.udev_monitor_filter_add_match_subsystem_devtype),
     udev_monitor_enable_receiving: *const @TypeOf(h.udev_monitor_enable_receiving),
     udev_monitor_receive_device: *const @TypeOf(h.udev_monitor_receive_device),
@@ -45,6 +47,7 @@ pub fn init() !void {
 
         monitor = c.udev_monitor_new_from_netlink(udev, "udev") orelse return error.Unexpected;
         errdefer _ = c.udev_monitor_unref(monitor);
+        try unix.pollfds.append(.{ .fd = c.udev_monitor_get_fd(monitor), .events = std.c.POLL.IN, .revents = undefined });
         _ = c.udev_monitor_filter_add_match_subsystem_devtype(monitor, "input", null);
         _ = c.udev_monitor_enable_receiving(monitor);
     }
@@ -177,6 +180,8 @@ pub const JoystickDevice = struct {
         errdefer internal.allocator.free(buttons);
         @memset(buttons, false);
 
+        try unix.pollfds.append(.{ .fd = fd, .events = std.c.POLL.IN, .revents = undefined });
+
         return .{ .fd = fd, .abs_map = abs_map, .key_map = key_map, .axis_info = axis_info, .axes = axes, .hats = hats, .buttons = buttons };
     }
 
@@ -204,10 +209,18 @@ pub const Joystick = struct {
     buttons: []bool,
 
     pub fn close(self: *Joystick) void {
+        for (unix.pollfds.items, 0..) |pollfd, i| {
+            if (pollfd.fd == self.fd) {
+                _ = unix.pollfds.swapRemove(i);
+                break;
+            }
+        }
+
         internal.allocator.free(self.buttons);
         internal.allocator.free(self.hats);
         internal.allocator.free(self.axes);
         internal.allocator.free(self.axis_info);
+
         _ = std.os.linux.close(self.fd);
     }
 
