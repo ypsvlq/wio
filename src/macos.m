@@ -308,6 +308,13 @@ void wioUpdate(void) {
     [NSApp updateWindows];
 }
 
+void wioWait(void) {
+    [NSApp nextEventMatchingMask:NSEventMaskAny
+        untilDate:[NSDate distantFuture]
+        inMode:NSDefaultRunLoopMode
+        dequeue:NO];
+}
+
 void wioMessageBox(uint8_t style, const char *ptr, size_t len) {
     NSAlertStyle styles[] = { NSAlertStyleInformational, NSAlertStyleWarning, NSAlertStyleCritical };
     NSAlert *alert = [[NSAlert alloc] init];

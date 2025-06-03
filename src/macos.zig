@@ -14,6 +14,7 @@ const log = std.log.scoped(.wio);
 
 extern fn wioInit() void;
 extern fn wioUpdate() void;
+extern fn wioWait() void;
 extern fn wioMessageBox(u8, [*]const u8, usize) void;
 extern fn wioCreateWindow(*anyopaque, u16, u16) *anyopaque;
 extern fn wioDestroyWindow(*anyopaque, ?*anyopaque) void;
@@ -143,7 +144,9 @@ pub fn update() void {
     wioUpdate();
 }
 
-pub fn wait() void {}
+pub fn wait() void {
+    wioWait();
+}
 
 pub fn messageBox(style: wio.MessageBoxStyle, _: []const u8, message: []const u8) void {
     wioMessageBox(@intFromEnum(style), message.ptr, message.len);
