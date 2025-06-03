@@ -57,6 +57,11 @@ pub fn build(b: *std.Build) void {
     options.addOption(bool, "system_integration", system_integration);
     module.addOptions("build_options", options);
 
+    if (enable_opengl) module.addCMacro("WIO_OPENGL", "");
+    if (enable_vulkan) module.addCMacro("WIO_VULKAN", "");
+    if (enable_joystick) module.addCMacro("WIO_JOYSTICK", "");
+    if (enable_audio) module.addCMacro("WIO_AUDIO", "");
+
     if (b.option(bool, "win32_manifest", "Embed application manifest (default: true)") orelse true) {
         module.addWin32ResourceFile(.{ .file = b.path("src/win32.rc") });
     }
@@ -69,13 +74,17 @@ pub fn build(b: *std.Build) void {
         },
         .macos => {
             module.addCSourceFile(.{ .file = b.path("src/macos.m"), .flags = &.{ "-fobjc-arc", "-Wno-deprecated-declarations" } });
+
             if (b.lazyDependency("xcode_frameworks", .{})) |xcode_frameworks| {
                 module.addSystemFrameworkPath(xcode_frameworks.path("Frameworks"));
                 module.addSystemIncludePath(xcode_frameworks.path("include"));
                 module.addLibraryPath(xcode_frameworks.path("lib"));
             }
+
             module.linkFramework("Cocoa", .{});
-            module.linkFramework("QuartzCore", .{});
+            if (enable_vulkan) {
+                module.linkFramework("QuartzCore", .{});
+            }
             if (enable_joystick) {
                 module.linkFramework("IOKit", .{});
             }

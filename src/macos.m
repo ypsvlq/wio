@@ -19,14 +19,6 @@ extern void wioMouseRelative(void *, SInt16, SInt16);
 extern void wioScroll(void *, Float32, Float32);
 extern char *wioDupeClipboardText(const void *, const char *, size_t *);
 
-const CFStringRef wioHIDDeviceUsagePageKey = CFSTR(kIOHIDDeviceUsagePageKey);
-const CFStringRef wioHIDDeviceUsageKey = CFSTR(kIOHIDDeviceUsageKey);
-const CFStringRef wioHIDVendorIDKey = CFSTR(kIOHIDVendorIDKey);
-const CFStringRef wioHIDProductIDKey = CFSTR(kIOHIDProductIDKey);
-const CFStringRef wioHIDVersionNumberKey = CFSTR(kIOHIDVersionNumberKey);
-const CFStringRef wioHIDSerialNumberKey = CFSTR(kIOHIDSerialNumberKey);
-const CFStringRef wioHIDProductKey = CFSTR(kIOHIDProductKey);
-
 static NSString *string(const char *ptr, size_t len) {
     return [[NSString alloc] initWithBytes:ptr length:len encoding:NSUTF8StringEncoding];
 }
@@ -415,6 +407,8 @@ char *wioGetClipboardText(const void *ptr, size_t *len) {
     return wioDupeClipboardText(ptr, [string UTF8String], len);
 }
 
+#ifdef WIO_OPENGL
+
 void *wioCreateContext(NSWindow *window, const NSOpenGLPixelFormatAttribute *attributes) {
     NSOpenGLPixelFormat *format = [[NSOpenGLPixelFormat alloc] initWithAttributes:attributes];
     NSOpenGLContext *context = [[NSOpenGLContext alloc] initWithFormat:format shareContext:nil];
@@ -436,6 +430,10 @@ void wioSwapInterval(NSOpenGLContext *context, int32_t interval) {
     [context setValues:&interval forParameter:NSOpenGLCPSwapInterval];
 }
 
+#endif
+
+#ifdef WIO_VULKAN
+
 void *wioCreateMetalLayer(NSWindow *window) {
     CAMetalLayer *layer = [CAMetalLayer layer];
     [layer setContentsScale:[window backingScaleFactor]];
@@ -444,3 +442,18 @@ void *wioCreateMetalLayer(NSWindow *window) {
     [view setLayer:layer];
     return (__bridge void *)layer;
 }
+
+#endif
+
+
+#ifdef WIO_JOYSTICK
+
+const CFStringRef wioHIDDeviceUsagePageKey = CFSTR(kIOHIDDeviceUsagePageKey);
+const CFStringRef wioHIDDeviceUsageKey = CFSTR(kIOHIDDeviceUsageKey);
+const CFStringRef wioHIDVendorIDKey = CFSTR(kIOHIDVendorIDKey);
+const CFStringRef wioHIDProductIDKey = CFSTR(kIOHIDProductIDKey);
+const CFStringRef wioHIDVersionNumberKey = CFSTR(kIOHIDVersionNumberKey);
+const CFStringRef wioHIDSerialNumberKey = CFSTR(kIOHIDSerialNumberKey);
+const CFStringRef wioHIDProductKey = CFSTR(kIOHIDProductKey);
+
+#endif
