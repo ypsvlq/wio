@@ -308,12 +308,10 @@ fn createCommandBuffer() !void {
 }
 
 var image_available_semaphore: vk.Semaphore = undefined;
-var render_finished_semaphore: vk.Semaphore = undefined;
 var in_flight_fence: vk.Fence = undefined;
 
 fn createSyncObjects() !void {
     image_available_semaphore = try device.createSemaphore(&.{}, null);
-    render_finished_semaphore = try device.createSemaphore(&.{}, null);
     in_flight_fence = try device.createFence(&.{ .flags = .{ .signaled_bit = true } }, null);
 }
 
@@ -321,6 +319,7 @@ var swapchain: vk.SwapchainKHR = .null_handle;
 var images: []vk.Image = &.{};
 var image_views: []vk.ImageView = &.{};
 var framebuffers: []vk.Framebuffer = &.{};
+var render_finished_semaphores: []vk.Semaphore = &.{};
 
 fn recreateSwapchain() !void {
     try device.deviceWaitIdle();
@@ -379,9 +378,16 @@ fn recreateSwapchain() !void {
             .layers = 1,
         }, null);
     }
+
+    render_finished_semaphores = try allocator.alloc(vk.Semaphore, images.len);
+    for (render_finished_semaphores) |*semaphore| {
+        semaphore.* = try device.createSemaphore(&.{}, null);
+    }
 }
 
 fn destroySwapchain() void {
+    for (render_finished_semaphores) |semaphore| device.destroySemaphore(semaphore, null);
+    allocator.free(render_finished_semaphores);
     for (framebuffers) |framebuffer| device.destroyFramebuffer(framebuffer, null);
     allocator.free(framebuffers);
     for (image_views) |image_view| device.destroyImageView(image_view, null);
@@ -444,14 +450,14 @@ fn drawFrame() !void {
             .command_buffer_count = 1,
             .p_command_buffers = &.{command_buffer},
             .signal_semaphore_count = 1,
-            .p_signal_semaphores = &.{render_finished_semaphore},
+            .p_signal_semaphores = &.{render_finished_semaphores[image_index]},
         }},
         in_flight_fence,
     );
 
     _ = try device.queuePresentKHR(present_queue, &.{
         .wait_semaphore_count = 1,
-        .p_wait_semaphores = &.{render_finished_semaphore},
+        .p_wait_semaphores = &.{render_finished_semaphores[image_index]},
         .swapchain_count = 1,
         .p_swapchains = &.{swapchain},
         .p_image_indices = &.{image_index},
@@ -463,13 +469,12 @@ fn loop() !bool {
         switch (event) {
             .close => {
                 try device.deviceWaitIdle();
+                destroySwapchain();
                 device.destroyFence(in_flight_fence, null);
-                device.destroySemaphore(render_finished_semaphore, null);
                 device.destroySemaphore(image_available_semaphore, null);
                 device.destroyCommandPool(command_pool, null);
                 device.destroyPipeline(pipeline, null);
                 device.destroyPipelineLayout(pipeline_layout, null);
-                destroySwapchain();
                 device.destroyRenderPass(render_pass, null);
                 device.destroyDevice(null);
                 instance.destroySurfaceKHR(surface, null);
