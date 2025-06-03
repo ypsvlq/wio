@@ -42,6 +42,7 @@ static void warpCursor(NSWindow *window) {
 @implementation WioApplicationDelegate
 
 - (void)applicationDidFinishLaunching:notification {
+    [NSApp activateIgnoringOtherApps:true];
     [NSApp stop:nil];
 }
 
@@ -284,14 +285,10 @@ static void warpCursor(NSWindow *window) {
 
 void wioInit() {
     [NSApplication sharedApplication];
-    [NSApp setDelegate:[[WioApplicationDelegate alloc] init]];
     [[NSBundle mainBundle] loadNibNamed:@"MainMenu" owner:NSApp topLevelObjects:nil];
-}
-
-void wioRun(void) {
-    [NSApp run];
+    [NSApp setDelegate:[[WioApplicationDelegate alloc] init]];
     [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
-    [NSApp activateIgnoringOtherApps:YES];
+    [NSApp run];
 }
 
 void wioUpdate(void) {
@@ -444,7 +441,6 @@ void *wioCreateMetalLayer(NSWindow *window) {
 }
 
 #endif
-
 
 #ifdef WIO_JOYSTICK
 

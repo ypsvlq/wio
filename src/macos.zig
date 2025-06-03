@@ -13,7 +13,6 @@ const c = @cImport({
 const log = std.log.scoped(.wio);
 
 extern fn wioInit() void;
-extern fn wioRun() void;
 extern fn wioUpdate() void;
 extern fn wioMessageBox(u8, [*]const u8, usize) void;
 extern fn wioCreateWindow(*anyopaque, u16, u16) *anyopaque;
@@ -135,7 +134,6 @@ pub fn deinit() void {
 }
 
 pub fn run(func: fn () anyerror!bool) !void {
-    wioRun();
     while (try func()) {
         update();
     }
