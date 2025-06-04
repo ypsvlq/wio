@@ -9,18 +9,13 @@ var window: wio.Window = undefined;
 var size = wio.Size{ .width = 640, .height = 480 };
 var visible = true;
 
-const apis: []const vk.ApiInfo = &.{
-    vk.features.version_1_0,
-    vk.extensions.khr_surface,
-    vk.extensions.khr_swapchain,
-};
-var vkb: vk.BaseWrapper(apis) = undefined;
+var vkb: vk.BaseWrapper = undefined;
 
 pub fn main() !void {
     try wio.init(allocator, .{});
     window = try wio.createWindow(.{ .title = "Vulkan", .size = size, .scale = 1 });
 
-    vkb = try .load(@as(*const fn (vk.Instance, [*:0]const u8) ?*const fn () void, @ptrCast(&wio.vkGetInstanceProcAddr)));
+    vkb = .load(@as(*const fn (vk.Instance, [*:0]const u8) ?*const fn () void, @ptrCast(&wio.vkGetInstanceProcAddr)));
     try createInstance();
     try createSurface();
     try pickPhysicalDevice();
@@ -34,8 +29,8 @@ pub fn main() !void {
     return wio.run(loop);
 }
 
-var vki: vk.InstanceWrapper(apis) = undefined;
-var instance: vk.InstanceProxy(apis) = undefined;
+var vki: vk.InstanceWrapper = undefined;
+var instance: vk.InstanceProxy = undefined;
 
 fn createInstance() !void {
     var enabled_extensions = std.ArrayList([*:0]const u8).init(allocator);
@@ -58,13 +53,13 @@ fn createInstance() !void {
         .p_application_info = &.{
             .application_version = 0,
             .engine_version = 0,
-            .api_version = vk.API_VERSION_1_1,
+            .api_version = @bitCast(vk.API_VERSION_1_1),
         },
         .enabled_extension_count = @intCast(enabled_extensions.items.len),
         .pp_enabled_extension_names = enabled_extensions.items.ptr,
     }, null);
 
-    vki = try .load(handle, vkb.dispatch.vkGetInstanceProcAddr);
+    vki = .load(handle, vkb.dispatch.vkGetInstanceProcAddr.?);
     instance = .init(handle, &vki);
 }
 
@@ -124,8 +119,8 @@ fn pickPhysicalDevice() !void {
     return error.NoSuitableDevice;
 }
 
-var vkd: vk.DeviceWrapper(apis) = undefined;
-var device: vk.DeviceProxy(apis) = undefined;
+var vkd: vk.DeviceWrapper = undefined;
+var device: vk.DeviceProxy = undefined;
 var graphics_queue: vk.Queue = undefined;
 var present_queue: vk.Queue = undefined;
 
@@ -161,7 +156,7 @@ fn createLogicalDevice() !void {
         .pp_enabled_extension_names = enabled_extensions.items.ptr,
     }, null);
 
-    vkd = try .load(handle, vki.dispatch.vkGetDeviceProcAddr);
+    vkd = .load(handle, vki.dispatch.vkGetDeviceProcAddr.?);
     device = .init(handle, &vkd);
 
     graphics_queue = device.getDeviceQueue(graphics_queue_index, 0);
