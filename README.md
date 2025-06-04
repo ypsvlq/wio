@@ -11,9 +11,7 @@ wio is a platform abstraction library. It provides:
 
 ## Getting started
 
-wio follows the [Mach nominated Zig version][1].
-
-The public API can be browsed in [src/wio.zig][2]. The [example][3] directory
+The public API can be browsed in [src/wio.zig][1]. The [example][2] directory
 contains a test program covering most features.
 
 The `features` build option can be used to disable optional functionality,
@@ -23,7 +21,7 @@ or enable Vulkan support (which is not available on all platforms).
 
 ### Windows
 
-By default, wio embeds an [application manifest][4] for proper functionality.
+By default, wio embeds an [application manifest][3] for proper functionality.
 When using a custom manifest, set the `win32_manifest` build option to false.
 
 If audio is enabled, wio initializes COM with options `COINIT_MULTITHREADED`
@@ -92,7 +90,6 @@ when targeting a given platform:
 - `Window.backend.wayland.surface` is the Wayland `wl_surface*`
 
 
-[1]: https://machengine.org/docs/nominated-zig/
-[2]: https://github.com/ypsvlq/wio/blob/master/src/wio.zig
-[3]: https://github.com/ypsvlq/wio/tree/master/example
-[4]: https://learn.microsoft.com/en-us/windows/win32/sbscs/application-manifests
+[1]: https://github.com/ypsvlq/wio/blob/master/src/wio.zig
+[2]: https://github.com/ypsvlq/wio/tree/master/example
+[3]: https://learn.microsoft.com/en-us/windows/win32/sbscs/application-manifests
