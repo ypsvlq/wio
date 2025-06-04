@@ -2,7 +2,6 @@
     .name = .vulkan,
     .version = "0.0.0",
     .fingerprint = 0xbe155a0332f8f4d4,
-    .minimum_zig_version = "0.14.0-dev.2577+271452d22",
     .dependencies = .{
         .wio = .{
             .path = "../..",
