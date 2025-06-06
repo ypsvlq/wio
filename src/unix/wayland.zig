@@ -117,10 +117,10 @@ var compose_state: ?*h.xkb_compose_state = null;
 
 var libdecor_context: *h.libdecor = undefined;
 
-var focus: ?*@This() = null;
+pub var focus: ?*@This() = null;
 var last_serial: u32 = 0;
 var pointer_enter_serial: u32 = 0;
-var repeat_period: i32 = undefined;
+pub var repeat_period: i32 = undefined;
 var repeat_delay: i32 = undefined;
 var clipboard_text: []const u8 = "";
 

@@ -104,7 +104,15 @@ pub fn update() void {
 }
 
 pub fn wait() void {
-    _ = std.c.poll(pollfds.items.ptr, pollfds.items.len, -1);
+    var timeout: c_int = -1;
+    if (active == .wayland) {
+        if (wayland.focus) |focus| {
+            if (focus.repeat_key != 0) {
+                timeout = wayland.repeat_period;
+            }
+        }
+    }
+    _ = std.c.poll(pollfds.items.ptr, pollfds.items.len, timeout);
 }
 
 pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
