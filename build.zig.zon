@@ -24,8 +24,6 @@
         "build.zig",
         "build.zig.zon",
         "src",
-        "example",
         "LICENSE.txt",
-        "README.md",
     },
 }
