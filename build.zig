@@ -16,7 +16,7 @@ pub fn build(b: *std.Build) void {
     var enable_audio = false;
 
     const features = b.option([]const u8, "features", "List of enabled features (default: opengl,joystick,audio) (available: vulkan)") orelse "opengl,joystick,audio";
-    var feature_iter = std.mem.splitScalar(u8, features, ',');
+    var feature_iter = std.mem.tokenizeScalar(u8, features, ',');
     while (feature_iter.next()) |feature| {
         if (std.mem.eql(u8, feature, "opengl")) {
             enable_opengl = true;
@@ -26,7 +26,7 @@ pub fn build(b: *std.Build) void {
             enable_joystick = true;
         } else if (std.mem.eql(u8, feature, "audio")) {
             enable_audio = true;
-        } else if (feature.len > 0) {
+        } else {
             @panic("option 'features' is invalid");
         }
     }
@@ -35,13 +35,13 @@ pub fn build(b: *std.Build) void {
     var enable_wayland = false;
 
     const unix_backends = b.option([]const u8, "unix_backends", "List of enabled backends (default: x11,wayland)") orelse "x11,wayland";
-    var backend_iter = std.mem.splitScalar(u8, unix_backends, ',');
+    var backend_iter = std.mem.tokenizeScalar(u8, unix_backends, ',');
     while (backend_iter.next()) |backend| {
         if (std.mem.eql(u8, backend, "x11")) {
             enable_x11 = true;
         } else if (std.mem.eql(u8, backend, "wayland")) {
             enable_wayland = true;
-        } else if (backend.len > 0) {
+        } else {
             @panic("option 'unix_backends' is invalid");
         }
     }
