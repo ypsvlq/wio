@@ -26,7 +26,7 @@ pub fn build(b: *std.Build) void {
             enable_joystick = true;
         } else if (std.mem.eql(u8, feature, "audio")) {
             enable_audio = true;
-        } else {
+        } else if (feature.len > 0) {
             @panic("option 'features' is invalid");
         }
     }
@@ -36,12 +36,12 @@ pub fn build(b: *std.Build) void {
 
     const unix_backends = b.option([]const u8, "unix_backends", "List of enabled backends (default: x11,wayland)") orelse "x11,wayland";
     var backend_iter = std.mem.splitScalar(u8, unix_backends, ',');
-    while (backend_iter.next()) |feature| {
-        if (std.mem.eql(u8, feature, "x11")) {
+    while (backend_iter.next()) |backend| {
+        if (std.mem.eql(u8, backend, "x11")) {
             enable_x11 = true;
-        } else if (std.mem.eql(u8, feature, "wayland")) {
+        } else if (std.mem.eql(u8, backend, "wayland")) {
             enable_wayland = true;
-        } else {
+        } else if (backend.len > 0) {
             @panic("option 'unix_backends' is invalid");
         }
     }
