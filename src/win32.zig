@@ -8,7 +8,6 @@ const log = std.log.scoped(.wio);
 const class_name = w.L("wio");
 
 var helper_window: w.HWND = undefined;
-var helper_input: []u8 = &.{};
 
 var wgl: struct {
     swapIntervalEXT: ?*const fn (i32) callconv(.winapi) w.BOOL = null,
@@ -24,6 +23,7 @@ const JoystickInfo = struct {
 };
 var joysticks: std.AutoHashMap(w.HANDLE, JoystickInfo) = undefined;
 var xinput = std.StaticBitSet(4).initEmpty();
+var helper_input: []u8 = &.{};
 
 var mm_device_enumerator: *w.IMMDeviceEnumerator = undefined;
 var mm_notification_client = MMNotificationClient{};
@@ -61,8 +61,10 @@ pub fn init() !void {
             instance,
             null,
         ) orelse return logLastError("CreateWindowExW");
-        errdefer _ = w.DestroyWindow(helper_window);
-        _ = w.SetWindowLongPtrW(helper_window, w.GWLP_WNDPROC, @bitCast(@intFromPtr(&helperWindowProc)));
+
+        if (build_options.joystick) {
+            _ = w.SetWindowLongPtrW(helper_window, w.GWLP_WNDPROC, @bitCast(@intFromPtr(&helperWindowProc)));
+        }
     }
 
     if (build_options.opengl) {
@@ -150,8 +152,10 @@ pub fn deinit() void {
     if (build_options.vulkan) {
         _ = w.FreeLibrary(vulkan);
     }
-    if (build_options.joystick) {
+    if (build_options.opengl or build_options.joystick) {
         _ = w.DestroyWindow(helper_window);
+    }
+    if (build_options.joystick) {
         internal.allocator.free(helper_input);
 
         var iter = joysticks.valueIterator();
