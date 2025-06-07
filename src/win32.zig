@@ -1203,12 +1203,14 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
         break :blk ptr orelse return w.DefWindowProcW(window, msg, wParam, lParam);
     };
 
-    if (self.left_shift and self.right_shift) {
-        // when both shifts are pressed, only one keyup message is sent
+    // when both shifts are pressed, only one keyup message is sent
+    if (self.left_shift) {
         if (w.GetAsyncKeyState(w.VK_LSHIFT) == 0) {
             self.left_shift = false;
             self.events.push(.{ .button_release = .left_shift });
         }
+    }
+    if (self.right_shift) {
         if (w.GetAsyncKeyState(w.VK_RSHIFT) == 0) {
             self.right_shift = false;
             self.events.push(.{ .button_release = .right_shift });
