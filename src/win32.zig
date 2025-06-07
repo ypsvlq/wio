@@ -10,17 +10,6 @@ const class_name = w.L("wio");
 var helper_window: w.HWND = undefined;
 var helper_input: []u8 = &.{};
 
-const JoystickInfo = struct {
-    interface: []u16,
-    joystick: ?*RawInputJoystick = null,
-};
-
-var joysticks: std.AutoHashMap(w.HANDLE, JoystickInfo) = undefined;
-var xinput = std.StaticBitSet(4).initEmpty();
-
-var mm_device_enumerator: *w.IMMDeviceEnumerator = undefined;
-var mm_notification_client = MMNotificationClient{};
-
 var wgl: struct {
     swapIntervalEXT: ?*const fn (i32) callconv(.winapi) w.BOOL = null,
     choosePixelFormatARB: ?*const fn (w.HDC, ?[*]const i32, ?[*]const f32, u32, [*c]i32, *u32) callconv(.winapi) w.BOOL = null,
@@ -28,6 +17,16 @@ var wgl: struct {
 } = .{};
 
 var vulkan: w.HMODULE = undefined;
+
+const JoystickInfo = struct {
+    interface: []u16,
+    joystick: ?*RawInputJoystick = null,
+};
+var joysticks: std.AutoHashMap(w.HANDLE, JoystickInfo) = undefined;
+var xinput = std.StaticBitSet(4).initEmpty();
+
+var mm_device_enumerator: *w.IMMDeviceEnumerator = undefined;
+var mm_notification_client = MMNotificationClient{};
 
 pub fn init() !void {
     const instance = w.GetModuleHandleW(null);
@@ -47,9 +46,7 @@ pub fn init() !void {
     };
     if (w.RegisterRawInputDevices(&mouse, 1, @sizeOf(w.RAWINPUTDEVICE)) == w.FALSE) return logLastError("RegisterRawInputDevices");
 
-    if (build_options.joystick) {
-        joysticks = .init(internal.allocator);
-
+    if (build_options.opengl or build_options.joystick) {
         helper_window = w.CreateWindowExW(
             0,
             class_name,
@@ -66,43 +63,6 @@ pub fn init() !void {
         ) orelse return logLastError("CreateWindowExW");
         errdefer _ = w.DestroyWindow(helper_window);
         _ = w.SetWindowLongPtrW(helper_window, w.GWLP_WNDPROC, @bitCast(@intFromPtr(&helperWindowProc)));
-
-        var devices = [_]w.RAWINPUTDEVICE{
-            .{
-                .usUsagePage = w.HID_USAGE_PAGE_GENERIC,
-                .usUsage = w.HID_USAGE_GENERIC_JOYSTICK,
-                .dwFlags = w.RIDEV_DEVNOTIFY,
-                .hwndTarget = helper_window,
-            },
-            .{
-                .usUsagePage = w.HID_USAGE_PAGE_GENERIC,
-                .usUsage = w.HID_USAGE_GENERIC_GAMEPAD,
-                .dwFlags = w.RIDEV_DEVNOTIFY,
-                .hwndTarget = helper_window,
-            },
-        };
-        if (w.RegisterRawInputDevices(&devices, devices.len, @sizeOf(w.RAWINPUTDEVICE)) == w.FALSE) return logLastError("RegisterRawInputDevices");
-    }
-
-    if (build_options.audio) {
-        try SUCCEED(w.CoInitializeEx(null, w.COINIT_MULTITHREADED | w.COINIT_DISABLE_OLE1DDE), "CoInitializeEx");
-        try SUCCEED(w.CoCreateInstance(&w.CLSID_MMDeviceEnumerator, null, w.CLSCTX_ALL, &w.IID_IMMDeviceEnumerator, @ptrCast(&mm_device_enumerator)), "CoCreateInstance");
-
-        var device: *w.IMMDevice = undefined;
-        if (internal.init_options.audioDefaultOutputFn) |callback| {
-            if (SUCCEED(mm_device_enumerator.GetDefaultAudioEndpoint(w.eRender, w.eConsole, @ptrCast(&device)), "GetDefaultAudioEndpoint")) {
-                callback(.{ .backend = .{ .device = device } });
-            } else |_| {}
-        }
-        if (internal.init_options.audioDefaultInputFn) |callback| {
-            if (SUCCEED(mm_device_enumerator.GetDefaultAudioEndpoint(w.eCapture, w.eConsole, @ptrCast(&device)), "GetDefaultAudioEndpoint")) {
-                callback(.{ .backend = .{ .device = device } });
-            } else |_| {}
-        }
-
-        if (internal.init_options.audioDefaultOutputFn != null or internal.init_options.audioDefaultInputFn != null) {
-            try SUCCEED(mm_device_enumerator.RegisterEndpointNotificationCallback(&mm_notification_client.parent), "RegisterEndpointNotificationCallback");
-        }
     }
 
     if (build_options.opengl) {
@@ -142,6 +102,47 @@ pub fn init() !void {
     if (build_options.vulkan) {
         vulkan = w.LoadLibraryW(w.L("vulkan-1.dll")) orelse return logLastError("LoadLibraryW");
         vkGetInstanceProcAddr = @ptrCast(w.GetProcAddress(vulkan, "vkGetInstanceProcAddr") orelse return logLastError("GetProcAddress"));
+    }
+
+    if (build_options.joystick) {
+        joysticks = .init(internal.allocator);
+
+        var devices = [_]w.RAWINPUTDEVICE{
+            .{
+                .usUsagePage = w.HID_USAGE_PAGE_GENERIC,
+                .usUsage = w.HID_USAGE_GENERIC_JOYSTICK,
+                .dwFlags = w.RIDEV_DEVNOTIFY,
+                .hwndTarget = helper_window,
+            },
+            .{
+                .usUsagePage = w.HID_USAGE_PAGE_GENERIC,
+                .usUsage = w.HID_USAGE_GENERIC_GAMEPAD,
+                .dwFlags = w.RIDEV_DEVNOTIFY,
+                .hwndTarget = helper_window,
+            },
+        };
+        if (w.RegisterRawInputDevices(&devices, devices.len, @sizeOf(w.RAWINPUTDEVICE)) == w.FALSE) return logLastError("RegisterRawInputDevices");
+    }
+
+    if (build_options.audio) {
+        try SUCCEED(w.CoInitializeEx(null, w.COINIT_MULTITHREADED | w.COINIT_DISABLE_OLE1DDE), "CoInitializeEx");
+        try SUCCEED(w.CoCreateInstance(&w.CLSID_MMDeviceEnumerator, null, w.CLSCTX_ALL, &w.IID_IMMDeviceEnumerator, @ptrCast(&mm_device_enumerator)), "CoCreateInstance");
+
+        var device: *w.IMMDevice = undefined;
+        if (internal.init_options.audioDefaultOutputFn) |callback| {
+            if (SUCCEED(mm_device_enumerator.GetDefaultAudioEndpoint(w.eRender, w.eConsole, @ptrCast(&device)), "GetDefaultAudioEndpoint")) {
+                callback(.{ .backend = .{ .device = device } });
+            } else |_| {}
+        }
+        if (internal.init_options.audioDefaultInputFn) |callback| {
+            if (SUCCEED(mm_device_enumerator.GetDefaultAudioEndpoint(w.eCapture, w.eConsole, @ptrCast(&device)), "GetDefaultAudioEndpoint")) {
+                callback(.{ .backend = .{ .device = device } });
+            } else |_| {}
+        }
+
+        if (internal.init_options.audioDefaultOutputFn != null or internal.init_options.audioDefaultInputFn != null) {
+            try SUCCEED(mm_device_enumerator.RegisterEndpointNotificationCallback(&mm_notification_client.parent), "RegisterEndpointNotificationCallback");
+        }
     }
 }
 
