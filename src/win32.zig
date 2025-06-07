@@ -1030,8 +1030,7 @@ fn isFullscreen(self: *@This()) bool {
 fn clipCursor(self: *@This()) void {
     var rect: w.RECT = undefined;
     _ = w.GetClientRect(self.window, &rect);
-    _ = w.ClientToScreen(self.window, @ptrCast(&rect.left));
-    _ = w.ClientToScreen(self.window, @ptrCast(&rect.right));
+    _ = w.MapWindowPoints(self.window, w.HWND_DESKTOP, @ptrCast(&rect), 2);
     _ = w.ClipCursor(&rect);
 }
 
