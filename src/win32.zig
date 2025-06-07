@@ -1286,18 +1286,17 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
         },
         w.WM_CHAR => {
             const char: u16 = @intCast(wParam);
-            var chars: []const u16 = undefined;
-            if (self.surrogate != 0) {
-                chars = &.{ self.surrogate, char };
-                self.surrogate = 0;
-            } else if (std.unicode.utf16IsHighSurrogate(char)) {
-                self.surrogate = char;
-                return 0;
-            } else {
-                chars = &.{char};
-            }
-            var iter = std.unicode.Utf16LeIterator.init(chars);
-            const codepoint = (iter.nextCodepoint() catch return 0).?; // never returns null on first call
+            const codepoint = blk: {
+                if (self.surrogate != 0) {
+                    defer self.surrogate = 0;
+                    break :blk std.unicode.utf16DecodeSurrogatePair(&.{ self.surrogate, char }) catch return 0;
+                } else if (std.unicode.utf16IsHighSurrogate(char)) {
+                    self.surrogate = char;
+                    return 0;
+                } else {
+                    break :blk char;
+                }
+            };
             if (codepoint >= ' ') {
                 self.events.push(.{ .char = codepoint });
             }
