@@ -268,7 +268,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
         .events = .init(),
         .window = window,
         .cursor = loadCursor(options.cursor),
-        .cursor_mode = options.cursor_mode,
+        .cursor_mode = options.cursor_mode, // WM_SETFOCUS calls clipCursor, so setCursorMode is not needed
     };
     _ = w.SetWindowLongPtrW(window, w.GWLP_USERDATA, @bitCast(@intFromPtr(self)));
 
