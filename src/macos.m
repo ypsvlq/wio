@@ -309,10 +309,11 @@ void wioUpdate(void) {
 }
 
 void wioWait(void) {
-    [NSApp nextEventMatchingMask:NSEventMaskAny
+    NSEvent *event = [NSApp nextEventMatchingMask:NSEventMaskAny
         untilDate:[NSDate distantFuture]
         inMode:NSDefaultRunLoopMode
-        dequeue:NO];
+        dequeue:YES];
+    [NSApp sendEvent:event];
 }
 
 void wioMessageBox(uint8_t style, const char *ptr, size_t len) {
