@@ -12,25 +12,29 @@ const c = @cImport({
 });
 const log = std.log.scoped(.wio);
 
+const NSWindow = opaque {};
+const NSOpenGLContext = opaque {};
+const CAMetalLayer = opaque {};
 extern fn wioInit() void;
 extern fn wioUpdate() void;
 extern fn wioWait() void;
 extern fn wioMessageBox(u8, [*]const u8, usize) void;
-extern fn wioCreateWindow(*anyopaque, u16, u16) *anyopaque;
-extern fn wioDestroyWindow(*anyopaque, ?*anyopaque) void;
-extern fn wioSetTitle(*anyopaque, [*]const u8, usize) void;
-extern fn wioSetMode(*anyopaque, u8) void;
-extern fn wioSetCursor(*anyopaque, u8) void;
-extern fn wioSetCursorMode(*anyopaque, u8) void;
-extern fn wioSetSize(*anyopaque, u16, u16) void;
+extern fn wioCreateWindow(*@This(), u16, u16) *NSWindow;
+extern fn wioDestroyWindow(*NSWindow) void;
+extern fn wioSetTitle(*NSWindow, [*]const u8, usize) void;
+extern fn wioSetMode(*NSWindow, u8) void;
+extern fn wioSetCursor(*NSWindow, u8) void;
+extern fn wioSetCursorMode(*NSWindow, u8) void;
+extern fn wioSetSize(*NSWindow, u16, u16) void;
 extern fn wioRequestAttention() void;
 extern fn wioSetClipboardText([*]const u8, usize) void;
-extern fn wioGetClipboardText(*const anyopaque, *usize) ?[*]u8;
-extern fn wioCreateContext(*anyopaque, [*]const c.CGLPixelFormatAttribute) ?*anyopaque;
-extern fn wioMakeContextCurrent(?*anyopaque) void;
-extern fn wioSwapBuffers(*anyopaque, ?*anyopaque) void;
-extern fn wioSwapInterval(?*anyopaque, i32) void;
-extern fn wioCreateMetalLayer(*anyopaque) *anyopaque;
+extern fn wioGetClipboardText(*const std.mem.Allocator, *usize) ?[*]u8;
+extern fn wioCreateContext(*NSWindow, [*]const c.CGLPixelFormatAttribute) ?*NSOpenGLContext;
+extern fn wioDestroyContext(?*NSOpenGLContext) void;
+extern fn wioMakeContextCurrent(?*NSOpenGLContext) void;
+extern fn wioSwapBuffers(*NSWindow, ?*NSOpenGLContext) void;
+extern fn wioSwapInterval(?*NSOpenGLContext, i32) void;
+extern fn wioCreateMetalLayer(*NSWindow) ?*CAMetalLayer;
 extern const wioHIDDeviceUsagePageKey: c.CFStringRef;
 extern const wioHIDDeviceUsageKey: c.CFStringRef;
 extern const wioHIDVendorIDKey: c.CFStringRef;
@@ -153,16 +157,16 @@ pub fn messageBox(style: wio.MessageBoxStyle, _: []const u8, message: []const u8
 }
 
 events: internal.EventQueue,
-window: *anyopaque,
-context: ?*anyopaque = null,
+window: *NSWindow,
+opengl: if (build_options.opengl) struct { context: ?*NSOpenGLContext = null } else struct {} = .{},
 
 pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     const self = try internal.allocator.create(@This());
-    self.events = .init(); // must be valid in wioCreateWindow
     self.* = .{
-        .events = self.events,
-        .window = wioCreateWindow(self, options.size.width, options.size.height),
+        .events = .init(),
+        .window = undefined,
     };
+    self.window = wioCreateWindow(self, options.size.width, options.size.height);
 
     self.setTitle(options.title);
     self.setMode(options.mode);
@@ -180,7 +184,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
             else
                 return error.UnsupportedOpenGLVersion;
 
-            self.context = wioCreateContext(self.window, &.{
+            self.opengl.context = wioCreateContext(self.window, &.{
                 c.kCGLPFAOpenGLProfile, profile,
                 c.kCGLPFAColorSize,     opengl.red_bits + opengl.green_bits + opengl.blue_bits,
                 c.kCGLPFAAlphaSize,     opengl.alpha_bits,
@@ -201,7 +205,8 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
 }
 
 pub fn destroy(self: *@This()) void {
-    wioDestroyWindow(self.window, self.context);
+    if (build_options.opengl) wioDestroyContext(self.opengl.context);
+    wioDestroyWindow(self.window);
     self.events.deinit();
     internal.allocator.destroy(self);
 }
@@ -250,15 +255,15 @@ pub fn getClipboardText(_: *@This(), allocator: std.mem.Allocator) ?[]u8 {
 }
 
 pub fn makeContextCurrent(self: *@This()) void {
-    wioMakeContextCurrent(self.context);
+    wioMakeContextCurrent(self.opengl.context);
 }
 
 pub fn swapBuffers(self: *@This()) void {
-    wioSwapBuffers(self.window, self.context);
+    wioSwapBuffers(self.window, self.opengl.context);
 }
 
 pub fn swapInterval(self: *@This(), interval: i32) void {
-    wioSwapInterval(self.context, interval);
+    wioSwapInterval(self.opengl.context, interval);
 }
 
 pub fn createSurface(self: @This(), instance: usize, allocator: ?*const anyopaque, surface: *u64) i32 {
@@ -266,7 +271,7 @@ pub fn createSurface(self: @This(), instance: usize, allocator: ?*const anyopaqu
         sType: i32 = 1000217000,
         pNext: ?*const anyopaque = null,
         flags: u32 = 0,
-        pLayer: ?*const anyopaque,
+        pLayer: ?*const CAMetalLayer,
     };
 
     const vkCreateMetalSurfaceEXT: *const fn (usize, *const VkMetalSurfaceCreateInfoEXT, ?*const anyopaque, *u64) callconv(.c) i32 =
@@ -699,11 +704,11 @@ export fn wioClose(self: *@This()) void {
     self.events.push(.close);
 }
 
-export fn wioFocus(self: *@This()) void {
+export fn wioFocused(self: *@This()) void {
     self.events.push(.focused);
 }
 
-export fn wioUnfocus(self: *@This()) void {
+export fn wioUnfocused(self: *@This()) void {
     self.events.push(.unfocused);
 }
 
@@ -711,7 +716,7 @@ export fn wioVisible(self: *@This()) void {
     self.events.push(.visible);
 }
 
-export fn wioHide(self: *@This()) void {
+export fn wioHidden(self: *@This()) void {
     self.events.push(.hidden);
 }
 

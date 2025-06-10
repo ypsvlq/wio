@@ -3,10 +3,10 @@
 #include <IOKit/hid/IOHIDKeys.h>
 
 extern void wioClose(void *);
-extern void wioFocus(void *);
-extern void wioUnfocus(void *);
+extern void wioFocused(void *);
+extern void wioUnfocused(void *);
 extern void wioVisible(void *);
-extern void wioHide(void *);
+extern void wioHidden(void *);
 extern void wioSize(void *, UInt8, UInt16, UInt16);
 extern void wioFramebuffer(void *, UInt16, UInt16);
 extern void wioScale(void *, Float32);
@@ -59,31 +59,35 @@ static void warpCursor(NSWindow *window) {
 @end
 
 @implementation WioWindowDelegate {
-    void *ptr;
+    void *zig;
+#ifdef WIO_OPENGL
     NSOpenGLContext *context;
+#endif
 }
 
-- (instancetype)initWithPointer:(void *)value {
+- (instancetype)initWithZigWindow:(void *)value {
     self = [super init];
-    ptr = value;
+    zig = value;
     return self;
 }
 
+#ifdef WIO_OPENGL
 - (void)setContext:value {
     context = value;
 }
+#endif
 
 - (void)windowDidEnterFullScreen:notification {
     [[[notification object] contentView] updateTrackingAreas];
 }
 
 - (BOOL)windowShouldClose:sender {
-    wioClose(ptr);
+    wioClose(zig);
     return NO;
 }
 
 - (void)windowDidBecomeKey:notification {
-    wioFocus(ptr);
+    wioFocused(zig);
 
     NSWindow *window = [notification object];
     WioView *view = [window contentView];
@@ -93,14 +97,14 @@ static void warpCursor(NSWindow *window) {
 }
 
 - (void)windowDidResignKey:notification {
-    wioUnfocus(ptr);
+    wioUnfocused(zig);
 }
 
 - (void)windowDidChangeOcclusionState:notification {
     if ([[notification object] occlusionState] & NSWindowOcclusionStateVisible) {
-        wioVisible(ptr);
+        wioVisible(zig);
     } else {
-        wioHide(ptr);
+        wioHidden(zig);
     }
 }
 
@@ -119,11 +123,13 @@ static void warpCursor(NSWindow *window) {
         mode = 2;
 
     NSRect rect = [view frame];
-    wioSize(ptr, mode, rect.size.width, rect.size.height);
+    wioSize(zig, mode, rect.size.width, rect.size.height);
     NSRect framebuffer = [view convertRectToBacking:rect];
-    wioFramebuffer(ptr, framebuffer.size.width, framebuffer.size.height);
+    wioFramebuffer(zig, framebuffer.size.width, framebuffer.size.height);
 
+#ifdef WIO_OPENGL
     [context update];
+#endif
 }
 
 - (void)windowDidChangeBackingProperties:notification {
@@ -132,27 +138,31 @@ static void warpCursor(NSWindow *window) {
     CGFloat scale = [window backingScaleFactor];
 
     NSRect rect = [view frame];
-    wioScale(ptr, scale);
+    wioScale(zig, scale);
     NSRect framebuffer = [view convertRectToBacking:rect];
-    wioFramebuffer(ptr, framebuffer.size.width, framebuffer.size.height);
+    wioFramebuffer(zig, framebuffer.size.width, framebuffer.size.height);
 
+#ifdef WIO_OPENGL
     [context update];
+#endif
+#ifdef WIO_VULKAN
     [[view layer] setContentsScale:scale];
+#endif
 }
 
 @end
 
 @implementation WioView {
-    void *ptr;
+    void *zig;
     NSTrackingArea *area;
     NSCursor *cursor;
     uint8_t cursorMode;
     BOOL cursorInside;
 }
 
-- (instancetype)initWithPointer:(void *)value {
+- (instancetype)initWithZigWindow:(void *)value {
     self = [super init];
-    ptr = value;
+    zig = value;
     return self;
 }
 
@@ -198,12 +208,12 @@ static void warpCursor(NSWindow *window) {
 }
 
 - (void)keyDown:event {
-    wioKey(ptr, [event keyCode], [event isARepeat]);
-    wioChars(ptr, [[event characters] UTF8String]);
+    wioKey(zig, [event keyCode], [event isARepeat]);
+    wioChars(zig, [[event characters] UTF8String]);
 }
 
 - (void)keyUp:event {
-    wioKey(ptr, [event keyCode], 2);
+    wioKey(zig, [event keyCode], 2);
 }
 
 - (void)flagsChanged:event {
@@ -219,50 +229,50 @@ static void warpCursor(NSWindow *window) {
         case 0x3D: flag = NX_DEVICERALTKEYMASK; break;
         case 0x3E: flag = NX_DEVICERCTLKEYMASK; break;
         case 0x39:
-            wioKey(ptr, key, 0);
-            wioKey(ptr, key, 2);
+            wioKey(zig, key, 0);
+            wioKey(zig, key, 2);
             return;
         default: return;
     }
-    wioKey(ptr, key, [event modifierFlags] & flag ? 0 : 2);
+    wioKey(zig, key, [event modifierFlags] & flag ? 0 : 2);
 }
 
 - (void)mouseDown:event {
-    wioButtonPress(ptr, 0);
+    wioButtonPress(zig, 0);
 }
 
 - (void)mouseUp:event {
-    wioButtonRelease(ptr, 0);
+    wioButtonRelease(zig, 0);
 }
 
 - (void)rightMouseDown:event {
-    wioButtonPress(ptr, 1);
+    wioButtonPress(zig, 1);
 }
 
 - (void)rightMouseUp:event {
-    wioButtonRelease(ptr, 1);
+    wioButtonRelease(zig, 1);
 }
 
 - (void)otherMouseDown:event {
     NSInteger button = [event buttonNumber];
-    if (button < 5) wioButtonPress(ptr, button);
+    if (button < 5) wioButtonPress(zig, button);
 }
 
 - (void)otherMouseUp:event {
     NSInteger button = [event buttonNumber];
-    if (button < 5) wioButtonRelease(ptr, button);
+    if (button < 5) wioButtonRelease(zig, button);
 }
 
 - (void)mouseMoved:event {
     if (cursorMode == 2) {
-        wioMouseRelative(ptr, [event deltaX], [event deltaY]);
+        wioMouseRelative(zig, [event deltaX], [event deltaY]);
         return;
     }
     NSPoint location = [event locationInWindow];
     NSRect frame = [self frame];
     location.y = frame.size.height - location.y - 1;
     if (location.x < 0 || location.y < 0 || location.x > frame.size.width || location.y > frame.size.height) return;
-    wioMouse(ptr, location.x, location.y);
+    wioMouse(zig, location.x, location.y);
 }
 
 - (void)mouseDragged:event {
@@ -278,7 +288,7 @@ static void warpCursor(NSWindow *window) {
 }
 
 - (void)scrollWheel:event {
-    wioScroll(ptr, [event scrollingDeltaX], [event scrollingDeltaY]);
+    wioScroll(zig, [event scrollingDeltaX], [event scrollingDeltaY]);
 }
 
 @end
@@ -324,15 +334,15 @@ void wioMessageBox(uint8_t style, const char *ptr, size_t len) {
     [alert runModal];
 }
 
-void *wioCreateWindow(void *ptr, uint16_t width, uint16_t height) {
+void *wioCreateWindow(void *zig, uint16_t width, uint16_t height) {
     NSWindow *window = [[NSWindow alloc]
         initWithContentRect:NSMakeRect(0, 0, width, height)
         styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable
         backing:NSBackingStoreBuffered
         defer:NO];
-    [window setDelegate:[[WioWindowDelegate alloc] initWithPointer:ptr]];
+    [window setDelegate:[[WioWindowDelegate alloc] initWithZigWindow:zig]];
 
-    WioView *view = [[WioView alloc] initWithPointer:ptr];
+    WioView *view = [[WioView alloc] initWithZigWindow:zig];
     [window setContentView:view];
     [window makeFirstResponder:view];
 
@@ -342,19 +352,18 @@ void *wioCreateWindow(void *ptr, uint16_t width, uint16_t height) {
     [window makeKeyAndOrderFront:nil];
     [window center];
 
-    wioVisible(ptr);
-    wioScale(ptr, [window backingScaleFactor]);
+    wioVisible(zig);
+    wioScale(zig, [window backingScaleFactor]);
 
     NSRect rect = [view frame];
-    wioSize(ptr, 0, rect.size.width, rect.size.height);
+    wioSize(zig, 0, rect.size.width, rect.size.height);
     NSRect framebuffer = [view convertRectToBacking:rect];
-    wioFramebuffer(ptr, framebuffer.size.width, framebuffer.size.height);
+    wioFramebuffer(zig, framebuffer.size.width, framebuffer.size.height);
 
     return (void *)CFBridgingRetain(window);
 }
 
-void wioDestroyWindow(void *ptr, void *context) {
-    CFBridgingRelease(context);
+void wioDestroyWindow(void *ptr) {
     NSWindow *window = CFBridgingRelease(ptr);
     [window close];
 }
@@ -421,6 +430,10 @@ void *wioCreateContext(NSWindow *window, const NSOpenGLPixelFormatAttribute *att
     WioWindowDelegate *delegate = [window delegate];
     [delegate setContext:context];
     return (void *)CFBridgingRetain(context);
+}
+
+void wioDestroyContext(void *context) {
+    CFBridgingRelease(context);
 }
 
 void wioMakeContextCurrent(NSOpenGLContext *context) {
