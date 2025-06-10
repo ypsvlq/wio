@@ -191,13 +191,12 @@ cursor: h.Cursor = h.None,
 cursor_mode: wio.CursorMode,
 size: wio.Size,
 warped: bool = false,
-colormap: h.Colormap,
-context: h.GLXContext,
+opengl: if (build_options.opengl) struct {
+    colormap: h.Colormap,
+    context: h.GLXContext,
+} else struct {},
 
 pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
-    const self = try internal.allocator.create(@This());
-    errdefer internal.allocator.destroy(self);
-
     var attributes: h.XSetWindowAttributes = undefined;
     attributes.event_mask = h.PropertyChangeMask | h.FocusChangeMask | h.ExposureMask | h.StructureNotifyMask | h.KeyPressMask | h.KeyReleaseMask | h.ButtonPressMask | h.ButtonReleaseMask | h.PointerMotionMask;
     attributes.colormap = h.CopyFromParent;
@@ -294,15 +293,17 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     ) orelse return error.Unexpected;
     errdefer _ = c.XDestroyIC(ic);
 
+    const self = try internal.allocator.create(@This());
+    errdefer internal.allocator.destroy(self);
     self.* = .{
         .events = .init(),
         .window = window,
         .ic = ic,
         .cursor_mode = options.cursor_mode,
         .size = options.size,
-        .colormap = attributes.colormap,
-        .context = context,
+        .opengl = if (build_options.opengl) .{ .colormap = attributes.colormap, .context = context } else .{},
     };
+
     self.setTitle(options.title);
     self.setMode(options.mode);
     self.setCursor(options.cursor);
@@ -321,8 +322,8 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
 pub fn destroy(self: *@This()) void {
     _ = windows.remove(self.window);
     if (build_options.opengl) {
-        if (self.context) |context| c.glXDestroyContext(display, context);
-        if (self.colormap != h.CopyFromParent) _ = c.XFreeColormap(display, self.colormap);
+        if (self.opengl.context) |context| c.glXDestroyContext(display, context);
+        if (self.opengl.colormap != h.CopyFromParent) _ = c.XFreeColormap(display, self.opengl.colormap);
     }
     _ = c.XDestroyIC(self.ic);
     _ = c.XDestroyWindow(display, self.window);
@@ -466,7 +467,7 @@ pub fn getClipboardText(self: *@This(), allocator: std.mem.Allocator) ?[]u8 {
 }
 
 pub fn makeContextCurrent(self: *@This()) void {
-    _ = c.glXMakeCurrent(display, self.window, self.context);
+    _ = c.glXMakeCurrent(display, self.window, self.opengl.context);
 }
 
 pub fn swapBuffers(self: *@This()) void {
