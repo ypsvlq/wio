@@ -238,13 +238,9 @@ international4: bool = false,
 input: []u8 = &.{},
 last_x: u16 = 0,
 last_y: u16 = 0,
-dc: w.HDC = null,
-rc: w.HGLRC = null,
+opengl: if (build_options.opengl) struct { dc: w.HDC = null, rc: w.HGLRC = null } else struct {} = .{},
 
 pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
-    const self = try internal.allocator.create(@This());
-    errdefer internal.allocator.destroy(self);
-
     const title = try std.unicode.utf8ToUtf16LeAllocZ(internal.allocator, options.title);
     defer internal.allocator.free(title);
     const style: u32 = w.WS_OVERLAPPEDWINDOW;
@@ -264,6 +260,8 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
         null,
     ) orelse return logLastError("CreateWindowExW");
 
+    const self = try internal.allocator.create(@This());
+    errdefer internal.allocator.destroy(self);
     self.* = .{
         .events = .init(),
         .window = window,
@@ -285,13 +283,13 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
 
     if (build_options.opengl) {
         if (options.opengl) |opengl| {
-            self.dc = w.GetDC(self.window);
+            self.opengl.dc = w.GetDC(self.window);
 
             var format: i32 = undefined;
             var pfd: w.PIXELFORMATDESCRIPTOR = undefined;
             if (wgl.choosePixelFormatARB) |choosePixelFormatARB| {
                 var count: u32 = undefined;
-                _ = choosePixelFormatARB(self.dc, &.{
+                _ = choosePixelFormatARB(self.opengl.dc, &.{
                     0x2011, if (opengl.doublebuffer) 1 else 0,
                     0x2015, opengl.red_bits,
                     0x2017, opengl.green_bits,
@@ -304,7 +302,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
                     0,
                 }, null, 1, &format, &count);
                 if (count != 1) return logLastError("wglChoosePixelFormatARB");
-                _ = w.DescribePixelFormat(self.dc, format, @sizeOf(w.PIXELFORMATDESCRIPTOR), &pfd);
+                _ = w.DescribePixelFormat(self.opengl.dc, format, @sizeOf(w.PIXELFORMATDESCRIPTOR), &pfd);
             } else {
                 pfd = std.mem.zeroInit(w.PIXELFORMATDESCRIPTOR, .{
                     .nSize = @sizeOf(w.PIXELFORMATDESCRIPTOR),
@@ -316,13 +314,13 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
                     .cDepthBits = opengl.depth_bits,
                     .cStencilBits = opengl.stencil_bits,
                 });
-                format = w.ChoosePixelFormat(self.dc, &pfd);
+                format = w.ChoosePixelFormat(self.opengl.dc, &pfd);
                 if (format == 0) return logLastError("ChoosePixelFormat");
             }
-            _ = w.SetPixelFormat(self.dc, format, &pfd);
+            _ = w.SetPixelFormat(self.opengl.dc, format, &pfd);
 
-            self.rc = if (wgl.createContextAttribsARB) |createContextAttribsARB|
-                createContextAttribsARB(self.dc, null, &[_]i32{
+            self.opengl.rc = if (wgl.createContextAttribsARB) |createContextAttribsARB|
+                createContextAttribsARB(self.opengl.dc, null, &[_]i32{
                     0x2091, opengl.major_version,
                     0x2092, opengl.minor_version,
                     0x2094, @as(i32, if (opengl.debug) 1 else 0) | @as(i32, if (opengl.forward_compatible) 2 else 0),
@@ -330,7 +328,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
                     0,
                 }) orelse return logLastError("wglCreateContextAttribsARB")
             else
-                w.wglCreateContext(self.dc) orelse return logLastError("wglCreateContext");
+                w.wglCreateContext(self.opengl.dc) orelse return logLastError("wglCreateContext");
         }
     }
 
@@ -339,8 +337,8 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
 
 pub fn destroy(self: *@This()) void {
     if (build_options.opengl) {
-        _ = w.wglDeleteContext(self.rc);
-        _ = w.ReleaseDC(self.window, self.dc);
+        _ = w.wglDeleteContext(self.opengl.rc);
+        _ = w.ReleaseDC(self.window, self.opengl.dc);
     }
     _ = w.DestroyWindow(self.window);
     self.events.deinit();
@@ -463,11 +461,11 @@ pub fn getClipboardText(_: *@This(), allocator: std.mem.Allocator) ?[]u8 {
 }
 
 pub fn makeContextCurrent(self: *@This()) void {
-    _ = w.wglMakeCurrent(self.dc, self.rc);
+    _ = w.wglMakeCurrent(self.opengl.dc, self.opengl.rc);
 }
 
 pub fn swapBuffers(self: *@This()) void {
-    _ = w.SwapBuffers(self.dc);
+    _ = w.SwapBuffers(self.opengl.dc);
 }
 
 pub fn swapInterval(_: @This(), interval: i32) void {
