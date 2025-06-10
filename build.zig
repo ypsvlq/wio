@@ -133,6 +133,29 @@ pub fn build(b: *std.Build) void {
                 }
             }
         },
+        .haiku => {
+            module.linkSystemLibrary("be", .{});
+            if (enable_opengl) module.linkSystemLibrary("GL", .{});
+            if (enable_joystick) module.linkSystemLibrary("device", .{});
+            if (enable_audio) module.linkSystemLibrary("media", .{});
+
+            const gcc = b.addSystemCommand(&.{
+                "g++",
+                "-Wall",
+                switch (optimize) {
+                    .Debug => "-O0",
+                    .ReleaseFast, .ReleaseSafe => "-O3",
+                    .ReleaseSmall => "-Os",
+                },
+                "-g",
+                "-c",
+                "-o",
+            });
+            const output = gcc.addOutputFileArg("haiku.o");
+            gcc.addFileArg(b.path("src/haiku.cpp"));
+            gcc.addArgs(module.c_macros.items);
+            module.addObjectFile(output);
+        },
         else => {
             if (target.result.cpu.arch.isWasm()) {
                 module.export_symbol_names = &.{ "wioLoop", "wioJoystick" };
