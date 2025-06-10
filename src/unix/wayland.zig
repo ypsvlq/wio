@@ -255,9 +255,6 @@ configured: bool = false,
 viewport: ?*h.wp_viewport = null,
 fractional_scale: ?*h.wp_fractional_scale_v1 = null,
 locked_pointer: ?*h.zwp_locked_pointer_v1 = null,
-egl_window: ?*h.wl_egl_window = null,
-egl_surface: h.EGLSurface = null,
-egl_context: h.EGLContext = null,
 repeat_key: u32 = 0,
 repeat_timestamp: i64 = undefined,
 repeat_ignore: bool = false,
@@ -265,6 +262,11 @@ size: wio.Size,
 scale: f32 = 1,
 cursor: u32 = undefined,
 cursor_mode: wio.CursorMode,
+egl: if (build_options.opengl) struct {
+    window: ?*h.wl_egl_window = null,
+    surface: h.EGLSurface = null,
+    context: h.EGLContext = null,
+} else struct {} = .{},
 
 pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     const self = try internal.allocator.create(@This());
@@ -331,9 +333,9 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
                 h.EGL_NONE,
             }, &config, 1, &count) == h.EGL_FALSE) return logEglError("eglChooseConfig");
 
-            self.egl_window = c.wl_egl_window_create(self.surface, 640, 480);
-            self.egl_surface = c.eglCreateWindowSurface(egl_display, config, self.egl_window, null) orelse return logEglError("eglCreateWindowSurface");
-            self.egl_context = c.eglCreateContext(egl_display, config, h.EGL_NO_CONTEXT, &[_]i32{
+            self.egl.window = c.wl_egl_window_create(self.surface, 640, 480);
+            self.egl.surface = c.eglCreateWindowSurface(egl_display, config, self.egl.window, null) orelse return logEglError("eglCreateWindowSurface");
+            self.egl.context = c.eglCreateContext(egl_display, config, h.EGL_NO_CONTEXT, &[_]i32{
                 h.EGL_CONTEXT_MAJOR_VERSION,             opengl.major_version,
                 h.EGL_CONTEXT_MINOR_VERSION,             opengl.minor_version,
                 h.EGL_CONTEXT_OPENGL_PROFILE_MASK,       if (opengl.profile == .core) h.EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT else h.EGL_CONTEXT_OPENGL_COMPATIBILITY_PROFILE_BIT,
@@ -351,9 +353,9 @@ pub fn destroy(self: *@This()) void {
     if (focus == self) focus = null;
 
     if (build_options.opengl) {
-        if (self.egl_context) |_| _ = c.eglDestroyContext(egl_display, self.egl_context);
-        if (self.egl_surface) |_| _ = c.eglDestroySurface(egl_display, self.egl_surface);
-        if (self.egl_window) |_| c.wl_egl_window_destroy(self.egl_window);
+        if (self.egl.context) |_| _ = c.eglDestroyContext(egl_display, self.egl.context);
+        if (self.egl.surface) |_| _ = c.eglDestroySurface(egl_display, self.egl.surface);
+        if (self.egl.window) |_| c.wl_egl_window_destroy(self.egl.window);
     }
 
     if (self.fractional_scale) |_| h.wp_fractional_scale_v1_destroy(self.fractional_scale);
@@ -479,11 +481,11 @@ pub fn getClipboardText(_: *@This(), allocator: std.mem.Allocator) ?[]u8 {
 }
 
 pub fn makeContextCurrent(self: *@This()) void {
-    _ = c.eglMakeCurrent(egl_display, self.egl_surface, self.egl_surface, self.egl_context);
+    _ = c.eglMakeCurrent(egl_display, self.egl.surface, self.egl.surface, self.egl.context);
 }
 
 pub fn swapBuffers(self: *@This()) void {
-    _ = c.eglSwapBuffers(egl_display, self.egl_surface);
+    _ = c.eglSwapBuffers(egl_display, self.egl.surface);
 }
 
 pub fn swapInterval(_: *@This(), interval: i32) void {
@@ -534,7 +536,7 @@ fn resize(self: *@This(), size: wio.Size, configuration: ?*h.libdecor_configurat
         h.wp_viewport_set_destination(self.viewport, size.width, size.height);
     }
 
-    if (build_options.opengl) if (self.egl_window != null) c.wl_egl_window_resize(self.egl_window, framebuffer.width, framebuffer.height, 0, 0);
+    if (build_options.opengl) if (self.egl.window != null) c.wl_egl_window_resize(self.egl.window, framebuffer.width, framebuffer.height, 0, 0);
 
     const state = c.libdecor_state_new(size.width, size.height);
     defer c.libdecor_state_free(state);
