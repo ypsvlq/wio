@@ -12,8 +12,8 @@ pub const std_options = std.Options{
         std.log.defaultLog,
 };
 
-var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-pub const allocator = gpa.allocator();
+var debug_allocator = std.heap.DebugAllocator(.{}).init;
+pub const allocator = debug_allocator.allocator();
 var window: wio.Window = undefined;
 
 pub fn main() !void {
@@ -48,7 +48,7 @@ fn loop() !bool {
                 joystick.close();
                 window.destroy();
                 wio.deinit();
-                _ = gpa.deinit();
+                _ = debug_allocator.deinit();
                 return false;
             },
             .draw => {
