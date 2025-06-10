@@ -112,7 +112,7 @@ pub fn wait() void {
             }
         }
     }
-    _ = std.c.poll(pollfds.items.ptr, pollfds.items.len, timeout);
+    _ = std.c.poll(pollfds.items.ptr, @intCast(pollfds.items.len), timeout);
 }
 
 pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
