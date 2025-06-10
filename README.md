@@ -17,6 +17,30 @@ contains a test program covering most features.
 The `features` build option can be used to disable optional functionality,
 or enable Vulkan support (which is not available on all platforms).
 
+## Platform support
+
+### Tier 1
+
+- Windows
+- macOS (10.15+)
+- Linux
+- WebAssembly
+
+### Tier 2
+
+Not actively tested, but most code is shared with tier 1 targets.
+
+- OpenBSD
+- NetBSD
+- FreeBSD
+- DragonFlyBSD
+
+### Tier 3
+
+Not actively tested.
+
+- Haiku
+
 ## Platform notes
 
 ### Windows
@@ -28,8 +52,6 @@ If audio is enabled, wio initializes COM with options `COINIT_MULTITHREADED`
 and `COINIT_DISABLE_OLE1DDE`.
 
 ### macOS
-
-Versions 10.15 and above are supported.
 
 The example directory contains an application bundle, which can be adapted by
 changing the `CFBundleExecutable` and `CFBundleName` values in Info.plist.
