@@ -14,9 +14,9 @@
             .hash = "N-V-__8AABHMqAWYuRdIlflwi8gksPnlUMQBiSxAqQAAZFms",
             .lazy = true,
         },
-        .unix_headers = .{
-            .url = "https://github.com/ypsvlq/wio-unix-headers/archive/a0edc69384f479597232619587bee2ef30ef57fa.tar.gz",
-            .hash = "N-V-__8AAN-cRQC5qDRZ-vrruoLXzYhlRTMunlUvTOCFbz8o",
+        .wio_unix_headers = .{
+            .url = "https://github.com/ypsvlq/wio-unix-headers/archive/8ac0f21d0de696b773fbe297d1ec90107ccccfd4.tar.gz",
+            .hash = "wio_unix_headers-0.0.0-seffXNKSPQC6cUdnUw-aivoa8Z7KLfqsdq5VfNpBgsXs",
             .lazy = true,
         },
     },
