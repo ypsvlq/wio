@@ -90,14 +90,13 @@ window: *BWindow,
 events: internal.EventQueue,
 events_mutex: std.Thread.Mutex = .{},
 buttons: std.StaticBitSet(5) = .initEmpty(),
-opengl: if (build_options.opengl) struct { context: *BGLView, vsync: bool = false } else void,
+opengl: if (build_options.opengl) struct { context: ?*BGLView = null, vsync: bool = false } else struct {} = .{},
 
 pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     const self = try internal.allocator.create(@This());
     self.* = .{
         .window = undefined,
         .events = .init(),
-        .opengl = undefined,
     };
 
     self.events.push(.visible);
@@ -113,7 +112,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
 
     if (build_options.opengl) {
         if (options.opengl) |opengl| {
-            self.opengl = .{ .context = wioCreateContext(self.window, opengl.doublebuffer, (opengl.alpha_bits > 0), (opengl.depth_bits > 0), (opengl.stencil_bits > 0)) };
+            self.opengl.context = wioCreateContext(self.window, opengl.doublebuffer, (opengl.alpha_bits > 0), (opengl.depth_bits > 0), (opengl.stencil_bits > 0));
         }
     }
 
@@ -172,7 +171,7 @@ pub fn getClipboardText(_: *@This(), allocator: std.mem.Allocator) ?[]u8 {
 }
 
 pub fn makeContextCurrent(self: *@This()) void {
-    wioMakeContextCurrent(self.opengl.context);
+    wioMakeContextCurrent(self.opengl.context.?);
 }
 
 pub fn swapBuffers(self: *@This()) void {
