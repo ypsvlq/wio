@@ -94,7 +94,7 @@ pub fn build(b: *std.Build) void {
                 module.linkFramework("AudioToolbox", .{});
             }
         },
-        .linux, .openbsd, .netbsd, .freebsd, .dragonfly => |tag| {
+        .linux, .openbsd, .netbsd, .freebsd, .dragonfly, .illumos => |tag| {
             module.link_libc = true;
             module.addCSourceFile(.{ .file = b.path("src/unix/wayland.c") });
 

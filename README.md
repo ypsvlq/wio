@@ -34,6 +34,7 @@ Not actively tested, but most code is shared with tier 1 targets.
 - NetBSD
 - FreeBSD
 - DragonFlyBSD
+- illumos
 
 ### Tier 3
 
