@@ -307,7 +307,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
                 pfd = std.mem.zeroInit(w.PIXELFORMATDESCRIPTOR, .{
                     .nSize = @sizeOf(w.PIXELFORMATDESCRIPTOR),
                     .nVersion = 1,
-                    .dwFlags = w.PFD_DRAW_TO_WINDOW | w.PFD_SUPPORT_OPENGL | if (opengl.doublebuffer) w.PFD_DOUBLEBUFFER else @as(u32, 0),
+                    .dwFlags = w.PFD_DRAW_TO_WINDOW | w.PFD_SUPPORT_OPENGL | if (opengl.doublebuffer) w.PFD_DOUBLEBUFFER else 0,
                     .iPixelType = w.PFD_TYPE_RGBA,
                     .cColorBits = opengl.red_bits + opengl.green_bits + opengl.blue_bits,
                     .cAlphaBits = opengl.alpha_bits,
