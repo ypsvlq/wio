@@ -896,10 +896,10 @@ const AudioClient = struct {
     dataFn: *const fn () void,
     event: w.HANDLE,
     channels: u16,
-    stop: bool = false,
+    stop: std.atomic.Value(bool) = .init(false),
 
     pub fn close(self: *AudioOutput) void {
-        self.stop = true;
+        self.stop.store(true, .unordered);
         self.thread.join();
 
         std.os.windows.CloseHandle(self.event.?);
@@ -915,7 +915,7 @@ const AudioClient = struct {
         var size: u32 = undefined;
         SUCCEED(self.client.GetBufferSize(&size), "IAudioClient::GetBufferSize") catch return;
 
-        while (!self.stop) {
+        while (!self.stop.load(.unordered)) {
             _ = w.WaitForSingleObject(self.event, w.INFINITE);
 
             var used: u32 = undefined;
@@ -933,7 +933,7 @@ const AudioClient = struct {
         const capture_client: *w.IAudioCaptureClient = @ptrCast(self.service);
         const readFn: *const fn ([]const f32) void = @ptrCast(self.dataFn);
 
-        while (!self.stop) {
+        while (!self.stop.load(.unordered)) {
             _ = w.WaitForSingleObject(self.event, w.INFINITE);
 
             var count: u32 = undefined;
