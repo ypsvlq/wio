@@ -429,10 +429,12 @@ pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
 
     if (mode == .relative) {
         if (self.locked_pointer == null) {
-            self.locked_pointer = h.zwp_pointer_constraints_v1_lock_pointer(pointer_constraints, self.surface, pointer, null, h.ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
+            if (pointer_constraints) |_| {
+                self.locked_pointer = h.zwp_pointer_constraints_v1_lock_pointer(pointer_constraints, self.surface, pointer, null, h.ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
+            }
         }
     } else {
-        if (self.locked_pointer != null) {
+        if (self.locked_pointer) |_| {
             h.zwp_locked_pointer_v1_destroy(self.locked_pointer);
             self.locked_pointer = null;
         }
