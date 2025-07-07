@@ -1215,6 +1215,7 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
         w.WM_SYSCOMMAND => {
             switch (wParam & 0xFFF0) {
                 w.SC_KEYMENU => return 0,
+                w.SC_SCREENSAVE, w.SC_MONITORPOWER => return if (self.isFullscreen()) 0 else w.DefWindowProcW(window, msg, wParam, lParam),
                 else => return w.DefWindowProcW(window, msg, wParam, lParam),
             }
         },
