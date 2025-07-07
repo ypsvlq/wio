@@ -143,7 +143,7 @@ pub fn init() !void {
         }
 
         if (internal.init_options.audioDefaultOutputFn != null or internal.init_options.audioDefaultInputFn != null) {
-            try SUCCEED(mm_device_enumerator.RegisterEndpointNotificationCallback(&mm_notification_client.parent), "RegisterEndpointNotificationCallback");
+            try SUCCEED(mm_device_enumerator.RegisterEndpointNotificationCallback(&mm_notification_client.interface), "RegisterEndpointNotificationCallback");
         }
     }
 }
@@ -952,49 +952,45 @@ pub const AudioOutput = AudioClient;
 pub const AudioInput = AudioClient;
 
 const MMNotificationClient = struct {
-    parent: w.IMMNotificationClient = .{ .lpVtbl = &vtbl },
-    mutex: std.Thread.Mutex = .{},
-    default_output: ?*w.IMMDevice = null,
-    default_input: ?*w.IMMDevice = null,
-
-    const vtbl = w.IMMNotificationClient.Vtbl{
-        .parent = .{
-            .AddRef = AddRef,
-            .Release = Release,
-            .QueryInterface = QueryInterface,
-        },
+    interface: w.IMMNotificationClient = .{ .lpVtbl = &.{
+        .QueryInterface = QueryInterface,
+        .AddRef = AddRef,
+        .Release = Release,
         .OnDeviceStateChanged = OnDeviceStateChanged,
         .OnDeviceAdded = OnDeviceAdded,
         .OnDeviceRemoved = OnDeviceRemoved,
         .OnDefaultDeviceChanged = OnDefaultDeviceChanged,
         .OnPropertyValueChanged = OnPropertyValueChanged,
-    };
+    } },
+    mutex: std.Thread.Mutex = .{},
+    default_output: ?*w.IMMDevice = null,
+    default_input: ?*w.IMMDevice = null,
 
-    fn AddRef(_: *const anyopaque) callconv(.winapi) u32 {
-        return 1;
-    }
-
-    fn Release(_: *const anyopaque) callconv(.winapi) u32 {
-        return 1;
-    }
-
-    fn QueryInterface(_: *const anyopaque, _: [*c]const w.GUID, _: [*c]?*anyopaque) callconv(.winapi) w.HRESULT {
+    fn QueryInterface(_: *w.IMMNotificationClient, _: [*c]const w.GUID, _: [*c]?*anyopaque) callconv(.winapi) w.HRESULT {
         return w.E_NOINTERFACE;
     }
 
-    fn OnDeviceStateChanged(_: *const anyopaque, _: [*c]const u16, _: u32) callconv(.winapi) w.HRESULT {
+    fn AddRef(_: *w.IMMNotificationClient) callconv(.winapi) u32 {
+        return 1;
+    }
+
+    fn Release(_: *w.IMMNotificationClient) callconv(.winapi) u32 {
+        return 1;
+    }
+
+    fn OnDeviceStateChanged(_: *w.IMMNotificationClient, _: [*c]const u16, _: u32) callconv(.winapi) w.HRESULT {
         return w.S_OK;
     }
 
-    fn OnDeviceAdded(_: *const anyopaque, _: [*c]const u16) callconv(.winapi) w.HRESULT {
+    fn OnDeviceAdded(_: *w.IMMNotificationClient, _: [*c]const u16) callconv(.winapi) w.HRESULT {
         return w.S_OK;
     }
 
-    fn OnDeviceRemoved(_: *const anyopaque, _: [*c]const u16) callconv(.winapi) w.HRESULT {
+    fn OnDeviceRemoved(_: *w.IMMNotificationClient, _: [*c]const u16) callconv(.winapi) w.HRESULT {
         return w.S_OK;
     }
 
-    fn OnDefaultDeviceChanged(_: *const anyopaque, flow: i32, role: i32, id: [*c]const u16) callconv(.winapi) w.HRESULT {
+    fn OnDefaultDeviceChanged(_: *w.IMMNotificationClient, flow: i32, role: i32, id: [*c]const u16) callconv(.winapi) w.HRESULT {
         if (role == w.eConsole) {
             const maybe_device = if (flow == w.eRender and internal.init_options.audioDefaultOutputFn != null)
                 &mm_notification_client.default_output
@@ -1016,7 +1012,7 @@ const MMNotificationClient = struct {
         return w.S_OK;
     }
 
-    fn OnPropertyValueChanged(_: *const anyopaque, _: [*c]const u16, _: w.PROPERTYKEY) callconv(.winapi) w.HRESULT {
+    fn OnPropertyValueChanged(_: *w.IMMNotificationClient, _: [*c]const u16, _: w.PROPERTYKEY) callconv(.winapi) w.HRESULT {
         return w.S_OK;
     }
 };
