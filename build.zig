@@ -71,6 +71,19 @@ pub fn build(b: *std.Build) void {
             if (b.lazyDependency("win32", .{ .target = target, .optimize = optimize })) |win32| {
                 module.addImport("win32", win32.module("win32"));
             }
+
+            module.linkSystemLibrary("user32", .{});
+            if (enable_opengl) {
+                module.linkSystemLibrary("gdi32", .{});
+                module.linkSystemLibrary("opengl32", .{});
+            }
+            if (enable_joystick) {
+                module.linkSystemLibrary("hid", .{});
+                module.linkSystemLibrary("xinput9_1_0", .{});
+            }
+            if (enable_audio) {
+                module.linkSystemLibrary("ole32", .{});
+            }
         },
         .macos => {
             module.addCSourceFile(.{ .file = b.path("src/macos.m"), .flags = &.{ "-fobjc-arc", "-Wno-deprecated-declarations" } });
