@@ -178,12 +178,6 @@ pub fn update() void {
     }
 }
 
-pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
-    _ = style;
-    _ = title;
-    _ = message;
-}
-
 events: internal.EventQueue,
 window: h.Window,
 ic: h.XIC,

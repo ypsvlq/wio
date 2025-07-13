@@ -116,10 +116,44 @@ pub fn wait() void {
 }
 
 pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
-    switch (active) {
-        .x11 => x11.messageBox(style, title, message),
-        .wayland => wayland.messageBox(style, title, message),
+    if (active == .wayland) {
+        if (wayland.focus) |focus| {
+            focus.repeat_key = 0;
+        }
     }
+
+    var kdialog = std.process.Child.init(&.{
+        "kdialog",
+        "--title",
+        title,
+        switch (style) {
+            .info => "--msgbox",
+            .warn => "--sorry",
+            .err => "--error",
+        },
+        message,
+    }, internal.allocator);
+
+    if (kdialog.spawnAndWait()) |_| {
+        return;
+    } else |_| {}
+
+    var zenity = std.process.Child.init(&.{
+        "zenity",
+        switch (style) {
+            .info => "--info",
+            .warn => "--warning",
+            .err => "--error",
+        },
+        "--title",
+        title,
+        "--text",
+        message,
+    }, internal.allocator);
+
+    if (zenity.spawnAndWait()) |_| {
+        return;
+    } else |_| {}
 }
 
 pub fn createWindow(options: wio.CreateWindowOptions) !Window {

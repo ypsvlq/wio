@@ -242,12 +242,6 @@ pub fn update() void {
     _ = c.wl_display_roundtrip(display);
 }
 
-pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
-    _ = style;
-    _ = title;
-    _ = message;
-}
-
 events: internal.EventQueue,
 surface: *h.wl_surface,
 frame: *h.libdecor_frame,
