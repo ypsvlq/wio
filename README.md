@@ -61,7 +61,8 @@ changing the `CFBundleExecutable` and `CFBundleName` values in Info.plist.
 
 Unix-like systems support different backends in the same executable, with the
 most appropriate being chosen at runtime. To restrict the available choices,
-set the `unix_backends` build option to a comma-separated list.
+set the `unix_backends` build option to a comma-separated list. Exposing this
+option in your build script is recommended.
 
 For X11, the following libraries are loaded:
 
