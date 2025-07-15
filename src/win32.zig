@@ -1,8 +1,9 @@
 const std = @import("std");
 const build_options = @import("build_options");
-const w = @import("win32");
+pub const win32 = @import("win32");
 const wio = @import("wio.zig");
 const internal = @import("wio.internal.zig");
+const w = win32;
 const log = std.log.scoped(.wio);
 
 const class_name = w.L("wio");

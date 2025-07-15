@@ -93,6 +93,7 @@ when targeting a given platform:
 ### Windows
 
 - `Window.backend.window` is the Win32 `HWND`
+- `wio.backend.win32` is the Win32 API bindings
 
 ### macOS
 
