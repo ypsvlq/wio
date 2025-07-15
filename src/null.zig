@@ -11,6 +11,8 @@ pub fn run(func: fn () anyerror!bool) !void {
     _ = func;
 }
 
+pub fn update() void {}
+
 pub fn wait() void {}
 
 pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
@@ -92,9 +94,27 @@ pub fn swapInterval(self: *@This(), interval: i32) void {
     _ = interval;
 }
 
+pub fn createSurface(self: *@This(), instance: usize, allocator: ?*const anyopaque, surface: *u64) i32 {
+    _ = self;
+    _ = instance;
+    _ = allocator;
+    _ = surface;
+    return 0;
+}
+
 pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
     _ = name;
     return null;
+}
+
+pub fn vkGetInstanceProcAddr(instance: usize, name: [*:0]const u8) ?*const fn () void {
+    _ = instance;
+    _ = name;
+    return null;
+}
+
+pub fn getVulkanExtensions() []const [*:0]const u8 {
+    return &.{};
 }
 
 pub const JoystickDeviceIterator = struct {

@@ -4,8 +4,8 @@ const build_options = @import("build_options");
 const wio = @import("wio.zig");
 const internal = @import("wio.internal.zig");
 const DynLib = @import("unix/DynLib.zig");
-pub const x11 = @import("unix/x11.zig");
-pub const wayland = @import("unix/wayland.zig");
+pub const x11 = if (build_options.x11) @import("unix/x11.zig") else @import("null.zig");
+pub const wayland = if (build_options.wayland) @import("unix/wayland.zig") else @import("null.zig");
 const joystick = switch (builtin.os.tag) {
     .linux => @import("unix/joystick/linux.zig"),
     else => @import("unix/joystick/null.zig"),
@@ -46,9 +46,9 @@ pub fn init() !void {
     if (build_options.joystick) try joystick.init();
     if (build_options.audio) try audio.init();
 
-    var try_x11 = build_options.x11;
-    var try_wayland = build_options.wayland;
-    if (try_x11 and try_wayland) {
+    var try_x11 = true;
+    var try_wayland = true;
+    if (build_options.x11 and build_options.wayland) {
         if (std.c.getenv("XDG_SESSION_TYPE")) |value| {
             const session_type = std.mem.sliceTo(value, 0);
             if (std.mem.eql(u8, session_type, "x11")) {
@@ -59,21 +59,21 @@ pub fn init() !void {
         }
     }
 
-    if (try_wayland) {
+    if (build_options.wayland and try_wayland) {
         if (wayland.init()) {
             active = .wayland;
             return;
         } else |err| if (err != error.Unavailable) return err;
     }
 
-    if (try_x11) {
+    if (build_options.x11 and try_x11) {
         if (x11.init()) {
             active = .x11;
             return;
         } else |err| if (err != error.Unavailable) return err;
     }
 
-    log.err("no backend found", .{});
+    log.err("could not connect to window system", .{});
     return error.Unexpected;
 }
 
@@ -105,7 +105,7 @@ pub fn update() void {
 
 pub fn wait() void {
     var timeout: c_int = -1;
-    if (active == .wayland) {
+    if (build_options.wayland and active == .wayland) {
         if (wayland.focus) |focus| {
             if (focus.repeat_key != 0) {
                 timeout = wayland.repeat_period;
@@ -116,7 +116,7 @@ pub fn wait() void {
 }
 
 pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
-    if (active == .wayland) {
+    if (build_options.wayland and active == .wayland) {
         if (wayland.focus) |focus| {
             focus.repeat_key = 0;
         }

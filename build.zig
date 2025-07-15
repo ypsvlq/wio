@@ -109,7 +109,10 @@ pub fn build(b: *std.Build) void {
         },
         .linux, .openbsd, .netbsd, .freebsd, .dragonfly, .illumos => |tag| {
             module.link_libc = true;
-            module.addCSourceFile(.{ .file = b.path("src/unix/wayland.c") });
+
+            if (enable_wayland) {
+                module.addCSourceFile(.{ .file = b.path("src/unix/wayland.c") });
+            }
 
             if (b.lazyDependency("wio_unix_headers", .{})) |unix_headers| {
                 module.addIncludePath(unix_headers.path("."));
