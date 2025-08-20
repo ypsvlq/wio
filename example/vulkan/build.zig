@@ -10,7 +10,12 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    const wio = b.dependency("wio", .{ .target = target, .optimize = optimize, .features = @as([]const u8, "vulkan") });
+    const wio = b.dependency("wio", .{
+        .target = target,
+        .optimize = optimize,
+        .features = "vulkan",
+        .unix_backends = b.option([]const u8, "unix_backends", "List of enabled wio backends"),
+    });
     exe_mod.addImport("wio", wio.module("wio"));
 
     const vulkan_headers = b.dependency("vulkan_headers", .{});
