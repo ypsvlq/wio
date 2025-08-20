@@ -420,7 +420,7 @@ export fn wioScroll(self: *@This(), vertical: f32, horizontal: f32) void {
 }
 
 fn wioAudioOutputWrite(data: *const anyopaque, buffer: [*]f32, size: usize) callconv(.c) void {
-    const writeFn: *const fn ([]f32) void = @alignCast(@ptrCast(data));
+    const writeFn: *const fn ([]f32) void = @ptrCast(@alignCast(data));
     writeFn(buffer[0 .. size / @sizeOf(f32)]);
 }
 

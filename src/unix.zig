@@ -29,8 +29,8 @@ pub var libvulkan: DynLib = undefined;
 pub fn init() !void {
     if (!build_options.system_integration and builtin.os.tag == .linux and builtin.output_mode == .Exe and builtin.link_mode == .static) @compileError("dynamic link required");
 
-    pollfds = .init(internal.allocator);
-    errdefer pollfds.deinit();
+    pollfds = .empty;
+    errdefer pollfds.deinit(internal.allocator);
 
     if (build_options.vulkan) {
         libvulkan = try .open("libvulkan.so.1");
@@ -42,9 +42,12 @@ pub fn init() !void {
                 return error.Unexpected;
             };
     }
+    errdefer if (build_options.vulkan) libvulkan.close();
 
     if (build_options.joystick) try joystick.init();
+    errdefer if (build_options.joystick) joystick.deinit();
     if (build_options.audio) try audio.init();
+    errdefer if (build_options.audio) audio.deinit();
 
     var try_x11 = true;
     var try_wayland = true;
@@ -88,7 +91,7 @@ pub fn deinit() void {
         .x11 => x11.deinit(),
         .wayland => wayland.deinit(),
     }
-    pollfds.deinit();
+    pollfds.deinit(internal.allocator);
 }
 
 pub fn run(func: fn () anyerror!bool) !void {

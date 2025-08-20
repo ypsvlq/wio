@@ -190,6 +190,8 @@ pub fn build(b: *std.Build) void {
     const exe = b.addExecutable(.{
         .name = "wio",
         .root_module = exe_mod,
+        // https://github.com/ziglang/zig/issues/24140
+        .use_llvm = true,
     });
     b.installArtifact(exe);
 

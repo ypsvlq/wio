@@ -161,7 +161,7 @@ pub fn init() !void {
 
     display = c.wl_display_connect(null) orelse return error.Unavailable;
     errdefer c.wl_display_disconnect(display);
-    try unix.pollfds.append(.{ .fd = c.wl_display_get_fd(display), .events = std.c.POLL.IN, .revents = undefined });
+    try unix.pollfds.append(internal.allocator, .{ .fd = c.wl_display_get_fd(display), .events = std.c.POLL.IN, .revents = undefined });
 
     xkb = c.xkb_context_new(h.XKB_CONTEXT_NO_FLAGS) orelse return error.Unexpected;
     errdefer c.xkb_context_unref(xkb);
@@ -667,7 +667,7 @@ fn keyboardKeymap(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, fd: i32, size: u32
 }
 
 fn keyboardEnter(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, surface: ?*h.wl_surface, _: ?*h.wl_array) callconv(.c) void {
-    focus = @alignCast(@ptrCast(h.wl_surface_get_user_data(surface)));
+    focus = @ptrCast(@alignCast(h.wl_surface_get_user_data(surface)));
     if (focus) |window| window.events.push(.focused);
 }
 
@@ -719,7 +719,7 @@ const pointer_listener = h.wl_pointer_listener{
 
 fn pointerEnter(_: ?*anyopaque, _: ?*h.wl_pointer, serial: u32, surface: ?*h.wl_surface, _: i32, _: i32) callconv(.c) void {
     pointer_enter_serial = serial;
-    if (@as(?*@This(), @alignCast(@ptrCast(h.wl_surface_get_user_data(surface))))) |window| {
+    if (@as(?*@This(), @ptrCast(@alignCast(h.wl_surface_get_user_data(surface))))) |window| {
         window.applyCursor();
     }
 }
@@ -773,7 +773,7 @@ const fractional_scale_listener = h.wp_fractional_scale_v1_listener{
 };
 
 fn fractionalScalePreferredScale(data: ?*anyopaque, _: ?*h.wp_fractional_scale_v1, scale: u32) callconv(.c) void {
-    const self: *@This() = @alignCast(@ptrCast(data orelse return));
+    const self: *@This() = @ptrCast(@alignCast(data orelse return));
     self.scale = @floatFromInt(scale);
     self.scale /= 120;
     self.events.push(.{ .scale = self.scale });
@@ -840,7 +840,7 @@ var libdecor_frame_interface = h.libdecor_frame_interface{
 };
 
 fn frameConfigure(frame: ?*h.libdecor_frame, configuration: ?*h.libdecor_configuration, data: ?*anyopaque) callconv(.c) void {
-    const self: *@This() = @alignCast(@ptrCast(data));
+    const self: *@This() = @ptrCast(@alignCast(data));
     self.configured = true;
 
     var mode = wio.WindowMode.normal;
@@ -861,7 +861,7 @@ fn frameConfigure(frame: ?*h.libdecor_frame, configuration: ?*h.libdecor_configu
 }
 
 fn frameClose(_: ?*h.libdecor_frame, data: ?*anyopaque) callconv(.c) void {
-    const self: *@This() = @alignCast(@ptrCast(data));
+    const self: *@This() = @ptrCast(@alignCast(data));
     self.events.push(.close);
 }
 

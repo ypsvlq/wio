@@ -46,7 +46,7 @@ extern const wioHIDProductKey: c.CFStringRef;
 var libvulkan: std.DynLib = undefined;
 
 var hid: c.IOHIDManagerRef = undefined;
-var removed_joysticks: std.AutoHashMap(c.IOHIDDeviceRef, bool) = undefined;
+var removed_joysticks: std.AutoHashMapUnmanaged(c.IOHIDDeviceRef, bool) = undefined;
 
 pub fn init() !void {
     wioInit();
@@ -89,7 +89,7 @@ pub fn init() !void {
         defer c.CFRelease(matching);
         c.IOHIDManagerSetDeviceMatchingMultiple(hid, matching);
 
-        removed_joysticks = .init(internal.allocator);
+        removed_joysticks = .empty;
         c.IOHIDManagerRegisterDeviceRemovalCallback(hid, joystickRemoved, null);
         if (internal.init_options.joystickConnectedFn != null) {
             c.IOHIDManagerRegisterDeviceMatchingCallback(hid, joystickConnected, null);
@@ -130,7 +130,7 @@ pub fn init() !void {
 
 pub fn deinit() void {
     if (build_options.joystick) {
-        removed_joysticks.deinit();
+        removed_joysticks.deinit(internal.allocator);
         c.CFRelease(hid);
     }
     if (build_options.vulkan) {
@@ -328,26 +328,26 @@ pub const JoystickDevice = struct {
         const elements = c.IOHIDDeviceCopyMatchingElements(self.device, null, c.kIOHIDOptionsTypeNone) orelse return error.Unexpected;
         defer c.CFRelease(elements);
 
-        var axis_elements = std.ArrayList(c.IOHIDElementRef).init(internal.allocator);
-        errdefer axis_elements.deinit();
-        var hat_elements = std.ArrayList(c.IOHIDElementRef).init(internal.allocator);
-        errdefer hat_elements.deinit();
-        var button_elements = std.ArrayList(c.IOHIDElementRef).init(internal.allocator);
-        errdefer button_elements.deinit();
+        var axis_elements: std.ArrayList(c.IOHIDElementRef) = .empty;
+        errdefer axis_elements.deinit(internal.allocator);
+        var hat_elements: std.ArrayList(c.IOHIDElementRef) = .empty;
+        errdefer hat_elements.deinit(internal.allocator);
+        var button_elements: std.ArrayList(c.IOHIDElementRef) = .empty;
+        errdefer button_elements.deinit(internal.allocator);
 
         const count = c.CFArrayGetCount(elements);
         var i: c.CFIndex = 0;
         while (i < count) : (i += 1) {
-            const element: c.IOHIDElementRef = @constCast(@ptrCast(c.CFArrayGetValueAtIndex(elements, i)));
+            const element: c.IOHIDElementRef = @ptrCast(@constCast(c.CFArrayGetValueAtIndex(elements, i)));
             if (c.IOHIDElementGetType(element) == c.kIOHIDElementTypeInput_Button) {
-                try button_elements.append(element);
+                try button_elements.append(internal.allocator, element);
             } else {
                 const page = c.IOHIDElementGetUsagePage(element);
                 const usage = c.IOHIDElementGetUsage(element);
                 switch (page) {
                     c.kHIDPage_GenericDesktop => {
                         switch (usage) {
-                            c.kHIDUsage_GD_Hatswitch => try hat_elements.append(element),
+                            c.kHIDUsage_GD_Hatswitch => try hat_elements.append(internal.allocator, element),
                             c.kHIDUsage_GD_X,
                             c.kHIDUsage_GD_Y,
                             c.kHIDUsage_GD_Z,
@@ -357,7 +357,7 @@ pub const JoystickDevice = struct {
                             c.kHIDUsage_GD_Slider,
                             c.kHIDUsage_GD_Dial,
                             c.kHIDUsage_GD_Wheel,
-                            => try axis_elements.append(element),
+                            => try axis_elements.append(internal.allocator, element),
                             else => {},
                         }
                     },
@@ -373,14 +373,14 @@ pub const JoystickDevice = struct {
         const buttons = try internal.allocator.alloc(bool, button_elements.items.len);
         errdefer internal.allocator.free(buttons);
 
-        const axis_elements_slice = try axis_elements.toOwnedSlice();
+        const axis_elements_slice = try axis_elements.toOwnedSlice(internal.allocator);
         errdefer internal.allocator.free(axis_elements_slice);
-        const hat_elements_slice = try hat_elements.toOwnedSlice();
+        const hat_elements_slice = try hat_elements.toOwnedSlice(internal.allocator);
         errdefer internal.allocator.free(hat_elements_slice);
-        const button_elements_slice = try button_elements.toOwnedSlice();
+        const button_elements_slice = try button_elements.toOwnedSlice(internal.allocator);
         errdefer internal.allocator.free(button_elements_slice);
 
-        try removed_joysticks.put(self.device, false);
+        try removed_joysticks.put(internal.allocator, self.device, false);
 
         return .{
             .device = self.device,
@@ -638,9 +638,9 @@ pub const AudioOutput = struct {
     }
 
     fn callback(data: ?*anyopaque, _: [*c]c.AudioUnitRenderActionFlags, _: [*c]const c.AudioTimeStamp, _: u32, _: u32, list: [*c]c.AudioBufferList) callconv(.c) c.OSStatus {
-        const writeFn: *const fn ([]f32) void = @alignCast(@ptrCast(data));
+        const writeFn: *const fn ([]f32) void = @ptrCast(@alignCast(data));
         const buffer = list.*.mBuffers[0];
-        const ptr: [*]f32 = @alignCast(@ptrCast(buffer.mData));
+        const ptr: [*]f32 = @ptrCast(@alignCast(buffer.mData));
         writeFn(ptr[0 .. buffer.mDataByteSize / @sizeOf(f32)]);
         return c.noErr;
     }
@@ -659,7 +659,7 @@ pub const AudioInput = struct {
     }
 
     fn callback(data: ?*anyopaque, flags: [*c]c.AudioUnitRenderActionFlags, timestamp: [*c]const c.AudioTimeStamp, bus: u32, frames: u32, _: [*c]c.AudioBufferList) callconv(.c) c.OSStatus {
-        const self: *AudioInput = @alignCast(@ptrCast(data));
+        const self: *AudioInput = @ptrCast(@alignCast(data));
 
         var list = c.AudioBufferList{
             .mNumberBuffers = 1,
@@ -693,7 +693,7 @@ pub const AudioInput = struct {
     }
 
     fn inputProc(_: c.AudioConverterRef, packets: [*c]u32, list: [*c]c.AudioBufferList, _: [*c][*c]c.AudioStreamPacketDescription, data: ?*anyopaque) callconv(.c) c.OSStatus {
-        const buffer: *c.AudioBuffer = @alignCast(@ptrCast(data));
+        const buffer: *c.AudioBuffer = @ptrCast(@alignCast(data));
         list.*.mBuffers[0] = buffer.*;
         packets.* = buffer.mDataByteSize / buffer.mNumberChannels / @sizeOf(f32);
         return c.noErr;

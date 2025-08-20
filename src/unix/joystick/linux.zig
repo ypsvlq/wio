@@ -38,6 +38,8 @@ var monitor: *h.udev_monitor = undefined;
 
 pub fn init() !void {
     try DynLib.load(&imports, &.{.{ .handle = &libudev, .name = "libudev.so.1" }});
+    errdefer libudev.close();
+
     udev = c.udev_new() orelse return error.Unexpected;
     errdefer _ = c.udev_unref(udev);
 
@@ -47,7 +49,7 @@ pub fn init() !void {
 
         monitor = c.udev_monitor_new_from_netlink(udev, "udev") orelse return error.Unexpected;
         errdefer _ = c.udev_monitor_unref(monitor);
-        try unix.pollfds.append(.{ .fd = c.udev_monitor_get_fd(monitor), .events = std.c.POLL.IN, .revents = undefined });
+        try unix.pollfds.append(internal.allocator, .{ .fd = c.udev_monitor_get_fd(monitor), .events = std.c.POLL.IN, .revents = undefined });
         _ = c.udev_monitor_filter_add_match_subsystem_devtype(monitor, "input", null);
         _ = c.udev_monitor_enable_receiving(monitor);
     }
@@ -180,7 +182,7 @@ pub const JoystickDevice = struct {
         errdefer internal.allocator.free(buttons);
         @memset(buttons, false);
 
-        try unix.pollfds.append(.{ .fd = fd, .events = std.c.POLL.IN, .revents = undefined });
+        try unix.pollfds.append(internal.allocator, .{ .fd = fd, .events = std.c.POLL.IN, .revents = undefined });
 
         return .{ .fd = fd, .abs_map = abs_map, .key_map = key_map, .axis_info = axis_info, .axes = axes, .hats = hats, .buttons = buttons };
     }

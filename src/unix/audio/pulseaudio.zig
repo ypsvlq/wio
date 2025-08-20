@@ -53,6 +53,7 @@ var context: *h.pa_context = undefined;
 
 pub fn init() !void {
     try DynLib.load(&imports, &.{.{ .handle = &libpulse, .name = "libpulse.so.0" }});
+    errdefer libpulse.close();
 
     loop = c.pa_threaded_mainloop_new() orelse return error.Unexpected;
     errdefer c.pa_threaded_mainloop_free(loop);
@@ -148,11 +149,11 @@ pub fn update() void {
 }
 
 pub const AudioDeviceIterator = struct {
-    list: std.ArrayList(AudioDevice),
+    list: std.ArrayList(AudioDevice) = .empty,
     index: usize = 0,
 
     pub fn init(mode: wio.AudioDeviceType) AudioDeviceIterator {
-        var self = AudioDeviceIterator{ .list = .init(internal.allocator) };
+        var self = AudioDeviceIterator{};
         c.pa_threaded_mainloop_lock(loop);
         defer c.pa_threaded_mainloop_unlock(loop);
         const operation = if (mode == .output)
@@ -165,7 +166,7 @@ pub const AudioDeviceIterator = struct {
     }
 
     pub fn deinit(self: *AudioDeviceIterator) void {
-        self.list.deinit();
+        self.list.deinit(internal.allocator);
     }
 
     pub fn next(self: *AudioDeviceIterator) ?AudioDevice {
@@ -269,11 +270,11 @@ pub const AudioOutput = struct {
     }
 
     fn callback(stream: ?*h.pa_stream, _: usize, data: ?*anyopaque) callconv(.c) void {
-        const writeFn: *const fn ([]f32) void = @alignCast(@ptrCast(data));
+        const writeFn: *const fn ([]f32) void = @ptrCast(@alignCast(data));
         var ptr: ?*anyopaque = undefined;
         var nbytes: usize = std.math.maxInt(usize);
         if (c.pa_stream_begin_write(stream, &ptr, &nbytes) == 0 and ptr != null) {
-            const buffer: [*]f32 = @alignCast(@ptrCast(ptr));
+            const buffer: [*]f32 = @ptrCast(@alignCast(ptr));
             writeFn(buffer[0 .. nbytes / @sizeOf(f32)]);
             _ = c.pa_stream_write(stream, ptr, nbytes, null, 0, h.PA_SEEK_RELATIVE);
         }
@@ -291,11 +292,11 @@ pub const AudioInput = struct {
     }
 
     fn callback(stream: ?*h.pa_stream, _: usize, data: ?*anyopaque) callconv(.c) void {
-        const readFn: *const fn ([]const f32) void = @alignCast(@ptrCast(data));
+        const readFn: *const fn ([]const f32) void = @ptrCast(@alignCast(data));
         var ptr: ?*const anyopaque = null;
         var nbytes: usize = 0;
         if (c.pa_stream_peek(stream, &ptr, &nbytes) == 0 and ptr != null) {
-            const buffer: [*]const f32 = @alignCast(@ptrCast(ptr));
+            const buffer: [*]const f32 = @ptrCast(@alignCast(ptr));
             readFn(buffer[0 .. nbytes / @sizeOf(f32)]);
         }
         if (nbytes != 0) _ = c.pa_stream_drop(stream);
@@ -315,13 +316,13 @@ fn successCallback(_: ?*h.pa_context, _: c_int, _: ?*anyopaque) callconv(.c) voi
 }
 
 fn serverInfoCallback(_: ?*h.pa_context, info: ?*const h.pa_server_info, data: ?*anyopaque) callconv(.c) void {
-    const result: *?*const h.pa_server_info = @alignCast(@ptrCast(data));
+    const result: *?*const h.pa_server_info = @ptrCast(@alignCast(data));
     result.* = info;
     c.pa_threaded_mainloop_signal(loop, 1);
 }
 
 fn sinkNameCallback(_: ?*h.pa_context, info: ?*const h.pa_sink_info, eol: c_int, data: ?*anyopaque) callconv(.c) void {
-    const result: *?[*:0]const u8 = @alignCast(@ptrCast(data));
+    const result: *?[*:0]const u8 = @ptrCast(@alignCast(data));
     if (eol == 0) {
         result.* = info.?.description;
         c.pa_threaded_mainloop_signal(loop, 1);
@@ -331,7 +332,7 @@ fn sinkNameCallback(_: ?*h.pa_context, info: ?*const h.pa_sink_info, eol: c_int,
 }
 
 fn sourceNameCallback(_: ?*h.pa_context, info: ?*const h.pa_source_info, eol: c_int, data: ?*anyopaque) callconv(.c) void {
-    const result: *?[*:0]const u8 = @alignCast(@ptrCast(data));
+    const result: *?[*:0]const u8 = @ptrCast(@alignCast(data));
     if (eol == 0) {
         result.* = info.?.description;
         c.pa_threaded_mainloop_signal(loop, 1);
@@ -341,10 +342,10 @@ fn sourceNameCallback(_: ?*h.pa_context, info: ?*const h.pa_source_info, eol: c_
 }
 
 fn sinkListCallback(_: ?*h.pa_context, info: ?*const h.pa_sink_info, eol: c_int, data: ?*anyopaque) callconv(.c) void {
-    const list: *std.ArrayList(AudioDevice) = @alignCast(@ptrCast(data));
+    const list: *std.ArrayList(AudioDevice) = @ptrCast(@alignCast(data));
     if (eol == 0) {
         const id = internal.allocator.dupeZ(u8, std.mem.sliceTo(info.?.name, 0)) catch return;
-        list.append(.{ .id = id, .type = .output }) catch {
+        list.append(internal.allocator, .{ .id = id, .type = .output }) catch {
             internal.allocator.free(id);
             return;
         };
@@ -354,10 +355,10 @@ fn sinkListCallback(_: ?*h.pa_context, info: ?*const h.pa_sink_info, eol: c_int,
 }
 
 fn sourceListCallback(_: ?*h.pa_context, info: ?*const h.pa_source_info, eol: c_int, data: ?*anyopaque) callconv(.c) void {
-    const list: *std.ArrayList(AudioDevice) = @alignCast(@ptrCast(data));
+    const list: *std.ArrayList(AudioDevice) = @ptrCast(@alignCast(data));
     if (eol == 0) {
         const id = internal.allocator.dupeZ(u8, std.mem.sliceTo(info.?.name, 0)) catch return;
-        list.append(.{ .id = id, .type = .input }) catch {
+        list.append(internal.allocator, .{ .id = id, .type = .input }) catch {
             internal.allocator.free(id);
             return;
         };

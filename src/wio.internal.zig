@@ -5,7 +5,7 @@ pub var allocator: std.mem.Allocator = undefined;
 pub var init_options: wio.InitOptions = undefined;
 
 pub const EventQueue = struct {
-    events: std.ArrayListUnmanaged(wio.Event) = .empty,
+    events: std.ArrayList(wio.Event) = .empty,
     head: usize = 0,
 
     pub fn init() EventQueue {

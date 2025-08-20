@@ -33,9 +33,9 @@ var vki: vk.InstanceWrapper = undefined;
 var instance: vk.InstanceProxy = undefined;
 
 fn createInstance() !void {
-    var enabled_extensions = std.ArrayList([*:0]const u8).init(allocator);
-    defer enabled_extensions.deinit();
-    try enabled_extensions.appendSlice(wio.getVulkanExtensions());
+    var enabled_extensions: std.ArrayList([*:0]const u8) = .empty;
+    defer enabled_extensions.deinit(allocator);
+    try enabled_extensions.appendSlice(allocator, wio.getVulkanExtensions());
 
     var has_portability = false;
     const extensions = try vkb.enumerateInstanceExtensionPropertiesAlloc(null, allocator);
@@ -43,7 +43,7 @@ fn createInstance() !void {
     for (extensions) |extension| {
         const name = std.mem.sliceTo(&extension.extension_name, 0);
         if (std.mem.eql(u8, name, "VK_KHR_portability_enumeration")) {
-            try enabled_extensions.append("VK_KHR_portability_enumeration");
+            try enabled_extensions.append(allocator, "VK_KHR_portability_enumeration");
             has_portability = true;
         }
     }
@@ -125,16 +125,16 @@ var graphics_queue: vk.Queue = undefined;
 var present_queue: vk.Queue = undefined;
 
 fn createLogicalDevice() !void {
-    var enabled_extensions = std.ArrayList([*:0]const u8).init(allocator);
-    defer enabled_extensions.deinit();
-    try enabled_extensions.append("VK_KHR_swapchain");
+    var enabled_extensions: std.ArrayList([*:0]const u8) = .empty;
+    defer enabled_extensions.deinit(allocator);
+    try enabled_extensions.append(allocator, "VK_KHR_swapchain");
 
     const extensions = try instance.enumerateDeviceExtensionPropertiesAlloc(physical_device, null, allocator);
     defer allocator.free(extensions);
     for (extensions) |extension| {
         const name = std.mem.sliceTo(&extension.extension_name, 0);
         if (std.mem.eql(u8, name, "VK_KHR_portability_subset")) {
-            try enabled_extensions.append("VK_KHR_portability_subset");
+            try enabled_extensions.append(allocator, "VK_KHR_portability_subset");
         }
     }
 
@@ -219,9 +219,9 @@ fn createGraphicsPipeline() !void {
     const vertex_code = @embedFile("shader.vert.spv");
     const fragment_code = @embedFile("shader.frag.spv");
 
-    const vertex_module = try device.createShaderModule(&.{ .code_size = vertex_code.len, .p_code = @alignCast(@ptrCast(vertex_code)) }, null);
+    const vertex_module = try device.createShaderModule(&.{ .code_size = vertex_code.len, .p_code = @ptrCast(@alignCast(vertex_code)) }, null);
     defer device.destroyShaderModule(vertex_module, null);
-    const fragment_module = try device.createShaderModule(&.{ .code_size = fragment_code.len, .p_code = @alignCast(@ptrCast(fragment_code)) }, null);
+    const fragment_module = try device.createShaderModule(&.{ .code_size = fragment_code.len, .p_code = @ptrCast(@alignCast(fragment_code)) }, null);
     defer device.destroyShaderModule(fragment_module, null);
 
     pipeline_layout = try device.createPipelineLayout(&.{}, null);

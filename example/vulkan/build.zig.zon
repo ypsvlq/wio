@@ -7,12 +7,12 @@
             .path = "../..",
         },
         .vulkan = .{
-            .url = "https://github.com/Snektron/vulkan-zig/archive/c9f2c528cc465f1d8238192d0ea07fc29367bf3d.tar.gz",
-            .hash = "vulkan-0.0.0-r7Ytx11UAwDj8RT0-qNjGxpRlTA4KfA7-4Urki6eTGJL",
+            .url = "https://github.com/Snektron/vulkan-zig/archive/93bc6f1ac3e13dd98d918e242dc892f179a0d0f5.tar.gz",
+            .hash = "vulkan-0.0.0-r7YtxwA_AwAU4rmOITZD_KJs11Kie1sv0t-pcMDQGIqw",
         },
         .vulkan_headers = .{
-            .url = "https://github.com/KhronosGroup/Vulkan-Headers/archive/v1.4.313.tar.gz",
-            .hash = "N-V-__8AAPLT7gH4vgN7Xo6yZlOMrzllGbdvVxxhrwUvgI9r",
+            .url = "https://github.com/KhronosGroup/Vulkan-Headers/archive/v1.4.321.tar.gz",
+            .hash = "N-V-__8AAI7-AQIsx0GGCNZVZDEQ-EhVjVd915WjwOOiSSA-",
         },
     },
     .paths = .{

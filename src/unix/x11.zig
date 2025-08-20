@@ -88,7 +88,7 @@ var atoms: extern struct {
 var libX11: DynLib = undefined;
 var libXcursor: DynLib = undefined;
 var libGL: DynLib = undefined;
-var windows: std.AutoHashMap(h.Window, *@This()) = undefined;
+var windows: std.AutoHashMapUnmanaged(h.Window, *@This()) = undefined;
 pub var display: *h.Display = undefined;
 var im: h.XIM = undefined;
 var keycodes: [248]wio.Button = undefined;
@@ -110,14 +110,14 @@ pub fn init() !void {
 
     display = c.XkbOpenDisplay(null, null, null, null, null, null) orelse return error.Unavailable;
     errdefer _ = c.XCloseDisplay(display);
-    try unix.pollfds.append(.{ .fd = h.ConnectionNumber(display), .events = std.c.POLL.IN, .revents = undefined });
+    try unix.pollfds.append(internal.allocator, .{ .fd = h.ConnectionNumber(display), .events = std.c.POLL.IN, .revents = undefined });
 
     var atom_names: [@typeInfo(@TypeOf(atoms)).@"struct".fields.len][*:0]const u8 = undefined;
     for (&atom_names, std.meta.fieldNames(@TypeOf(atoms))) |*name_z, name| name_z.* = name;
     _ = c.XInternAtoms(display, @ptrCast(&atom_names), atom_names.len, h.False, @ptrCast(&atoms));
 
-    windows = .init(internal.allocator);
-    errdefer windows.deinit();
+    windows = .empty;
+    errdefer windows.deinit(internal.allocator);
 
     _ = std.c.setlocale(.CTYPE, "");
     im = c.XOpenIM(display, null, null, null) orelse return error.Unexpected;
@@ -128,11 +128,11 @@ pub fn init() !void {
     _ = c.XkbGetNames(display, h.XkbKeyNamesMask | h.XkbKeyAliasesMask, xkb);
     const names: *h.XkbNamesRec = xkb.names;
 
-    var aliases = std.AutoHashMap([4]u8, wio.Button).init(internal.allocator);
-    defer aliases.deinit();
+    var aliases: std.AutoHashMapUnmanaged([4]u8, wio.Button) = .empty;
+    defer aliases.deinit(internal.allocator);
     for (names.key_aliases[0..names.num_key_aliases]) |alias| {
         if (nameToButton(alias.alias)) |button| {
-            try aliases.put(alias.real, button);
+            try aliases.put(internal.allocator, alias.real, button);
         }
     }
 
@@ -167,7 +167,7 @@ pub fn deinit() void {
     if (build_options.opengl) libGL.close();
     libXcursor.close();
     libX11.close();
-    windows.deinit();
+    windows.deinit(internal.allocator);
 }
 
 pub fn update() void {
@@ -309,7 +309,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     self.events.push(.{ .framebuffer = size });
     self.events.push(.draw);
 
-    try windows.put(window, self);
+    try windows.put(internal.allocator, window, self);
     return self;
 }
 

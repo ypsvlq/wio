@@ -22,7 +22,7 @@ const JoystickInfo = struct {
     interface: []u16,
     joystick: ?*RawInputJoystick = null,
 };
-var joysticks: std.AutoHashMap(w.HANDLE, JoystickInfo) = undefined;
+var joysticks: std.AutoHashMapUnmanaged(w.HANDLE, JoystickInfo) = undefined;
 var xinput = std.StaticBitSet(4).initEmpty();
 var helper_input: []u8 = &.{};
 
@@ -108,7 +108,7 @@ pub fn init() !void {
     }
 
     if (build_options.joystick) {
-        joysticks = .init(internal.allocator);
+        joysticks = .empty;
 
         var devices = [_]w.RAWINPUTDEVICE{
             .{
@@ -153,16 +153,19 @@ pub fn deinit() void {
     if (build_options.vulkan) {
         _ = w.FreeLibrary(vulkan);
     }
+
     if (build_options.opengl or build_options.joystick) {
         _ = w.DestroyWindow(helper_window);
     }
+
     if (build_options.joystick) {
         internal.allocator.free(helper_input);
 
         var iter = joysticks.valueIterator();
         while (iter.next()) |info| internal.allocator.free(info.interface);
-        joysticks.deinit();
+        joysticks.deinit(internal.allocator);
     }
+
     if (build_options.audio) {
         _ = mm_device_enumerator.Release();
         w.CoUninitialize();
@@ -440,7 +443,7 @@ pub fn setClipboardText(_: *@This(), text: []const u8) void {
     const text_w = std.unicode.utf8ToUtf16LeAlloc(internal.allocator, text) catch return;
     defer internal.allocator.free(text_w);
     const mem = w.GlobalAlloc(w.GMEM_MOVEABLE, (text_w.len + 1) * @sizeOf(u16)) orelse return;
-    const buf: [*]u16 = @alignCast(@ptrCast(w.GlobalLock(mem) orelse {
+    const buf: [*]u16 = @ptrCast(@alignCast(w.GlobalLock(mem) orelse {
         _ = w.GlobalFree(mem);
         return;
     }));
@@ -456,7 +459,7 @@ pub fn getClipboardText(_: *@This(), allocator: std.mem.Allocator) ?[]u8 {
     if (w.OpenClipboard(null) == 0) return null;
     defer _ = w.CloseClipboard();
     const mem = w.GetClipboardData(w.CF_UNICODETEXT) orelse return null;
-    const text: [*:0]const u16 = @alignCast(@ptrCast(w.GlobalLock(mem) orelse return null));
+    const text: [*:0]const u16 = @ptrCast(@alignCast(w.GlobalLock(mem) orelse return null));
     defer _ = w.GlobalUnlock(mem);
     return std.unicode.utf16LeToUtf8Alloc(allocator, std.mem.sliceTo(text, 0)) catch null;
 }
@@ -1109,7 +1112,7 @@ fn helperWindowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM
                         return 0;
                     }
 
-                    joysticks.put(device, .{ .interface = interface }) catch {
+                    joysticks.put(internal.allocator, device, .{ .interface = interface }) catch {
                         internal.allocator.free(interface);
                         return 0;
                     };
@@ -1143,7 +1146,7 @@ fn helperWindowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM
             if (w.GetRawInputData(handle, w.RID_INPUT, null, &size, @sizeOf(w.RAWINPUTHEADER)) == -1) return 0;
             if (size > helper_input.len) helper_input = internal.allocator.realloc(helper_input, size) catch return 0;
             if (w.GetRawInputData(handle, w.RID_INPUT, helper_input.ptr, &size, @sizeOf(w.RAWINPUTHEADER)) == -1) return 0;
-            const raw: *w.RAWINPUT = @alignCast(@ptrCast(helper_input));
+            const raw: *w.RAWINPUT = @ptrCast(@alignCast(helper_input));
 
             if (joysticks.get(raw.header.hDevice)) |info| {
                 const joystick = info.joystick orelse return 0;
@@ -1387,7 +1390,7 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
                 if (w.GetRawInputData(handle, w.RID_INPUT, null, &size, @sizeOf(w.RAWINPUTHEADER)) == -1) return 0;
                 if (size > self.input.len) self.input = internal.allocator.realloc(self.input, size) catch return 0;
                 if (w.GetRawInputData(handle, w.RID_INPUT, self.input.ptr, &size, @sizeOf(w.RAWINPUTHEADER)) == -1) return 0;
-                const raw: *w.RAWINPUT = @alignCast(@ptrCast(self.input));
+                const raw: *w.RAWINPUT = @ptrCast(@alignCast(self.input));
 
                 if (raw.data.mouse.usFlags & w.MOUSE_MOVE_ABSOLUTE != 0) {
                     if (raw.data.mouse.lLastX != 0 or raw.data.mouse.lLastY != 0) { // prevent spurious (0,0)
