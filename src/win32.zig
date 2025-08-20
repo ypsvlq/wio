@@ -1081,6 +1081,10 @@ fn HIWORD(x: anytype) u16 {
     return @intCast((x >> 16) & 0xFFFF);
 }
 
+fn LOSHORT(x: anytype) i16 {
+    return @bitCast(LOWORD(x));
+}
+
 fn HISHORT(x: anytype) i16 {
     return @bitCast(HIWORD(x));
 }
@@ -1380,7 +1384,13 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
             return if (msg == w.WM_XBUTTONDOWN or msg == w.WM_XBUTTONUP) w.TRUE else 0;
         },
         w.WM_MOUSEMOVE => {
-            if (self.cursor_mode != .relative) self.events.push(.{ .mouse = .{ .x = LOWORD(lParam), .y = HIWORD(lParam) } });
+            if (self.cursor_mode != .relative) {
+                const x = LOSHORT(lParam);
+                const y = HISHORT(lParam);
+                if (x >= 0 and y >= 0) {
+                    self.events.push(.{ .mouse = .{ .x = @intCast(x), .y = @intCast(y) } });
+                }
+            }
             return 0;
         },
         w.WM_INPUT => {
