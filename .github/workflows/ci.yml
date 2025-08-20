@@ -10,7 +10,9 @@ jobs:
         target:
         - x86-windows
         - aarch64-macos
-        - arm-linux-gnueabihf
+        - arm-linux-gnueabi
+        - mips-netbsd
+        - riscv64-freebsd
         - wasm32-freestanding
     runs-on: ubuntu-latest
     steps:
