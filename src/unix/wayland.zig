@@ -472,8 +472,21 @@ pub fn getClipboardText(_: *@This(), allocator: std.mem.Allocator) ?[]u8 {
     h.wl_data_offer_receive(data_offer, "text/plain;charset=utf-8", pipe[1]);
     _ = c.wl_display_roundtrip(display);
     _ = std.c.close(pipe[1]);
-    const file = std.fs.File{ .handle = pipe[0] };
-    return file.readToEndAlloc(allocator, std.math.maxInt(usize)) catch null;
+    return readClipboardText(allocator, .{ .handle = pipe[0] }) catch null;
+}
+
+fn readClipboardText(allocator: std.mem.Allocator, file: std.fs.File) ![]u8 {
+    var buffer: [1024]u8 = undefined;
+    var text: std.ArrayList(u8) = .empty;
+    errdefer text.deinit(allocator);
+    while (true) {
+        const count = try file.read(&buffer);
+        if (count > 0) {
+            try text.appendSlice(allocator, buffer[0..count]);
+        } else {
+            return text.toOwnedSlice(allocator);
+        }
+    }
 }
 
 pub fn makeContextCurrent(self: *@This()) void {
@@ -810,7 +823,8 @@ fn dataSourceTarget(_: ?*anyopaque, _: ?*h.wl_data_source, _: [*c]const u8) call
 fn dataSourceSend(_: ?*anyopaque, _: ?*h.wl_data_source, _: [*c]const u8, fd: i32) callconv(.c) void {
     defer _ = std.c.close(fd);
     const file = std.fs.File{ .handle = fd };
-    file.writeAll(clipboard_text) catch {};
+    var writer = file.writer(&.{});
+    writer.interface.writeAll(clipboard_text) catch {};
 }
 
 fn dataSourceCancelled(_: ?*anyopaque, _: ?*h.wl_data_source) callconv(.c) void {}
