@@ -21,6 +21,7 @@ var imports: extern struct {
     pa_context_unref: *const @TypeOf(h.pa_context_unref),
     pa_context_connect: *const @TypeOf(h.pa_context_connect),
     pa_context_disconnect: *const @TypeOf(h.pa_context_disconnect),
+    pa_context_errno: *const @TypeOf(h.pa_context_errno),
     pa_context_set_state_callback: *const @TypeOf(h.pa_context_set_state_callback),
     pa_context_get_state: *const @TypeOf(h.pa_context_get_state),
     pa_context_set_subscribe_callback: *const @TypeOf(h.pa_context_set_subscribe_callback),
@@ -30,6 +31,7 @@ var imports: extern struct {
     pa_context_get_source_info_by_name: *const @TypeOf(h.pa_context_get_source_info_by_name),
     pa_context_get_sink_info_list: *const @TypeOf(h.pa_context_get_sink_info_list),
     pa_context_get_source_info_list: *const @TypeOf(h.pa_context_get_source_info_list),
+    pa_strerror: *const @TypeOf(h.pa_strerror),
     pa_operation_unref: *const @TypeOf(h.pa_operation_unref),
     pa_operation_get_state: *const @TypeOf(h.pa_operation_get_state),
     pa_channel_map_init_auto: *const @TypeOf(h.pa_channel_map_init_auto),
@@ -55,26 +57,26 @@ pub fn init() !void {
     try DynLib.load(&imports, &.{.{ .handle = &libpulse, .name = "libpulse.so.0" }});
     errdefer libpulse.close();
 
-    loop = c.pa_threaded_mainloop_new() orelse return error.Unexpected;
+    loop = c.pa_threaded_mainloop_new() orelse return logContextlessError("pa_threaded_mainloop_new");
     errdefer c.pa_threaded_mainloop_free(loop);
 
     const api = c.pa_threaded_mainloop_get_api(loop);
-    context = c.pa_context_new(api, null) orelse return error.Unexpected;
+    context = c.pa_context_new(api, null) orelse return logContextlessError("pa_context_new");
     errdefer c.pa_context_unref(context);
 
     c.pa_context_set_state_callback(context, notifyCallback, null);
-    if (c.pa_context_connect(context, null, h.PA_CONTEXT_NOFLAGS, null) < 0) return error.Unexpected;
+    if (c.pa_context_connect(context, null, h.PA_CONTEXT_NOFLAGS, null) < 0) return logContextError("pa_context_connect");
 
     c.pa_threaded_mainloop_lock(loop);
     defer c.pa_threaded_mainloop_unlock(loop);
 
-    if (c.pa_threaded_mainloop_start(loop) < 0) return error.Unexpected;
+    if (c.pa_threaded_mainloop_start(loop) < 0) return logContextlessError("pa_threaded_mainloop_start");
     errdefer c.pa_threaded_mainloop_stop(loop);
 
     while (true) {
         switch (c.pa_context_get_state(context)) {
             h.PA_CONTEXT_READY => break,
-            h.PA_CONTEXT_FAILED => return error.Unexpected,
+            h.PA_CONTEXT_FAILED => return logContextError("pa_context_connect"),
             else => c.pa_threaded_mainloop_wait(loop),
         }
     }
@@ -199,12 +201,8 @@ pub const AudioDevice = struct {
         c.pa_threaded_mainloop_lock(loop);
         defer c.pa_threaded_mainloop_unlock(loop);
 
-        var map: h.pa_channel_map = undefined;
-        _ = c.pa_channel_map_init_auto(&map, format.channels, h.PA_CHANNEL_MAP_DEFAULT) orelse return error.Unexpected;
-
-        const stream = c.pa_stream_new(context, "", &.{ .format = h.PA_SAMPLE_FLOAT32, .rate = format.sample_rate, .channels = map.channels }, &map) orelse return error.Unexpected;
+        const stream = try openStream(format);
         errdefer c.pa_stream_unref(stream);
-
         c.pa_stream_set_write_callback(stream, AudioOutput.callback, @constCast(writeFn));
 
         const attr = h.pa_buffer_attr{
@@ -214,7 +212,7 @@ pub const AudioDevice = struct {
             .minreq = std.math.maxInt(u32),
             .fragsize = std.math.maxInt(u32),
         };
-        if (c.pa_stream_connect_playback(stream, self.id, &attr, h.PA_STREAM_ADJUST_LATENCY, null, null) != 0) return error.Unexpected;
+        if (c.pa_stream_connect_playback(stream, self.id, &attr, h.PA_STREAM_ADJUST_LATENCY, null, null) != 0) return logContextError("pa_stream_connect_playback");
 
         return .{ .stream = stream };
     }
@@ -223,10 +221,7 @@ pub const AudioDevice = struct {
         c.pa_threaded_mainloop_lock(loop);
         defer c.pa_threaded_mainloop_unlock(loop);
 
-        var map: h.pa_channel_map = undefined;
-        _ = c.pa_channel_map_init_auto(&map, format.channels, h.PA_CHANNEL_MAP_DEFAULT) orelse return error.Unexpected;
-
-        const stream = c.pa_stream_new(context, "", &.{ .format = h.PA_SAMPLE_FLOAT32, .rate = format.sample_rate, .channels = map.channels }, &map) orelse return error.Unexpected;
+        const stream = try openStream(format);
         errdefer c.pa_stream_unref(stream);
         c.pa_stream_set_read_callback(stream, AudioInput.callback, @constCast(readFn));
 
@@ -237,7 +232,7 @@ pub const AudioDevice = struct {
             .minreq = std.math.maxInt(u32),
             .fragsize = 1,
         };
-        if (c.pa_stream_connect_record(stream, self.id, &attr, h.PA_STREAM_ADJUST_LATENCY) != 0) return error.Unexpected;
+        if (c.pa_stream_connect_record(stream, self.id, &attr, h.PA_STREAM_ADJUST_LATENCY) != 0) return logContextError("pa_stream_connect_record");
 
         return .{ .stream = stream };
     }
@@ -265,8 +260,9 @@ pub const AudioDevice = struct {
 };
 
 fn openStream(format: wio.AudioFormat) !*h.pa_stream {
-    var map = h.pa_channel_map{ .channels = 0, .map = undefined };
-    return c.pa_stream_new(context, "", &.{ .format = h.PA_SAMPLE_FLOAT32LE, .rate = format.sample_rate, .channels = map.channels }, &map) orelse return error.Unexpected;
+    var map: h.pa_channel_map = undefined;
+    _ = c.pa_channel_map_init_auto(&map, format.channels, h.PA_CHANNEL_MAP_DEFAULT) orelse return logContextlessError("pa_channel_map_init_auto");
+    return c.pa_stream_new(context, "", &.{ .format = h.PA_SAMPLE_FLOAT32LE, .rate = format.sample_rate, .channels = map.channels }, &map) orelse logContextError("pa_stream_new");
 }
 
 pub const AudioOutput = struct {
@@ -312,6 +308,16 @@ pub const AudioInput = struct {
         if (nbytes != 0) _ = c.pa_stream_drop(stream);
     }
 };
+
+fn logContextlessError(name: []const u8) error{Unexpected} {
+    log.err("{s} failed", .{name});
+    return error.Unexpected;
+}
+
+fn logContextError(name: []const u8) error{Unexpected} {
+    log.err("{s} failed: {s}", .{ name, c.pa_strerror(c.pa_context_errno(context)) });
+    return error.Unexpected;
+}
 
 fn notifyCallback(_: ?*h.pa_context, _: ?*anyopaque) callconv(.c) void {
     c.pa_threaded_mainloop_signal(loop, 0);
