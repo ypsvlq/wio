@@ -57,16 +57,27 @@ pub fn init() !void {
 
     loop = c.pa_threaded_mainloop_new() orelse return error.Unexpected;
     errdefer c.pa_threaded_mainloop_free(loop);
-    if (c.pa_threaded_mainloop_start(loop) < 0) return error.Unexpected;
-    errdefer c.pa_threaded_mainloop_stop(loop);
-    c.pa_threaded_mainloop_lock(loop);
 
     const api = c.pa_threaded_mainloop_get_api(loop);
     context = c.pa_context_new(api, null) orelse return error.Unexpected;
     errdefer c.pa_context_unref(context);
-    if (c.pa_context_connect(context, null, h.PA_CONTEXT_NOFLAGS, null) < 0) return error.Unexpected;
+
     c.pa_context_set_state_callback(context, notifyCallback, null);
-    while (c.pa_context_get_state(context) != h.PA_CONTEXT_READY) c.pa_threaded_mainloop_wait(loop);
+    if (c.pa_context_connect(context, null, h.PA_CONTEXT_NOFLAGS, null) < 0) return error.Unexpected;
+
+    c.pa_threaded_mainloop_lock(loop);
+    defer c.pa_threaded_mainloop_unlock(loop);
+
+    if (c.pa_threaded_mainloop_start(loop) < 0) return error.Unexpected;
+    errdefer c.pa_threaded_mainloop_stop(loop);
+
+    while (true) {
+        switch (c.pa_context_get_state(context)) {
+            h.PA_CONTEXT_READY => break,
+            h.PA_CONTEXT_FAILED => return error.Unexpected,
+            else => c.pa_threaded_mainloop_wait(loop),
+        }
+    }
 
     if (internal.init_options.audioDefaultOutputFn != null or internal.init_options.audioDefaultInputFn != null) {
         c.pa_context_set_subscribe_callback(context, subscribeCallback, null);
@@ -74,7 +85,6 @@ pub fn init() !void {
         defer c.pa_operation_unref(operation);
         while (c.pa_operation_get_state(operation) == h.PA_OPERATION_RUNNING) c.pa_threaded_mainloop_wait(loop);
     }
-    c.pa_threaded_mainloop_unlock(loop);
 }
 
 pub fn deinit() void {
