@@ -21,8 +21,8 @@ pub const InitOptions = struct {
 };
 
 /// Unless otherwise noted, all calls to wio functions must be made on the same thread.
-pub fn init(ally: std.mem.Allocator, options: InitOptions) !void {
-    internal.allocator = ally;
+pub fn init(allocator: std.mem.Allocator, options: InitOptions) !void {
+    internal.allocator = allocator;
     internal.init_options = options;
     try backend.init();
 }
@@ -137,8 +137,8 @@ pub const Window = struct {
         self.backend.setClipboardText(text);
     }
 
-    pub fn getClipboardText(self: *Window, ally: std.mem.Allocator) ?[]u8 {
-        return self.backend.getClipboardText(ally);
+    pub fn getClipboardText(self: *Window, allocator: std.mem.Allocator) ?[]u8 {
+        return self.backend.getClipboardText(allocator);
     }
 
     /// May be called on any thread.
@@ -213,13 +213,13 @@ pub const JoystickDevice = struct {
     }
 
     /// May not be unique.
-    pub fn getId(self: JoystickDevice, ally: std.mem.Allocator) ?[]u8 {
-        return self.backend.getId(ally) catch null;
+    pub fn getId(self: JoystickDevice, allocator: std.mem.Allocator) ?[]u8 {
+        return self.backend.getId(allocator) catch null;
     }
 
     /// Returns "" on error.
-    pub fn getName(self: JoystickDevice, ally: std.mem.Allocator) []u8 {
-        return self.backend.getName(ally) catch "";
+    pub fn getName(self: JoystickDevice, allocator: std.mem.Allocator) []u8 {
+        return self.backend.getName(allocator) catch "";
     }
 };
 
@@ -287,13 +287,13 @@ pub const AudioDevice = struct {
     }
 
     /// May not be unique.
-    pub fn getId(self: AudioDevice, ally: std.mem.Allocator) ?[]u8 {
-        return self.backend.getId(ally) catch null;
+    pub fn getId(self: AudioDevice, allocator: std.mem.Allocator) ?[]u8 {
+        return self.backend.getId(allocator) catch null;
     }
 
     /// Returns "" on error.
-    pub fn getName(self: AudioDevice, ally: std.mem.Allocator) []u8 {
-        return self.backend.getName(ally) catch "";
+    pub fn getName(self: AudioDevice, allocator: std.mem.Allocator) []u8 {
+        return self.backend.getName(allocator) catch "";
     }
 };
 
