@@ -1,6 +1,6 @@
 # wio
 
-wio is a platform abstraction library. It provides:
+wio is a platform abstraction library, providing:
 
 - window management and events
 - clipboard access
@@ -14,8 +14,8 @@ wio is a platform abstraction library. It provides:
 The public API can be browsed in [src/wio.zig][1]. The [example][2] directory
 contains a test program covering most features.
 
-The `features` build option can be used to disable optional functionality,
-or enable Vulkan support (which is not available on all platforms).
+The `features` build option can be used to disable some functions, or enable
+Vulkan support.
 
 ## Platform support
 
@@ -46,8 +46,8 @@ Not actively tested.
 
 ### Windows
 
-By default, wio embeds an [application manifest][3] for proper functionality.
-When using a custom manifest, set the `win32_manifest` build option to false.
+wio embeds an [application manifest][3] by default. To use a custom manifest,
+set the `win32_manifest` build option to `false`.
 
 If audio is enabled, wio initializes COM with options `COINIT_MULTITHREADED`
 and `COINIT_DISABLE_OLE1DDE`.
@@ -59,18 +59,23 @@ changing the `CFBundleExecutable` and `CFBundleName` values in Info.plist.
 
 ### Unix
 
-Unix-like systems support different backends in the same executable, with the
-most appropriate being chosen at runtime. To restrict the available choices,
-set the `unix_backends` build option to a comma-separated list. Exposing this
-option in your build script is recommended.
+Unix-like systems support different backends in the same executable. By default
+all backends are enabled, the `unix_backends` build option can be used to
+limit the choices.
 
-For X11, the following libraries are loaded:
+When building a project that uses wio, passing `-fsys=wio` to `zig build` will
+link libraries explicitly (rather than using `dlopen`).
+
+It is recommended to expose `unix_backends` in your build script and document
+the existance of `-fsys=wio`, to assist with packaging your project.
+
+The following libraries are loaded for the X11 backend:
 
 - `libX11.so.6`
 - `libXcursor.so.1`
 - `libGL.so.1` (if OpenGL is enabled)
 
-For Wayland, the following libraries are loaded:
+The following libraries are loaded for the Wayland backend:
 
 - `libwayland-client.so.0`
 - `libxkbcommon.so.0`
@@ -78,31 +83,28 @@ For Wayland, the following libraries are loaded:
 - `libwayland-egl.so.1` (if OpenGL is enabled)
 - `libEGL.so.1` (if OpenGL is enabled)
 
-Additionally, the following libraries are loaded for Linux:
+The following libraries are loaded under Linux:
 
 - `libudev.so.1` (if joysticks are enabled)
 - `libpulse.so.0` (if audio is enabled)
 
-When building a project that uses wio, passing `-fsys=wio` to `zig build` will
-link libraries explicitly (instead of using dlopen).
-
 ## Platform-specific API
 
 The following variables and fields may be considered part of the public API
-when targeting a given platform:
+for a given platform:
 
 ### Windows
 
 - `Window.backend.window` is the Win32 `HWND`
-- `wio.backend.win32` is the Win32 API bindings
+- `wio.backend.win32` is a set of Win32 API bindings
 
 ### macOS
 
-- `Window.backend.window` is the AppKit `NSWindow*`
+- `Window.backend.window` is the AppKit `NSWindow`
 
 ### Unix
 
-`wio.backend.active` is an enum describing the backend in use:
+`wio.backend.active` is an enum variable specifying the backend in use:
 
 #### `.x11`
 
@@ -111,8 +113,8 @@ when targeting a given platform:
 
 #### `.wayland`
 
-- `wio.backend.wayland.display` is the Wayland `wl_display*`
-- `Window.backend.wayland.surface` is the Wayland `wl_surface*`
+- `wio.backend.wayland.display` is the Wayland `wl_display`
+- `Window.backend.wayland.surface` is the Wayland `wl_surface`
 
 
 [1]: https://github.com/ypsvlq/wio/blob/master/src/wio.zig
