@@ -545,7 +545,6 @@ fn resize(self: *@This(), size: wio.Size, configuration: ?*h.libdecor_configurat
     const framebuffer = size.multiply(self.scale);
 
     if (self.viewport) |_| {
-        h.wp_viewport_set_source(self.viewport, 0, 0, @as(i32, framebuffer.width) << 8, @as(i32, framebuffer.height) << 8);
         h.wp_viewport_set_destination(self.viewport, size.width, size.height);
     }
 
