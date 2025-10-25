@@ -2,8 +2,8 @@ const std = @import("std");
 const wio = @import("wio");
 const vk = @import("vulkan");
 
-var gpa = std.heap.GeneralPurposeAllocator(.{}).init;
-const allocator = gpa.allocator();
+var debug_allocator = std.heap.DebugAllocator(.{}).init;
+const allocator = debug_allocator.allocator();
 
 var window: wio.Window = undefined;
 var size = wio.Size{ .width = 640, .height = 480 };
@@ -476,7 +476,7 @@ fn loop() !bool {
                 instance.destroyInstance(null);
                 window.destroy();
                 wio.deinit();
-                _ = gpa.deinit();
+                _ = debug_allocator.deinit();
                 return false;
             },
             .framebuffer => |new_size| {
