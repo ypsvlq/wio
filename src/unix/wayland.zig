@@ -117,6 +117,7 @@ var compose_state: ?*h.xkb_compose_state = null;
 
 var libdecor_context: *h.libdecor = undefined;
 
+var windows: std.AutoHashMapUnmanaged(*@This(), void) = .empty;
 pub var focus: ?*@This() = null;
 var last_serial: u32 = 0;
 var pointer_enter_serial: u32 = 0;
@@ -203,6 +204,7 @@ pub fn deinit() void {
     }
 
     internal.allocator.free(clipboard_text);
+    windows.deinit(internal.allocator);
 
     c.libdecor_unref(libdecor_context);
     libdecor.close();
@@ -340,11 +342,13 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
         }
     }
 
+    try windows.put(internal.allocator, self, {});
     return self;
 }
 
 pub fn destroy(self: *@This()) void {
     if (focus == self) focus = null;
+    _ = windows.remove(self);
 
     if (build_options.opengl) {
         if (self.egl.context) |_| _ = c.eglDestroyContext(egl_display, self.egl.context);
@@ -585,6 +589,11 @@ fn applyCursor(self: *@This()) void {
     }
 }
 
+fn getWindow(surface: ?*h.wl_surface) ?*@This() {
+    const window: *@This() = @ptrCast(@alignCast(h.wl_surface_get_user_data(surface) orelse return null));
+    return if (windows.contains(window)) window else null;
+}
+
 const registry_listener = h.wl_registry_listener{
     .global = registryGlobal,
     .global_remove = registryGlobalRemove,
@@ -680,7 +689,7 @@ fn keyboardKeymap(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, fd: i32, size: u32
 }
 
 fn keyboardEnter(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, surface: ?*h.wl_surface, _: ?*h.wl_array) callconv(.c) void {
-    focus = @ptrCast(@alignCast(h.wl_surface_get_user_data(surface)));
+    focus = getWindow(surface);
     if (focus) |window| window.events.push(.focused);
 }
 
@@ -732,7 +741,7 @@ const pointer_listener = h.wl_pointer_listener{
 
 fn pointerEnter(_: ?*anyopaque, _: ?*h.wl_pointer, serial: u32, surface: ?*h.wl_surface, _: i32, _: i32) callconv(.c) void {
     pointer_enter_serial = serial;
-    if (@as(?*@This(), @ptrCast(@alignCast(h.wl_surface_get_user_data(surface))))) |window| {
+    if (getWindow(surface)) |window| {
         window.applyCursor();
     }
 }
