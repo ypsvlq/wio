@@ -13,7 +13,6 @@ pub const backend = switch (builtin.os.tag) {
 pub const InitOptions = struct {
     /// Free with `JoystickDevice.release()`.
     joystickConnectedFn: ?*const fn (JoystickDevice) void = null,
-
     /// Free with `AudioDevice.release()`.
     audioDefaultOutputFn: ?*const fn (AudioDevice) void = null,
     /// Free with `AudioDevice.release()`.
@@ -27,7 +26,7 @@ pub fn init(allocator: std.mem.Allocator, options: InitOptions) !void {
     try backend.init();
 }
 
-/// All windows and devices must be closed before deinit is called.
+/// All windows and devices must be closed before calling.
 pub fn deinit() void {
     backend.deinit();
 }
@@ -40,7 +39,7 @@ pub fn run(func: fn () anyerror!bool) !void {
     return backend.run(func);
 }
 
-/// Alternative to `run`, providing user control over the main loop.
+/// Alternative to `run()`, providing user control over the main loop.
 ///
 /// Not available on all platforms.
 pub fn update() void {
@@ -85,6 +84,8 @@ pub const CreateWindowOptions = struct {
     scale: ?f32 = null,
 
     /// Window handle, for embedding.
+    ///
+    /// Not functional on all platforms.
     parent: usize = 0,
 
     opengl: ?CreateContextOptions = null,
@@ -185,7 +186,7 @@ pub fn getVulkanExtensions() []const [*:0]const u8 {
 pub const JoystickDeviceIterator = struct {
     backend: backend.JoystickDeviceIterator,
 
-    /// Invalidated on the next iteration of the main loop (or call to `update`).
+    /// Free with `deinit()` before the next iteration of the main loop.
     pub fn init() JoystickDeviceIterator {
         assertFeature(.joystick);
         return .{ .backend = backend.JoystickDeviceIterator.init() };
@@ -208,6 +209,7 @@ pub const JoystickDevice = struct {
         self.backend.release();
     }
 
+    /// Free with `Joystick.close()`.
     pub fn open(self: JoystickDevice) ?Joystick {
         return .{ .backend = self.backend.open() catch return null };
     }
@@ -253,7 +255,7 @@ pub const AudioDeviceType = enum { output, input };
 pub const AudioDeviceIterator = struct {
     backend: backend.AudioDeviceIterator,
 
-    /// Invalidated on the next iteration of the main loop (or call to `update`).
+    /// Free with `deinit()` before the next iteration of the main loop.
     pub fn init(mode: AudioDeviceType) AudioDeviceIterator {
         assertFeature(.audio);
         return .{ .backend = backend.AudioDeviceIterator.init(mode) };
@@ -263,7 +265,7 @@ pub const AudioDeviceIterator = struct {
         self.backend.deinit();
     }
 
-    // Free with `AudioDevice.release()`.
+    /// Free with `AudioDevice.release()`.
     pub fn next(self: *AudioDeviceIterator) ?AudioDevice {
         return .{ .backend = self.backend.next() orelse return null };
     }
@@ -277,11 +279,15 @@ pub const AudioDevice = struct {
     }
 
     /// `writeFn` is called on a separate thread.
+    ///
+    /// Free with `AudioOutput.close()`.
     pub fn openOutput(self: AudioDevice, writeFn: *const fn ([]f32) void, format: AudioFormat) ?AudioOutput {
         return .{ .backend = self.backend.openOutput(writeFn, format) catch return null };
     }
 
     /// `readFn` is called on a separate thread.
+    ///
+    /// Free with `AudioInput.close()`.
     pub fn openInput(self: AudioDevice, readFn: *const fn ([]const f32) void, format: AudioFormat) ?AudioInput {
         return .{ .backend = self.backend.openInput(readFn, format) catch return null };
     }
@@ -295,6 +301,11 @@ pub const AudioDevice = struct {
     pub fn getName(self: AudioDevice, allocator: std.mem.Allocator) []u8 {
         return self.backend.getName(allocator) catch "";
     }
+};
+
+pub const AudioFormat = struct {
+    sample_rate: u32,
+    channels: u8,
 };
 
 pub const AudioOutput = struct {
@@ -311,11 +322,6 @@ pub const AudioInput = struct {
     pub fn close(self: *AudioInput) void {
         self.backend.close();
     }
-};
-
-pub const AudioFormat = struct {
-    sample_rate: u32,
-    channels: u8,
 };
 
 pub const Event = union(enum) {
