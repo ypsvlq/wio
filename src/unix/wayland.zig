@@ -888,7 +888,11 @@ fn frameClose(_: ?*h.libdecor_frame, data: ?*anyopaque) callconv(.c) void {
     self.events.push(.close);
 }
 
-fn frameCommit(_: ?*h.libdecor_frame, _: ?*anyopaque) callconv(.c) void {}
+fn frameCommit(_: ?*h.libdecor_frame, data: ?*anyopaque) callconv(.c) void {
+    const self: *@This() = @ptrCast(@alignCast(data));
+    self.events.push(.draw);
+}
+
 fn frameDismissPopup(_: ?*h.libdecor_frame, _: [*c]const u8, _: ?*anyopaque) callconv(.c) void {}
 
 fn keyToButton(key: u32) ?wio.Button {
