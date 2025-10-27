@@ -8,7 +8,7 @@ jobs:
       fail-fast: false
       matrix:
         target:
-        - x86-windows
+        - thumb-windows
         - aarch64-macos
         - arm-linux-gnueabi
         - mips-netbsd

@@ -5,8 +5,8 @@
     .minimum_zig_version = "0.15.1",
     .dependencies = .{
         .win32 = .{
-            .url = "https://github.com/ypsvlq/win32/archive/5aa470a488d79d5d42a6179d961e7a34a06b0541.tar.gz",
-            .hash = "win32-0.0.0-4XUubfi17wKozbaW5c2n_UsOjJqyX06YlGGQEUDPPjlg",
+            .url = "https://github.com/ypsvlq/win32/archive/fc126defa5747f36275a2cb0938620d466fea6ce.tar.gz",
+            .hash = "win32-0.0.0-4XUubRv1-gLIfSxQ_WaWxHVyW8M7LuouYBo0mFVgvkW8",
             .lazy = true,
         },
         .xcode_frameworks = .{
