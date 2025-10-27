@@ -182,7 +182,7 @@ pub fn swapInterval(self: *@This(), interval: i32) void {
     self.opengl.vsync = (interval > 0);
 }
 
-pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
+pub fn glGetProcAddress(name: [:0]const u8) ?*const anyopaque {
     var location: ?*const anyopaque = undefined;
     return if (get_image_symbol(libGL, name, 0x2, &location) == 0)
         location

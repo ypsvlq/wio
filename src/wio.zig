@@ -167,7 +167,7 @@ pub const Window = struct {
 };
 
 /// Must be called on the thread where the context is current.
-pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const fn () void {
+pub fn glGetProcAddress(name: [:0]const u8) ?*const fn () void {
     assertFeature(.opengl);
     return @ptrCast(@alignCast(backend.glGetProcAddress(name)));
 }

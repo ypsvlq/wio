@@ -102,7 +102,7 @@ pub fn createSurface(self: *@This(), instance: usize, allocator: ?*const anyopaq
     return 0;
 }
 
-pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
+pub fn glGetProcAddress(name: [:0]const u8) ?*const anyopaque {
     _ = name;
     return null;
 }

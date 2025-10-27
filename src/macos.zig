@@ -8,7 +8,7 @@ const c = @cImport({
     @cInclude("AudioUnit/AudioUnit.h");
     @cInclude("AudioToolbox/AudioToolbox.h");
     @cInclude("OpenGL/OpenGL.h");
-    @cInclude("mach-o/dyld.h");
+    @cInclude("dlfcn.h");
 });
 const log = std.log.scoped(.wio);
 
@@ -285,8 +285,8 @@ pub fn createSurface(self: @This(), instance: usize, allocator: ?*const anyopaqu
     );
 }
 
-pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
-    return if (c.NSLookupAndBindSymbol("_" ++ name)) |symbol| c.NSAddressOfSymbol(symbol) else null;
+pub fn glGetProcAddress(name: [:0]const u8) ?*const anyopaque {
+    return c.dlsym(c.RTLD_DEFAULT, name);
 }
 
 pub var vkGetInstanceProcAddr: *const fn (usize, [*:0]const u8) callconv(.c) ?*const fn () void = undefined;

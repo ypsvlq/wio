@@ -279,7 +279,7 @@ pub const Window = union {
     }
 };
 
-pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
+pub fn glGetProcAddress(name: [:0]const u8) ?*const anyopaque {
     switch (active) {
         .x11 => return x11.glGetProcAddress(name),
         .wayland => return wayland.glGetProcAddress(name),

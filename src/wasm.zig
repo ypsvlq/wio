@@ -113,7 +113,7 @@ pub fn swapBuffers(_: *@This()) void {}
 
 pub fn swapInterval(_: *@This(), _: i32) void {}
 
-pub fn glGetProcAddress(comptime _: [:0]const u8) ?*const anyopaque {
+pub fn glGetProcAddress(_: [:0]const u8) ?*const anyopaque {
     return null;
 }
 

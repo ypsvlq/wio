@@ -501,11 +501,8 @@ pub fn createSurface(self: @This(), instance: usize, allocator: ?*const anyopaqu
     );
 }
 
-pub fn glGetProcAddress(comptime name: [:0]const u8) ?*const anyopaque {
-    if (@hasDecl(w, name)) {
-        return &@field(w, name);
-    }
-    return w.wglGetProcAddress(name);
+pub fn glGetProcAddress(name: [:0]const u8) ?*const anyopaque {
+    return w.wglGetProcAddress(name) orelse w.GetProcAddress(w.GetModuleHandleW(w.L("opengl32.dll")), name);
 }
 
 pub var vkGetInstanceProcAddr: *const fn (usize, [*:0]const u8) callconv(.winapi) ?*const fn () void = undefined;
