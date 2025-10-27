@@ -32,7 +32,7 @@ pub fn main() !void {
     });
     window.makeContextCurrent();
     window.swapInterval(1);
-    renderer.init();
+    try renderer.init();
     return wio.run(loop);
 }
 

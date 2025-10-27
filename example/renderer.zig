@@ -10,8 +10,8 @@ const vertices = [_]f32{
 
 var loaded: bool = false;
 
-pub fn init() void {
-    gl.load(wio.glGetProcAddress) catch return;
+pub fn init() !void {
+    try gl.load(wio.glGetProcAddress);
     loaded = true;
 
     gl.clearColor(0, 0, 0, 1);
