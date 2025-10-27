@@ -424,19 +424,6 @@ pub fn setCursor(self: *@This(), shape: wio.Cursor) void {
 pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
     self.cursor_mode = mode;
     if (focus == self) self.applyCursor();
-
-    if (mode == .relative) {
-        if (self.locked_pointer == null) {
-            if (pointer_constraints) |_| {
-                self.locked_pointer = h.zwp_pointer_constraints_v1_lock_pointer(pointer_constraints, self.surface, pointer, null, h.ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
-            }
-        }
-    } else {
-        if (self.locked_pointer) |_| {
-            h.zwp_locked_pointer_v1_destroy(self.locked_pointer);
-            self.locked_pointer = null;
-        }
-    }
 }
 
 pub fn setSize(self: *@This(), size: wio.Size) void {
@@ -585,6 +572,17 @@ fn applyCursor(self: *@This()) void {
         }
     } else {
         h.wl_pointer_set_cursor(pointer, pointer_enter_serial, null, 0, 0);
+    }
+
+    if (self.locked_pointer) |_| {
+        h.zwp_locked_pointer_v1_destroy(self.locked_pointer);
+        self.locked_pointer = null;
+    }
+
+    if (self.cursor_mode == .relative) {
+        if (pointer_constraints) |_| {
+            self.locked_pointer = h.zwp_pointer_constraints_v1_lock_pointer(pointer_constraints, self.surface, pointer, null, h.ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
+        }
     }
 }
 
