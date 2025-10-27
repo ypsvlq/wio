@@ -79,7 +79,7 @@ pub fn build(b: *std.Build) void {
             }
             if (enable_joystick) {
                 module.linkSystemLibrary("hid", .{});
-                module.linkSystemLibrary("xinput9_1_0", .{});
+                module.linkSystemLibrary(if (target.result.cpu.arch.isX86()) "xinput9_1_0" else "xinput1_4", .{});
             }
             if (enable_audio) {
                 module.linkSystemLibrary("ole32", .{});
