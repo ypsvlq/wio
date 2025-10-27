@@ -121,6 +121,7 @@ var windows: std.AutoHashMapUnmanaged(*@This(), void) = .empty;
 pub var focus: ?*@This() = null;
 var last_serial: u32 = 0;
 var pointer_enter_serial: u32 = 0;
+var pointer_surface: ?*h.wl_surface = null;
 pub var repeat_period: i32 = undefined;
 var repeat_delay: i32 = undefined;
 var clipboard_text: []const u8 = "";
@@ -418,12 +419,12 @@ pub fn setCursor(self: *@This(), shape: wio.Cursor) void {
         .size_nesw => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_NESW_RESIZE,
         .size_nwse => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_NWSE_RESIZE,
     };
-    if (focus == self) self.applyCursor();
+    if (pointer_surface == self.surface) self.applyCursor();
 }
 
 pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
     self.cursor_mode = mode;
-    if (focus == self) self.applyCursor();
+    if (pointer_surface == self.surface) self.applyCursor();
 }
 
 pub fn setSize(self: *@This(), size: wio.Size) void {
@@ -738,12 +739,15 @@ const pointer_listener = h.wl_pointer_listener{
 
 fn pointerEnter(_: ?*anyopaque, _: ?*h.wl_pointer, serial: u32, surface: ?*h.wl_surface, _: i32, _: i32) callconv(.c) void {
     pointer_enter_serial = serial;
+    pointer_surface = surface;
     if (getWindow(surface)) |window| {
         window.applyCursor();
     }
 }
 
-fn pointerLeave(_: ?*anyopaque, _: ?*h.wl_pointer, _: u32, _: ?*h.wl_surface) callconv(.c) void {}
+fn pointerLeave(_: ?*anyopaque, _: ?*h.wl_pointer, _: u32, _: ?*h.wl_surface) callconv(.c) void {
+    pointer_surface = null;
+}
 
 fn pointerMotion(_: ?*anyopaque, _: ?*h.wl_pointer, _: u32, surface_x: i32, surface_y: i32) callconv(.c) void {
     if (focus) |window| window.events.push(.{ .mouse = .{ .x = std.math.cast(u16, surface_x >> 8) orelse return, .y = std.math.cast(u16, surface_y >> 8) orelse return } });
