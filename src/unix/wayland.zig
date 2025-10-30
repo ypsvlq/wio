@@ -330,7 +330,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
                 h.EGL_NONE,
             }, &config, 1, &count) == h.EGL_FALSE) return logEglError("eglChooseConfig");
 
-            self.egl.window = c.wl_egl_window_create(self.surface, 640, 480);
+            self.egl.window = c.wl_egl_window_create(self.surface, options.size.width, options.size.height);
             self.egl.surface = c.eglCreateWindowSurface(egl_display, config, self.egl.window, null) orelse return logEglError("eglCreateWindowSurface");
             self.egl.context = c.eglCreateContext(egl_display, config, h.EGL_NO_CONTEXT, &[_]i32{
                 h.EGL_CONTEXT_MAJOR_VERSION,             opengl.major_version,
