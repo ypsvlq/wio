@@ -14,6 +14,7 @@ jobs:
         - mips-netbsd
         - riscv64-freebsd
         - wasm32-freestanding
+        - native
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
@@ -22,9 +23,14 @@ jobs:
       uses: mlugg/setup-zig@v2
       with:
         cache-key: ${{ matrix.target }}
+    - if: ${{ matrix.target == 'native' }}
+      name: Install packages
+      run: |
+        sudo apt-get update
+        sudo apt-get install libx11-dev libxcursor-dev libglvnd-dev libwayland-dev libxkbcommon-dev libdecor-0-dev libvulkan-dev libudev-dev libpulse-dev
     - name: Build
-      run: zig build -Dtarget=${{ matrix.target }}
+      run: zig build -Dtarget=${{ matrix.target }} ${{ matrix.target == 'native' && '-fsys=wio' }}
     - if: ${{ matrix.target != 'wasm32-freestanding' }}
       name: Build Vulkan
-      run: zig build -Dtarget=${{ matrix.target }}
+      run: zig build -Dtarget=${{ matrix.target }} ${{ matrix.target == 'native' && '-fsys=wio' }}
       working-directory: example/vulkan
