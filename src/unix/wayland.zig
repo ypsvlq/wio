@@ -603,27 +603,27 @@ const registry_listener = h.wl_registry_listener{
     .global_remove = registryGlobalRemove,
 };
 
-fn registryGlobal(_: ?*anyopaque, _: ?*h.wl_registry, name: u32, interface_ptr: [*c]const u8, _: u32) callconv(.c) void {
+fn registryGlobal(_: ?*anyopaque, _: ?*h.wl_registry, name: u32, interface_ptr: [*c]const u8, version: u32) callconv(.c) void {
     const interface = std.mem.sliceTo(interface_ptr, 0);
     if (std.mem.eql(u8, interface, "wl_compositor")) {
-        compositor = @ptrCast(h.wl_registry_bind(registry, name, &h.wl_compositor_interface, 3));
+        compositor = @ptrCast(h.wl_registry_bind(registry, name, &h.wl_compositor_interface, @min(version, 3)));
     } else if (std.mem.eql(u8, interface, "wl_seat")) {
-        seat = @ptrCast(h.wl_registry_bind(registry, name, &h.wl_seat_interface, 4));
+        seat = @ptrCast(h.wl_registry_bind(registry, name, &h.wl_seat_interface, @min(version, 4)));
         _ = h.wl_seat_add_listener(seat, &seat_listener, null);
     } else if (std.mem.eql(u8, interface, "wp_viewporter")) {
-        viewporter = @ptrCast(h.wl_registry_bind(registry, name, &h.wp_viewporter_interface, 1));
+        viewporter = @ptrCast(h.wl_registry_bind(registry, name, &h.wp_viewporter_interface, @min(version, 1)));
     } else if (std.mem.eql(u8, interface, "wp_fractional_scale_manager_v1")) {
-        fractional_scale_manager = @ptrCast(h.wl_registry_bind(registry, name, &h.wp_fractional_scale_manager_v1_interface, 1));
+        fractional_scale_manager = @ptrCast(h.wl_registry_bind(registry, name, &h.wp_fractional_scale_manager_v1_interface, @min(version, 1)));
     } else if (std.mem.eql(u8, interface, "wp_cursor_shape_manager_v1")) {
-        cursor_shape_manager = @ptrCast(h.wl_registry_bind(registry, name, &h.wp_cursor_shape_manager_v1_interface, 1));
+        cursor_shape_manager = @ptrCast(h.wl_registry_bind(registry, name, &h.wp_cursor_shape_manager_v1_interface, @min(version, 1)));
     } else if (std.mem.eql(u8, interface, "zwp_pointer_constraints_v1")) {
-        pointer_constraints = @ptrCast(h.wl_registry_bind(registry, name, &h.zwp_pointer_constraints_v1_interface, 1));
+        pointer_constraints = @ptrCast(h.wl_registry_bind(registry, name, &h.zwp_pointer_constraints_v1_interface, @min(version, 1)));
     } else if (std.mem.eql(u8, interface, "zwp_relative_pointer_manager_v1")) {
-        relative_pointer_manager = @ptrCast(h.wl_registry_bind(registry, name, &h.zwp_relative_pointer_manager_v1_interface, 1));
+        relative_pointer_manager = @ptrCast(h.wl_registry_bind(registry, name, &h.zwp_relative_pointer_manager_v1_interface, @min(version, 1)));
     } else if (std.mem.eql(u8, interface, "wl_data_device_manager")) {
-        data_device_manager = @ptrCast(h.wl_registry_bind(registry, name, &h.wl_data_device_manager_interface, 1));
+        data_device_manager = @ptrCast(h.wl_registry_bind(registry, name, &h.wl_data_device_manager_interface, @min(version, 1)));
     } else if (std.mem.eql(u8, interface, "xdg_activation_v1")) {
-        activation = @ptrCast(h.wl_registry_bind(registry, name, &h.xdg_activation_v1_interface, 1));
+        activation = @ptrCast(h.wl_registry_bind(registry, name, &h.xdg_activation_v1_interface, @min(version, 1)));
     }
 }
 
