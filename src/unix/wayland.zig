@@ -122,7 +122,7 @@ pub var focus: ?*@This() = null;
 var last_serial: u32 = 0;
 var pointer_enter_serial: u32 = 0;
 var pointer_surface: ?*h.wl_surface = null;
-pub var repeat_period: i32 = undefined;
+pub var repeat_period: i32 = 0;
 var repeat_delay: i32 = undefined;
 var clipboard_text: []const u8 = "";
 
@@ -372,21 +372,23 @@ pub fn destroy(self: *@This()) void {
 pub fn getEvent(self: *@This()) ?wio.Event {
     const maybe_event = self.events.pop();
 
-    if (!self.repeat_ignore) {
-        const now = std.time.milliTimestamp();
-        if (self.repeat_key != 0 and now > self.repeat_timestamp) {
-            self.pushKeyEvent(self.repeat_key, .button_repeat);
-            self.repeat_timestamp = now + repeat_period;
-            self.repeat_ignore = true;
-        }
-    } else {
-        if (maybe_event) |event| {
-            switch (event) {
-                .button_repeat, .char => {},
-                else => self.repeat_ignore = false,
+    if (repeat_period > 0) {
+        if (!self.repeat_ignore) {
+            const now = std.time.milliTimestamp();
+            if (self.repeat_key != 0 and now > self.repeat_timestamp) {
+                self.pushKeyEvent(self.repeat_key, .button_repeat);
+                self.repeat_timestamp = now + repeat_period;
+                self.repeat_ignore = true;
             }
         } else {
-            self.repeat_ignore = false;
+            if (maybe_event) |event| {
+                switch (event) {
+                    .button_repeat, .char => {},
+                    else => self.repeat_ignore = false,
+                }
+            } else {
+                self.repeat_ignore = false;
+            }
         }
     }
 
@@ -711,8 +713,10 @@ fn keyboardKey(_: ?*anyopaque, _: ?*h.wl_keyboard, serial: u32, _: u32, key: u32
     if (focus) |window| {
         if (state == h.WL_KEYBOARD_KEY_STATE_PRESSED) {
             window.pushKeyEvent(key, .button_press);
-            window.repeat_key = key;
-            window.repeat_timestamp = std.time.milliTimestamp() + repeat_delay;
+            if (repeat_period > 0) {
+                window.repeat_key = key;
+                window.repeat_timestamp = std.time.milliTimestamp() + repeat_delay;
+            }
         } else {
             if (keyToButton(key)) |button| {
                 window.events.push(.{ .button_release = button });
@@ -729,8 +733,10 @@ fn keyboardModifiers(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, mods_depressed:
 }
 
 fn keyboardRepeatInfo(_: ?*anyopaque, _: ?*h.wl_keyboard, rate: i32, delay: i32) callconv(.c) void {
-    repeat_period = @divTrunc(1000, rate);
-    repeat_delay = delay;
+    if (rate > 0) {
+        repeat_period = @divTrunc(1000, rate);
+        repeat_delay = delay;
+    }
 }
 
 const pointer_listener = h.wl_pointer_listener{

@@ -111,7 +111,7 @@ pub fn update() void {
 
 pub fn wait() void {
     var timeout: c_int = -1;
-    if (build_options.wayland and active == .wayland) {
+    if (build_options.wayland and active == .wayland and wayland.repeat_period > 0) {
         if (wayland.focus) |focus| {
             if (focus.repeat_key != 0) {
                 timeout = wayland.repeat_period;
