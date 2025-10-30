@@ -191,7 +191,7 @@ pub fn build(b: *std.Build) void {
         .name = "wio",
         .root_module = exe_mod,
         // https://github.com/ziglang/zig/issues/24140
-        .use_llvm = true,
+        .use_llvm = if (system_integration) null else true,
     });
     b.installArtifact(exe);
 
