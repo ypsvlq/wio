@@ -6,7 +6,7 @@ const unix = @import("../unix.zig");
 const DynLib = @import("DynLib.zig");
 const log = std.log.scoped(.wio);
 const h = @cImport({
-    @cInclude("wio-wayland.h");
+    if (build_options.system_integration) {} else @cInclude("wio-wayland.h");
     @cInclude("wayland-client-protocol.h");
     @cInclude("viewporter-client-protocol.h");
     @cInclude("fractional-scale-v1-client-protocol.h");
@@ -128,12 +128,14 @@ var clipboard_text: []const u8 = "";
 
 var egl_display: h.EGLDisplay = undefined;
 
-export var wio_wl_proxy_get_version: *const @TypeOf(h.wl_proxy_get_version) = undefined;
-export var wio_wl_proxy_marshal_flags: *const @TypeOf(h.wl_proxy_marshal_flags) = undefined;
-export var wio_wl_proxy_add_listener: *const @TypeOf(h.wl_proxy_add_listener) = undefined;
-export var wio_wl_proxy_destroy: *const @TypeOf(h.wl_proxy_destroy) = undefined;
-export var wio_wl_proxy_set_user_data: *const @TypeOf(h.wl_proxy_set_user_data) = undefined;
-export var wio_wl_proxy_get_user_data: *const @TypeOf(h.wl_proxy_get_user_data) = undefined;
+const exports = if (!build_options.system_integration) struct {
+    export var wio_wl_proxy_get_version: *const @TypeOf(h.wl_proxy_get_version) = undefined;
+    export var wio_wl_proxy_marshal_flags: *const @TypeOf(h.wl_proxy_marshal_flags) = undefined;
+    export var wio_wl_proxy_add_listener: *const @TypeOf(h.wl_proxy_add_listener) = undefined;
+    export var wio_wl_proxy_destroy: *const @TypeOf(h.wl_proxy_destroy) = undefined;
+    export var wio_wl_proxy_set_user_data: *const @TypeOf(h.wl_proxy_set_user_data) = undefined;
+    export var wio_wl_proxy_get_user_data: *const @TypeOf(h.wl_proxy_get_user_data) = undefined;
+} else void;
 
 pub fn init() !void {
     DynLib.load(&imports, &.{
@@ -154,12 +156,14 @@ pub fn init() !void {
     errdefer if (build_options.opengl) libwayland_egl.close();
     errdefer if (build_options.opengl) libEGL.close();
 
-    wio_wl_proxy_get_version = c.wl_proxy_get_version;
-    wio_wl_proxy_marshal_flags = c.wl_proxy_marshal_flags;
-    wio_wl_proxy_add_listener = c.wl_proxy_add_listener;
-    wio_wl_proxy_destroy = c.wl_proxy_destroy;
-    wio_wl_proxy_set_user_data = c.wl_proxy_set_user_data;
-    wio_wl_proxy_get_user_data = c.wl_proxy_get_user_data;
+    if (!build_options.system_integration) {
+        exports.wio_wl_proxy_get_version = c.wl_proxy_get_version;
+        exports.wio_wl_proxy_marshal_flags = c.wl_proxy_marshal_flags;
+        exports.wio_wl_proxy_add_listener = c.wl_proxy_add_listener;
+        exports.wio_wl_proxy_destroy = c.wl_proxy_destroy;
+        exports.wio_wl_proxy_set_user_data = c.wl_proxy_set_user_data;
+        exports.wio_wl_proxy_get_user_data = c.wl_proxy_get_user_data;
+    }
 
     display = c.wl_display_connect(null) orelse return error.Unavailable;
     errdefer c.wl_display_disconnect(display);
