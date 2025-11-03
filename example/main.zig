@@ -30,9 +30,11 @@ pub fn main() !void {
             .samples = 4,
         },
     });
-    window.makeContextCurrent();
-    window.swapInterval(1);
-    try renderer.init();
+    if (wio.build_options.opengl) {
+        window.makeContextCurrent();
+        window.swapInterval(1);
+        try renderer.init();
+    }
     return wio.run(loop);
 }
 
@@ -52,10 +54,12 @@ fn loop() !bool {
                 return false;
             },
             .draw => {
-                renderer.draw();
-                window.swapBuffers();
+                if (wio.build_options.opengl) {
+                    renderer.draw();
+                    window.swapBuffers();
+                }
             },
-            .framebuffer => |size| renderer.resize(size),
+            .framebuffer => |size| if (wio.build_options.opengl) renderer.resize(size),
             .button_press, .button_repeat => |button| {
                 if (button == .left_control or button == .right_control) actions = true;
                 if (actions) action(button);

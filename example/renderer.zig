@@ -8,11 +8,8 @@ const vertices = [_]f32{
     0.0,  0.5,
 };
 
-var loaded: bool = false;
-
 pub fn init() !void {
     try gl.load(wio.glGetProcAddress);
-    loaded = true;
 
     gl.clearColor(0, 0, 0, 1);
 
@@ -42,12 +39,10 @@ pub fn init() !void {
 }
 
 pub fn resize(size: wio.Size) void {
-    if (!loaded) return;
     gl.viewport(0, 0, size.width, size.height);
 }
 
 pub fn draw() void {
-    if (!loaded) return;
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 }
