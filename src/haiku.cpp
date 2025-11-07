@@ -39,30 +39,20 @@ public:
             case B_WINDOW_ACTIVATED: {
                 bool active;
                 if (message->FindBool("active", &active) == B_OK) {
-                    if (active) {
-                        wioFocused(zig);
-                    } else {
-                        wioUnfocused(zig);
-                    }
+                    active ? wioFocused(zig) : wioUnfocused(zig);
                 }
                 break;
             }
             case B_MINIMIZE: {
                 bool minimize;
                 if (message->FindBool("minimize", &minimize) == B_OK) {
-                    if (minimize) {
-                        wioHidden(zig);
-                    } else {
-                        wioVisible(zig);
-                    }
+                    minimize ? wioHidden(zig) : wioVisible(zig);
                 }
             }
             case B_WINDOW_RESIZED: {
                 int32 width, height;
-                if (message->FindInt32("width", &width) == B_OK) {
-                    if (message->FindInt32("height", &height) == B_OK) {
-                        wioSize(zig, width, height);
-                    }
+                if (message->FindInt32("width", &width) == B_OK && message->FindInt32("height", &height) == B_OK) {
+                    wioSize(zig, width, height);
                 }
                 break;
             }
@@ -105,8 +95,8 @@ public:
             }
             case B_MOUSE_WHEEL_CHANGED: {
                 float y, x;
-                message->FindFloat("be:wheel_delta_y", &y);
-                message->FindFloat("be:wheel_delta_x", &x);
+                message->FindFloat("be:wheel_delta_y", &y); // sets to 0 on failure
+                message->FindFloat("be:wheel_delta_x", &x); // sets to 0 on failure
                 wioScroll(zig, y, x);
                 break;
             }
