@@ -181,6 +181,7 @@ pub fn update() void {
 events: internal.EventQueue,
 window: h.Window,
 ic: h.XIC,
+text: bool = false,
 cursor: h.Cursor = h.None,
 cursor_mode: wio.CursorMode,
 size: wio.Size,
@@ -330,11 +331,11 @@ pub fn getEvent(self: *@This()) ?wio.Event {
 }
 
 pub fn enableTextInput(self: *@This()) void {
-    _ = self;
+    self.text = true;
 }
 
 pub fn disableTextInput(self: *@This()) void {
-    _ = self;
+    self.text = false;
 }
 
 pub fn setTitle(self: *@This(), title: []const u8) void {
@@ -682,22 +683,24 @@ fn handleKeyPress(event: *h.XEvent, repeat: bool) void {
             }
         }
 
-        var stack: [4]u8 = undefined;
-        const len = c.Xutf8LookupString(window.ic, &event.xkey, &stack, stack.len, null, null);
-        var slice: []u8 = undefined;
-        if (len > stack.len) {
-            slice = internal.allocator.alloc(u8, @intCast(len)) catch return;
-            _ = c.Xutf8LookupString(window.ic, &event.xkey, slice.ptr, len, null, null);
-        } else {
-            slice = stack[0..@intCast(len)];
-        }
-        defer if (len > stack.len) internal.allocator.free(slice);
+        if (window.text) {
+            var stack: [4]u8 = undefined;
+            const len = c.Xutf8LookupString(window.ic, &event.xkey, &stack, stack.len, null, null);
+            var slice: []u8 = undefined;
+            if (len > stack.len) {
+                slice = internal.allocator.alloc(u8, @intCast(len)) catch return;
+                _ = c.Xutf8LookupString(window.ic, &event.xkey, slice.ptr, len, null, null);
+            } else {
+                slice = stack[0..@intCast(len)];
+            }
+            defer if (len > stack.len) internal.allocator.free(slice);
 
-        const view = std.unicode.Utf8View.init(slice) catch return;
-        var iter = view.iterator();
-        while (iter.nextCodepoint()) |codepoint| {
-            if (codepoint >= ' ' and codepoint != 0x7F) {
-                window.events.push(.{ .char = codepoint });
+            const view = std.unicode.Utf8View.init(slice) catch return;
+            var iter = view.iterator();
+            while (iter.nextCodepoint()) |codepoint| {
+                if (codepoint >= ' ' and codepoint != 0x7F) {
+                    window.events.push(.{ .char = codepoint });
+                }
             }
         }
     }
