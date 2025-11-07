@@ -51,6 +51,7 @@ const wio = {
         const window = {
             canvas: canvas,
             events: events,
+            text: false,
             cursor: undefined,
             cursor_mode: undefined,
         };
@@ -75,7 +76,7 @@ const wio = {
             event.preventDefault();
             const key = wio.keys[event.code];
             if (key) events.push(event.repeat ? 12 : 11, key);
-            if ([...event.key].length === 1) events.push(10, event.key.codePointAt(0));
+            if (window.text && [...event.key].length === 1) events.push(10, event.key.codePointAt(0));
         });
         canvas.addEventListener("keyup", event => {
             const key = wio.keys[event.code];
@@ -104,6 +105,10 @@ const wio = {
 
         wio.windows.push(window);
         return wio.windows.length - 1;
+    },
+
+    setTextInput(id, enabled) {
+        wio.windows[id].text = enabled;
     },
 
     setFullscreen(id, fullscreen) {

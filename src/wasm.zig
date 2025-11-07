@@ -7,6 +7,7 @@ const js = struct {
     extern "wio" fn shiftFloat(u32) f32;
     extern "wio" fn messageBox([*]const u8, usize) void;
     extern "wio" fn createWindow() u32;
+    extern "wio" fn setTextInput(u32, bool) void;
     extern "wio" fn setFullscreen(u32, bool) void;
     extern "wio" fn setCursor(u32, u8) void;
     extern "wio" fn setCursorMode(u32, u8) void;
@@ -78,11 +79,11 @@ pub fn getEvent(self: *@This()) ?wio.Event {
 }
 
 pub fn enableTextInput(self: *@This()) void {
-    _ = self;
+    js.setTextInput(self.id, true);
 }
 
 pub fn disableTextInput(self: *@This()) void {
-    _ = self;
+    js.setTextInput(self.id, false);
 }
 
 pub fn setTitle(_: *@This(), _: []const u8) void {}
