@@ -158,6 +158,7 @@ pub fn messageBox(style: wio.MessageBoxStyle, _: []const u8, message: []const u8
 
 events: internal.EventQueue,
 window: *NSWindow,
+text: bool = false,
 opengl: if (build_options.opengl) struct { context: ?*NSOpenGLContext = null } else struct {} = .{},
 
 pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
@@ -216,11 +217,11 @@ pub fn getEvent(self: *@This()) ?wio.Event {
 }
 
 pub fn enableTextInput(self: *@This()) void {
-    _ = self;
+    self.text = true;
 }
 
 pub fn disableTextInput(self: *@This()) void {
-    _ = self;
+    self.text = false;
 }
 
 pub fn setTitle(self: *@This(), title: []const u8) void {
@@ -743,11 +744,13 @@ export fn wioScale(self: *@This(), scale: f32) void {
 }
 
 export fn wioChars(self: *@This(), buf: [*:0]const u8) void {
-    const view = std.unicode.Utf8View.init(std.mem.sliceTo(buf, 0)) catch return;
-    var iter = view.iterator();
-    while (iter.nextCodepoint()) |codepoint| {
-        if (codepoint >= ' ' and codepoint != 0x7F and (codepoint < 0xF700 or codepoint > 0xF7FF)) {
-            self.events.push(.{ .char = codepoint });
+    if (self.text) {
+        const view = std.unicode.Utf8View.init(std.mem.sliceTo(buf, 0)) catch return;
+        var iter = view.iterator();
+        while (iter.nextCodepoint()) |codepoint| {
+            if (codepoint >= ' ' and codepoint != 0x7F and (codepoint < 0xF700 or codepoint > 0xF7FF)) {
+                self.events.push(.{ .char = codepoint });
+            }
         }
     }
 }
