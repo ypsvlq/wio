@@ -10,6 +10,7 @@ const h = @cImport({
     @cInclude("wayland-client-protocol.h");
     @cInclude("viewporter-client-protocol.h");
     @cInclude("fractional-scale-v1-client-protocol.h");
+    @cInclude("text-input-v3-client-protocol.h");
     @cInclude("cursor-shape-v1-client-protocol.h");
     @cInclude("pointer-constraints-v1-client-protocol.h");
     @cInclude("relative-pointer-v1-client-protocol.h");
@@ -98,12 +99,14 @@ var keyboard: ?*h.wl_keyboard = null;
 var pointer: ?*h.wl_pointer = null;
 var viewporter: ?*h.wp_viewporter = null;
 var fractional_scale_manager: ?*h.wp_fractional_scale_manager_v1 = null;
+var text_input_manager: ?*h.zwp_text_input_manager_v3 = null;
 var cursor_shape_manager: ?*h.wp_cursor_shape_manager_v1 = null;
 var pointer_constraints: ?*h.zwp_pointer_constraints_v1 = null;
 var relative_pointer_manager: ?*h.zwp_relative_pointer_manager_v1 = null;
 var data_device_manager: ?*h.wl_data_device_manager = null;
 var activation: ?*h.xdg_activation_v1 = null;
 
+var text_input: ?*h.zwp_text_input_v3 = null;
 var cursor_shape_device: ?*h.wp_cursor_shape_device_v1 = null;
 var relative_pointer: ?*h.zwp_relative_pointer_v1 = null;
 var data_device: ?*h.wl_data_device = null;
@@ -124,6 +127,7 @@ var pointer_enter_serial: u32 = 0;
 var pointer_surface: ?*h.wl_surface = null;
 pub var repeat_period: i32 = 0;
 var repeat_delay: i32 = undefined;
+var commit_string: std.ArrayList(u8) = .empty;
 var clipboard_text: []const u8 = "";
 
 var egl_display: h.EGLDisplay = undefined;
@@ -188,6 +192,13 @@ pub fn init() !void {
     libdecor_context = c.libdecor_new(display, &libdecor_interface) orelse return error.Unexpected;
     errdefer c.libdecor_unref(libdecor_context);
 
+    if (text_input_manager) |_| {
+        text_input = h.zwp_text_input_manager_v3_get_text_input(text_input_manager, seat);
+        if (text_input) |_| {
+            _ = h.zwp_text_input_v3_add_listener(text_input, &text_input_listener, null);
+        }
+    }
+
     if (data_device_manager) |_| {
         data_device = h.wl_data_device_manager_get_data_device(data_device_manager, seat);
         if (data_device) |_| {
@@ -209,6 +220,7 @@ pub fn deinit() void {
     }
 
     internal.allocator.free(clipboard_text);
+    commit_string.deinit(internal.allocator);
     windows.deinit(internal.allocator);
 
     c.libdecor_unref(libdecor_context);
@@ -231,11 +243,13 @@ fn destroyProxies() void {
     if (data_device) |_| h.wl_data_device_destroy(data_device);
     if (relative_pointer) |_| h.zwp_relative_pointer_v1_destroy(relative_pointer);
     if (cursor_shape_device) |_| h.wp_cursor_shape_device_v1_destroy(cursor_shape_device);
+    if (text_input) |_| h.zwp_text_input_v3_destroy(text_input);
     if (activation) |_| h.xdg_activation_v1_destroy(activation);
     if (data_device_manager) |_| h.wl_data_device_manager_destroy(data_device_manager);
     if (relative_pointer_manager) |_| h.zwp_relative_pointer_manager_v1_destroy(relative_pointer_manager);
     if (pointer_constraints) |_| h.zwp_pointer_constraints_v1_destroy(pointer_constraints);
     if (cursor_shape_manager) |_| h.wp_cursor_shape_manager_v1_destroy(cursor_shape_manager);
+    if (text_input_manager) |_| h.zwp_text_input_manager_v3_destroy(text_input_manager);
     if (fractional_scale_manager) |_| h.wp_fractional_scale_manager_v1_destroy(fractional_scale_manager);
     if (viewporter) |_| h.wp_viewporter_destroy(viewporter);
     if (pointer) |_| h.wl_pointer_destroy(pointer);
@@ -259,6 +273,7 @@ locked_pointer: ?*h.zwp_locked_pointer_v1 = null,
 repeat_key: u32 = 0,
 repeat_timestamp: i64 = undefined,
 repeat_ignore: bool = false,
+text: bool = false,
 size: wio.Size,
 scale: f32 = 1,
 cursor: u32 = undefined,
@@ -396,11 +411,23 @@ pub fn getEvent(self: *@This()) ?wio.Event {
 }
 
 pub fn enableTextInput(self: *@This()) void {
-    _ = self;
+    self.text = true;
+    if (focus == self) {
+        if (text_input) |_| {
+            h.zwp_text_input_v3_enable(text_input);
+            h.zwp_text_input_v3_commit(text_input);
+        }
+    }
 }
 
 pub fn disableTextInput(self: *@This()) void {
-    _ = self;
+    self.text = false;
+    if (focus == self) {
+        if (text_input) |_| {
+            h.zwp_text_input_v3_disable(text_input);
+            h.zwp_text_input_v3_commit(text_input);
+        }
+    }
 }
 
 pub fn setTitle(self: *@This(), title: []const u8) void {
@@ -566,18 +593,20 @@ fn pushKeyEvent(self: *@This(), key: u32, comptime event: wio.EventType) void {
         self.events.push(@unionInit(wio.Event, @tagName(event), button));
     }
 
-    var sym = c.xkb_state_key_get_one_sym(xkb_state, key + 8);
-    if (compose_state) |_| {
-        if (c.xkb_compose_state_feed(compose_state, sym) == h.XKB_COMPOSE_FEED_ACCEPTED) {
-            switch (c.xkb_compose_state_get_status(compose_state)) {
-                h.XKB_COMPOSE_COMPOSED => sym = c.xkb_compose_state_get_one_sym(compose_state),
-                h.XKB_COMPOSE_COMPOSING, h.XKB_COMPOSE_CANCELLED => return,
-                else => {},
+    if (self.text) {
+        var sym = c.xkb_state_key_get_one_sym(xkb_state, key + 8);
+        if (compose_state) |_| {
+            if (c.xkb_compose_state_feed(compose_state, sym) == h.XKB_COMPOSE_FEED_ACCEPTED) {
+                switch (c.xkb_compose_state_get_status(compose_state)) {
+                    h.XKB_COMPOSE_COMPOSED => sym = c.xkb_compose_state_get_one_sym(compose_state),
+                    h.XKB_COMPOSE_COMPOSING, h.XKB_COMPOSE_CANCELLED => return,
+                    else => {},
+                }
             }
         }
+        const char: u21 = @intCast(c.xkb_keysym_to_utf32(sym));
+        if (char >= ' ' and char != 0x7F) self.events.push(.{ .char = char });
     }
-    const char: u21 = @intCast(c.xkb_keysym_to_utf32(sym));
-    if (char >= ' ' and char != 0x7F) self.events.push(.{ .char = char });
 }
 
 fn applyCursor(self: *@This()) void {
@@ -622,6 +651,8 @@ fn registryGlobal(_: ?*anyopaque, _: ?*h.wl_registry, name: u32, interface_ptr: 
         viewporter = @ptrCast(h.wl_registry_bind(registry, name, &h.wp_viewporter_interface, @min(version, 1)));
     } else if (std.mem.eql(u8, interface, "wp_fractional_scale_manager_v1")) {
         fractional_scale_manager = @ptrCast(h.wl_registry_bind(registry, name, &h.wp_fractional_scale_manager_v1_interface, @min(version, 1)));
+    } else if (std.mem.eql(u8, interface, "zwp_text_input_manager_v3")) {
+        text_input_manager = @ptrCast(h.wl_registry_bind(registry, name, &h.zwp_text_input_manager_v3_interface, @min(version, 1)));
     } else if (std.mem.eql(u8, interface, "wp_cursor_shape_manager_v1")) {
         cursor_shape_manager = @ptrCast(h.wl_registry_bind(registry, name, &h.wp_cursor_shape_manager_v1_interface, @min(version, 1)));
     } else if (std.mem.eql(u8, interface, "zwp_pointer_constraints_v1")) {
@@ -818,6 +849,52 @@ fn fractionalScalePreferredScale(data: ?*anyopaque, _: ?*h.wp_fractional_scale_v
     self.scale = @floatFromInt(scale);
     self.scale /= 120;
     self.events.push(.{ .scale = self.scale });
+}
+
+const text_input_listener = h.zwp_text_input_v3_listener{
+    .enter = textInputEnter,
+    .leave = textInputLeave,
+    .preedit_string = textInputPreeditString,
+    .commit_string = textInputCommitString,
+    .delete_surrounding_text = textInputDeleteSurroundingText,
+    .done = textInputDone,
+};
+
+fn textInputEnter(_: ?*anyopaque, _: ?*h.zwp_text_input_v3, surface: ?*h.wl_surface) callconv(.c) void {
+    if (getWindow(surface)) |window| {
+        if (window.text) {
+            h.zwp_text_input_v3_enable(text_input);
+            h.zwp_text_input_v3_commit(text_input);
+        }
+    }
+}
+
+fn textInputLeave(_: ?*anyopaque, _: ?*h.zwp_text_input_v3, surface: ?*h.wl_surface) callconv(.c) void {
+    if (getWindow(surface)) |window| {
+        if (window.text) {
+            h.zwp_text_input_v3_disable(text_input);
+            h.zwp_text_input_v3_commit(text_input);
+        }
+    }
+}
+
+fn textInputPreeditString(_: ?*anyopaque, _: ?*h.zwp_text_input_v3, _: [*c]const u8, _: i32, _: i32) callconv(.c) void {}
+
+fn textInputCommitString(_: ?*anyopaque, _: ?*h.zwp_text_input_v3, text: [*c]const u8) callconv(.c) void {
+    commit_string.replaceRange(internal.allocator, 0, commit_string.items.len, std.mem.sliceTo(text, 0)) catch {};
+}
+
+fn textInputDeleteSurroundingText(_: ?*anyopaque, _: ?*h.zwp_text_input_v3, _: u32, _: u32) callconv(.c) void {}
+
+fn textInputDone(_: ?*anyopaque, _: ?*h.zwp_text_input_v3, _: u32) callconv(.c) void {
+    if (focus) |window| {
+        const view = std.unicode.Utf8View.init(commit_string.items) catch return;
+        var iter = view.iterator();
+        while (iter.nextCodepoint()) |char| {
+            window.events.push(.{ .char = char });
+        }
+    }
+    commit_string.items.len = 0;
 }
 
 const data_device_listener = h.wl_data_device_listener{
