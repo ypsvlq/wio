@@ -77,6 +77,14 @@ pub fn getEvent(self: *@This()) ?wio.Event {
     };
 }
 
+pub fn enableTextInput(self: *@This()) void {
+    _ = self;
+}
+
+pub fn disableTextInput(self: *@This()) void {
+    _ = self;
+}
+
 pub fn setTitle(_: *@This(), _: []const u8) void {}
 
 pub fn setMode(self: *@This(), mode: wio.WindowMode) void {

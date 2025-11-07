@@ -98,10 +98,19 @@ fn logEvent(event: wio.Event) void {
     }
 }
 
+var text_input = false;
 var cursor: u8 = 0;
 
 fn action(button: wio.Button) void {
     switch (button) {
+        .k => {
+            if (!text_input) {
+                window.enableTextInput();
+            } else {
+                window.disableTextInput();
+            }
+            text_input = !text_input;
+        },
         .t => window.setTitle("retitled wio example"),
         .w => window.setMode(.normal),
         .m => window.setMode(.maximized),

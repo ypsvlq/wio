@@ -395,6 +395,14 @@ pub fn getEvent(self: *@This()) ?wio.Event {
     return maybe_event;
 }
 
+pub fn enableTextInput(self: *@This()) void {
+    _ = self;
+}
+
+pub fn disableTextInput(self: *@This()) void {
+    _ = self;
+}
+
 pub fn setTitle(self: *@This(), title: []const u8) void {
     const title_z = internal.allocator.dupeZ(u8, title) catch return;
     defer internal.allocator.free(title_z);

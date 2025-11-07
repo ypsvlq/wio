@@ -106,6 +106,17 @@ pub const Window = struct {
         return self.backend.getEvent();
     }
 
+    /// When text input is enabled, character keys will send `.char` events instead of `.button_press`.
+    ///
+    /// Text input is disabled by default.
+    pub fn enableTextInput(self: *Window) void {
+        self.backend.enableTextInput();
+    }
+
+    pub fn disableTextInput(self: *Window) void {
+        self.backend.disableTextInput();
+    }
+
     pub fn setTitle(self: *Window, title: []const u8) void {
         self.backend.setTitle(title);
     }

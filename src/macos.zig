@@ -215,6 +215,14 @@ pub fn getEvent(self: *@This()) ?wio.Event {
     return self.events.pop();
 }
 
+pub fn enableTextInput(self: *@This()) void {
+    _ = self;
+}
+
+pub fn disableTextInput(self: *@This()) void {
+    _ = self;
+}
+
 pub fn setTitle(self: *@This(), title: []const u8) void {
     wioSetTitle(self.window, title.ptr, title.len);
 }

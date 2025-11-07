@@ -354,6 +354,14 @@ pub fn getEvent(self: *@This()) ?wio.Event {
     return self.events.pop();
 }
 
+pub fn enableTextInput(self: *@This()) void {
+    _ = self;
+}
+
+pub fn disableTextInput(self: *@This()) void {
+    _ = self;
+}
+
 pub fn setTitle(self: *@This(), title: []const u8) void {
     const title_w = std.unicode.utf8ToUtf16LeAllocZ(internal.allocator, title) catch return;
     defer internal.allocator.free(title_w);

@@ -36,6 +36,14 @@ pub fn getEvent(self: *@This()) ?wio.Event {
     return null;
 }
 
+pub fn enableTextInput(self: *@This()) void {
+    _ = self;
+}
+
+pub fn disableTextInput(self: *@This()) void {
+    _ = self;
+}
+
 pub fn setTitle(self: *@This(), title: []const u8) void {
     _ = self;
     _ = title;

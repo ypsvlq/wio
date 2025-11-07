@@ -329,6 +329,14 @@ pub fn getEvent(self: *@This()) ?wio.Event {
     return self.events.pop();
 }
 
+pub fn enableTextInput(self: *@This()) void {
+    _ = self;
+}
+
+pub fn disableTextInput(self: *@This()) void {
+    _ = self;
+}
+
 pub fn setTitle(self: *@This(), title: []const u8) void {
     _ = c.XChangeProperty(display, self.window, h.XA_WM_NAME, h.XA_STRING, 8, h.PropModeReplace, title.ptr, @intCast(title.len));
 }

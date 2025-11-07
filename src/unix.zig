@@ -187,6 +187,20 @@ pub const Window = union {
         }
     }
 
+    pub fn enableTextInput(self: *@This()) void {
+        switch (active) {
+            .x11 => self.x11.enableTextInput(),
+            .wayland => self.wayland.enableTextInput(),
+        }
+    }
+
+    pub fn disableTextInput(self: *@This()) void {
+        switch (active) {
+            .x11 => self.x11.disableTextInput(),
+            .wayland => self.wayland.disableTextInput(),
+        }
+    }
+
     pub fn setTitle(self: *@This(), title: []const u8) void {
         switch (active) {
             .x11 => self.x11.setTitle(title),
