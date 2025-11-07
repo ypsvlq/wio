@@ -90,6 +90,7 @@ window: *BWindow,
 events: internal.EventQueue,
 events_mutex: std.Thread.Mutex = .{},
 buttons: std.StaticBitSet(5) = .initEmpty(),
+text: bool = false,
 opengl: if (build_options.opengl) struct { context: ?*BGLView = null, vsync: bool = false } else struct {} = .{},
 
 pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
@@ -132,11 +133,11 @@ pub fn getEvent(self: *@This()) ?wio.Event {
 }
 
 pub fn enableTextInput(self: *@This()) void {
-    _ = self;
+    self.text = true;
 }
 
 pub fn disableTextInput(self: *@This()) void {
-    _ = self;
+    self.text = false;
 }
 
 pub fn setTitle(self: *@This(), title: []const u8) void {
@@ -383,11 +384,13 @@ export fn wioSize(self: *@This(), width: u16, height: u16) void {
 }
 
 export fn wioChars(self: *@This(), chars: [*:0]const u8) void {
-    const view = std.unicode.Utf8View.init(std.mem.sliceTo(chars, 0)) catch return;
-    var iter = view.iterator();
-    while (iter.nextCodepoint()) |char| {
-        if (char >= ' ' and char != 0x7F) {
-            self.pushEvent(.{ .char = char });
+    if (self.text) {
+        const view = std.unicode.Utf8View.init(std.mem.sliceTo(chars, 0)) catch return;
+        var iter = view.iterator();
+        while (iter.nextCodepoint()) |char| {
+            if (char >= ' ' and char != 0x7F) {
+                self.pushEvent(.{ .char = char });
+            }
         }
     }
 }
