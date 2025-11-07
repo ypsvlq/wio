@@ -242,6 +242,7 @@ international4: bool = false,
 input: []u8 = &.{},
 last_x: u16 = 0,
 last_y: u16 = 0,
+text: bool = false,
 opengl: if (build_options.opengl) struct { dc: w.HDC = null, rc: w.HGLRC = null } else struct {} = .{},
 
 pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
@@ -355,11 +356,11 @@ pub fn getEvent(self: *@This()) ?wio.Event {
 }
 
 pub fn enableTextInput(self: *@This()) void {
-    _ = self;
+    self.text = true;
 }
 
 pub fn disableTextInput(self: *@This()) void {
-    _ = self;
+    self.text = false;
 }
 
 pub fn setTitle(self: *@This(), title: []const u8) void {
@@ -1294,20 +1295,22 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
             return 0;
         },
         w.WM_CHAR => {
-            const char: u16 = @intCast(wParam);
-            const codepoint = blk: {
-                if (self.surrogate != 0) {
-                    defer self.surrogate = 0;
-                    break :blk std.unicode.utf16DecodeSurrogatePair(&.{ self.surrogate, char }) catch return 0;
-                } else if (std.unicode.utf16IsHighSurrogate(char)) {
-                    self.surrogate = char;
-                    return 0;
-                } else {
-                    break :blk char;
+            if (self.text) {
+                const char: u16 = @intCast(wParam);
+                const codepoint = blk: {
+                    if (self.surrogate != 0) {
+                        defer self.surrogate = 0;
+                        break :blk std.unicode.utf16DecodeSurrogatePair(&.{ self.surrogate, char }) catch return 0;
+                    } else if (std.unicode.utf16IsHighSurrogate(char)) {
+                        self.surrogate = char;
+                        return 0;
+                    } else {
+                        break :blk char;
+                    }
+                };
+                if (codepoint >= ' ') {
+                    self.events.push(.{ .char = codepoint });
                 }
-            };
-            if (codepoint >= ' ') {
-                self.events.push(.{ .char = codepoint });
             }
             return 0;
         },
