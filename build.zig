@@ -184,6 +184,8 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("example/main.zig"),
         .target = target,
         .optimize = optimize,
+        // https://github.com/ziglang/zig/pull/19572
+        .single_threaded = if (target.result.os.tag == .haiku) false else null,
     });
     exe_mod.addImport("wio", module);
 
