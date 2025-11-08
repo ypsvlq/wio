@@ -424,9 +424,11 @@ char *wioGetClipboardText(const void *ptr, size_t *len) {
 #ifdef WIO_OPENGL
 
 void *wioCreateContext(NSWindow *window, const NSOpenGLPixelFormatAttribute *attributes) {
+    NSView *view = [window contentView];
+    [view setWantsBestResolutionOpenGLSurface:YES];
     NSOpenGLPixelFormat *format = [[NSOpenGLPixelFormat alloc] initWithAttributes:attributes];
     NSOpenGLContext *context = [[NSOpenGLContext alloc] initWithFormat:format shareContext:nil];
-    [context setView:[window contentView]];
+    [context setView:view];
     WioWindowDelegate *delegate = [window delegate];
     [delegate setContext:context];
     return (void *)CFBridgingRetain(context);

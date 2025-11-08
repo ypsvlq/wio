@@ -22,7 +22,7 @@ Vulkan support.
 ### Tier 1
 
 - Windows
-- macOS (10.15+)
+- macOS (10.13+)
 - Linux
 - WebAssembly
 
