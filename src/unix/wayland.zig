@@ -883,6 +883,9 @@ fn textInputLeave(_: ?*anyopaque, _: ?*h.zwp_text_input_v3, surface: ?*h.wl_surf
 }
 
 fn textInputPreeditString(_: ?*anyopaque, _: ?*h.zwp_text_input_v3, text: [*c]const u8, cursor_begin: i32, cursor_end: i32) callconv(.c) void {
+    if (focus) |window| {
+        window.repeat_key = 0;
+    }
     if (text == null) {
         preedit_string.clearRetainingCapacity();
         preedit_cursors = .{ 0, 0 };
