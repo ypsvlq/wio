@@ -127,6 +127,9 @@ var pointer_enter_serial: u32 = 0;
 var pointer_surface: ?*h.wl_surface = null;
 pub var repeat_period: i32 = 0;
 var repeat_delay: i32 = undefined;
+var preedit_string: std.ArrayList(u8) = .empty;
+var preedit_cursors: [2]i32 = .{ 0, 0 };
+var preedit_active = false;
 var commit_string: std.ArrayList(u8) = .empty;
 var clipboard_text: []const u8 = "";
 
@@ -221,6 +224,7 @@ pub fn deinit() void {
 
     internal.allocator.free(clipboard_text);
     commit_string.deinit(internal.allocator);
+    preedit_string.deinit(internal.allocator);
     windows.deinit(internal.allocator);
 
     c.libdecor_unref(libdecor_context);
@@ -878,7 +882,16 @@ fn textInputLeave(_: ?*anyopaque, _: ?*h.zwp_text_input_v3, surface: ?*h.wl_surf
     }
 }
 
-fn textInputPreeditString(_: ?*anyopaque, _: ?*h.zwp_text_input_v3, _: [*c]const u8, _: i32, _: i32) callconv(.c) void {}
+fn textInputPreeditString(_: ?*anyopaque, _: ?*h.zwp_text_input_v3, text: [*c]const u8, cursor_begin: i32, cursor_end: i32) callconv(.c) void {
+    if (text == null) {
+        preedit_string.clearRetainingCapacity();
+        preedit_cursors = .{ 0, 0 };
+        return;
+    }
+    preedit_active = true;
+    preedit_string.replaceRange(internal.allocator, 0, preedit_string.items.len, std.mem.sliceTo(text, 0)) catch {};
+    preedit_cursors = .{ cursor_begin, cursor_end };
+}
 
 fn textInputCommitString(_: ?*anyopaque, _: ?*h.zwp_text_input_v3, text: [*c]const u8) callconv(.c) void {
     commit_string.replaceRange(internal.allocator, 0, commit_string.items.len, std.mem.sliceTo(text, 0)) catch {};
@@ -888,13 +901,39 @@ fn textInputDeleteSurroundingText(_: ?*anyopaque, _: ?*h.zwp_text_input_v3, _: u
 
 fn textInputDone(_: ?*anyopaque, _: ?*h.zwp_text_input_v3, _: u32) callconv(.c) void {
     if (focus) |window| {
-        const view = std.unicode.Utf8View.init(commit_string.items) catch return;
-        var iter = view.iterator();
-        while (iter.nextCodepoint()) |char| {
-            window.events.push(.{ .char = char });
+        if (preedit_active) {
+            window.events.push(.preview_reset);
+            if (preedit_string.items.len == 0) {
+                preedit_active = false;
+            }
+        }
+        if (commit_string.items.len > 0) {
+            const view = std.unicode.Utf8View.init(commit_string.items) catch return;
+            var iter = view.iterator();
+            while (iter.nextCodepoint()) |char| {
+                window.events.push(.{ .char = char });
+            }
+        }
+        if (preedit_string.items.len > 0) {
+            const view = std.unicode.Utf8View.init(preedit_string.items) catch return;
+            var iter = view.iterator();
+            var count: usize = 1;
+            while (iter.nextCodepoint()) |char| : (count += 1) {
+                window.events.push(.{ .preview_char = char });
+                // convert byte offset to codepoint offset
+                for (&preedit_cursors) |*cursor| {
+                    if (cursor.* == iter.i) {
+                        cursor.* = @intCast(count);
+                    }
+                }
+            }
+            if (preedit_cursors[0] != -1 and preedit_cursors[1] != -1) {
+                window.events.push(.{ .preview_cursor = .{ std.math.cast(u16, preedit_cursors[0]) orelse return, std.math.cast(u16, preedit_cursors[1]) orelse return } });
+            }
         }
     }
     commit_string.items.len = 0;
+    preedit_string.items.len = 0;
 }
 
 const data_device_listener = h.wl_data_device_listener{
