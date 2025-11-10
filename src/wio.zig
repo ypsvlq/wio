@@ -342,15 +342,22 @@ pub const Event = union(enum) {
     visible: void,
     hidden: void,
     draw: void,
+
     size: Size,
     framebuffer: Size,
     scale: f32,
     /// Sent before `size`.
     mode: WindowMode,
+
     char: u21,
+    preview_reset: void,
+    preview_char: u21,
+    preview_cursor: [2]u16,
+
     button_press: Button,
     button_repeat: Button,
     button_release: Button,
+
     mouse: struct { x: u16, y: u16 },
     mouse_relative: struct { x: i16, y: i16 },
     scroll_vertical: f32,

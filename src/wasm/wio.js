@@ -75,32 +75,32 @@ const wio = {
         canvas.addEventListener("keydown", event => {
             event.preventDefault();
             const key = wio.keys[event.code];
-            if (key) events.push(event.repeat ? 12 : 11, key);
+            if (key) events.push(event.repeat ? 15 : 14, key);
             if (window.text && [...event.key].length === 1) events.push(10, event.key.codePointAt(0));
         });
         canvas.addEventListener("keyup", event => {
             const key = wio.keys[event.code];
-            if (key) events.push(13, key);
+            if (key) events.push(16, key);
         });
         canvas.addEventListener("mousedown", event => {
             const button = wio.buttons[event.button];
-            if (button !== undefined) events.push(11, button);
+            if (button !== undefined) events.push(14, button);
             if (window.cursor_mode === 2) canvas.requestPointerLock({ unadjustedMovement: true });
         });
         canvas.addEventListener("mouseup", event => {
             const button = wio.buttons[event.button];
-            if (button !== undefined) events.push(13, button);
+            if (button !== undefined) events.push(16, button);
         });
         canvas.addEventListener("mousemove", event => {
             if (window.cursor_mode !== 2) {
-                events.push(14, event.offsetX, event.offsetY);
+                events.push(17, event.offsetX, event.offsetY);
             } else {
-                events.push(15, event.movementX, event.movementY);
+                events.push(18, event.movementX, event.movementY);
             }
         });
         canvas.addEventListener("wheel", event => {
-            if (event.deltaY !== 0) events.push(16, event.deltaY);
-            if (event.deltaX !== 0) events.push(17, event.deltaX);
+            if (event.deltaY !== 0) events.push(19, event.deltaY);
+            if (event.deltaX !== 0) events.push(20, event.deltaX);
         });
 
         wio.windows.push(window);
