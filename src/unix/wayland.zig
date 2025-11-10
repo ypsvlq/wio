@@ -935,8 +935,8 @@ fn textInputDone(_: ?*anyopaque, _: ?*h.zwp_text_input_v3, _: u32) callconv(.c) 
             }
         }
     }
-    commit_string.items.len = 0;
-    preedit_string.items.len = 0;
+    commit_string.clearRetainingCapacity();
+    preedit_string.clearRetainingCapacity();
 }
 
 const data_device_listener = h.wl_data_device_listener{
