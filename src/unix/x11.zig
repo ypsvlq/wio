@@ -95,20 +95,20 @@ var keycodes: [248]wio.Button = undefined;
 var scale: f32 = 1;
 var clipboard_text: []const u8 = "";
 
-pub fn init() !void {
+pub fn init() !bool {
     DynLib.load(&imports, &.{
         .{ .handle = &libXcursor, .name = "libXcursor.so.1", .prefix = "Xcursor" },
         .{ .handle = &libX11, .name = "libX11.so.6", .prefix = "X" },
-    }) catch return error.Unavailable;
+    }) catch return false;
     errdefer libX11.close();
     errdefer libXcursor.close();
 
     if (build_options.opengl) {
-        DynLib.load(&imports, &.{.{ .handle = &libGL, .name = "libGL.so.1", .prefix = "glX" }}) catch return error.Unavailable;
+        DynLib.load(&imports, &.{.{ .handle = &libGL, .name = "libGL.so.1", .prefix = "glX" }}) catch return false;
     }
     errdefer if (build_options.opengl) libGL.close();
 
-    display = c.XkbOpenDisplay(null, null, null, null, null, null) orelse return error.Unavailable;
+    display = c.XkbOpenDisplay(null, null, null, null, null, null) orelse return false;
     errdefer _ = c.XCloseDisplay(display);
     try unix.pollfds.append(internal.allocator, .{ .fd = h.ConnectionNumber(display), .events = std.c.POLL.IN, .revents = undefined });
 
@@ -158,6 +158,8 @@ pub fn init() !void {
             }
         }
     }
+
+    return true;
 }
 
 pub fn deinit() void {

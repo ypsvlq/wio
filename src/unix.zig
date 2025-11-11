@@ -55,32 +55,37 @@ pub fn init() !void {
         if (std.c.getenv("XDG_SESSION_TYPE")) |value| {
             const session_type = std.mem.sliceTo(value, 0);
             if (std.mem.eql(u8, session_type, "wayland")) {
-                if (try initBackend(.wayland)) return;
+                if (try wayland.init()) {
+                    active = .wayland;
+                    return;
+                }
                 try_wayland = false;
             } else if (std.mem.eql(u8, session_type, "x11")) {
-                if (try initBackend(.x11)) return;
+                if (try x11.init()) {
+                    active = .x11;
+                    return;
+                }
                 try_x11 = false;
             }
         }
     }
 
     if (build_options.wayland and try_wayland) {
-        if (try initBackend(.wayland)) return;
+        if (try wayland.init()) {
+            active = .wayland;
+            return;
+        }
     }
 
     if (build_options.x11 and try_x11) {
-        if (try initBackend(.x11)) return;
+        if (try x11.init()) {
+            active = .x11;
+            return;
+        }
     }
 
     log.err("could not connect to window system", .{});
     return error.Unexpected;
-}
-
-fn initBackend(comptime backend: anytype) !bool {
-    if (@field(@This(), @tagName(backend)).init()) {
-        active = backend;
-        return true;
-    } else |err| return if (err == error.Unavailable) false else err;
 }
 
 pub fn deinit() void {

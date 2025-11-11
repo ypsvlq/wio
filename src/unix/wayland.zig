@@ -144,12 +144,12 @@ const exports = if (!build_options.system_integration) struct {
     export var wio_wl_proxy_get_user_data: *const @TypeOf(h.wl_proxy_get_user_data) = undefined;
 } else void;
 
-pub fn init() !void {
+pub fn init() !bool {
     DynLib.load(&imports, &.{
         .{ .handle = &libwayland_client, .name = "libwayland-client.so.0", .prefix = "wl", .exclude = "wl_egl" },
         .{ .handle = &libxkbcommon, .name = "libxkbcommon.so.0", .prefix = "xkb" },
         .{ .handle = &libdecor, .name = "libdecor-0.so.0", .prefix = "libdecor" },
-    }) catch return error.Unavailable;
+    }) catch return false;
     errdefer libwayland_client.close();
     errdefer libxkbcommon.close();
     errdefer libdecor.close();
@@ -158,7 +158,7 @@ pub fn init() !void {
         DynLib.load(&imports, &.{
             .{ .handle = &libwayland_egl, .name = "libwayland-egl.so.1", .prefix = "wl_egl" },
             .{ .handle = &libEGL, .name = "libEGL.so.1", .prefix = "egl" },
-        }) catch return error.Unavailable;
+        }) catch return false;
     }
     errdefer if (build_options.opengl) libwayland_egl.close();
     errdefer if (build_options.opengl) libEGL.close();
@@ -172,7 +172,7 @@ pub fn init() !void {
         exports.wio_wl_proxy_get_user_data = c.wl_proxy_get_user_data;
     }
 
-    display = c.wl_display_connect(null) orelse return error.Unavailable;
+    display = c.wl_display_connect(null) orelse return false;
     errdefer c.wl_display_disconnect(display);
     try unix.pollfds.append(internal.allocator, .{ .fd = c.wl_display_get_fd(display), .events = std.c.POLL.IN, .revents = undefined });
 
@@ -213,6 +213,8 @@ pub fn init() !void {
         egl_display = c.eglGetDisplay(display) orelse return logEglError("eglGetDisplay");
         if (c.eglInitialize(egl_display, null, null) == h.EGL_FALSE) return logEglError("eglInitialize");
     }
+
+    return true;
 }
 
 pub fn deinit() void {
