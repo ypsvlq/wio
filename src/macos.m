@@ -41,12 +41,12 @@ static void warpCursor(NSWindow *window) {
 
 @implementation WioApplicationDelegate
 
-- (void)applicationDidFinishLaunching:notification {
-    [NSApp activateIgnoringOtherApps:true];
+- (void)applicationDidFinishLaunching:(NSNotification *)notification {
+    [NSApp activateIgnoringOtherApps:YES];
     [NSApp stop:nil];
 }
 
-- (NSApplicationTerminateReply)applicationShouldTerminate:sender {
+- (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender {
     for (NSWindow *window in [NSApp windows]) {
         id delegate = [window delegate];
         if ([delegate respondsToSelector:@selector(windowShouldClose:)]) {
@@ -72,21 +72,21 @@ static void warpCursor(NSWindow *window) {
 }
 
 #ifdef WIO_OPENGL
-- (void)setContext:value {
+- (void)setContext:(NSOpenGLContext *)value {
     context = value;
 }
 #endif
 
-- (void)windowDidEnterFullScreen:notification {
+- (void)windowDidEnterFullScreen:(NSNotification *)notification {
     [[[notification object] contentView] updateTrackingAreas];
 }
 
-- (BOOL)windowShouldClose:sender {
+- (BOOL)windowShouldClose:(NSWindow *)sender {
     wioClose(zig);
     return NO;
 }
 
-- (void)windowDidBecomeKey:notification {
+- (void)windowDidBecomeKey:(NSNotification *)notification {
     wioFocused(zig);
 
     NSWindow *window = [notification object];
@@ -96,11 +96,11 @@ static void warpCursor(NSWindow *window) {
     }
 }
 
-- (void)windowDidResignKey:notification {
+- (void)windowDidResignKey:(NSNotification *)notification {
     wioUnfocused(zig);
 }
 
-- (void)windowDidChangeOcclusionState:notification {
+- (void)windowDidChangeOcclusionState:(NSNotification *)notification {
     if ([[notification object] occlusionState] & NSWindowOcclusionStateVisible) {
         wioVisible(zig);
     } else {
@@ -108,7 +108,7 @@ static void warpCursor(NSWindow *window) {
     }
 }
 
-- (void)windowDidResize:notification {
+- (void)windowDidResize:(NSNotification *)notification {
     NSWindow *window = [notification object];
     WioView *view = [window contentView];
 
@@ -132,7 +132,7 @@ static void warpCursor(NSWindow *window) {
 #endif
 }
 
-- (void)windowDidChangeBackingProperties:notification {
+- (void)windowDidChangeBackingProperties:(NSNotification *)notification {
     NSWindow *window = [notification object];
     NSView *view = [window contentView];
     CGFloat scale = [window backingScaleFactor];
@@ -166,7 +166,7 @@ static void warpCursor(NSWindow *window) {
     return self;
 }
 
-- (void)setCursor:value {
+- (void)setCursor:(NSCursor *)value {
     cursor = value;
     [self updateTrackingAreas];
 }
@@ -193,30 +193,30 @@ static void warpCursor(NSWindow *window) {
     [super updateTrackingAreas];
 }
 
-- (void)cursorUpdate:event {
+- (void)cursorUpdate:(NSEvent *)event {
     [cursor set];
 }
 
-- (void)mouseEntered:event {
+- (void)mouseEntered:(NSEvent *)event {
     if (!cursorInside && cursorMode != 0) [NSCursor hide];
-    cursorInside = true;
+    cursorInside = YES;
 }
 
-- (void)mouseExited:event {
+- (void)mouseExited:(NSEvent *)event {
     if (cursorInside && cursorMode != 0) [NSCursor unhide];
-    cursorInside = false;
+    cursorInside = NO;
 }
 
-- (void)keyDown:event {
+- (void)keyDown:(NSEvent *)event {
     wioKey(zig, [event keyCode], [event isARepeat]);
     wioChars(zig, [[event characters] UTF8String]);
 }
 
-- (void)keyUp:event {
+- (void)keyUp:(NSEvent *)event {
     wioKey(zig, [event keyCode], 2);
 }
 
-- (void)flagsChanged:event {
+- (void)flagsChanged:(NSEvent *)event {
     UInt16 key = [event keyCode];
     NSUInteger flag;
     switch (key) {
@@ -237,33 +237,33 @@ static void warpCursor(NSWindow *window) {
     wioKey(zig, key, [event modifierFlags] & flag ? 0 : 2);
 }
 
-- (void)mouseDown:event {
+- (void)mouseDown:(NSEvent *)event {
     wioButtonPress(zig, 0);
 }
 
-- (void)mouseUp:event {
+- (void)mouseUp:(NSEvent *)event {
     wioButtonRelease(zig, 0);
 }
 
-- (void)rightMouseDown:event {
+- (void)rightMouseDown:(NSEvent *)event {
     wioButtonPress(zig, 1);
 }
 
-- (void)rightMouseUp:event {
+- (void)rightMouseUp:(NSEvent *)event {
     wioButtonRelease(zig, 1);
 }
 
-- (void)otherMouseDown:event {
+- (void)otherMouseDown:(NSEvent *)event {
     NSInteger button = [event buttonNumber];
     if (button < 5) wioButtonPress(zig, button);
 }
 
-- (void)otherMouseUp:event {
+- (void)otherMouseUp:(NSEvent *)event {
     NSInteger button = [event buttonNumber];
     if (button < 5) wioButtonRelease(zig, button);
 }
 
-- (void)mouseMoved:event {
+- (void)mouseMoved:(NSEvent *)event {
     if (cursorMode == 2) {
         wioMouseRelative(zig, [event deltaX], [event deltaY]);
         return;
@@ -275,19 +275,19 @@ static void warpCursor(NSWindow *window) {
     wioMouse(zig, location.x, location.y);
 }
 
-- (void)mouseDragged:event {
+- (void)mouseDragged:(NSEvent *)event {
     [self mouseMoved:event];
 }
 
-- (void)rightMouseDragged:event {
+- (void)rightMouseDragged:(NSEvent *)event {
     [self mouseMoved:event];
 }
 
-- (void)otherMouseDragged:event {
+- (void)otherMouseDragged:(NSEvent *)event {
     [self mouseMoved:event];
 }
 
-- (void)scrollWheel:event {
+- (void)scrollWheel:(NSEvent *)event {
     wioScroll(zig, [event scrollingDeltaX], [event scrollingDeltaY]);
 }
 
