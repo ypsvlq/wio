@@ -37,8 +37,9 @@ pub const Window = struct {
         return null;
     }
 
-    pub fn enableTextInput(self: *Window) void {
+    pub fn enableTextInput(self: *Window, options: wio.TextInputOptions) void {
         _ = self;
+        _ = options;
     }
 
     pub fn disableTextInput(self: *Window) void {

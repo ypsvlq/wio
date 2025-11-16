@@ -71,6 +71,9 @@ pub const Size = struct {
     }
 };
 
+pub const Position = struct { x: u16, y: u16 };
+pub const RelativePosition = struct { x: i16, y: i16 };
+
 pub const CreateWindowOptions = struct {
     title: []const u8 = "wio",
     mode: WindowMode = .normal,
@@ -109,8 +112,10 @@ pub const Window = struct {
     /// When text input is enabled, character keys will send `.char` events instead of `.button_press`.
     ///
     /// Text input is disabled by default.
-    pub fn enableTextInput(self: *Window) void {
-        self.backend.enableTextInput();
+    ///
+    /// May be called repeatedly to change `options`.
+    pub fn enableTextInput(self: *Window, options: TextInputOptions) void {
+        self.backend.enableTextInput(options);
     }
 
     pub fn disableTextInput(self: *Window) void {
@@ -358,8 +363,8 @@ pub const Event = union(enum) {
     button_repeat: Button,
     button_release: Button,
 
-    mouse: struct { x: u16, y: u16 },
-    mouse_relative: struct { x: i16, y: i16 },
+    mouse: Position,
+    mouse_relative: RelativePosition,
     scroll_vertical: f32,
     scroll_horizontal: f32,
 };
@@ -370,6 +375,10 @@ pub const WindowMode = enum {
     normal,
     maximized,
     fullscreen,
+};
+
+pub const TextInputOptions = struct {
+    cursor: ?Position = null,
 };
 
 pub const Cursor = enum {

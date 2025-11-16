@@ -333,7 +333,7 @@ pub const Window = struct {
         return self.events.pop();
     }
 
-    pub fn enableTextInput(self: *Window) void {
+    pub fn enableTextInput(self: *Window, _: wio.TextInputOptions) void {
         self.text = true;
     }
 

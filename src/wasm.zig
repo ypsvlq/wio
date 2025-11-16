@@ -79,7 +79,7 @@ pub const Window = struct {
         };
     }
 
-    pub fn enableTextInput(self: *Window) void {
+    pub fn enableTextInput(self: *Window, _: wio.TextInputOptions) void {
         js.setTextInput(self.id, true);
     }
 

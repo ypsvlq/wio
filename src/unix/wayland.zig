@@ -362,7 +362,7 @@ pub const Window = struct {
     repeat_key: u32 = 0,
     repeat_timestamp: i64 = undefined,
     repeat_ignore: bool = false,
-    text: bool = false,
+    text_options: ?wio.TextInputOptions = null,
     size: wio.Size,
     scale: f32 = 1,
     cursor: u32 = undefined,
@@ -417,18 +417,21 @@ pub const Window = struct {
         return maybe_event;
     }
 
-    pub fn enableTextInput(self: *Window) void {
-        self.text = true;
+    pub fn enableTextInput(self: *Window, options: wio.TextInputOptions) void {
+        self.text_options = options;
         if (focus == self) {
             if (text_input) |_| {
                 h.zwp_text_input_v3_enable(text_input);
+                if (options.cursor) |cursor| {
+                    h.zwp_text_input_v3_set_cursor_rectangle(text_input, cursor.x, cursor.y, 0, 0);
+                }
                 h.zwp_text_input_v3_commit(text_input);
             }
         }
     }
 
     pub fn disableTextInput(self: *Window) void {
-        self.text = false;
+        self.text_options = null;
         if (focus == self) {
             if (text_input) |_| {
                 h.zwp_text_input_v3_disable(text_input);
@@ -587,7 +590,7 @@ pub const Window = struct {
             self.events.push(@unionInit(wio.Event, @tagName(event), button));
         }
 
-        if (self.text) {
+        if (self.text_options) |_| {
             var sym = c.xkb_state_key_get_one_sym(xkb_state, key + 8);
             if (compose_state) |_| {
                 if (c.xkb_compose_state_feed(compose_state, sym) == h.XKB_COMPOSE_FEED_ACCEPTED) {
@@ -870,8 +873,11 @@ const text_input_listener = h.zwp_text_input_v3_listener{
 
 fn textInputEnter(_: ?*anyopaque, _: ?*h.zwp_text_input_v3, surface: ?*h.wl_surface) callconv(.c) void {
     if (getWindow(surface)) |window| {
-        if (window.text) {
+        if (window.text_options) |options| {
             h.zwp_text_input_v3_enable(text_input);
+            if (options.cursor) |cursor| {
+                h.zwp_text_input_v3_set_cursor_rectangle(text_input, cursor.x, cursor.y, 0, 0);
+            }
             h.zwp_text_input_v3_commit(text_input);
         }
     }
@@ -879,7 +885,7 @@ fn textInputEnter(_: ?*anyopaque, _: ?*h.zwp_text_input_v3, surface: ?*h.wl_surf
 
 fn textInputLeave(_: ?*anyopaque, _: ?*h.zwp_text_input_v3, surface: ?*h.wl_surface) callconv(.c) void {
     if (getWindow(surface)) |window| {
-        if (window.text) {
+        if (window.text_options) |_| {
             h.zwp_text_input_v3_disable(text_input);
             h.zwp_text_input_v3_commit(text_input);
         }

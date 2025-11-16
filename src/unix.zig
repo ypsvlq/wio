@@ -192,10 +192,10 @@ pub const Window = union {
         }
     }
 
-    pub fn enableTextInput(self: *Window) void {
+    pub fn enableTextInput(self: *Window, options: wio.TextInputOptions) void {
         switch (active) {
-            .x11 => self.x11.enableTextInput(),
-            .wayland => self.wayland.enableTextInput(),
+            .x11 => self.x11.enableTextInput(options),
+            .wayland => self.wayland.enableTextInput(options),
         }
     }
 

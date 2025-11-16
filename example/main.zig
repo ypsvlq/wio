@@ -104,9 +104,9 @@ var cursor: u8 = 0;
 
 fn action(button: wio.Button) void {
     switch (button) {
-        .k => {
+        .@"1" => {
             if (!text_input) {
-                window.enableTextInput();
+                window.enableTextInput(.{ .cursor = .{ .x = 100, .y = 100 } });
             } else {
                 window.disableTextInput();
             }
