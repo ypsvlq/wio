@@ -12,7 +12,7 @@ const BJoystick = opaque {};
 const BSoundPlayer = opaque {};
 extern fn wioInit() void;
 extern fn wioMessageBox(u8, [*:0]const u8, [*:0]const u8) void;
-extern fn wioCreateWindow(*@This(), [*:0]const u8, u16, u16) *BWindow;
+extern fn wioCreateWindow(*Window, [*:0]const u8, u16, u16) *BWindow;
 extern fn wioDestroyWindow(*BWindow) void;
 extern fn wioSetTitle(*BWindow, [*:0]const u8) void;
 extern fn wioSetSize(*BWindow, f32, f32) void;
@@ -86,15 +86,8 @@ pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []cons
     wioMessageBox(@intFromEnum(style), title_z, message_z);
 }
 
-window: *BWindow,
-events: internal.EventQueue,
-events_mutex: std.Thread.Mutex = .{},
-buttons: std.StaticBitSet(5) = .initEmpty(),
-text: bool = false,
-opengl: if (build_options.opengl) struct { context: ?*BGLView = null, vsync: bool = false } else struct {} = .{},
-
-pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
-    const self = try internal.allocator.create(@This());
+pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
+    const self = try internal.allocator.create(Window);
     self.* = .{
         .window = undefined,
         .events = .init(),
@@ -120,76 +113,92 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     return self;
 }
 
-pub fn destroy(self: *@This()) void {
-    wioDestroyWindow(self.window);
-    self.events.deinit();
-    internal.allocator.destroy(self);
-}
+pub const Window = struct {
+    window: *BWindow,
+    events: internal.EventQueue,
+    events_mutex: std.Thread.Mutex = .{},
+    buttons: std.StaticBitSet(5) = .initEmpty(),
+    text: bool = false,
+    opengl: if (build_options.opengl) struct { context: ?*BGLView = null, vsync: bool = false } else struct {} = .{},
 
-pub fn getEvent(self: *@This()) ?wio.Event {
-    self.events_mutex.lock();
-    defer self.events_mutex.unlock();
-    return self.events.pop();
-}
+    pub fn destroy(self: *Window) void {
+        wioDestroyWindow(self.window);
+        self.events.deinit();
+        internal.allocator.destroy(self);
+    }
 
-pub fn enableTextInput(self: *@This()) void {
-    self.text = true;
-}
+    pub fn getEvent(self: *Window) ?wio.Event {
+        self.events_mutex.lock();
+        defer self.events_mutex.unlock();
+        return self.events.pop();
+    }
 
-pub fn disableTextInput(self: *@This()) void {
-    self.text = false;
-}
+    pub fn enableTextInput(self: *Window) void {
+        self.text = true;
+    }
 
-pub fn setTitle(self: *@This(), title: []const u8) void {
-    const title_z = internal.allocator.dupeZ(u8, title) catch return;
-    defer internal.allocator.free(title_z);
-    wioSetTitle(self.window, title_z);
-}
+    pub fn disableTextInput(self: *Window) void {
+        self.text = false;
+    }
 
-pub fn setMode(self: *@This(), mode: wio.WindowMode) void {
-    _ = self;
-    _ = mode;
-}
+    pub fn setTitle(self: *Window, title: []const u8) void {
+        const title_z = internal.allocator.dupeZ(u8, title) catch return;
+        defer internal.allocator.free(title_z);
+        wioSetTitle(self.window, title_z);
+    }
 
-pub fn setCursor(self: *@This(), shape: wio.Cursor) void {
-    _ = self;
-    _ = shape;
-}
+    pub fn setMode(self: *Window, mode: wio.WindowMode) void {
+        _ = self;
+        _ = mode;
+    }
 
-pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
-    _ = self;
-    _ = mode;
-}
+    pub fn setCursor(self: *Window, shape: wio.Cursor) void {
+        _ = self;
+        _ = shape;
+    }
 
-pub fn setSize(self: *@This(), size: wio.Size) void {
-    wioSetSize(self.window, @floatFromInt(size.width), @floatFromInt(size.height));
-}
+    pub fn setCursorMode(self: *Window, mode: wio.CursorMode) void {
+        _ = self;
+        _ = mode;
+    }
 
-pub fn setParent(_: *@This(), _: usize) void {}
+    pub fn setSize(self: *Window, size: wio.Size) void {
+        wioSetSize(self.window, @floatFromInt(size.width), @floatFromInt(size.height));
+    }
 
-pub fn requestAttention(_: *@This()) void {}
+    pub fn setParent(_: *Window, _: usize) void {}
 
-pub fn setClipboardText(_: *@This(), text: []const u8) void {
-    wioSetClipboardText(text.ptr, text.len);
-}
+    pub fn requestAttention(_: *Window) void {}
 
-pub fn getClipboardText(_: *@This(), allocator: std.mem.Allocator) ?[]u8 {
-    var len: usize = undefined;
-    const ptr = wioGetClipboardText(&len) orelse return null;
-    return allocator.dupe(u8, ptr[0..len]) catch return null;
-}
+    pub fn setClipboardText(_: *Window, text: []const u8) void {
+        wioSetClipboardText(text.ptr, text.len);
+    }
 
-pub fn makeContextCurrent(self: *@This()) void {
-    wioMakeContextCurrent(self.opengl.context.?);
-}
+    pub fn getClipboardText(_: *Window, allocator: std.mem.Allocator) ?[]u8 {
+        var len: usize = undefined;
+        const ptr = wioGetClipboardText(&len) orelse return null;
+        return allocator.dupe(u8, ptr[0..len]) catch return null;
+    }
 
-pub fn swapBuffers(self: *@This()) void {
-    wioSwapBuffers(self.opengl.vsync);
-}
+    pub fn makeContextCurrent(self: *Window) void {
+        wioMakeContextCurrent(self.opengl.context.?);
+    }
 
-pub fn swapInterval(self: *@This(), interval: i32) void {
-    self.opengl.vsync = (interval > 0);
-}
+    pub fn swapBuffers(self: *Window) void {
+        wioSwapBuffers(self.opengl.vsync);
+    }
+
+    pub fn swapInterval(self: *Window, interval: i32) void {
+        self.opengl.vsync = (interval > 0);
+    }
+
+    fn pushEvent(self: *Window, event: wio.Event) void {
+        self.events_mutex.lock();
+        defer self.events_mutex.unlock();
+        self.events.push(event);
+        wait_event.set();
+    }
+};
 
 pub fn glGetProcAddress(name: [:0]const u8) ?*const anyopaque {
     var location: ?*const anyopaque = undefined;
@@ -218,7 +227,7 @@ pub const JoystickDeviceIterator = struct {
         if (self.index == self.count) return null;
         defer self.index += 1;
 
-        var device: JoystickDevice = .{ .name = undefined };
+        var device = JoystickDevice{ .name = undefined };
         wioJoystickIteratorNext(self.handle, self.index, &device.name);
         return device;
     }
@@ -350,40 +359,33 @@ pub const AudioInput = struct {
     }
 };
 
-fn pushEvent(self: *@This(), event: wio.Event) void {
-    self.events_mutex.lock();
-    defer self.events_mutex.unlock();
-    self.events.push(event);
-    wait_event.set();
-}
-
-export fn wioClose(self: *@This()) void {
+export fn wioClose(self: *Window) void {
     self.pushEvent(.close);
 }
 
-export fn wioFocused(self: *@This()) void {
+export fn wioFocused(self: *Window) void {
     self.pushEvent(.focused);
 }
 
-export fn wioUnfocused(self: *@This()) void {
+export fn wioUnfocused(self: *Window) void {
     self.pushEvent(.unfocused);
 }
 
-export fn wioVisible(self: *@This()) void {
+export fn wioVisible(self: *Window) void {
     self.pushEvent(.visible);
 }
 
-export fn wioHidden(self: *@This()) void {
+export fn wioHidden(self: *Window) void {
     self.pushEvent(.hidden);
 }
 
-export fn wioSize(self: *@This(), width: u16, height: u16) void {
+export fn wioSize(self: *Window, width: u16, height: u16) void {
     self.pushEvent(.{ .size = .{ .width = width, .height = height } });
     self.pushEvent(.{ .framebuffer = .{ .width = width, .height = height } });
     self.pushEvent(.draw);
 }
 
-export fn wioChars(self: *@This(), chars: [*:0]const u8) void {
+export fn wioChars(self: *Window, chars: [*:0]const u8) void {
     if (self.text) {
         const view = std.unicode.Utf8View.init(std.mem.sliceTo(chars, 0)) catch return;
         var iter = view.iterator();
@@ -395,7 +397,7 @@ export fn wioChars(self: *@This(), chars: [*:0]const u8) void {
     }
 }
 
-export fn wioKey(self: *@This(), key: i32, event: u8) void {
+export fn wioKey(self: *Window, key: i32, event: u8) void {
     if (keyToButton(key)) |button| {
         self.pushEvent(
             switch (event) {
@@ -408,7 +410,7 @@ export fn wioKey(self: *@This(), key: i32, event: u8) void {
     }
 }
 
-export fn wioButtons(self: *@This(), buttons: u8) void {
+export fn wioButtons(self: *Window, buttons: u8) void {
     const changes = self.buttons.xorWith(.{ .mask = @truncate(buttons) });
     var iter = changes.iterator(.{});
     while (iter.next()) |i| {
@@ -421,11 +423,11 @@ export fn wioButtons(self: *@This(), buttons: u8) void {
     self.buttons = self.buttons.xorWith(changes);
 }
 
-export fn wioMouse(self: *@This(), x: u16, y: u16) void {
+export fn wioMouse(self: *Window, x: u16, y: u16) void {
     self.pushEvent(.{ .mouse = .{ .x = x, .y = y } });
 }
 
-export fn wioScroll(self: *@This(), vertical: f32, horizontal: f32) void {
+export fn wioScroll(self: *Window, vertical: f32, horizontal: f32) void {
     if (vertical != 0) self.pushEvent(.{ .scroll_vertical = vertical });
     if (horizontal != 0) self.pushEvent(.{ .scroll_horizontal = horizontal });
 }

@@ -224,28 +224,7 @@ pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []cons
     _ = w.MessageBoxW(null, message_w, title_w, flags);
 }
 
-events: internal.EventQueue,
-window: w.HWND,
-cursor: w.HCURSOR,
-cursor_mode: wio.CursorMode,
-rect: w.RECT = .{ .left = 0, .top = 0, .right = 0, .bottom = 0 },
-surrogate: u16 = 0,
-left_shift: bool = false,
-right_shift: bool = false,
-left_control: bool = false,
-right_control: bool = false,
-left_alt: bool = false,
-right_alt: bool = false,
-international2: bool = false,
-international3: bool = false,
-international4: bool = false,
-input: []u8 = &.{},
-last_x: u16 = 0,
-last_y: u16 = 0,
-text: bool = false,
-opengl: if (build_options.opengl) struct { dc: w.HDC = null, rc: w.HGLRC = null } else struct {} = .{},
-
-pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
+pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
     const title = try std.unicode.utf8ToUtf16LeAllocZ(internal.allocator, options.title);
     defer internal.allocator.free(title);
     const style: u32 = w.WS_OVERLAPPEDWINDOW;
@@ -265,7 +244,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
         null,
     ) orelse return logLastError("CreateWindowExW");
 
-    const self = try internal.allocator.create(@This());
+    const self = try internal.allocator.create(Window);
     errdefer internal.allocator.destroy(self);
     self.* = .{
         .events = .init(),
@@ -340,175 +319,209 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     return self;
 }
 
-pub fn destroy(self: *@This()) void {
-    if (build_options.opengl) {
-        _ = w.wglDeleteContext(self.opengl.rc);
-        _ = w.ReleaseDC(self.window, self.opengl.dc);
+pub const Window = struct {
+    events: internal.EventQueue,
+    window: w.HWND,
+    cursor: w.HCURSOR,
+    cursor_mode: wio.CursorMode,
+    rect: w.RECT = .{ .left = 0, .top = 0, .right = 0, .bottom = 0 },
+    surrogate: u16 = 0,
+    left_shift: bool = false,
+    right_shift: bool = false,
+    left_control: bool = false,
+    right_control: bool = false,
+    left_alt: bool = false,
+    right_alt: bool = false,
+    international2: bool = false,
+    international3: bool = false,
+    international4: bool = false,
+    input: []u8 = &.{},
+    last_x: u16 = 0,
+    last_y: u16 = 0,
+    text: bool = false,
+    opengl: if (build_options.opengl) struct { dc: w.HDC = null, rc: w.HGLRC = null } else struct {} = .{},
+
+    pub fn destroy(self: *Window) void {
+        if (build_options.opengl) {
+            _ = w.wglDeleteContext(self.opengl.rc);
+            _ = w.ReleaseDC(self.window, self.opengl.dc);
+        }
+        _ = w.DestroyWindow(self.window);
+        self.events.deinit();
+        internal.allocator.free(self.input);
+        internal.allocator.destroy(self);
     }
-    _ = w.DestroyWindow(self.window);
-    self.events.deinit();
-    internal.allocator.free(self.input);
-    internal.allocator.destroy(self);
-}
 
-pub fn getEvent(self: *@This()) ?wio.Event {
-    return self.events.pop();
-}
+    pub fn getEvent(self: *Window) ?wio.Event {
+        return self.events.pop();
+    }
 
-pub fn enableTextInput(self: *@This()) void {
-    self.text = true;
-}
+    pub fn enableTextInput(self: *Window) void {
+        self.text = true;
+    }
 
-pub fn disableTextInput(self: *@This()) void {
-    self.text = false;
-}
+    pub fn disableTextInput(self: *Window) void {
+        self.text = false;
+    }
 
-pub fn setTitle(self: *@This(), title: []const u8) void {
-    const title_w = std.unicode.utf8ToUtf16LeAllocZ(internal.allocator, title) catch return;
-    defer internal.allocator.free(title_w);
-    _ = w.SetWindowTextW(self.window, title_w);
-}
+    pub fn setTitle(self: *Window, title: []const u8) void {
+        const title_w = std.unicode.utf8ToUtf16LeAllocZ(internal.allocator, title) catch return;
+        defer internal.allocator.free(title_w);
+        _ = w.SetWindowTextW(self.window, title_w);
+    }
 
-pub fn setMode(self: *@This(), mode: wio.WindowMode) void {
-    switch (mode) {
-        .normal, .maximized => {
-            if (self.isFullscreen()) {
-                _ = w.SetWindowLongPtrW(self.window, w.GWL_STYLE, w.WS_OVERLAPPEDWINDOW);
+    pub fn setMode(self: *Window, mode: wio.WindowMode) void {
+        switch (mode) {
+            .normal, .maximized => {
+                if (self.isFullscreen()) {
+                    _ = w.SetWindowLongPtrW(self.window, w.GWL_STYLE, w.WS_OVERLAPPEDWINDOW);
+                    _ = w.SetWindowPos(
+                        self.window,
+                        null,
+                        self.rect.left,
+                        self.rect.top,
+                        self.rect.right - self.rect.left,
+                        self.rect.bottom - self.rect.top,
+                        w.SWP_FRAMECHANGED | w.SWP_NOZORDER,
+                    );
+                }
+            },
+            .fullscreen => {
+                const monitor = w.MonitorFromWindow(self.window, w.MONITOR_DEFAULTTONEAREST);
+                var info: w.MONITORINFO = undefined;
+                info.cbSize = @sizeOf(w.MONITORINFO);
+                _ = w.GetMonitorInfoW(monitor, &info);
+                _ = w.SetWindowLongPtrW(self.window, w.GWL_STYLE, @bitCast(@as(usize, w.WS_POPUP)));
                 _ = w.SetWindowPos(
                     self.window,
                     null,
-                    self.rect.left,
-                    self.rect.top,
-                    self.rect.right - self.rect.left,
-                    self.rect.bottom - self.rect.top,
+                    info.rcMonitor.left,
+                    info.rcMonitor.top,
+                    info.rcMonitor.right - info.rcMonitor.left,
+                    info.rcMonitor.bottom - info.rcMonitor.top,
                     w.SWP_FRAMECHANGED | w.SWP_NOZORDER,
                 );
-            }
-        },
-        .fullscreen => {
-            const monitor = w.MonitorFromWindow(self.window, w.MONITOR_DEFAULTTONEAREST);
-            var info: w.MONITORINFO = undefined;
-            info.cbSize = @sizeOf(w.MONITORINFO);
-            _ = w.GetMonitorInfoW(monitor, &info);
-            _ = w.SetWindowLongPtrW(self.window, w.GWL_STYLE, @bitCast(@as(usize, w.WS_POPUP)));
-            _ = w.SetWindowPos(
-                self.window,
-                null,
-                info.rcMonitor.left,
-                info.rcMonitor.top,
-                info.rcMonitor.right - info.rcMonitor.left,
-                info.rcMonitor.bottom - info.rcMonitor.top,
-                w.SWP_FRAMECHANGED | w.SWP_NOZORDER,
-            );
-        },
+            },
+        }
+
+        switch (mode) {
+            .normal, .fullscreen => _ = w.ShowWindow(self.window, w.SW_RESTORE),
+            .maximized => _ = w.ShowWindow(self.window, w.SW_MAXIMIZE),
+        }
     }
 
-    switch (mode) {
-        .normal, .fullscreen => _ = w.ShowWindow(self.window, w.SW_RESTORE),
-        .maximized => _ = w.ShowWindow(self.window, w.SW_MAXIMIZE),
-    }
-}
+    pub fn setCursor(self: *Window, shape: wio.Cursor) void {
+        self.cursor = loadCursor(shape);
 
-pub fn setCursor(self: *@This(), shape: wio.Cursor) void {
-    self.cursor = loadCursor(shape);
-
-    // trigger WM_SETCURSOR
-    var pos: w.POINT = undefined;
-    _ = w.GetCursorPos(&pos);
-    _ = w.SetCursorPos(pos.x, pos.y);
-}
-
-pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
-    self.cursor_mode = mode;
-    if (mode == .relative) {
-        self.clipCursor();
-    } else {
-        _ = w.ClipCursor(null);
+        // trigger WM_SETCURSOR
+        var pos: w.POINT = undefined;
+        _ = w.GetCursorPos(&pos);
+        _ = w.SetCursorPos(pos.x, pos.y);
     }
 
-    // trigger WM_SETCURSOR
-    var pos: w.POINT = undefined;
-    _ = w.GetCursorPos(&pos);
-    _ = w.SetCursorPos(pos.x, pos.y);
-}
+    pub fn setCursorMode(self: *Window, mode: wio.CursorMode) void {
+        self.cursor_mode = mode;
+        if (mode == .relative) {
+            self.clipCursor();
+        } else {
+            _ = w.ClipCursor(null);
+        }
 
-pub fn setSize(self: *@This(), size: wio.Size) void {
-    const style: u32 = @bitCast(@as(i32, @intCast(w.GetWindowLongPtrW(self.window, w.GWL_STYLE))));
-    const window_size = clientToWindow(size, style);
-    _ = w.SetWindowPos(self.window, null, 0, 0, window_size.width, window_size.height, w.SWP_NOMOVE | w.SWP_NOZORDER);
-}
-
-pub fn setParent(self: *@This(), parent: usize) void {
-    _ = w.SetParent(self.window, @ptrFromInt(parent));
-}
-
-pub fn requestAttention(self: *@This()) void {
-    _ = w.FlashWindow(self.window, w.TRUE);
-}
-
-pub fn setClipboardText(_: *@This(), text: []const u8) void {
-    if (w.OpenClipboard(null) == 0) return;
-    defer _ = w.CloseClipboard();
-    const text_w = std.unicode.utf8ToUtf16LeAlloc(internal.allocator, text) catch return;
-    defer internal.allocator.free(text_w);
-    const mem = w.GlobalAlloc(w.GMEM_MOVEABLE, (text_w.len + 1) * @sizeOf(u16)) orelse return;
-    const buf: [*]u16 = @ptrCast(@alignCast(w.GlobalLock(mem) orelse {
-        _ = w.GlobalFree(mem);
-        return;
-    }));
-    @memcpy(buf, text_w);
-    buf[text_w.len] = 0;
-    _ = w.GlobalUnlock(mem);
-    if (w.SetClipboardData(w.CF_UNICODETEXT, buf) == null) {
-        _ = w.GlobalFree(mem);
+        // trigger WM_SETCURSOR
+        var pos: w.POINT = undefined;
+        _ = w.GetCursorPos(&pos);
+        _ = w.SetCursorPos(pos.x, pos.y);
     }
-}
 
-pub fn getClipboardText(_: *@This(), allocator: std.mem.Allocator) ?[]u8 {
-    if (w.OpenClipboard(null) == 0) return null;
-    defer _ = w.CloseClipboard();
-    const mem = w.GetClipboardData(w.CF_UNICODETEXT) orelse return null;
-    const text: [*:0]const u16 = @ptrCast(@alignCast(w.GlobalLock(mem) orelse return null));
-    defer _ = w.GlobalUnlock(mem);
-    return std.unicode.utf16LeToUtf8Alloc(allocator, std.mem.sliceTo(text, 0)) catch null;
-}
-
-pub fn makeContextCurrent(self: *@This()) void {
-    _ = w.wglMakeCurrent(self.opengl.dc, self.opengl.rc);
-}
-
-pub fn swapBuffers(self: *@This()) void {
-    _ = w.SwapBuffers(self.opengl.dc);
-}
-
-pub fn swapInterval(_: @This(), interval: i32) void {
-    if (wgl.swapIntervalEXT) |swapIntervalEXT| {
-        _ = swapIntervalEXT(interval);
+    pub fn setSize(self: *Window, size: wio.Size) void {
+        const style: u32 = @bitCast(@as(i32, @intCast(w.GetWindowLongPtrW(self.window, w.GWL_STYLE))));
+        const window_size = clientToWindow(size, style);
+        _ = w.SetWindowPos(self.window, null, 0, 0, window_size.width, window_size.height, w.SWP_NOMOVE | w.SWP_NOZORDER);
     }
-}
 
-pub fn createSurface(self: @This(), instance: usize, allocator: ?*const anyopaque, surface: *u64) i32 {
-    const VkWin32SurfaceCreateInfoKHR = extern struct {
-        sType: i32 = 1000009000,
-        pNext: ?*const anyopaque = null,
-        flags: u32 = 0,
-        hinstance: w.HINSTANCE,
-        hwnd: w.HWND,
-    };
+    pub fn setParent(self: *Window, parent: usize) void {
+        _ = w.SetParent(self.window, @ptrFromInt(parent));
+    }
 
-    const vkCreateWin32SurfaceKHR: *const fn (usize, *const VkWin32SurfaceCreateInfoKHR, ?*const anyopaque, *u64) callconv(.winapi) i32 =
-        @ptrCast(vkGetInstanceProcAddr(instance, "vkCreateWin32SurfaceKHR"));
+    pub fn requestAttention(self: *Window) void {
+        _ = w.FlashWindow(self.window, w.TRUE);
+    }
 
-    return vkCreateWin32SurfaceKHR(
-        instance,
-        &.{
-            .hinstance = w.GetModuleHandleW(null),
-            .hwnd = self.window,
-        },
-        allocator,
-        surface,
-    );
-}
+    pub fn setClipboardText(_: *Window, text: []const u8) void {
+        if (w.OpenClipboard(null) == 0) return;
+        defer _ = w.CloseClipboard();
+        const text_w = std.unicode.utf8ToUtf16LeAlloc(internal.allocator, text) catch return;
+        defer internal.allocator.free(text_w);
+        const mem = w.GlobalAlloc(w.GMEM_MOVEABLE, (text_w.len + 1) * @sizeOf(u16)) orelse return;
+        const buf: [*]u16 = @ptrCast(@alignCast(w.GlobalLock(mem) orelse {
+            _ = w.GlobalFree(mem);
+            return;
+        }));
+        @memcpy(buf, text_w);
+        buf[text_w.len] = 0;
+        _ = w.GlobalUnlock(mem);
+        if (w.SetClipboardData(w.CF_UNICODETEXT, buf) == null) {
+            _ = w.GlobalFree(mem);
+        }
+    }
+
+    pub fn getClipboardText(_: *Window, allocator: std.mem.Allocator) ?[]u8 {
+        if (w.OpenClipboard(null) == 0) return null;
+        defer _ = w.CloseClipboard();
+        const mem = w.GetClipboardData(w.CF_UNICODETEXT) orelse return null;
+        const text: [*:0]const u16 = @ptrCast(@alignCast(w.GlobalLock(mem) orelse return null));
+        defer _ = w.GlobalUnlock(mem);
+        return std.unicode.utf16LeToUtf8Alloc(allocator, std.mem.sliceTo(text, 0)) catch null;
+    }
+
+    pub fn makeContextCurrent(self: *Window) void {
+        _ = w.wglMakeCurrent(self.opengl.dc, self.opengl.rc);
+    }
+
+    pub fn swapBuffers(self: *Window) void {
+        _ = w.SwapBuffers(self.opengl.dc);
+    }
+
+    pub fn swapInterval(_: Window, interval: i32) void {
+        if (wgl.swapIntervalEXT) |swapIntervalEXT| {
+            _ = swapIntervalEXT(interval);
+        }
+    }
+
+    pub fn createSurface(self: Window, instance: usize, allocator: ?*const anyopaque, surface: *u64) i32 {
+        const VkWin32SurfaceCreateInfoKHR = extern struct {
+            sType: i32 = 1000009000,
+            pNext: ?*const anyopaque = null,
+            flags: u32 = 0,
+            hinstance: w.HINSTANCE,
+            hwnd: w.HWND,
+        };
+
+        const vkCreateWin32SurfaceKHR: *const fn (usize, *const VkWin32SurfaceCreateInfoKHR, ?*const anyopaque, *u64) callconv(.winapi) i32 =
+            @ptrCast(vkGetInstanceProcAddr(instance, "vkCreateWin32SurfaceKHR"));
+
+        return vkCreateWin32SurfaceKHR(
+            instance,
+            &.{
+                .hinstance = w.GetModuleHandleW(null),
+                .hwnd = self.window,
+            },
+            allocator,
+            surface,
+        );
+    }
+
+    fn isFullscreen(self: *Window) bool {
+        return (w.GetWindowLongPtrW(self.window, w.GWL_STYLE) & w.WS_OVERLAPPEDWINDOW != w.WS_OVERLAPPEDWINDOW);
+    }
+
+    fn clipCursor(self: *Window) void {
+        var rect: w.RECT = undefined;
+        _ = w.GetClientRect(self.window, &rect);
+        _ = w.MapWindowPoints(self.window, w.HWND_DESKTOP, @ptrCast(&rect), 2);
+        _ = w.ClipCursor(&rect);
+    }
+};
 
 pub fn glGetProcAddress(name: [:0]const u8) ?*const anyopaque {
     return w.wglGetProcAddress(name) orelse w.GetProcAddress(w.GetModuleHandleW(w.L("opengl32.dll")), name);
@@ -1027,17 +1040,6 @@ const MMNotificationClient = struct {
     }
 };
 
-fn isFullscreen(self: *@This()) bool {
-    return (w.GetWindowLongPtrW(self.window, w.GWL_STYLE) & w.WS_OVERLAPPEDWINDOW != w.WS_OVERLAPPEDWINDOW);
-}
-
-fn clipCursor(self: *@This()) void {
-    var rect: w.RECT = undefined;
-    _ = w.GetClientRect(self.window, &rect);
-    _ = w.MapWindowPoints(self.window, w.HWND_DESKTOP, @ptrCast(&rect), 2);
-    _ = w.ClipCursor(&rect);
-}
-
 fn clientToWindow(size: wio.Size, style: u32) wio.Size {
     var rect = w.RECT{
         .left = 0,
@@ -1207,7 +1209,7 @@ fn helperWindowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM
 fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) callconv(.winapi) w.LRESULT {
     const self = blk: {
         const userdata: usize = @bitCast(w.GetWindowLongPtrW(window, w.GWLP_USERDATA));
-        const ptr: ?*@This() = @ptrFromInt(userdata);
+        const ptr: ?*Window = @ptrFromInt(userdata);
         break :blk ptr orelse return w.DefWindowProcW(window, msg, wParam, lParam);
     };
 

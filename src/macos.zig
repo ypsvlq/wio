@@ -19,7 +19,7 @@ extern fn wioInit() void;
 extern fn wioUpdate() void;
 extern fn wioWait() void;
 extern fn wioMessageBox(u8, [*]const u8, usize) void;
-extern fn wioCreateWindow(*@This(), u16, u16) *NSWindow;
+extern fn wioCreateWindow(*Window, u16, u16) *NSWindow;
 extern fn wioDestroyWindow(*NSWindow) void;
 extern fn wioSetTitle(*NSWindow, [*]const u8, usize) void;
 extern fn wioSetMode(*NSWindow, u8) void;
@@ -156,13 +156,8 @@ pub fn messageBox(style: wio.MessageBoxStyle, _: []const u8, message: []const u8
     wioMessageBox(@intFromEnum(style), message.ptr, message.len);
 }
 
-events: internal.EventQueue,
-window: *NSWindow,
-text: bool = false,
-opengl: if (build_options.opengl) struct { context: ?*NSOpenGLContext = null } else struct {} = .{},
-
-pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
-    const self = try internal.allocator.create(@This());
+pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
+    const self = try internal.allocator.create(Window);
     self.* = .{
         .events = .init(),
         .window = undefined,
@@ -205,94 +200,101 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     return self;
 }
 
-pub fn destroy(self: *@This()) void {
-    if (build_options.opengl) wioDestroyContext(self.opengl.context);
-    wioDestroyWindow(self.window);
-    self.events.deinit();
-    internal.allocator.destroy(self);
-}
+pub const Window = struct {
+    events: internal.EventQueue,
+    window: *NSWindow,
+    text: bool = false,
+    opengl: if (build_options.opengl) struct { context: ?*NSOpenGLContext = null } else struct {} = .{},
 
-pub fn getEvent(self: *@This()) ?wio.Event {
-    return self.events.pop();
-}
+    pub fn destroy(self: *Window) void {
+        if (build_options.opengl) wioDestroyContext(self.opengl.context);
+        wioDestroyWindow(self.window);
+        self.events.deinit();
+        internal.allocator.destroy(self);
+    }
 
-pub fn enableTextInput(self: *@This()) void {
-    self.text = true;
-}
+    pub fn getEvent(self: *Window) ?wio.Event {
+        return self.events.pop();
+    }
 
-pub fn disableTextInput(self: *@This()) void {
-    self.text = false;
-}
+    pub fn enableTextInput(self: *Window) void {
+        self.text = true;
+    }
 
-pub fn setTitle(self: *@This(), title: []const u8) void {
-    wioSetTitle(self.window, title.ptr, title.len);
-}
+    pub fn disableTextInput(self: *Window) void {
+        self.text = false;
+    }
 
-pub fn setMode(self: *@This(), mode: wio.WindowMode) void {
-    wioSetMode(self.window, @intFromEnum(mode));
-}
+    pub fn setTitle(self: *Window, title: []const u8) void {
+        wioSetTitle(self.window, title.ptr, title.len);
+    }
 
-pub fn setCursor(self: *@This(), shape: wio.Cursor) void {
-    wioSetCursor(self.window, @intFromEnum(shape));
-}
+    pub fn setMode(self: *Window, mode: wio.WindowMode) void {
+        wioSetMode(self.window, @intFromEnum(mode));
+    }
 
-pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
-    wioSetCursorMode(self.window, @intFromEnum(mode));
-}
+    pub fn setCursor(self: *Window, shape: wio.Cursor) void {
+        wioSetCursor(self.window, @intFromEnum(shape));
+    }
 
-pub fn setSize(self: *@This(), size: wio.Size) void {
-    wioSetSize(self.window, size.width, size.height);
-}
+    pub fn setCursorMode(self: *Window, mode: wio.CursorMode) void {
+        wioSetCursorMode(self.window, @intFromEnum(mode));
+    }
 
-pub fn setParent(self: *@This(), parent: usize) void {
-    _ = self;
-    _ = parent;
-}
+    pub fn setSize(self: *Window, size: wio.Size) void {
+        wioSetSize(self.window, size.width, size.height);
+    }
 
-pub fn requestAttention(_: *@This()) void {
-    wioRequestAttention();
-}
+    pub fn setParent(self: *Window, parent: usize) void {
+        _ = self;
+        _ = parent;
+    }
 
-pub fn setClipboardText(_: *@This(), text: []const u8) void {
-    wioSetClipboardText(text.ptr, text.len);
-}
+    pub fn requestAttention(_: *Window) void {
+        wioRequestAttention();
+    }
 
-pub fn getClipboardText(_: *@This(), allocator: std.mem.Allocator) ?[]u8 {
-    var len: usize = undefined;
-    const text = wioGetClipboardText(&allocator, &len) orelse return null;
-    return text[0..len];
-}
+    pub fn setClipboardText(_: *Window, text: []const u8) void {
+        wioSetClipboardText(text.ptr, text.len);
+    }
 
-pub fn makeContextCurrent(self: *@This()) void {
-    wioMakeContextCurrent(self.opengl.context);
-}
+    pub fn getClipboardText(_: *Window, allocator: std.mem.Allocator) ?[]u8 {
+        var len: usize = undefined;
+        const text = wioGetClipboardText(&allocator, &len) orelse return null;
+        return text[0..len];
+    }
 
-pub fn swapBuffers(self: *@This()) void {
-    wioSwapBuffers(self.window, self.opengl.context);
-}
+    pub fn makeContextCurrent(self: *Window) void {
+        wioMakeContextCurrent(self.opengl.context);
+    }
 
-pub fn swapInterval(self: *@This(), interval: i32) void {
-    wioSwapInterval(self.opengl.context, interval);
-}
+    pub fn swapBuffers(self: *Window) void {
+        wioSwapBuffers(self.window, self.opengl.context);
+    }
 
-pub fn createSurface(self: @This(), instance: usize, allocator: ?*const anyopaque, surface: *u64) i32 {
-    const VkMetalSurfaceCreateInfoEXT = extern struct {
-        sType: i32 = 1000217000,
-        pNext: ?*const anyopaque = null,
-        flags: u32 = 0,
-        pLayer: ?*const CAMetalLayer,
-    };
+    pub fn swapInterval(self: *Window, interval: i32) void {
+        wioSwapInterval(self.opengl.context, interval);
+    }
 
-    const vkCreateMetalSurfaceEXT: *const fn (usize, *const VkMetalSurfaceCreateInfoEXT, ?*const anyopaque, *u64) callconv(.c) i32 =
-        @ptrCast(vkGetInstanceProcAddr(instance, "vkCreateMetalSurfaceEXT"));
+    pub fn createSurface(self: Window, instance: usize, allocator: ?*const anyopaque, surface: *u64) i32 {
+        const VkMetalSurfaceCreateInfoEXT = extern struct {
+            sType: i32 = 1000217000,
+            pNext: ?*const anyopaque = null,
+            flags: u32 = 0,
+            pLayer: ?*const CAMetalLayer,
+        };
 
-    return vkCreateMetalSurfaceEXT(
-        instance,
-        &.{ .pLayer = wioCreateMetalLayer(self.window) },
-        allocator,
-        surface,
-    );
-}
+        const vkCreateMetalSurfaceEXT: *const fn (usize, *const VkMetalSurfaceCreateInfoEXT, ?*const anyopaque, *u64) callconv(.c) i32 =
+            @ptrCast(vkGetInstanceProcAddr(instance, "vkCreateMetalSurfaceEXT"));
+
+        return vkCreateMetalSurfaceEXT(
+            instance,
+            &.{ .pLayer = wioCreateMetalLayer(self.window) },
+            allocator,
+            surface,
+        );
+    }
+};
 
 pub fn glGetProcAddress(name: [:0]const u8) ?*const anyopaque {
     return c.dlsym(c.RTLD_DEFAULT, name);
@@ -709,41 +711,41 @@ pub const AudioInput = struct {
     }
 };
 
-export fn wioClose(self: *@This()) void {
+export fn wioClose(self: *Window) void {
     self.events.push(.close);
 }
 
-export fn wioFocused(self: *@This()) void {
+export fn wioFocused(self: *Window) void {
     self.events.push(.focused);
 }
 
-export fn wioUnfocused(self: *@This()) void {
+export fn wioUnfocused(self: *Window) void {
     self.events.push(.unfocused);
 }
 
-export fn wioVisible(self: *@This()) void {
+export fn wioVisible(self: *Window) void {
     self.events.push(.visible);
 }
 
-export fn wioHidden(self: *@This()) void {
+export fn wioHidden(self: *Window) void {
     self.events.push(.hidden);
 }
 
-export fn wioSize(self: *@This(), mode: u8, width: u16, height: u16) void {
+export fn wioSize(self: *Window, mode: u8, width: u16, height: u16) void {
     self.events.push(.{ .mode = @enumFromInt(mode) });
     self.events.push(.{ .size = .{ .width = width, .height = height } });
 }
 
-export fn wioFramebuffer(self: *@This(), width: u16, height: u16) void {
+export fn wioFramebuffer(self: *Window, width: u16, height: u16) void {
     self.events.push(.{ .framebuffer = .{ .width = width, .height = height } });
     self.events.push(.draw);
 }
 
-export fn wioScale(self: *@This(), scale: f32) void {
+export fn wioScale(self: *Window, scale: f32) void {
     self.events.push(.{ .scale = scale });
 }
 
-export fn wioChars(self: *@This(), buf: [*:0]const u8) void {
+export fn wioChars(self: *Window, buf: [*:0]const u8) void {
     if (self.text) {
         const view = std.unicode.Utf8View.init(std.mem.sliceTo(buf, 0)) catch return;
         var iter = view.iterator();
@@ -755,7 +757,7 @@ export fn wioChars(self: *@This(), buf: [*:0]const u8) void {
     }
 }
 
-export fn wioKey(self: *@This(), key: u16, event: u8) void {
+export fn wioKey(self: *Window, key: u16, event: u8) void {
     if (keycodeToButton(key)) |button| {
         switch (event) {
             0 => self.events.push(.{ .button_press = button }),
@@ -766,23 +768,23 @@ export fn wioKey(self: *@This(), key: u16, event: u8) void {
     }
 }
 
-export fn wioButtonPress(self: *@This(), button: u8) void {
+export fn wioButtonPress(self: *Window, button: u8) void {
     self.events.push(.{ .button_press = @enumFromInt(button) });
 }
 
-export fn wioButtonRelease(self: *@This(), button: u8) void {
+export fn wioButtonRelease(self: *Window, button: u8) void {
     self.events.push(.{ .button_release = @enumFromInt(button) });
 }
 
-export fn wioMouse(self: *@This(), x: u16, y: u16) void {
+export fn wioMouse(self: *Window, x: u16, y: u16) void {
     self.events.push(.{ .mouse = .{ .x = x, .y = y } });
 }
 
-export fn wioMouseRelative(self: *@This(), x: i16, y: i16) void {
+export fn wioMouseRelative(self: *Window, x: i16, y: i16) void {
     self.events.push(.{ .mouse_relative = .{ .x = x, .y = y } });
 }
 
-export fn wioScroll(self: *@This(), x: f32, y: f32) void {
+export fn wioScroll(self: *Window, x: f32, y: f32) void {
     if (x != 0) self.events.push(.{ .scroll_horizontal = x });
     if (y != 0) self.events.push(.{ .scroll_vertical = -y });
 }

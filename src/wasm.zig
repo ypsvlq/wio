@@ -43,84 +43,86 @@ pub fn messageBox(_: wio.MessageBoxStyle, _: []const u8, message: []const u8) vo
     js.messageBox(message.ptr, message.len);
 }
 
-id: u32,
-
-pub fn createWindow(options: wio.CreateWindowOptions) !@This() {
-    var self = @This(){ .id = js.createWindow() };
+pub fn createWindow(options: wio.CreateWindowOptions) !Window {
+    var self = Window{ .id = js.createWindow() };
     self.setCursor(options.cursor);
     self.setCursorMode(options.cursor_mode);
     return self;
 }
 
-pub fn destroy(_: *@This()) void {}
+pub const Window = struct {
+    id: u32,
 
-pub fn getEvent(self: *@This()) ?wio.Event {
-    const event: wio.EventType = @enumFromInt(js.shift(self.id));
-    return switch (event) {
-        .close => null, // never sent, EventType 0 is reused to indicate empty queue
-        .focused => .focused,
-        .unfocused => .unfocused,
-        .visible => .visible,
-        .draw => .draw,
-        .size => .{ .size = .{ .width = @intCast(js.shift(self.id)), .height = @intCast(js.shift(self.id)) } },
-        .framebuffer => .{ .framebuffer = .{ .width = @intCast(js.shift(self.id)), .height = @intCast(js.shift(self.id)) } },
-        .scale => .{ .scale = js.shiftFloat(self.id) },
-        .mode => .{ .mode = @enumFromInt(js.shift(self.id)) },
-        .char => .{ .char = @intCast(js.shift(self.id)) },
-        .button_press => .{ .button_press = @enumFromInt(js.shift(self.id)) },
-        .button_repeat => .{ .button_repeat = @enumFromInt(js.shift(self.id)) },
-        .button_release => .{ .button_release = @enumFromInt(js.shift(self.id)) },
-        .mouse => .{ .mouse = .{ .x = @intCast(js.shift(self.id)), .y = @intCast(js.shift(self.id)) } },
-        .mouse_relative => .{ .mouse_relative = .{ .x = @intCast(@as(i32, @bitCast(js.shift(self.id)))), .y = @intCast(@as(i32, @bitCast(js.shift(self.id)))) } },
-        .scroll_vertical => .{ .scroll_vertical = js.shiftFloat(self.id) },
-        .scroll_horizontal => .{ .scroll_horizontal = js.shiftFloat(self.id) },
-        else => unreachable,
-    };
-}
+    pub fn destroy(_: *Window) void {}
 
-pub fn enableTextInput(self: *@This()) void {
-    js.setTextInput(self.id, true);
-}
+    pub fn getEvent(self: *Window) ?wio.Event {
+        const event: wio.EventType = @enumFromInt(js.shift(self.id));
+        return switch (event) {
+            .close => null, // never sent, EventType 0 is reused to indicate empty queue
+            .focused => .focused,
+            .unfocused => .unfocused,
+            .visible => .visible,
+            .draw => .draw,
+            .size => .{ .size = .{ .width = @intCast(js.shift(self.id)), .height = @intCast(js.shift(self.id)) } },
+            .framebuffer => .{ .framebuffer = .{ .width = @intCast(js.shift(self.id)), .height = @intCast(js.shift(self.id)) } },
+            .scale => .{ .scale = js.shiftFloat(self.id) },
+            .mode => .{ .mode = @enumFromInt(js.shift(self.id)) },
+            .char => .{ .char = @intCast(js.shift(self.id)) },
+            .button_press => .{ .button_press = @enumFromInt(js.shift(self.id)) },
+            .button_repeat => .{ .button_repeat = @enumFromInt(js.shift(self.id)) },
+            .button_release => .{ .button_release = @enumFromInt(js.shift(self.id)) },
+            .mouse => .{ .mouse = .{ .x = @intCast(js.shift(self.id)), .y = @intCast(js.shift(self.id)) } },
+            .mouse_relative => .{ .mouse_relative = .{ .x = @intCast(@as(i32, @bitCast(js.shift(self.id)))), .y = @intCast(@as(i32, @bitCast(js.shift(self.id)))) } },
+            .scroll_vertical => .{ .scroll_vertical = js.shiftFloat(self.id) },
+            .scroll_horizontal => .{ .scroll_horizontal = js.shiftFloat(self.id) },
+            else => unreachable,
+        };
+    }
 
-pub fn disableTextInput(self: *@This()) void {
-    js.setTextInput(self.id, false);
-}
+    pub fn enableTextInput(self: *Window) void {
+        js.setTextInput(self.id, true);
+    }
 
-pub fn setTitle(_: *@This(), _: []const u8) void {}
+    pub fn disableTextInput(self: *Window) void {
+        js.setTextInput(self.id, false);
+    }
 
-pub fn setMode(self: *@This(), mode: wio.WindowMode) void {
-    js.setFullscreen(self.id, mode == .fullscreen);
-}
+    pub fn setTitle(_: *Window, _: []const u8) void {}
 
-pub fn setCursor(self: *@This(), shape: wio.Cursor) void {
-    js.setCursor(self.id, @intFromEnum(shape));
-}
+    pub fn setMode(self: *Window, mode: wio.WindowMode) void {
+        js.setFullscreen(self.id, mode == .fullscreen);
+    }
 
-pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
-    js.setCursorMode(self.id, @intFromEnum(mode));
-}
+    pub fn setCursor(self: *Window, shape: wio.Cursor) void {
+        js.setCursor(self.id, @intFromEnum(shape));
+    }
 
-pub fn setSize(self: *@This(), size: wio.Size) void {
-    js.setSize(self.id, size.width, size.height);
-}
+    pub fn setCursorMode(self: *Window, mode: wio.CursorMode) void {
+        js.setCursorMode(self.id, @intFromEnum(mode));
+    }
 
-pub fn setParent(_: *@This(), _: usize) void {}
+    pub fn setSize(self: *Window, size: wio.Size) void {
+        js.setSize(self.id, size.width, size.height);
+    }
 
-pub fn requestAttention(_: *@This()) void {}
+    pub fn setParent(_: *Window, _: usize) void {}
 
-pub fn setClipboardText(_: *@This(), text: []const u8) void {
-    js.setClipboardText(text.ptr, text.len);
-}
+    pub fn requestAttention(_: *Window) void {}
 
-pub fn getClipboardText(_: *@This(), _: std.mem.Allocator) ?[]u8 {
-    return null;
-}
+    pub fn setClipboardText(_: *Window, text: []const u8) void {
+        js.setClipboardText(text.ptr, text.len);
+    }
 
-pub fn makeContextCurrent(_: *@This()) void {}
+    pub fn getClipboardText(_: *Window, _: std.mem.Allocator) ?[]u8 {
+        return null;
+    }
 
-pub fn swapBuffers(_: *@This()) void {}
+    pub fn makeContextCurrent(_: *Window) void {}
 
-pub fn swapInterval(_: *@This(), _: i32) void {}
+    pub fn swapBuffers(_: *Window) void {}
+
+    pub fn swapInterval(_: *Window, _: i32) void {}
+};
 
 pub fn glGetProcAddress(_: [:0]const u8) ?*const anyopaque {
     return null;

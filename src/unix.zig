@@ -175,122 +175,122 @@ pub fn createWindow(options: wio.CreateWindowOptions) !Window {
 }
 
 pub const Window = union {
-    x11: *x11,
-    wayland: *wayland,
+    x11: *x11.Window,
+    wayland: *wayland.Window,
 
-    pub fn destroy(self: *@This()) void {
+    pub fn destroy(self: *Window) void {
         switch (active) {
             .x11 => self.x11.destroy(),
             .wayland => self.wayland.destroy(),
         }
     }
 
-    pub fn getEvent(self: *@This()) ?wio.Event {
+    pub fn getEvent(self: *Window) ?wio.Event {
         switch (active) {
             .x11 => return self.x11.getEvent(),
             .wayland => return self.wayland.getEvent(),
         }
     }
 
-    pub fn enableTextInput(self: *@This()) void {
+    pub fn enableTextInput(self: *Window) void {
         switch (active) {
             .x11 => self.x11.enableTextInput(),
             .wayland => self.wayland.enableTextInput(),
         }
     }
 
-    pub fn disableTextInput(self: *@This()) void {
+    pub fn disableTextInput(self: *Window) void {
         switch (active) {
             .x11 => self.x11.disableTextInput(),
             .wayland => self.wayland.disableTextInput(),
         }
     }
 
-    pub fn setTitle(self: *@This(), title: []const u8) void {
+    pub fn setTitle(self: *Window, title: []const u8) void {
         switch (active) {
             .x11 => self.x11.setTitle(title),
             .wayland => self.wayland.setTitle(title),
         }
     }
 
-    pub fn setMode(self: *@This(), mode: wio.WindowMode) void {
+    pub fn setMode(self: *Window, mode: wio.WindowMode) void {
         switch (active) {
             .x11 => self.x11.setMode(mode),
             .wayland => self.wayland.setMode(mode),
         }
     }
 
-    pub fn setCursor(self: *@This(), shape: wio.Cursor) void {
+    pub fn setCursor(self: *Window, shape: wio.Cursor) void {
         switch (active) {
             .x11 => self.x11.setCursor(shape),
             .wayland => self.wayland.setCursor(shape),
         }
     }
 
-    pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
+    pub fn setCursorMode(self: *Window, mode: wio.CursorMode) void {
         switch (active) {
             .x11 => self.x11.setCursorMode(mode),
             .wayland => self.wayland.setCursorMode(mode),
         }
     }
 
-    pub fn setSize(self: *@This(), size: wio.Size) void {
+    pub fn setSize(self: *Window, size: wio.Size) void {
         switch (active) {
             .x11 => self.x11.setSize(size),
             .wayland => self.wayland.setSize(size),
         }
     }
 
-    pub fn setParent(self: *@This(), parent: usize) void {
+    pub fn setParent(self: *Window, parent: usize) void {
         switch (active) {
             .x11 => self.x11.setParent(parent),
             .wayland => self.wayland.setParent(parent),
         }
     }
 
-    pub fn requestAttention(self: *@This()) void {
+    pub fn requestAttention(self: *Window) void {
         switch (active) {
             .x11 => self.x11.requestAttention(),
             .wayland => self.wayland.requestAttention(),
         }
     }
 
-    pub fn setClipboardText(self: *@This(), text: []const u8) void {
+    pub fn setClipboardText(self: *Window, text: []const u8) void {
         switch (active) {
             .x11 => self.x11.setClipboardText(text),
             .wayland => self.wayland.setClipboardText(text),
         }
     }
 
-    pub fn getClipboardText(self: *@This(), allocator: std.mem.Allocator) ?[]u8 {
+    pub fn getClipboardText(self: *Window, allocator: std.mem.Allocator) ?[]u8 {
         switch (active) {
             .x11 => return self.x11.getClipboardText(allocator),
             .wayland => return self.wayland.getClipboardText(allocator),
         }
     }
 
-    pub fn makeContextCurrent(self: *@This()) void {
+    pub fn makeContextCurrent(self: *Window) void {
         switch (active) {
             .x11 => self.x11.makeContextCurrent(),
             .wayland => self.wayland.makeContextCurrent(),
         }
     }
 
-    pub fn swapBuffers(self: *@This()) void {
+    pub fn swapBuffers(self: *Window) void {
         switch (active) {
             .x11 => self.x11.swapBuffers(),
             .wayland => self.wayland.swapBuffers(),
         }
     }
 
-    pub fn swapInterval(self: *@This(), interval: i32) void {
+    pub fn swapInterval(self: *Window, interval: i32) void {
         switch (active) {
             .x11 => self.x11.swapInterval(interval),
             .wayland => self.wayland.swapInterval(interval),
         }
     }
 
-    pub fn createSurface(self: @This(), instance: usize, allocator: ?*const anyopaque, surface: *u64) i32 {
+    pub fn createSurface(self: Window, instance: usize, allocator: ?*const anyopaque, surface: *u64) i32 {
         switch (active) {
             .x11 => return self.x11.createSurface(instance, allocator, surface),
             .wayland => return self.wayland.createSurface(instance, allocator, surface),

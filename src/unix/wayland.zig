@@ -120,8 +120,8 @@ var compose_state: ?*h.xkb_compose_state = null;
 
 var libdecor_context: *h.libdecor = undefined;
 
-var windows: std.AutoHashMapUnmanaged(*@This(), void) = .empty;
-pub var focus: ?*@This() = null;
+var windows: std.AutoHashMapUnmanaged(*Window, void) = .empty;
+pub var focus: ?*Window = null;
 var last_serial: u32 = 0;
 var pointer_enter_serial: u32 = 0;
 var pointer_surface: ?*h.wl_surface = null;
@@ -269,29 +269,8 @@ pub fn update() void {
     _ = c.wl_display_roundtrip(display);
 }
 
-events: internal.EventQueue,
-surface: *h.wl_surface,
-frame: *h.libdecor_frame,
-configured: bool = false,
-viewport: ?*h.wp_viewport = null,
-fractional_scale: ?*h.wp_fractional_scale_v1 = null,
-locked_pointer: ?*h.zwp_locked_pointer_v1 = null,
-repeat_key: u32 = 0,
-repeat_timestamp: i64 = undefined,
-repeat_ignore: bool = false,
-text: bool = false,
-size: wio.Size,
-scale: f32 = 1,
-cursor: u32 = undefined,
-cursor_mode: wio.CursorMode,
-egl: if (build_options.opengl) struct {
-    window: ?*h.wl_egl_window = null,
-    surface: h.EGLSurface = null,
-    context: h.EGLContext = null,
-} else struct {} = .{},
-
-pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
-    const self = try internal.allocator.create(@This());
+pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
+    const self = try internal.allocator.create(Window);
 
     const surface = h.wl_compositor_create_surface(compositor) orelse return error.Unexpected;
     errdefer h.wl_surface_destroy(surface);
@@ -372,196 +351,279 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
     return self;
 }
 
-pub fn destroy(self: *@This()) void {
-    if (focus == self) focus = null;
-    _ = windows.remove(self);
+pub const Window = struct {
+    events: internal.EventQueue,
+    surface: *h.wl_surface,
+    frame: *h.libdecor_frame,
+    configured: bool = false,
+    viewport: ?*h.wp_viewport = null,
+    fractional_scale: ?*h.wp_fractional_scale_v1 = null,
+    locked_pointer: ?*h.zwp_locked_pointer_v1 = null,
+    repeat_key: u32 = 0,
+    repeat_timestamp: i64 = undefined,
+    repeat_ignore: bool = false,
+    text: bool = false,
+    size: wio.Size,
+    scale: f32 = 1,
+    cursor: u32 = undefined,
+    cursor_mode: wio.CursorMode,
+    egl: if (build_options.opengl) struct {
+        window: ?*h.wl_egl_window = null,
+        surface: h.EGLSurface = null,
+        context: h.EGLContext = null,
+    } else struct {} = .{},
 
-    if (build_options.opengl) {
-        if (self.egl.context) |_| _ = c.eglDestroyContext(egl_display, self.egl.context);
-        if (self.egl.surface) |_| _ = c.eglDestroySurface(egl_display, self.egl.surface);
-        if (self.egl.window) |_| c.wl_egl_window_destroy(self.egl.window);
+    pub fn destroy(self: *Window) void {
+        if (focus == self) focus = null;
+        _ = windows.remove(self);
+
+        if (build_options.opengl) {
+            if (self.egl.context) |_| _ = c.eglDestroyContext(egl_display, self.egl.context);
+            if (self.egl.surface) |_| _ = c.eglDestroySurface(egl_display, self.egl.surface);
+            if (self.egl.window) |_| c.wl_egl_window_destroy(self.egl.window);
+        }
+
+        if (self.fractional_scale) |_| h.wp_fractional_scale_v1_destroy(self.fractional_scale);
+        if (self.viewport) |_| h.wp_viewport_destroy(self.viewport);
+        self.events.deinit();
+        c.libdecor_frame_unref(self.frame);
+        h.wl_surface_destroy(self.surface);
+        internal.allocator.destroy(self);
     }
 
-    if (self.fractional_scale) |_| h.wp_fractional_scale_v1_destroy(self.fractional_scale);
-    if (self.viewport) |_| h.wp_viewport_destroy(self.viewport);
-    self.events.deinit();
-    c.libdecor_frame_unref(self.frame);
-    h.wl_surface_destroy(self.surface);
-    internal.allocator.destroy(self);
-}
+    pub fn getEvent(self: *Window) ?wio.Event {
+        const maybe_event = self.events.pop();
 
-pub fn getEvent(self: *@This()) ?wio.Event {
-    const maybe_event = self.events.pop();
-
-    if (repeat_period > 0) {
-        if (!self.repeat_ignore) {
-            const now = std.time.milliTimestamp();
-            if (self.repeat_key != 0 and now > self.repeat_timestamp) {
-                self.pushKeyEvent(self.repeat_key, .button_repeat);
-                self.repeat_timestamp = now + repeat_period;
-                self.repeat_ignore = true;
-            }
-        } else {
-            if (maybe_event) |event| {
-                switch (event) {
-                    .button_repeat, .char => {},
-                    else => self.repeat_ignore = false,
+        if (repeat_period > 0) {
+            if (!self.repeat_ignore) {
+                const now = std.time.milliTimestamp();
+                if (self.repeat_key != 0 and now > self.repeat_timestamp) {
+                    self.pushKeyEvent(self.repeat_key, .button_repeat);
+                    self.repeat_timestamp = now + repeat_period;
+                    self.repeat_ignore = true;
                 }
             } else {
-                self.repeat_ignore = false;
+                if (maybe_event) |event| {
+                    switch (event) {
+                        .button_repeat, .char => {},
+                        else => self.repeat_ignore = false,
+                    }
+                } else {
+                    self.repeat_ignore = false;
+                }
+            }
+        }
+
+        return maybe_event;
+    }
+
+    pub fn enableTextInput(self: *Window) void {
+        self.text = true;
+        if (focus == self) {
+            if (text_input) |_| {
+                h.zwp_text_input_v3_enable(text_input);
+                h.zwp_text_input_v3_commit(text_input);
             }
         }
     }
 
-    return maybe_event;
-}
-
-pub fn enableTextInput(self: *@This()) void {
-    self.text = true;
-    if (focus == self) {
-        if (text_input) |_| {
-            h.zwp_text_input_v3_enable(text_input);
-            h.zwp_text_input_v3_commit(text_input);
+    pub fn disableTextInput(self: *Window) void {
+        self.text = false;
+        if (focus == self) {
+            if (text_input) |_| {
+                h.zwp_text_input_v3_disable(text_input);
+                h.zwp_text_input_v3_commit(text_input);
+            }
         }
     }
-}
 
-pub fn disableTextInput(self: *@This()) void {
-    self.text = false;
-    if (focus == self) {
-        if (text_input) |_| {
-            h.zwp_text_input_v3_disable(text_input);
-            h.zwp_text_input_v3_commit(text_input);
+    pub fn setTitle(self: *Window, title: []const u8) void {
+        const title_z = internal.allocator.dupeZ(u8, title) catch return;
+        defer internal.allocator.free(title_z);
+        c.libdecor_frame_set_title(self.frame, title_z);
+    }
+
+    pub fn setMode(self: *Window, mode: wio.WindowMode) void {
+        if (mode != .fullscreen) c.libdecor_frame_unset_fullscreen(self.frame);
+        switch (mode) {
+            .normal => c.libdecor_frame_unset_maximized(self.frame),
+            .maximized => c.libdecor_frame_set_maximized(self.frame),
+            .fullscreen => c.libdecor_frame_set_fullscreen(self.frame, null),
         }
     }
-}
 
-pub fn setTitle(self: *@This(), title: []const u8) void {
-    const title_z = internal.allocator.dupeZ(u8, title) catch return;
-    defer internal.allocator.free(title_z);
-    c.libdecor_frame_set_title(self.frame, title_z);
-}
-
-pub fn setMode(self: *@This(), mode: wio.WindowMode) void {
-    if (mode != .fullscreen) c.libdecor_frame_unset_fullscreen(self.frame);
-    switch (mode) {
-        .normal => c.libdecor_frame_unset_maximized(self.frame),
-        .maximized => c.libdecor_frame_set_maximized(self.frame),
-        .fullscreen => c.libdecor_frame_set_fullscreen(self.frame, null),
+    pub fn setCursor(self: *Window, shape: wio.Cursor) void {
+        self.cursor = switch (shape) {
+            .arrow => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_DEFAULT,
+            .arrow_busy => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_PROGRESS,
+            .busy => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_WAIT,
+            .text => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_TEXT,
+            .hand => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_POINTER,
+            .crosshair => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_CROSSHAIR,
+            .forbidden => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_NOT_ALLOWED,
+            .move => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_MOVE,
+            .size_ns => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_NS_RESIZE,
+            .size_ew => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_EW_RESIZE,
+            .size_nesw => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_NESW_RESIZE,
+            .size_nwse => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_NWSE_RESIZE,
+        };
+        if (pointer_surface == self.surface) self.applyCursor();
     }
-}
 
-pub fn setCursor(self: *@This(), shape: wio.Cursor) void {
-    self.cursor = switch (shape) {
-        .arrow => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_DEFAULT,
-        .arrow_busy => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_PROGRESS,
-        .busy => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_WAIT,
-        .text => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_TEXT,
-        .hand => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_POINTER,
-        .crosshair => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_CROSSHAIR,
-        .forbidden => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_NOT_ALLOWED,
-        .move => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_MOVE,
-        .size_ns => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_NS_RESIZE,
-        .size_ew => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_EW_RESIZE,
-        .size_nesw => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_NESW_RESIZE,
-        .size_nwse => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_NWSE_RESIZE,
-    };
-    if (pointer_surface == self.surface) self.applyCursor();
-}
+    pub fn setCursorMode(self: *Window, mode: wio.CursorMode) void {
+        self.cursor_mode = mode;
+        if (pointer_surface == self.surface) self.applyCursor();
+    }
 
-pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
-    self.cursor_mode = mode;
-    if (pointer_surface == self.surface) self.applyCursor();
-}
+    pub fn setSize(self: *Window, size: wio.Size) void {
+        self.resize(size, null);
+    }
 
-pub fn setSize(self: *@This(), size: wio.Size) void {
-    self.resize(size, null);
-}
+    pub fn setParent(self: *Window, parent: usize) void {
+        _ = self;
+        _ = parent;
+    }
 
-pub fn setParent(self: *@This(), parent: usize) void {
-    _ = self;
-    _ = parent;
-}
+    pub fn requestAttention(self: *Window) void {
+        if (activation == null) return;
+        const token = h.xdg_activation_v1_get_activation_token(activation);
+        _ = h.xdg_activation_token_v1_add_listener(token, &activation_token_listener, self.surface);
+        h.xdg_activation_token_v1_commit(token);
+    }
 
-pub fn requestAttention(self: *@This()) void {
-    if (activation == null) return;
-    const token = h.xdg_activation_v1_get_activation_token(activation);
-    _ = h.xdg_activation_token_v1_add_listener(token, &activation_token_listener, self.surface);
-    h.xdg_activation_token_v1_commit(token);
-}
+    pub fn setClipboardText(_: *Window, text: []const u8) void {
+        if (data_device_manager == null or data_device == null) return;
 
-pub fn setClipboardText(_: *@This(), text: []const u8) void {
-    if (data_device_manager == null or data_device == null) return;
+        internal.allocator.free(clipboard_text);
+        clipboard_text = internal.allocator.dupe(u8, text) catch "";
 
-    internal.allocator.free(clipboard_text);
-    clipboard_text = internal.allocator.dupe(u8, text) catch "";
+        if (data_source) |_| h.wl_data_source_destroy(data_source);
+        data_source = h.wl_data_device_manager_create_data_source(data_device_manager);
+        _ = h.wl_data_source_add_listener(data_source, &data_source_listener, null);
+        h.wl_data_source_offer(data_source, "text/plain;charset=utf-8");
+        h.wl_data_device_set_selection(data_device, data_source, last_serial);
+    }
 
-    if (data_source) |_| h.wl_data_source_destroy(data_source);
-    data_source = h.wl_data_device_manager_create_data_source(data_device_manager);
-    _ = h.wl_data_source_add_listener(data_source, &data_source_listener, null);
-    h.wl_data_source_offer(data_source, "text/plain;charset=utf-8");
-    h.wl_data_device_set_selection(data_device, data_source, last_serial);
-}
+    pub fn getClipboardText(_: *Window, allocator: std.mem.Allocator) ?[]u8 {
+        if (data_offer == null) return null;
+        var pipe: [2]i32 = undefined;
+        if (std.c.pipe(&pipe) == -1) return null;
+        defer _ = std.c.close(pipe[0]);
+        h.wl_data_offer_receive(data_offer, "text/plain;charset=utf-8", pipe[1]);
+        _ = c.wl_display_roundtrip(display);
+        _ = std.c.close(pipe[1]);
+        return readClipboardText(allocator, .{ .handle = pipe[0] }) catch null;
+    }
 
-pub fn getClipboardText(_: *@This(), allocator: std.mem.Allocator) ?[]u8 {
-    if (data_offer == null) return null;
-    var pipe: [2]i32 = undefined;
-    if (std.c.pipe(&pipe) == -1) return null;
-    defer _ = std.c.close(pipe[0]);
-    h.wl_data_offer_receive(data_offer, "text/plain;charset=utf-8", pipe[1]);
-    _ = c.wl_display_roundtrip(display);
-    _ = std.c.close(pipe[1]);
-    return readClipboardText(allocator, .{ .handle = pipe[0] }) catch null;
-}
+    fn readClipboardText(allocator: std.mem.Allocator, file: std.fs.File) ![]u8 {
+        var buffer: [1024]u8 = undefined;
+        var text: std.ArrayList(u8) = .empty;
+        errdefer text.deinit(allocator);
+        while (true) {
+            const count = try file.read(&buffer);
+            if (count > 0) {
+                try text.appendSlice(allocator, buffer[0..count]);
+            } else {
+                return text.toOwnedSlice(allocator);
+            }
+        }
+    }
 
-fn readClipboardText(allocator: std.mem.Allocator, file: std.fs.File) ![]u8 {
-    var buffer: [1024]u8 = undefined;
-    var text: std.ArrayList(u8) = .empty;
-    errdefer text.deinit(allocator);
-    while (true) {
-        const count = try file.read(&buffer);
-        if (count > 0) {
-            try text.appendSlice(allocator, buffer[0..count]);
+    pub fn makeContextCurrent(self: *Window) void {
+        _ = c.eglMakeCurrent(egl_display, self.egl.surface, self.egl.surface, self.egl.context);
+    }
+
+    pub fn swapBuffers(self: *Window) void {
+        _ = c.eglSwapBuffers(egl_display, self.egl.surface);
+    }
+
+    pub fn swapInterval(_: *Window, interval: i32) void {
+        _ = c.eglSwapInterval(egl_display, interval);
+    }
+
+    pub fn createSurface(self: Window, instance: usize, allocator: ?*const anyopaque, surface: *u64) i32 {
+        const VkWaylandSurfaceCreateInfoKHR = extern struct {
+            sType: i32 = 1000006000,
+            pNext: ?*const anyopaque = null,
+            flags: u32 = 0,
+            display: *h.wl_display,
+            surface: *h.wl_surface,
+        };
+
+        const vkCreateWaylandSurfaceKHR: *const fn (usize, *const VkWaylandSurfaceCreateInfoKHR, ?*const anyopaque, *u64) callconv(.c) i32 =
+            @ptrCast(unix.vkGetInstanceProcAddr(instance, "vkCreateWaylandSurfaceKHR"));
+
+        return vkCreateWaylandSurfaceKHR(
+            instance,
+            &.{
+                .display = display,
+                .surface = self.surface,
+            },
+            allocator,
+            surface,
+        );
+    }
+
+    fn resize(self: *Window, size: wio.Size, configuration: ?*h.libdecor_configuration) void {
+        const framebuffer = size.multiply(self.scale);
+
+        if (self.viewport) |_| {
+            h.wp_viewport_set_destination(self.viewport, size.width, size.height);
+        }
+
+        if (build_options.opengl) if (self.egl.window != null) c.wl_egl_window_resize(self.egl.window, framebuffer.width, framebuffer.height, 0, 0);
+
+        const state = c.libdecor_state_new(size.width, size.height);
+        defer c.libdecor_state_free(state);
+        c.libdecor_frame_commit(self.frame, state, configuration);
+
+        self.events.push(.{ .size = size });
+        self.events.push(.{ .framebuffer = framebuffer });
+        self.events.push(.draw);
+    }
+
+    fn pushKeyEvent(self: *Window, key: u32, comptime event: wio.EventType) void {
+        if (keyToButton(key)) |button| {
+            self.events.push(@unionInit(wio.Event, @tagName(event), button));
+        }
+
+        if (self.text) {
+            var sym = c.xkb_state_key_get_one_sym(xkb_state, key + 8);
+            if (compose_state) |_| {
+                if (c.xkb_compose_state_feed(compose_state, sym) == h.XKB_COMPOSE_FEED_ACCEPTED) {
+                    switch (c.xkb_compose_state_get_status(compose_state)) {
+                        h.XKB_COMPOSE_COMPOSED => sym = c.xkb_compose_state_get_one_sym(compose_state),
+                        h.XKB_COMPOSE_COMPOSING, h.XKB_COMPOSE_CANCELLED => return,
+                        else => {},
+                    }
+                }
+            }
+            const char: u21 = @intCast(c.xkb_keysym_to_utf32(sym));
+            if (char >= ' ' and char != 0x7F) self.events.push(.{ .char = char });
+        }
+    }
+
+    fn applyCursor(self: *Window) void {
+        if (self.cursor_mode == .normal) {
+            if (cursor_shape_device) |_| {
+                h.wp_cursor_shape_device_v1_set_shape(cursor_shape_device, pointer_enter_serial, self.cursor);
+            }
         } else {
-            return text.toOwnedSlice(allocator);
+            h.wl_pointer_set_cursor(pointer, pointer_enter_serial, null, 0, 0);
+        }
+
+        if (self.locked_pointer) |_| {
+            h.zwp_locked_pointer_v1_destroy(self.locked_pointer);
+            self.locked_pointer = null;
+        }
+
+        if (self.cursor_mode == .relative) {
+            if (pointer_constraints) |_| {
+                self.locked_pointer = h.zwp_pointer_constraints_v1_lock_pointer(pointer_constraints, self.surface, pointer, null, h.ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
+            }
         }
     }
-}
-
-pub fn makeContextCurrent(self: *@This()) void {
-    _ = c.eglMakeCurrent(egl_display, self.egl.surface, self.egl.surface, self.egl.context);
-}
-
-pub fn swapBuffers(self: *@This()) void {
-    _ = c.eglSwapBuffers(egl_display, self.egl.surface);
-}
-
-pub fn swapInterval(_: *@This(), interval: i32) void {
-    _ = c.eglSwapInterval(egl_display, interval);
-}
-
-pub fn createSurface(self: @This(), instance: usize, allocator: ?*const anyopaque, surface: *u64) i32 {
-    const VkWaylandSurfaceCreateInfoKHR = extern struct {
-        sType: i32 = 1000006000,
-        pNext: ?*const anyopaque = null,
-        flags: u32 = 0,
-        display: *h.wl_display,
-        surface: *h.wl_surface,
-    };
-
-    const vkCreateWaylandSurfaceKHR: *const fn (usize, *const VkWaylandSurfaceCreateInfoKHR, ?*const anyopaque, *u64) callconv(.c) i32 =
-        @ptrCast(unix.vkGetInstanceProcAddr(instance, "vkCreateWaylandSurfaceKHR"));
-
-    return vkCreateWaylandSurfaceKHR(
-        instance,
-        &.{
-            .display = display,
-            .surface = self.surface,
-        },
-        allocator,
-        surface,
-    );
-}
+};
 
 pub fn glGetProcAddress(name: [:0]const u8) ?*const anyopaque {
     return c.eglGetProcAddress(name);
@@ -576,68 +638,8 @@ fn logEglError(name: []const u8) error{Unexpected} {
     return error.Unexpected;
 }
 
-fn resize(self: *@This(), size: wio.Size, configuration: ?*h.libdecor_configuration) void {
-    const framebuffer = size.multiply(self.scale);
-
-    if (self.viewport) |_| {
-        h.wp_viewport_set_destination(self.viewport, size.width, size.height);
-    }
-
-    if (build_options.opengl) if (self.egl.window != null) c.wl_egl_window_resize(self.egl.window, framebuffer.width, framebuffer.height, 0, 0);
-
-    const state = c.libdecor_state_new(size.width, size.height);
-    defer c.libdecor_state_free(state);
-    c.libdecor_frame_commit(self.frame, state, configuration);
-
-    self.events.push(.{ .size = size });
-    self.events.push(.{ .framebuffer = framebuffer });
-    self.events.push(.draw);
-}
-
-fn pushKeyEvent(self: *@This(), key: u32, comptime event: wio.EventType) void {
-    if (keyToButton(key)) |button| {
-        self.events.push(@unionInit(wio.Event, @tagName(event), button));
-    }
-
-    if (self.text) {
-        var sym = c.xkb_state_key_get_one_sym(xkb_state, key + 8);
-        if (compose_state) |_| {
-            if (c.xkb_compose_state_feed(compose_state, sym) == h.XKB_COMPOSE_FEED_ACCEPTED) {
-                switch (c.xkb_compose_state_get_status(compose_state)) {
-                    h.XKB_COMPOSE_COMPOSED => sym = c.xkb_compose_state_get_one_sym(compose_state),
-                    h.XKB_COMPOSE_COMPOSING, h.XKB_COMPOSE_CANCELLED => return,
-                    else => {},
-                }
-            }
-        }
-        const char: u21 = @intCast(c.xkb_keysym_to_utf32(sym));
-        if (char >= ' ' and char != 0x7F) self.events.push(.{ .char = char });
-    }
-}
-
-fn applyCursor(self: *@This()) void {
-    if (self.cursor_mode == .normal) {
-        if (cursor_shape_device) |_| {
-            h.wp_cursor_shape_device_v1_set_shape(cursor_shape_device, pointer_enter_serial, self.cursor);
-        }
-    } else {
-        h.wl_pointer_set_cursor(pointer, pointer_enter_serial, null, 0, 0);
-    }
-
-    if (self.locked_pointer) |_| {
-        h.zwp_locked_pointer_v1_destroy(self.locked_pointer);
-        self.locked_pointer = null;
-    }
-
-    if (self.cursor_mode == .relative) {
-        if (pointer_constraints) |_| {
-            self.locked_pointer = h.zwp_pointer_constraints_v1_lock_pointer(pointer_constraints, self.surface, pointer, null, h.ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
-        }
-    }
-}
-
-fn getWindow(surface: ?*h.wl_surface) ?*@This() {
-    const window: *@This() = @ptrCast(@alignCast(h.wl_surface_get_user_data(surface) orelse return null));
+fn getWindow(surface: ?*h.wl_surface) ?*Window {
+    const window: *Window = @ptrCast(@alignCast(h.wl_surface_get_user_data(surface) orelse return null));
     return if (windows.contains(window)) window else null;
 }
 
@@ -851,7 +853,7 @@ const fractional_scale_listener = h.wp_fractional_scale_v1_listener{
 };
 
 fn fractionalScalePreferredScale(data: ?*anyopaque, _: ?*h.wp_fractional_scale_v1, scale: u32) callconv(.c) void {
-    const self: *@This() = @ptrCast(@alignCast(data orelse return));
+    const self: *Window = @ptrCast(@alignCast(data orelse return));
     self.scale = @floatFromInt(scale);
     self.scale /= 120;
     self.events.push(.{ .scale = self.scale });
@@ -1003,7 +1005,7 @@ var libdecor_frame_interface = h.libdecor_frame_interface{
 };
 
 fn frameConfigure(frame: ?*h.libdecor_frame, configuration: ?*h.libdecor_configuration, data: ?*anyopaque) callconv(.c) void {
-    const self: *@This() = @ptrCast(@alignCast(data));
+    const self: *Window = @ptrCast(@alignCast(data));
     self.configured = true;
 
     var mode = wio.WindowMode.normal;
@@ -1024,12 +1026,12 @@ fn frameConfigure(frame: ?*h.libdecor_frame, configuration: ?*h.libdecor_configu
 }
 
 fn frameClose(_: ?*h.libdecor_frame, data: ?*anyopaque) callconv(.c) void {
-    const self: *@This() = @ptrCast(@alignCast(data));
+    const self: *Window = @ptrCast(@alignCast(data));
     self.events.push(.close);
 }
 
 fn frameCommit(_: ?*h.libdecor_frame, data: ?*anyopaque) callconv(.c) void {
-    const self: *@This() = @ptrCast(@alignCast(data));
+    const self: *Window = @ptrCast(@alignCast(data));
     self.events.push(.draw);
 }
 

@@ -21,94 +21,96 @@ pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []cons
     _ = message;
 }
 
-pub fn createWindow(options: wio.CreateWindowOptions) !*@This() {
-    const self = try internal.allocator.create(@This());
+pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
+    const self = try internal.allocator.create(Window);
     _ = options;
     return self;
 }
 
-pub fn destroy(self: *@This()) void {
-    internal.allocator.destroy(self);
-}
+pub const Window = struct {
+    pub fn destroy(self: *Window) void {
+        internal.allocator.destroy(self);
+    }
 
-pub fn getEvent(self: *@This()) ?wio.Event {
-    _ = self;
-    return null;
-}
+    pub fn getEvent(self: *Window) ?wio.Event {
+        _ = self;
+        return null;
+    }
 
-pub fn enableTextInput(self: *@This()) void {
-    _ = self;
-}
+    pub fn enableTextInput(self: *Window) void {
+        _ = self;
+    }
 
-pub fn disableTextInput(self: *@This()) void {
-    _ = self;
-}
+    pub fn disableTextInput(self: *Window) void {
+        _ = self;
+    }
 
-pub fn setTitle(self: *@This(), title: []const u8) void {
-    _ = self;
-    _ = title;
-}
+    pub fn setTitle(self: *Window, title: []const u8) void {
+        _ = self;
+        _ = title;
+    }
 
-pub fn setMode(self: *@This(), mode: wio.WindowMode) void {
-    _ = self;
-    _ = mode;
-}
+    pub fn setMode(self: *Window, mode: wio.WindowMode) void {
+        _ = self;
+        _ = mode;
+    }
 
-pub fn setCursor(self: *@This(), shape: wio.Cursor) void {
-    _ = self;
-    _ = shape;
-}
+    pub fn setCursor(self: *Window, shape: wio.Cursor) void {
+        _ = self;
+        _ = shape;
+    }
 
-pub fn setCursorMode(self: *@This(), mode: wio.CursorMode) void {
-    _ = self;
-    _ = mode;
-}
+    pub fn setCursorMode(self: *Window, mode: wio.CursorMode) void {
+        _ = self;
+        _ = mode;
+    }
 
-pub fn setSize(self: *@This(), size: wio.Size) void {
-    _ = self;
-    _ = size;
-}
+    pub fn setSize(self: *Window, size: wio.Size) void {
+        _ = self;
+        _ = size;
+    }
 
-pub fn setParent(self: *@This(), parent: usize) void {
-    _ = self;
-    _ = parent;
-}
+    pub fn setParent(self: *Window, parent: usize) void {
+        _ = self;
+        _ = parent;
+    }
 
-pub fn requestAttention(self: *@This()) void {
-    _ = self;
-}
+    pub fn requestAttention(self: *Window) void {
+        _ = self;
+    }
 
-pub fn setClipboardText(self: *@This(), text: []const u8) void {
-    _ = self;
-    _ = text;
-}
+    pub fn setClipboardText(self: *Window, text: []const u8) void {
+        _ = self;
+        _ = text;
+    }
 
-pub fn getClipboardText(self: *@This(), allocator: std.mem.Allocator) ?[]u8 {
-    _ = self;
-    _ = allocator;
-    return null;
-}
+    pub fn getClipboardText(self: *Window, allocator: std.mem.Allocator) ?[]u8 {
+        _ = self;
+        _ = allocator;
+        return null;
+    }
 
-pub fn makeContextCurrent(self: *@This()) void {
-    _ = self;
-}
+    pub fn makeContextCurrent(self: *Window) void {
+        _ = self;
+    }
 
-pub fn swapBuffers(self: *@This()) void {
-    _ = self;
-}
+    pub fn swapBuffers(self: *Window) void {
+        _ = self;
+    }
 
-pub fn swapInterval(self: *@This(), interval: i32) void {
-    _ = self;
-    _ = interval;
-}
+    pub fn swapInterval(self: *Window, interval: i32) void {
+        _ = self;
+        _ = interval;
+    }
 
-pub fn createSurface(self: *@This(), instance: usize, allocator: ?*const anyopaque, surface: *u64) i32 {
-    _ = self;
-    _ = instance;
-    _ = allocator;
-    _ = surface;
-    return 0;
-}
+    pub fn createSurface(self: *Window, instance: usize, allocator: ?*const anyopaque, surface: *u64) i32 {
+        _ = self;
+        _ = instance;
+        _ = allocator;
+        _ = surface;
+        return 0;
+    }
+};
 
 pub fn glGetProcAddress(name: [:0]const u8) ?*const anyopaque {
     _ = name;
