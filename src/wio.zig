@@ -19,6 +19,8 @@ pub const InitOptions = struct {
     audioDefaultInputFn: ?*const fn (AudioDevice) void = null,
 };
 
+/// Must be called only once.
+///
 /// Unless otherwise noted, all calls to wio functions must be made on the same thread.
 pub fn init(allocator: std.mem.Allocator, options: InitOptions) !void {
     internal.allocator = allocator;
