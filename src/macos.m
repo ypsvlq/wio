@@ -11,6 +11,8 @@ extern void wioSize(void *, UInt8, UInt16, UInt16);
 extern void wioFramebuffer(void *, UInt16, UInt16);
 extern void wioScale(void *, Float32);
 extern void wioChars(void *, const char *);
+extern void wioPreviewChars(void *, const char *, uint16_t, uint16_t);
+extern void wioPreviewReset(void *);
 extern void wioKey(void *, UInt16, UInt8);
 extern void wioButtonPress(void *, UInt8);
 extern void wioButtonRelease(void *, UInt8);
@@ -35,7 +37,7 @@ static void warpCursor(NSWindow *window) {
 @interface WioWindowDelegate : NSObject <NSWindowDelegate>
 @end
 
-@interface WioView : NSView
+@interface WioView : NSView <NSTextInputClient>
 - (uint8_t)cursorMode;
 @end
 
@@ -154,8 +156,11 @@ static void warpCursor(NSWindow *window) {
 
 @implementation WioView {
     void *zig;
+    NSString *marked;
     NSTrackingArea *area;
     NSCursor *cursor;
+    uint16_t textX, textY;
+    BOOL textInput;
     uint8_t cursorMode;
     BOOL cursorInside;
 }
@@ -164,6 +169,16 @@ static void warpCursor(NSWindow *window) {
     self = [super init];
     zig = value;
     return self;
+}
+
+- (void)setTextInput:(BOOL)value x:(uint16_t)x y:(uint16_t)y {
+    textInput = value;
+    textX = x;
+    textY = y;
+    if (!value && marked != nil) {
+        [[NSTextInputContext currentInputContext] discardMarkedText];
+        marked = nil;
+    }
 }
 
 - (void)setCursor:(NSCursor *)value {
@@ -180,6 +195,63 @@ static void warpCursor(NSWindow *window) {
 
 - (uint8_t)cursorMode {
     return cursorMode;
+}
+
+- (void)insertText:(id)string replacementRange:(NSRange)replacementRange {
+    if (marked) {
+        wioPreviewReset(zig);
+        marked = nil;
+    }
+    NSString *s = [string isKindOfClass:[NSString class]] ? string : [string string];
+    wioChars(zig, [s UTF8String]);
+}
+
+- (void)doCommandBySelector:(SEL)selector {}
+
+- (void)setMarkedText:(id)string selectedRange:(NSRange)selectedRange replacementRange:(NSRange)replacementRange {
+    marked = [string isKindOfClass:[NSString class]] ? string : [string string];
+    if ([marked length] == 0) {
+        wioPreviewReset(zig);
+        marked = nil;
+        return;
+    }
+    wioPreviewChars(zig, [marked UTF8String], selectedRange.location, selectedRange.length);
+}
+
+- (void)unmarkText {
+    if (marked) {
+        wioPreviewReset(zig);
+        wioChars(zig, [marked UTF8String]);
+        marked = nil;
+    }
+}
+
+- (NSRange)selectedRange {
+    return NSMakeRange(NSNotFound, 0);
+}
+
+- (NSRange)markedRange {
+    return (marked != nil) ? NSMakeRange(0, [marked length]) : NSMakeRange(NSNotFound, 0);
+}
+
+- (BOOL)hasMarkedText {
+    return (marked != nil);
+}
+
+- (NSAttributedString *)attributedSubstringForProposedRange:(NSRange)range actualRange:(NSRangePointer)actualRange {
+    return nil;
+}
+
+- (NSArray<NSAttributedStringKey> *)validAttributesForMarkedText {
+    return @[];
+}
+
+- (NSRect)firstRectForCharacterRange:(NSRange)range actualRange:(NSRangePointer)actualRange {
+    return [[self window] convertRectToScreen:NSMakeRect(textX, [self frame].size.height - textY, 0, 0)];
+}
+
+- (NSUInteger)characterIndexForPoint:(NSPoint)point {
+    return 0;
 }
 
 - (void)updateTrackingAreas {
@@ -209,7 +281,9 @@ static void warpCursor(NSWindow *window) {
 
 - (void)keyDown:(NSEvent *)event {
     wioKey(zig, [event keyCode], [event isARepeat]);
-    wioChars(zig, [[event characters] UTF8String]);
+    if (textInput) {
+        [[NSTextInputContext currentInputContext] handleEvent:event];
+    }
 }
 
 - (void)keyUp:(NSEvent *)event {
@@ -366,6 +440,14 @@ void *wioCreateWindow(void *zig, uint16_t width, uint16_t height) {
 void wioDestroyWindow(void *ptr) {
     NSWindow *window = CFBridgingRelease(ptr);
     [window close];
+}
+
+void wioEnableTextInput(NSWindow *window, uint16_t x, uint16_t y) {
+    [[window contentView] setTextInput:YES x:x y:y];
+}
+
+void wioDisableTextInput(NSWindow *window) {
+    [[window contentView] setTextInput:NO x:0 y:0];
 }
 
 void wioSetTitle(NSWindow *window, const char *ptr, size_t len) {

@@ -21,6 +21,8 @@ extern fn wioWait() void;
 extern fn wioMessageBox(u8, [*]const u8, usize) void;
 extern fn wioCreateWindow(*Window, u16, u16) *NSWindow;
 extern fn wioDestroyWindow(*NSWindow) void;
+extern fn wioEnableTextInput(*NSWindow, u16, u16) void;
+extern fn wioDisableTextInput(*NSWindow) void;
 extern fn wioSetTitle(*NSWindow, [*]const u8, usize) void;
 extern fn wioSetMode(*NSWindow, u8) void;
 extern fn wioSetCursor(*NSWindow, u8) void;
@@ -203,7 +205,6 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
 pub const Window = struct {
     events: internal.EventQueue,
     window: *NSWindow,
-    text: bool = false,
     opengl: if (build_options.opengl) struct { context: ?*NSOpenGLContext = null } else struct {} = .{},
 
     pub fn destroy(self: *Window) void {
@@ -217,12 +218,16 @@ pub const Window = struct {
         return self.events.pop();
     }
 
-    pub fn enableTextInput(self: *Window, _: wio.TextInputOptions) void {
-        self.text = true;
+    pub fn enableTextInput(self: *Window, options: wio.TextInputOptions) void {
+        wioEnableTextInput(
+            self.window,
+            if (options.cursor) |cursor| cursor.x else 0,
+            if (options.cursor) |cursor| cursor.y else 0,
+        );
     }
 
     pub fn disableTextInput(self: *Window) void {
-        self.text = false;
+        wioDisableTextInput(self.window);
     }
 
     pub fn setTitle(self: *Window, title: []const u8) void {
@@ -746,15 +751,24 @@ export fn wioScale(self: *Window, scale: f32) void {
 }
 
 export fn wioChars(self: *Window, buf: [*:0]const u8) void {
-    if (self.text) {
-        const view = std.unicode.Utf8View.init(std.mem.sliceTo(buf, 0)) catch return;
-        var iter = view.iterator();
-        while (iter.nextCodepoint()) |codepoint| {
-            if (codepoint >= ' ' and codepoint != 0x7F and (codepoint < 0xF700 or codepoint > 0xF7FF)) {
-                self.events.push(.{ .char = codepoint });
-            }
-        }
+    const view = std.unicode.Utf8View.init(std.mem.sliceTo(buf, 0)) catch return;
+    var iter = view.iterator();
+    while (iter.nextCodepoint()) |char| {
+        self.events.push(.{ .char = char });
     }
+}
+
+export fn wioPreviewChars(self: *Window, buf: [*:0]const u8, cursor_start: u16, cursor_length: u16) void {
+    const view = std.unicode.Utf8View.init(std.mem.sliceTo(buf, 0)) catch return;
+    var iter = view.iterator();
+    while (iter.nextCodepoint()) |char| {
+        self.events.push(.{ .preview_char = char });
+    }
+    self.events.push(.{ .preview_cursor = .{ cursor_start, cursor_start + cursor_length } });
+}
+
+export fn wioPreviewReset(self: *Window) void {
+    self.events.push(.preview_reset);
 }
 
 export fn wioKey(self: *Window, key: u16, event: u8) void {
