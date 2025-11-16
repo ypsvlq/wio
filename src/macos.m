@@ -210,8 +210,8 @@ static void warpCursor(NSWindow *window) {
 
 - (void)setMarkedText:(id)string selectedRange:(NSRange)selectedRange replacementRange:(NSRange)replacementRange {
     marked = [string isKindOfClass:[NSString class]] ? string : [string string];
+    wioPreviewReset(zig);
     if ([marked length] == 0) {
-        wioPreviewReset(zig);
         marked = nil;
         return;
     }
