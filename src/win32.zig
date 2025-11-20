@@ -338,6 +338,8 @@ pub const Window = struct {
     input: []u8 = &.{},
     last_x: u16 = 0,
     last_y: u16 = 0,
+    touch_bitmap: std.StaticBitSet(256) = .initEmpty(),
+    touch_ids: std.AutoHashMapUnmanaged(u16, u8) = .empty,
     text: bool = false,
     opengl: if (build_options.opengl) struct { dc: w.HDC = null, rc: w.HGLRC = null } else struct {} = .{},
 
@@ -347,6 +349,7 @@ pub const Window = struct {
             _ = w.ReleaseDC(self.window, self.opengl.dc);
         }
         _ = w.DestroyWindow(self.window);
+        self.touch_ids.deinit(internal.allocator);
         self.events.deinit();
         internal.allocator.free(self.input);
         internal.allocator.destroy(self);
@@ -1430,6 +1433,28 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
             const delta: f32 = @floatFromInt(HISHORT(wParam));
             const value = delta / w.WHEEL_DELTA;
             self.events.push(if (msg == w.WM_MOUSEWHEEL) .{ .scroll_vertical = -value } else .{ .scroll_horizontal = value });
+            return 0;
+        },
+        w.WM_POINTERDOWN, w.WM_POINTERUPDATE => {
+            const pointer_id = LOWORD(wParam);
+            const id = self.touch_ids.get(pointer_id) orelse blk: {
+                var iter = self.touch_bitmap.iterator(.{ .kind = .unset });
+                const id: u8 = @intCast(iter.next() orelse return 0);
+                self.touch_ids.put(internal.allocator, pointer_id, id) catch return 0;
+                self.touch_bitmap.set(id);
+                break :blk id;
+            };
+            const flags = HIWORD(wParam);
+            if (flags & w.POINTER_FLAG_INCONTACT == 0) return 0;
+            var point = w.POINT{ .x = LOSHORT(lParam), .y = HISHORT(lParam) };
+            _ = w.ScreenToClient(self.window, &point);
+            self.events.push(.{ .touch = .{ .id = id, .x = std.math.cast(u16, point.x) orelse return 0, .y = std.math.cast(u16, point.y) orelse return 0 } });
+            return 0;
+        },
+        w.WM_POINTERUP, w.WM_POINTERCAPTURECHANGED => {
+            const id = self.touch_ids.get(LOWORD(wParam)) orelse return 0;
+            self.events.push(.{ .touch_end = .{ .id = id, .ignore = if (msg == w.WM_POINTERUP) false else true } });
+            self.touch_bitmap.unset(id);
             return 0;
         },
         else => return w.DefWindowProcW(window, msg, wParam, lParam),
