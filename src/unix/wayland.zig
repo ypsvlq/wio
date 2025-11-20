@@ -97,6 +97,7 @@ var compositor: ?*h.wl_compositor = null;
 var seat: ?*h.wl_seat = null;
 var keyboard: ?*h.wl_keyboard = null;
 var pointer: ?*h.wl_pointer = null;
+var touch: ?*h.wl_touch = null;
 var viewporter: ?*h.wp_viewporter = null;
 var fractional_scale_manager: ?*h.wp_fractional_scale_manager_v1 = null;
 var text_input_manager: ?*h.zwp_text_input_manager_v3 = null;
@@ -131,6 +132,8 @@ var preedit_string: std.ArrayList(u8) = .empty;
 var preedit_cursors: [2]i32 = .{ 0, 0 };
 var preedit_active = false;
 var commit_string: std.ArrayList(u8) = .empty;
+var touch_ids: std.StaticBitSet(256) = .initEmpty();
+var touch_info: std.AutoHashMapUnmanaged(i32, struct { public_id: u8, window: *Window }) = .empty;
 var clipboard_text: []const u8 = "";
 
 var egl_display: h.EGLDisplay = undefined;
@@ -225,6 +228,7 @@ pub fn deinit() void {
     }
 
     internal.allocator.free(clipboard_text);
+    touch_info.deinit(internal.allocator);
     commit_string.deinit(internal.allocator);
     preedit_string.deinit(internal.allocator);
     windows.deinit(internal.allocator);
@@ -376,6 +380,17 @@ pub const Window = struct {
     pub fn destroy(self: *Window) void {
         if (focus == self) focus = null;
         _ = windows.remove(self);
+
+        while (true) {
+            var iter = touch_info.iterator();
+            while (iter.next()) |entry| {
+                if (entry.value_ptr.window == self) {
+                    _ = touch_info.remove(entry.key_ptr.*);
+                    continue;
+                }
+            }
+            break;
+        }
 
         if (build_options.opengl) {
             if (self.egl.context) |_| _ = c.eglDestroyContext(egl_display, self.egl.context);
@@ -685,6 +700,12 @@ const seat_listener = h.wl_seat_listener{
 };
 
 fn seatCapabilities(_: ?*anyopaque, _: ?*h.wl_seat, capabilities: h.wl_seat_capability) callconv(.c) void {
+    if (touch) |_| {
+        h.wl_touch_destroy(touch);
+        touch = null;
+        touch_ids = .initEmpty();
+        touch_info.clearRetainingCapacity();
+    }
     if (relative_pointer) |_| {
         h.zwp_relative_pointer_v1_destroy(relative_pointer);
         relative_pointer = null;
@@ -716,6 +737,10 @@ fn seatCapabilities(_: ?*anyopaque, _: ?*h.wl_seat, capabilities: h.wl_seat_capa
             relative_pointer = h.zwp_relative_pointer_manager_v1_get_relative_pointer(relative_pointer_manager, pointer);
             _ = h.zwp_relative_pointer_v1_add_listener(relative_pointer, &relative_pointer_listener, null);
         }
+    }
+    if (capabilities & h.WL_SEAT_CAPABILITY_TOUCH != 0) {
+        touch = h.wl_seat_get_touch(seat);
+        _ = h.wl_touch_add_listener(touch, &touch_listener, null);
     }
 }
 
@@ -849,6 +874,50 @@ fn relativePointerMotion(_: ?*anyopaque, _: ?*h.zwp_relative_pointer_v1, _: u32,
             window.events.push(.{ .mouse_relative = .{ .x = std.math.cast(i16, dx_unaccel >> 8) orelse return, .y = std.math.cast(i16, dy_unaccel >> 8) orelse return } });
         }
     }
+}
+
+const touch_listener = h.wl_touch_listener{
+    .down = touchDown,
+    .up = touchUp,
+    .motion = touchMotion,
+    .frame = touchFrame,
+    .cancel = touchCancel,
+};
+
+fn touchDown(_: ?*anyopaque, _: ?*h.wl_touch, serial: u32, _: u32, surface: ?*h.wl_surface, id: i32, x: h.wl_fixed_t, y: h.wl_fixed_t) callconv(.c) void {
+    last_serial = serial;
+    if (getWindow(surface)) |window| {
+        var iter = touch_ids.iterator(.{ .kind = .unset });
+        const public_id: u8 = @intCast(iter.next() orelse return);
+        touch_info.put(internal.allocator, id, .{ .public_id = public_id, .window = window }) catch return;
+        touch_ids.set(public_id);
+        window.events.push(.{ .touch = .{ .id = public_id, .x = std.math.cast(u16, x >> 8) orelse return, .y = std.math.cast(u16, y >> 8) orelse return } });
+    }
+}
+
+fn touchUp(_: ?*anyopaque, _: ?*h.wl_touch, serial: u32, _: u32, id: i32) callconv(.c) void {
+    last_serial = serial;
+    if (touch_info.get(id)) |info| {
+        info.window.events.push(.{ .touch_end = .{ .id = info.public_id, .ignore = false } });
+        touch_ids.unset(info.public_id);
+    }
+}
+
+fn touchMotion(_: ?*anyopaque, _: ?*h.wl_touch, _: u32, id: i32, x: h.wl_fixed_t, y: h.wl_fixed_t) callconv(.c) void {
+    if (touch_info.get(id)) |info| {
+        info.window.events.push(.{ .touch = .{ .id = info.public_id, .x = std.math.cast(u16, x >> 8) orelse return, .y = std.math.cast(u16, y >> 8) orelse return } });
+    }
+}
+
+fn touchFrame(_: ?*anyopaque, _: ?*h.wl_touch) callconv(.c) void {}
+
+fn touchCancel(_: ?*anyopaque, _: ?*h.wl_touch) callconv(.c) void {
+    var iter = touch_info.valueIterator();
+    while (iter.next()) |info| {
+        info.window.events.push(.{ .touch_end = .{ .id = info.public_id, .ignore = true } });
+    }
+    touch_ids = .initEmpty();
+    touch_info.clearRetainingCapacity();
 }
 
 const fractional_scale_listener = h.wp_fractional_scale_v1_listener{
