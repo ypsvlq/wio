@@ -369,6 +369,9 @@ pub const Event = union(enum) {
     mouse_relative: RelativePosition,
     scroll_vertical: f32,
     scroll_horizontal: f32,
+
+    touch: struct { id: u8, x: u16, y: u16 },
+    touch_end: struct { id: u8, ignore: bool },
 };
 
 pub const EventType = @typeInfo(Event).@"union".tag_type.?;

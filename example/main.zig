@@ -95,6 +95,8 @@ fn logEvent(event: wio.Event) void {
         .mouse => |mouse| std.log.info("({},{})", .{ mouse.x, mouse.y }),
         .mouse_relative => |mouse| std.log.info("{},{}", .{ mouse.x, mouse.y }),
         .scroll_vertical, .scroll_horizontal => |value| std.log.info("{s} {d}", .{ @tagName(event), value }),
+        .touch => |touch| std.log.info("touch {}: ({},{})", .{ touch.id, touch.x, touch.y }),
+        .touch_end => |touch| std.log.info("touch {}: {s}", .{ touch.id, if (touch.ignore) "ignore" else "end" }),
         else => std.log.info("{s}", .{@tagName(event)}),
     }
 }
