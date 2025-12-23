@@ -40,6 +40,7 @@ var imports: extern struct {
     XGetWindowProperty: *const @TypeOf(h.XGetWindowProperty),
     Xutf8LookupString: *const @TypeOf(h.Xutf8LookupString),
     XSendEvent: *const @TypeOf(h.XSendEvent),
+    XSetICValues: *const @TypeOf(h.XSetICValues),
     XcursorLibraryLoadCursor: *const @TypeOf(h.XcursorLibraryLoadCursor),
     XDefineCursor: *const @TypeOf(h.XDefineCursor),
     XCreatePixmap: *const @TypeOf(h.XCreatePixmap),
@@ -361,8 +362,13 @@ pub const Window = struct {
         return self.events.pop();
     }
 
-    pub fn enableTextInput(self: *Window, _: wio.TextInputOptions) void {
+    pub fn enableTextInput(self: *Window, options: wio.TextInputOptions) void {
         self.text = true;
+        if (options.cursor) |cursor| {
+            const attributes = c.XVaCreateNestedList(0, h.XNSpotLocation, &h.XPoint{ .x = std.math.cast(c_short, cursor.x) orelse return, .y = std.math.cast(c_short, cursor.y) orelse return }, @as(usize, 0));
+            defer _ = c.XFree(attributes);
+            _ = c.XSetICValues(self.ic, h.XNPreeditAttributes, attributes, @as(usize, 0));
+        }
     }
 
     pub fn disableTextInput(self: *Window) void {
