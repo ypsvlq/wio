@@ -17,8 +17,11 @@ var imports: extern struct {
     XkbOpenDisplay: *const @TypeOf(h.XkbOpenDisplay),
     XCloseDisplay: *const @TypeOf(h.XCloseDisplay),
     XInternAtoms: *const @TypeOf(h.XInternAtoms),
+    XSetLocaleModifiers: *const @TypeOf(h.XSetLocaleModifiers),
     XOpenIM: *const @TypeOf(h.XOpenIM),
     XCloseIM: *const @TypeOf(h.XCloseIM),
+    XGetIMValues: *const @TypeOf(h.XGetIMValues),
+    XFree: *const @TypeOf(h.XFree),
     XkbGetMap: *const @TypeOf(h.XkbGetMap),
     XkbFreeKeyboard: *const @TypeOf(h.XkbFreeKeyboard),
     XkbGetNames: *const @TypeOf(h.XkbGetNames),
@@ -27,9 +30,9 @@ var imports: extern struct {
     XDestroyWindow: *const @TypeOf(h.XDestroyWindow),
     XMapWindow: *const @TypeOf(h.XMapWindow),
     XChangeProperty: *const @TypeOf(h.XChangeProperty),
+    XVaCreateNestedList: *const @TypeOf(h.XVaCreateNestedList),
     XCreateIC: *const @TypeOf(h.XCreateIC),
     XDestroyIC: *const @TypeOf(h.XDestroyIC),
-    XFree: *const @TypeOf(h.XFree),
     XNextEvent: *const @TypeOf(h.XNextEvent),
     XPending: *const @TypeOf(h.XPending),
     XFilterEvent: *const @TypeOf(h.XFilterEvent),
@@ -91,6 +94,7 @@ var libGL: DynLib = undefined;
 var windows: std.AutoHashMapUnmanaged(h.Window, *Window) = undefined;
 pub var display: *h.Display = undefined;
 var im: h.XIM = undefined;
+var im_style: h.XIMStyle = 0;
 var keycodes: [248]wio.Button = undefined;
 var scale: f32 = 1;
 var clipboard_text: []const u8 = "";
@@ -120,8 +124,25 @@ pub fn init() !bool {
     errdefer windows.deinit(internal.allocator);
 
     _ = std.c.setlocale(.CTYPE, "");
+    _ = c.XSetLocaleModifiers("");
     im = c.XOpenIM(display, null, null, null) orelse return error.Unexpected;
     errdefer _ = c.XCloseIM(im);
+
+    var im_styles: *h.XIMStyles = undefined;
+    if (c.XGetIMValues(im, h.XNQueryInputStyle, &im_styles, @as(usize, 0)) != null) return error.Unexpected;
+    defer _ = c.XFree(im_styles);
+
+    const supported_styles = im_styles.supported_styles[0..im_styles.count_styles];
+    const preferred_styles = [_]h.XIMStyle{
+        h.XIMPreeditCallbacks | h.XIMStatusNothing,
+        h.XIMPreeditNothing | h.XIMStatusNothing,
+    };
+    for (preferred_styles) |style| {
+        if (std.mem.indexOfScalar(h.XIMStyle, supported_styles, style) != null) {
+            im_style = style;
+            break;
+        }
+    }
 
     const xkb: *h.XkbDescRec = c.XkbGetMap(display, h.XkbNamesMask, h.XkbUseCoreKbd) orelse return error.Unexpected;
     defer _ = c.XkbFreeKeyboard(xkb, 0, h.True);
@@ -267,18 +288,36 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
     const protocols = [_]h.Atom{atoms.WM_DELETE_WINDOW};
     _ = c.XChangeProperty(display, window, atoms.WM_PROTOCOLS, h.XA_ATOM, 32, h.PropModeReplace, @ptrCast(&protocols), protocols.len);
 
+    const self = try internal.allocator.create(Window);
+    errdefer internal.allocator.destroy(self);
+
+    const preedit_attributes = c.XVaCreateNestedList(
+        0,
+        h.XNPreeditStartCallback,
+        &h.XIMCallback{ .callback = @ptrCast(&preeditStart) },
+        h.XNPreeditDoneCallback,
+        &h.XIMCallback{ .client_data = @ptrCast(self), .callback = @ptrCast(&preeditDone) },
+        h.XNPreeditDrawCallback,
+        &h.XIMCallback{ .client_data = @ptrCast(self), .callback = @ptrCast(&preeditDraw) },
+        @as(usize, 0),
+    );
+    defer _ = c.XFree(preedit_attributes);
+
     const ic = c.XCreateIC(
         im,
         h.XNInputStyle,
-        h.XIMPreeditNothing | h.XIMStatusNothing,
+        im_style,
         h.XNClientWindow,
         window,
+        h.XNPreeditAttributes,
+        preedit_attributes,
         @as(usize, 0),
-    ) orelse return error.Unexpected;
+    ) orelse {
+        log.err("{s} failed", .{"XCreateIC"});
+        return error.Unexpected;
+    };
     errdefer _ = c.XDestroyIC(ic);
 
-    const self = try internal.allocator.create(Window);
-    errdefer internal.allocator.destroy(self);
     self.* = .{
         .events = .init(),
         .window = window,
@@ -308,6 +347,7 @@ pub const Window = struct {
     window: h.Window,
     ic: h.XIC,
     text: bool = false,
+    preedit_string: std.ArrayList(u21) = .empty,
     cursor: h.Cursor = h.None,
     cursor_mode: wio.CursorMode,
     size: wio.Size,
@@ -319,12 +359,15 @@ pub const Window = struct {
 
     pub fn destroy(self: *Window) void {
         _ = windows.remove(self.window);
+
         if (build_options.opengl) {
             if (self.opengl.context) |context| c.glXDestroyContext(display, context);
             if (self.opengl.colormap != h.CopyFromParent) _ = c.XFreeColormap(display, self.opengl.colormap);
         }
         _ = c.XDestroyIC(self.ic);
         _ = c.XDestroyWindow(display, self.window);
+
+        self.preedit_string.deinit(internal.allocator);
         self.events.deinit();
         internal.allocator.destroy(self);
     }
@@ -518,6 +561,60 @@ pub fn getVulkanExtensions() []const [*:0]const u8 {
     return &.{ "VK_KHR_surface", "VK_KHR_xlib_surface" };
 }
 
+fn preeditStart(_: h.XIC, _: h.XPointer, _: h.XPointer) callconv(.c) c_int {
+    return -1; // no size limit
+}
+
+fn preeditDone(_: h.XIC, window: *Window, _: h.XPointer) callconv(.c) void {
+    window.preedit_string.clearRetainingCapacity();
+    window.events.push(.preview_reset);
+}
+
+fn preeditDraw(_: h.XIC, window: *Window, data: *h.XIMPreeditDrawCallbackStruct) callconv(.c) void {
+    const chg_first = std.math.cast(u16, data.chg_first) orelse return;
+    const chg_length = std.math.cast(u16, data.chg_length) orelse return;
+    const caret = std.math.cast(u16, data.caret) orelse return;
+
+    var cursor: [2]u16 = .{ caret, caret };
+
+    if (@as(?*h.XIMText, data.text)) |text| {
+        if (text.encoding_is_wchar == h.False) {
+            if (text.string.multi_byte) |string| {
+                window.preedit_string.replaceRangeAssumeCapacity(chg_first, chg_length, &.{});
+                const view = std.unicode.Utf8View.init(std.mem.sliceTo(string, 0)) catch return;
+                var iter = view.iterator();
+                var i = chg_first;
+                while (iter.nextCodepoint()) |char| : (i += 1) {
+                    window.preedit_string.insert(internal.allocator, i, char) catch return;
+                }
+            }
+        }
+
+        if (text.feedback) |feedback| {
+            var start: u16 = 0;
+            var end: u16 = 0;
+            while (start < text.length) : (start += 1) {
+                if (feedback[start] & h.XIMReverse != 0) {
+                    end = start;
+                    while (end < text.length and feedback[end] == feedback[start]) : (end += 1) {}
+                    cursor = .{ chg_first + start, chg_first + end };
+                    break;
+                }
+            }
+        }
+    } else {
+        window.preedit_string.replaceRangeAssumeCapacity(chg_first, chg_length, &.{});
+    }
+
+    window.events.push(.preview_reset);
+    for (window.preedit_string.items) |char| {
+        window.events.push(.{ .preview_char = char });
+    }
+    if (window.preedit_string.items.len > 0) {
+        window.events.push(.{ .preview_cursor = cursor });
+    }
+}
+
 fn handle(event: *h.XEvent) void {
     if (event.type == h.SelectionRequest) {
         const requestor = event.xselectionrequest.requestor;
@@ -547,7 +644,14 @@ fn handle(event: *h.XEvent) void {
         _ = c.XSendEvent(display, requestor, h.True, h.NoEventMask, &reply);
     }
 
-    const window = windows.get(event.xany.window) orelse return;
+    const window = windows.get(event.xany.window) orelse {
+        _ = c.XFilterEvent(event, h.None);
+        return;
+    };
+
+    if (window.text and c.XFilterEvent(event, h.None) == h.True) {
+        return;
+    }
 
     switch (event.type) {
         h.ClientMessage => {
@@ -598,10 +702,7 @@ fn handle(event: *h.XEvent) void {
             window.events.push(.{ .framebuffer = window.size });
             window.events.push(.draw);
         },
-        h.KeyPress => {
-            if (c.XFilterEvent(event, event.xkey.window) == h.True) return;
-            handleKeyPress(window, event, false);
-        },
+        h.KeyPress => handleKeyPress(window, event, false),
         h.KeyRelease => {
             if (c.XPending(display) > 0) {
                 // key repeats are sent as a consecutive release and press
