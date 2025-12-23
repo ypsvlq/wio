@@ -519,97 +519,88 @@ pub fn getVulkanExtensions() []const [*:0]const u8 {
 }
 
 fn handle(event: *h.XEvent) void {
+    if (event.type == h.SelectionRequest) {
+        const requestor = event.xselectionrequest.requestor;
+        const target = event.xselectionrequest.target;
+        var property = event.xselectionrequest.property;
+        if (property == h.None) property = target;
+
+        if (target == atoms.TARGETS) {
+            const targets = [_]h.Atom{ atoms.TARGETS, atoms.UTF8_STRING };
+            _ = c.XChangeProperty(display, requestor, property, h.XA_ATOM, 32, h.PropModeReplace, @ptrCast(&targets), targets.len);
+        } else if (target == atoms.UTF8_STRING) {
+            _ = c.XChangeProperty(display, requestor, property, atoms.UTF8_STRING, 8, h.PropModeReplace, clipboard_text.ptr, @intCast(clipboard_text.len));
+        } else {
+            property = h.None;
+        }
+
+        var reply = h.XEvent{
+            .xselection = .{
+                .type = h.SelectionNotify,
+                .requestor = requestor,
+                .selection = event.xselectionrequest.selection,
+                .target = target,
+                .property = property,
+                .time = h.CurrentTime,
+            },
+        };
+        _ = c.XSendEvent(display, requestor, h.True, h.NoEventMask, &reply);
+    }
+
+    const window = windows.get(event.xany.window) orelse return;
+
     switch (event.type) {
-        h.SelectionRequest => {
-            const requestor = event.xselectionrequest.requestor;
-            const target = event.xselectionrequest.target;
-            var property = event.xselectionrequest.property;
-            if (property == h.None) property = target;
-
-            if (target == atoms.TARGETS) {
-                const targets = [_]h.Atom{ atoms.TARGETS, atoms.UTF8_STRING };
-                _ = c.XChangeProperty(display, requestor, property, h.XA_ATOM, 32, h.PropModeReplace, @ptrCast(&targets), targets.len);
-            } else if (target == atoms.UTF8_STRING) {
-                _ = c.XChangeProperty(display, requestor, property, atoms.UTF8_STRING, 8, h.PropModeReplace, clipboard_text.ptr, @intCast(clipboard_text.len));
-            } else {
-                property = h.None;
-            }
-
-            var reply = h.XEvent{
-                .xselection = .{
-                    .type = h.SelectionNotify,
-                    .requestor = requestor,
-                    .selection = event.xselectionrequest.selection,
-                    .target = target,
-                    .property = property,
-                    .time = h.CurrentTime,
-                },
-            };
-            _ = c.XSendEvent(display, requestor, h.True, h.NoEventMask, &reply);
-        },
         h.ClientMessage => {
             if (event.xclient.message_type == atoms.WM_PROTOCOLS) {
                 if (event.xclient.data.l[0] == atoms.WM_DELETE_WINDOW) {
-                    if (windows.get(event.xclient.window)) |window| {
-                        window.events.push(.close);
-                    }
+                    window.events.push(.close);
                 }
             }
         },
         h.FocusIn => {
-            if (windows.get(event.xfocus.window)) |window| {
-                window.events.push(.focused);
-                window.warped = false;
-            }
+            window.events.push(.focused);
+            window.warped = false;
         },
-        h.FocusOut => {
-            if (windows.get(event.xfocus.window)) |window| {
-                window.events.push(.unfocused);
-            }
-        },
+        h.FocusOut => window.events.push(.unfocused),
         h.Expose => {
             if (event.xexpose.count == 0) {
-                if (windows.get(event.xexpose.window)) |window| {
-                    window.events.push(.draw);
-                }
-            }
-        },
-        h.ConfigureNotify => {
-            if (windows.get(event.xconfigure.window)) |window| {
-                var states: [*]c_long = undefined;
-                var actual_type: h.Atom = undefined;
-                var actual_format: c_int = undefined;
-                var count: c_ulong = undefined;
-                var bytes_after: c_ulong = undefined;
-                _ = c.XGetWindowProperty(display, window.window, atoms._NET_WM_STATE, 0, std.math.maxInt(c_long), h.False, h.XA_ATOM, &actual_type, &actual_format, &count, &bytes_after, @ptrCast(&states));
-                defer _ = c.XFree(states);
-
-                var mode = wio.WindowMode.normal;
-                var maximized_vert = false;
-                var maximized_horz = false;
-                if (actual_type == h.XA_ATOM and actual_format == 32) {
-                    for (states[0..count]) |state| {
-                        if (state == atoms._NET_WM_STATE_MAXIMIZED_VERT) {
-                            maximized_vert = true;
-                        } else if (state == atoms._NET_WM_STATE_MAXIMIZED_HORZ) {
-                            maximized_horz = true;
-                        } else if (state == atoms._NET_WM_STATE_FULLSCREEN) {
-                            mode = .fullscreen;
-                        }
-                    }
-                }
-                if (mode == .normal and maximized_horz and maximized_vert) mode = .maximized;
-                window.events.push(.{ .mode = mode });
-
-                window.size = wio.Size{ .width = @intCast(event.xconfigure.width), .height = @intCast(event.xconfigure.height) };
-                window.events.push(.{ .size = window.size });
-                window.events.push(.{ .framebuffer = window.size });
                 window.events.push(.draw);
             }
         },
+        h.ConfigureNotify => {
+            var states: [*]c_long = undefined;
+            var actual_type: h.Atom = undefined;
+            var actual_format: c_int = undefined;
+            var count: c_ulong = undefined;
+            var bytes_after: c_ulong = undefined;
+            _ = c.XGetWindowProperty(display, window.window, atoms._NET_WM_STATE, 0, std.math.maxInt(c_long), h.False, h.XA_ATOM, &actual_type, &actual_format, &count, &bytes_after, @ptrCast(&states));
+            defer _ = c.XFree(states);
+
+            var mode = wio.WindowMode.normal;
+            var maximized_vert = false;
+            var maximized_horz = false;
+            if (actual_type == h.XA_ATOM and actual_format == 32) {
+                for (states[0..count]) |state| {
+                    if (state == atoms._NET_WM_STATE_MAXIMIZED_VERT) {
+                        maximized_vert = true;
+                    } else if (state == atoms._NET_WM_STATE_MAXIMIZED_HORZ) {
+                        maximized_horz = true;
+                    } else if (state == atoms._NET_WM_STATE_FULLSCREEN) {
+                        mode = .fullscreen;
+                    }
+                }
+            }
+            if (mode == .normal and maximized_horz and maximized_vert) mode = .maximized;
+            window.events.push(.{ .mode = mode });
+
+            window.size = wio.Size{ .width = @intCast(event.xconfigure.width), .height = @intCast(event.xconfigure.height) };
+            window.events.push(.{ .size = window.size });
+            window.events.push(.{ .framebuffer = window.size });
+            window.events.push(.draw);
+        },
         h.KeyPress => {
             if (c.XFilterEvent(event, event.xkey.window) == h.True) return;
-            handleKeyPress(event, false);
+            handleKeyPress(window, event, false);
         },
         h.KeyRelease => {
             if (c.XPending(display) > 0) {
@@ -618,93 +609,83 @@ fn handle(event: *h.XEvent) void {
                 _ = c.XPeekEvent(display, &next);
                 if (next.type == h.KeyPress and next.xkey.time == event.xkey.time) {
                     _ = c.XNextEvent(display, &next);
-                    handleKeyPress(&next, true);
+                    handleKeyPress(window, &next, true);
                     return;
                 }
             }
-            if (windows.get(event.xkey.window)) |window| {
-                const button = keycodes[event.xkey.keycode - 8];
-                if (button != .mouse_left) window.events.push(.{ .button_release = button });
-            }
+            const button = keycodes[event.xkey.keycode - 8];
+            if (button != .mouse_left) window.events.push(.{ .button_release = button });
         },
         h.ButtonPress => {
-            if (windows.get(event.xbutton.window)) |window| {
-                const button: wio.Button = switch (event.xbutton.button) {
-                    1 => .mouse_left,
-                    2 => .mouse_middle,
-                    3 => .mouse_right,
-                    4 => return window.events.push(.{ .scroll_vertical = -1 }),
-                    5 => return window.events.push(.{ .scroll_vertical = 1 }),
-                    6 => return window.events.push(.{ .scroll_horizontal = -1 }),
-                    7 => return window.events.push(.{ .scroll_horizontal = 1 }),
-                    8 => .mouse_back,
-                    9 => .mouse_forward,
-                    else => return,
-                };
-                window.events.push(.{ .button_press = button });
-            }
+            const button: wio.Button = switch (event.xbutton.button) {
+                1 => .mouse_left,
+                2 => .mouse_middle,
+                3 => .mouse_right,
+                4 => return window.events.push(.{ .scroll_vertical = -1 }),
+                5 => return window.events.push(.{ .scroll_vertical = 1 }),
+                6 => return window.events.push(.{ .scroll_horizontal = -1 }),
+                7 => return window.events.push(.{ .scroll_horizontal = 1 }),
+                8 => .mouse_back,
+                9 => .mouse_forward,
+                else => return,
+            };
+            window.events.push(.{ .button_press = button });
         },
         h.ButtonRelease => {
-            if (windows.get(event.xbutton.window)) |window| {
-                const button: wio.Button = switch (event.xbutton.button) {
-                    1 => .mouse_left,
-                    2 => .mouse_middle,
-                    3 => .mouse_right,
-                    8 => .mouse_back,
-                    9 => .mouse_forward,
-                    else => return,
-                };
-                window.events.push(.{ .button_release = button });
-            }
+            const button: wio.Button = switch (event.xbutton.button) {
+                1 => .mouse_left,
+                2 => .mouse_middle,
+                3 => .mouse_right,
+                8 => .mouse_back,
+                9 => .mouse_forward,
+                else => return,
+            };
+            window.events.push(.{ .button_release = button });
         },
         h.MotionNotify => {
-            if (windows.get(event.xmotion.window)) |window| {
-                if (window.cursor_mode == .relative) {
-                    const dx = event.xmotion.x - window.size.width / 2;
-                    const dy = event.xmotion.y - window.size.height / 2;
-                    if (dx != 0 or dy != 0) {
-                        if (window.warped) window.events.push(.{ .mouse_relative = .{ .x = @intCast(dx), .y = @intCast(dy) } });
-                        _ = c.XWarpPointer(display, h.None, window.window, 0, 0, 0, 0, window.size.width / 2, window.size.height / 2);
-                        window.warped = true;
-                    }
-                } else {
-                    const x = std.math.cast(u16, event.xmotion.x) orelse return;
-                    const y = std.math.cast(u16, event.xmotion.y) orelse return;
-                    window.events.push(.{ .mouse = .{ .x = x, .y = y } });
+            if (window.cursor_mode == .relative) {
+                const dx = event.xmotion.x - window.size.width / 2;
+                const dy = event.xmotion.y - window.size.height / 2;
+                if (dx != 0 or dy != 0) {
+                    if (window.warped) window.events.push(.{ .mouse_relative = .{ .x = @intCast(dx), .y = @intCast(dy) } });
+                    _ = c.XWarpPointer(display, h.None, window.window, 0, 0, 0, 0, window.size.width / 2, window.size.height / 2);
+                    window.warped = true;
                 }
+            } else {
+                const x = std.math.cast(u16, event.xmotion.x) orelse return;
+                const y = std.math.cast(u16, event.xmotion.y) orelse return;
+                window.events.push(.{ .mouse = .{ .x = x, .y = y } });
             }
         },
         else => {},
     }
 }
 
-fn handleKeyPress(event: *h.XEvent, repeat: bool) void {
-    if (windows.get(event.xkey.window)) |window| {
-        if (event.xkey.keycode != 0) {
-            const button = keycodes[event.xkey.keycode - 8];
-            if (button != .mouse_left) {
-                window.events.push(if (repeat) .{ .button_repeat = button } else .{ .button_press = button });
-            }
+fn handleKeyPress(window: *Window, event: *h.XEvent, repeat: bool) void {
+    if (event.xkey.keycode != 0) {
+        const button = keycodes[event.xkey.keycode - 8];
+        if (button != .mouse_left) {
+            window.events.push(if (repeat) .{ .button_repeat = button } else .{ .button_press = button });
         }
+    }
 
-        if (window.text) {
-            var stack: [4]u8 = undefined;
-            const len = c.Xutf8LookupString(window.ic, &event.xkey, &stack, stack.len, null, null);
-            var slice: []u8 = undefined;
-            if (len > stack.len) {
-                slice = internal.allocator.alloc(u8, @intCast(len)) catch return;
-                _ = c.Xutf8LookupString(window.ic, &event.xkey, slice.ptr, len, null, null);
-            } else {
-                slice = stack[0..@intCast(len)];
-            }
-            defer if (len > stack.len) internal.allocator.free(slice);
+    if (window.text) {
+        var stack: [4]u8 = undefined;
+        const len = c.Xutf8LookupString(window.ic, &event.xkey, &stack, stack.len, null, null);
+        var slice: []u8 = undefined;
+        if (len > stack.len) {
+            slice = internal.allocator.alloc(u8, @intCast(len)) catch return;
+            _ = c.Xutf8LookupString(window.ic, &event.xkey, slice.ptr, len, null, null);
+        } else {
+            slice = stack[0..@intCast(len)];
+        }
+        defer if (len > stack.len) internal.allocator.free(slice);
 
-            const view = std.unicode.Utf8View.init(slice) catch return;
-            var iter = view.iterator();
-            while (iter.nextCodepoint()) |codepoint| {
-                if (codepoint >= ' ' and codepoint != 0x7F) {
-                    window.events.push(.{ .char = codepoint });
-                }
+        const view = std.unicode.Utf8View.init(slice) catch return;
+        var iter = view.iterator();
+        while (iter.nextCodepoint()) |codepoint| {
+            if (codepoint >= ' ' and codepoint != 0x7F) {
+                window.events.push(.{ .char = codepoint });
             }
         }
     }
