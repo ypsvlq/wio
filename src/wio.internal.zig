@@ -1,5 +1,6 @@
 const std = @import("std");
 const wio = @import("wio.zig");
+const log = std.log.scoped(.wio);
 
 pub var allocator: std.mem.Allocator = undefined;
 pub var init_options: wio.InitOptions = undefined;
@@ -43,3 +44,8 @@ pub const EventQueue = struct {
         return self.events.items[self.head];
     }
 };
+
+pub fn logUnexpected(name: []const u8) error{Unexpected} {
+    log.err("{s} failed", .{name});
+    return error.Unexpected;
+}

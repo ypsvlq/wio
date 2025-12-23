@@ -57,11 +57,11 @@ pub fn init() !void {
     try DynLib.load(&imports, &.{.{ .handle = &libpulse, .name = "libpulse.so.0" }});
     errdefer libpulse.close();
 
-    loop = c.pa_threaded_mainloop_new() orelse return logContextlessError("pa_threaded_mainloop_new");
+    loop = c.pa_threaded_mainloop_new() orelse return internal.logUnexpected("pa_threaded_mainloop_new");
     errdefer c.pa_threaded_mainloop_free(loop);
 
     const api = c.pa_threaded_mainloop_get_api(loop);
-    context = c.pa_context_new(api, null) orelse return logContextlessError("pa_context_new");
+    context = c.pa_context_new(api, null) orelse return internal.logUnexpected("pa_context_new");
     errdefer c.pa_context_unref(context);
 
     c.pa_context_set_state_callback(context, notifyCallback, null);
@@ -70,7 +70,7 @@ pub fn init() !void {
     c.pa_threaded_mainloop_lock(loop);
     defer c.pa_threaded_mainloop_unlock(loop);
 
-    if (c.pa_threaded_mainloop_start(loop) < 0) return logContextlessError("pa_threaded_mainloop_start");
+    if (c.pa_threaded_mainloop_start(loop) < 0) return internal.logUnexpected("pa_threaded_mainloop_start");
     errdefer c.pa_threaded_mainloop_stop(loop);
 
     while (true) {
@@ -261,7 +261,7 @@ pub const AudioDevice = struct {
 
 fn openStream(format: wio.AudioFormat) !*h.pa_stream {
     var map: h.pa_channel_map = undefined;
-    _ = c.pa_channel_map_init_auto(&map, format.channels, h.PA_CHANNEL_MAP_DEFAULT) orelse return logContextlessError("pa_channel_map_init_auto");
+    _ = c.pa_channel_map_init_auto(&map, format.channels, h.PA_CHANNEL_MAP_DEFAULT) orelse return internal.logUnexpected("pa_channel_map_init_auto");
     return c.pa_stream_new(context, "", &.{ .format = h.PA_SAMPLE_FLOAT32LE, .rate = format.sample_rate, .channels = map.channels }, &map) orelse logContextError("pa_stream_new");
 }
 
@@ -308,11 +308,6 @@ pub const AudioInput = struct {
         if (nbytes != 0) _ = c.pa_stream_drop(stream);
     }
 };
-
-fn logContextlessError(name: []const u8) error{Unexpected} {
-    log.err("{s} failed", .{name});
-    return error.Unexpected;
-}
 
 fn logContextError(name: []const u8) error{Unexpected} {
     log.err("{s} failed: {s}", .{ name, c.pa_strerror(c.pa_context_errno(context)) });

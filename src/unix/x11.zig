@@ -223,18 +223,12 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
                 h.GLX_SAMPLE_BUFFERS, if (opengl.samples != 0) 1 else 0,
                 h.GLX_SAMPLES,        opengl.samples,
                 h.None,
-            }, &count) orelse {
-                log.err("{s} failed", .{"glXChooseFBConfig"});
-                return error.Unexpected;
-            };
+            }, &count) orelse return internal.logUnexpected("glXChooseFBConfig");
             defer _ = c.XFree(@ptrCast(configs));
 
             const config = configs[0];
 
-            const info: *h.XVisualInfo = c.glXGetVisualFromFBConfig(display, config) orelse {
-                log.err("{s} failed", .{"glXGetVisualFromFBConfig"});
-                return error.Unexpected;
-            };
+            const info: *h.XVisualInfo = c.glXGetVisualFromFBConfig(display, config) orelse return internal.logUnexpected("glXGetVisualFromFBConfig");
             defer _ = c.XFree(info);
             visual = info.visual;
             depth = info.depth;
@@ -249,15 +243,9 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
                     h.GLX_CONTEXT_FLAGS_ARB,         (if (opengl.forward_compatible) h.GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB else 0) | (if (opengl.debug) h.GLX_CONTEXT_DEBUG_BIT_ARB else 0),
                     h.GLX_CONTEXT_PROFILE_MASK_ARB,  if (opengl.profile == .core) h.GLX_CONTEXT_CORE_PROFILE_BIT_ARB else h.GLX_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
                     h.None,
-                }) orelse {
-                    log.err("{s} failed", .{"glXCreateContextAttribsARB"});
-                    return error.Unexpected;
-                }
+                }) orelse return internal.logUnexpected("glXCreateContextAttribsARB")
             else
-                c.glXCreateNewContext(display, config, h.GLX_RGBA_TYPE, null, h.True) orelse {
-                    log.err("{s} failed", .{"glXCreateNewContext"});
-                    return error.Unexpected;
-                };
+                c.glXCreateNewContext(display, config, h.GLX_RGBA_TYPE, null, h.True) orelse return internal.logUnexpected("glXCreateNewContext");
         }
     }
     errdefer if (build_options.opengl) {
@@ -312,10 +300,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
         h.XNPreeditAttributes,
         preedit_attributes,
         @as(usize, 0),
-    ) orelse {
-        log.err("{s} failed", .{"XCreateIC"});
-        return error.Unexpected;
-    };
+    ) orelse return internal.logUnexpected("XCreateIC");
     errdefer _ = c.XDestroyIC(ic);
 
     self.* = .{
