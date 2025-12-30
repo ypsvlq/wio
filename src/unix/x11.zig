@@ -376,7 +376,7 @@ pub const Window = struct {
     }
 
     pub fn setTitle(self: *Window, title: []const u8) void {
-        _ = c.XChangeProperty(display, self.window, h.XA_WM_NAME, h.XA_STRING, 8, h.PropModeReplace, title.ptr, @intCast(title.len));
+        _ = c.XChangeProperty(display, self.window, h.XA_WM_NAME, h.XA_STRING, 8, h.PropModeReplace, title.ptr, std.math.cast(c_int, title.len) orelse return);
     }
 
     pub fn setMode(self: *Window, mode: wio.WindowMode) void {
@@ -617,7 +617,7 @@ fn handle(event: *h.XEvent) void {
             const targets = [_]h.Atom{ atoms.TARGETS, atoms.UTF8_STRING };
             _ = c.XChangeProperty(display, requestor, property, h.XA_ATOM, 32, h.PropModeReplace, @ptrCast(&targets), targets.len);
         } else if (target == atoms.UTF8_STRING) {
-            _ = c.XChangeProperty(display, requestor, property, atoms.UTF8_STRING, 8, h.PropModeReplace, clipboard_text.ptr, @intCast(clipboard_text.len));
+            _ = c.XChangeProperty(display, requestor, property, atoms.UTF8_STRING, 8, h.PropModeReplace, clipboard_text.ptr, std.math.lossyCast(c_int, clipboard_text.len));
         } else {
             property = h.None;
         }
@@ -633,6 +633,8 @@ fn handle(event: *h.XEvent) void {
             },
         };
         _ = c.XSendEvent(display, requestor, h.True, h.NoEventMask, &reply);
+
+        return;
     }
 
     const window = windows.get(event.xany.window) orelse {
@@ -688,7 +690,7 @@ fn handle(event: *h.XEvent) void {
             if (mode == .normal and maximized_horz and maximized_vert) mode = .maximized;
             window.events.push(.{ .mode = mode });
 
-            window.size = wio.Size{ .width = @intCast(event.xconfigure.width), .height = @intCast(event.xconfigure.height) };
+            window.size = wio.Size{ .width = std.math.lossyCast(u16, event.xconfigure.width), .height = std.math.lossyCast(u16, event.xconfigure.height) };
             window.events.push(.{ .size = window.size });
             window.events.push(.{ .framebuffer = window.size });
             window.events.push(.draw);
@@ -736,10 +738,10 @@ fn handle(event: *h.XEvent) void {
         },
         h.MotionNotify => {
             if (window.cursor_mode == .relative) {
-                const dx = event.xmotion.x - window.size.width / 2;
-                const dy = event.xmotion.y - window.size.height / 2;
+                const dx = event.xmotion.x - (window.size.width / 2);
+                const dy = event.xmotion.y - (window.size.height / 2);
                 if (dx != 0 or dy != 0) {
-                    if (window.warped) window.events.push(.{ .mouse_relative = .{ .x = @intCast(dx), .y = @intCast(dy) } });
+                    if (window.warped) window.events.push(.{ .mouse_relative = .{ .x = std.math.cast(i16, dx) orelse return, .y = std.math.cast(i16, dy) orelse return } });
                     _ = c.XWarpPointer(display, h.None, window.window, 0, 0, 0, 0, window.size.width / 2, window.size.height / 2);
                     window.warped = true;
                 }
