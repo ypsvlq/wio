@@ -616,7 +616,7 @@ pub const Window = struct {
                     }
                 }
             }
-            const char: u21 = @intCast(c.xkb_keysym_to_utf32(sym));
+            const char = std.math.cast(u21, c.xkb_keysym_to_utf32(sym)) orelse return;
             if (char >= ' ' and char != 0x7F) self.events.push(.{ .char = char });
         }
     }
@@ -982,6 +982,11 @@ fn textInputCommitString(_: ?*anyopaque, _: ?*h.zwp_text_input_v3, text: [*c]con
 fn textInputDeleteSurroundingText(_: ?*anyopaque, _: ?*h.zwp_text_input_v3, _: u32, _: u32) callconv(.c) void {}
 
 fn textInputDone(_: ?*anyopaque, _: ?*h.zwp_text_input_v3, _: u32) callconv(.c) void {
+    defer {
+        commit_string.clearRetainingCapacity();
+        preedit_string.clearRetainingCapacity();
+    }
+
     if (focus) |window| {
         if (preedit_active) {
             window.events.push(.preview_reset);
@@ -1005,7 +1010,7 @@ fn textInputDone(_: ?*anyopaque, _: ?*h.zwp_text_input_v3, _: u32) callconv(.c) 
                 // convert byte offset to codepoint offset
                 for (&preedit_cursors) |*cursor| {
                     if (cursor.* == iter.i) {
-                        cursor.* = @intCast(count);
+                        cursor.* = std.math.cast(i32, count) orelse -1;
                     }
                 }
             }
@@ -1014,8 +1019,6 @@ fn textInputDone(_: ?*anyopaque, _: ?*h.zwp_text_input_v3, _: u32) callconv(.c) 
             }
         }
     }
-    commit_string.clearRetainingCapacity();
-    preedit_string.clearRetainingCapacity();
 }
 
 const data_device_listener = h.wl_data_device_listener{
@@ -1097,7 +1100,7 @@ fn frameConfigure(frame: ?*h.libdecor_frame, configuration: ?*h.libdecor_configu
         width = self.size.width;
         height = self.size.height;
     }
-    self.resize(.{ .width = @intCast(width), .height = @intCast(height) }, configuration);
+    self.resize(.{ .width = std.math.lossyCast(u16, width), .height = std.math.lossyCast(u16, height) }, configuration);
 }
 
 fn frameClose(_: ?*h.libdecor_frame, data: ?*anyopaque) callconv(.c) void {
