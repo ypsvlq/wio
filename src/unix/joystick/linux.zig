@@ -191,10 +191,11 @@ pub const JoystickDevice = struct {
     }
 
     pub fn getName(self: JoystickDevice, allocator: std.mem.Allocator) ![]u8 {
-        var buf: [512]u8 = undefined;
-        const count = std.os.linux.ioctl(self.fd, h.EVIOCGNAME(buf.len), @intFromPtr(&buf));
-        if (std.os.linux.E.init(count) != .SUCCESS) return error.Unexpected;
-        return allocator.dupe(u8, buf[0..count]);
+        var name: [512]u8 = undefined;
+        var name_len = std.os.linux.ioctl(self.fd, h.EVIOCGNAME(name.len), @intFromPtr(&name));
+        if (std.os.linux.E.init(name_len) != .SUCCESS) return error.Unexpected;
+        name_len -= 1; // null terminator
+        return allocator.dupe(u8, name[0..name_len]);
     }
 };
 
