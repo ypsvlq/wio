@@ -26,6 +26,7 @@ var imports: extern struct {
     udev_monitor_filter_add_match_subsystem_devtype: *const @TypeOf(h.udev_monitor_filter_add_match_subsystem_devtype),
     udev_monitor_enable_receiving: *const @TypeOf(h.udev_monitor_enable_receiving),
     udev_monitor_receive_device: *const @TypeOf(h.udev_monitor_receive_device),
+    udev_device_new_from_syspath: *const @TypeOf(h.udev_device_new_from_syspath),
     udev_device_unref: *const @TypeOf(h.udev_device_unref),
     udev_device_get_property_value: *const @TypeOf(h.udev_device_get_property_value),
     udev_device_get_devpath: *const @TypeOf(h.udev_device_get_devpath),
@@ -68,7 +69,7 @@ pub fn update() void {
             const joystick = std.mem.sliceTo(c.udev_device_get_property_value(device, "ID_INPUT_JOYSTICK") orelse continue, 0);
             if (std.mem.eql(u8, joystick, "1")) {
                 const path = std.mem.sliceTo(c.udev_device_get_devpath(device) orelse continue, 0);
-                callback(.{ .backend = pathToDevice(path) orelse continue });
+                callback(.{ .backend = makeDevice(path, device) orelse continue });
             }
         }
     }
@@ -102,11 +103,13 @@ pub const JoystickDeviceIterator = struct {
         if (self.entry == null) return null;
         const name = std.mem.sliceTo(c.udev_list_entry_get_name(self.entry), 0);
         self.entry = c.udev_list_entry_get_next(self.entry);
-        return pathToDevice(name) orelse self.next();
+        const device = c.udev_device_new_from_syspath(udev, name) orelse return self.next();
+        defer _ = c.udev_device_unref(device);
+        return makeDevice(name, device) orelse self.next();
     }
 };
 
-fn pathToDevice(path: []const u8) ?JoystickDevice {
+fn makeDevice(path: []const u8, device: *h.udev_device) ?JoystickDevice {
     const basename = path[std.mem.lastIndexOfScalar(u8, path, '/').? + 1 ..];
     if (!std.mem.startsWith(u8, basename, "event")) return null;
 
@@ -114,13 +117,21 @@ fn pathToDevice(path: []const u8) ?JoystickDevice {
     _ = std.fmt.bufPrintZ(&buf, "/dev/input/{s}", .{basename}) catch return null;
     const result = std.os.linux.open(&buf, .{ .NONBLOCK = true }, 0);
     if (std.os.linux.E.init(result) != .SUCCESS) return null;
-    return .{ .fd = @intCast(result) };
+    return .{
+        .fd = @intCast(result),
+        .serial = if (c.udev_device_get_property_value(device, "ID_SERIAL_SHORT")) |serial|
+            internal.allocator.dupe(u8, std.mem.sliceTo(serial, 0)) catch ""
+        else
+            "",
+    };
 }
 
 pub const JoystickDevice = struct {
     fd: i32,
+    serial: []const u8,
 
     pub fn release(self: JoystickDevice) void {
+        internal.allocator.free(self.serial);
         _ = std.os.linux.close(self.fd);
     }
 
@@ -187,7 +198,7 @@ pub const JoystickDevice = struct {
     pub fn getId(self: JoystickDevice, allocator: std.mem.Allocator) ![]u8 {
         var info: h.input_id = undefined;
         if (std.os.linux.ioctl(self.fd, h.EVIOCGID, @intFromPtr(&info)) != 0) return error.Unexpected;
-        return std.fmt.allocPrint(allocator, "{x:0>4}{x:0>4}", .{ info.vendor, info.product });
+        return std.fmt.allocPrint(allocator, "{x:0>4}{x:0>4}{x:0>4}{s}", .{ info.vendor, info.product, info.version, self.serial });
     }
 
     pub fn getName(self: JoystickDevice, allocator: std.mem.Allocator) ![]u8 {
