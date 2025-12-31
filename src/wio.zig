@@ -256,9 +256,9 @@ pub const Joystick = struct {
 };
 
 pub const JoystickState = struct {
-    axes: []u16,
-    hats: []Hat,
-    buttons: []bool,
+    axes: []const u16,
+    hats: []const Hat,
+    buttons: []const bool,
 };
 
 pub const Hat = packed struct {
