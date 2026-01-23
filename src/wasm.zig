@@ -7,7 +7,8 @@ const js = struct {
     extern "wio" fn shiftFloat(u32) f32;
     extern "wio" fn messageBox([*]const u8, usize) void;
     extern "wio" fn createWindow() u32;
-    extern "wio" fn setTextInput(u32, bool) void;
+    extern "wio" fn enableTextInput(u32, u16, u16) void;
+    extern "wio" fn disableTextInput(u32) void;
     extern "wio" fn setFullscreen(u32, bool) void;
     extern "wio" fn setCursor(u32, u8) void;
     extern "wio" fn setCursorMode(u32, u8) void;
@@ -68,6 +69,8 @@ pub const Window = struct {
             .scale => .{ .scale = js.shiftFloat(self.id) },
             .mode => .{ .mode = @enumFromInt(js.shift(self.id)) },
             .char => .{ .char = @intCast(js.shift(self.id)) },
+            .preview_reset => .preview_reset,
+            .preview_char => .{ .preview_char = @intCast(js.shift(self.id)) },
             .button_press => .{ .button_press = @enumFromInt(js.shift(self.id)) },
             .button_repeat => .{ .button_repeat = @enumFromInt(js.shift(self.id)) },
             .button_release => .{ .button_release = @enumFromInt(js.shift(self.id)) },
@@ -79,12 +82,13 @@ pub const Window = struct {
         };
     }
 
-    pub fn enableTextInput(self: *Window, _: wio.TextInputOptions) void {
-        js.setTextInput(self.id, true);
+    pub fn enableTextInput(self: *Window, options: wio.TextInputOptions) void {
+        const x, const y = if (options.cursor) |cursor| .{ cursor.x, cursor.y } else .{ 0, 0 };
+        js.enableTextInput(self.id, x, y);
     }
 
     pub fn disableTextInput(self: *Window) void {
-        js.setTextInput(self.id, false);
+        js.disableTextInput(self.id);
     }
 
     pub fn setTitle(_: *Window, _: []const u8) void {}

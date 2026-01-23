@@ -48,9 +48,31 @@ const wio = {
         if (canvas === undefined) throw new Error("no canvas available");
 
         const events = [3];
+
+        const input = document.createElement("input");
+        input.tabIndex = "-1";
+        input.style.position = "absolute";
+        input.style.border = "0px";
+        input.style.padding = "0px";
+        input.addEventListener("input", event => {
+            if (event.inputType === "insertText" || event.inputType === "insertCompositionText") {
+                if (event.inputType === "insertCompositionText") {
+                    events.push(11);
+                }
+                for (const char of event.data) {
+                    events.push((event.isComposing ? 12 : 10), char.codePointAt(0));
+                }
+                if (!event.isComposing) {
+                    input.value = "";
+                }
+            }
+        });
+        canvas.appendChild(input);
+
         const window = {
             canvas: canvas,
             events: events,
+            input: input,
             text: false,
             cursor: undefined,
             cursor_mode: undefined,
@@ -70,13 +92,21 @@ const wio = {
             );
         }).observe(canvas);
         canvas.addEventListener("contextmenu", event => event.preventDefault());
-        canvas.addEventListener("focus", () => events.push(1));
-        canvas.addEventListener("blur", () => events.push(2));
+        canvas.addEventListener("focus", () => {
+            events.push(1);
+            if (window.text) {
+                input.focus();
+            }
+        });
+        canvas.addEventListener("blur", () => {
+            if (!window.text) {
+                events.push(2);
+            }
+        });
         canvas.addEventListener("keydown", event => {
             event.preventDefault();
             const key = wio.keys[event.code];
             if (key) events.push(event.repeat ? 15 : 14, key);
-            if (window.text && [...event.key].length === 1) events.push(10, event.key.codePointAt(0));
         });
         canvas.addEventListener("keyup", event => {
             const key = wio.keys[event.code];
@@ -107,8 +137,20 @@ const wio = {
         return wio.windows.length - 1;
     },
 
-    setTextInput(id, enabled) {
-        wio.windows[id].text = enabled;
+    enableTextInput(id, x, y) {
+        wio.windows[id].text = true;
+        wio.windows[id].input.style.left = `${x}px`;
+        wio.windows[id].input.style.top = `${y}px`;
+        if (document.activeElement === wio.windows[id].canvas) {
+            wio.windows[id].input.focus();
+        }
+    },
+
+    disableTextInput(id) {
+        wio.windows[id].text = false;
+        if (document.activeElement === wio.windows[id].input) {
+            wio.windows[id].canvas.focus();
+        }
     },
 
     setFullscreen(id, fullscreen) {
