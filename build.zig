@@ -1,6 +1,6 @@
 const std = @import("std");
 
-pub fn build(b: *std.Build) void {
+pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
@@ -175,7 +175,12 @@ pub fn build(b: *std.Build) void {
         },
         else => {
             if (target.result.cpu.arch.isWasm()) {
-                module.export_symbol_names = &.{ "wioLoop", "wioJoystick" };
+                var exports: std.ArrayList([]const u8) = .empty;
+                try exports.append(b.allocator, "wioLoop");
+                if (enable_joystick) {
+                    try exports.append(b.allocator, "wioJoystick");
+                }
+                module.export_symbol_names = exports.items;
             }
         },
     }
