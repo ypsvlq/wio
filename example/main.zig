@@ -1,7 +1,8 @@
 const std = @import("std");
 const wio = @import("wio");
+const gl = @import("gl.zig");
+const triangle = @import("triangle.zig");
 const joystick = @import("joystick.zig");
-const renderer = @import("renderer.zig");
 const audio = @import("audio.zig");
 
 pub const std_options = std.Options{
@@ -14,7 +15,9 @@ pub const std_options = std.Options{
 
 var debug_allocator = std.heap.DebugAllocator(.{}).init;
 pub const allocator = debug_allocator.allocator();
+
 var window: wio.Window = undefined;
+var maybe_window2: ?wio.Window = null;
 
 pub fn main() !void {
     try wio.init(allocator, .{
@@ -22,6 +25,7 @@ pub fn main() !void {
         .audioDefaultOutputFn = audio.defaultOutput,
         .audioDefaultInputFn = audio.defaultInput,
     });
+
     window = try wio.createWindow(.{
         .title = "wio example",
         .scale = 1,
@@ -30,16 +34,16 @@ pub fn main() !void {
             .samples = 4,
         },
     });
+
     if (wio.build_options.opengl) {
+        try gl.load(wio.glGetProcAddress);
         window.makeContextCurrent();
         window.swapInterval(1);
-        try renderer.init();
+        try triangle.init();
     }
+
     return wio.run(loop);
 }
-
-var actions = false;
-var request_attention = false;
 
 fn loop() !bool {
     while (window.getEvent()) |event| {
@@ -48,37 +52,63 @@ fn loop() !bool {
             .close => {
                 audio.close();
                 joystick.close();
+
+                if (maybe_window2) |*window2| window2.destroy();
                 window.destroy();
+
                 wio.deinit();
                 _ = debug_allocator.deinit();
+
                 return false;
             },
             .draw => {
                 if (wio.build_options.opengl) {
-                    renderer.draw();
+                    window.makeContextCurrent();
+                    triangle.draw();
                     window.swapBuffers();
                 }
             },
-            .framebuffer => |size| if (wio.build_options.opengl) renderer.resize(size),
-            .button_press, .button_repeat => |button| {
-                if (button == .left_control or button == .right_control) actions = true;
-                if (actions) action(button);
-            },
-            .button_release => |button| {
-                if (button == .left_control or button == .right_control) actions = false;
-            },
-            .unfocused => {
-                actions = false;
-                if (request_attention) {
-                    window.requestAttention();
-                    request_attention = false;
+            .framebuffer => |size| {
+                if (wio.build_options.opengl) {
+                    window.makeContextCurrent();
+                    gl.viewport(0, 0, size.width, size.height);
                 }
             },
-            else => {},
+            else => try actionEvent(event),
         }
     }
+
+    if (maybe_window2) |*window2| {
+        while (window2.getEvent()) |event| {
+            logEvent(event);
+            switch (event) {
+                .close => {
+                    window2.destroy();
+                    maybe_window2 = null;
+                    break;
+                },
+                .draw => {
+                    if (wio.build_options.opengl) {
+                        window2.makeContextCurrent();
+                        gl.clearColor(0.5, 0.5, 0.5, 1);
+                        gl.clear(gl.COLOR_BUFFER_BIT);
+                        window2.swapBuffers();
+                    }
+                },
+                .framebuffer => |size| {
+                    if (wio.build_options.opengl) {
+                        window2.makeContextCurrent();
+                        gl.viewport(0, 0, size.width, size.height);
+                    }
+                },
+                else => {},
+            }
+        }
+    }
+
     joystick.update();
     wio.wait();
+
     return true;
 }
 
@@ -101,11 +131,47 @@ fn logEvent(event: wio.Event) void {
     }
 }
 
+var actions = false;
+var request_attention = false;
 var text_input = false;
 var cursor: u8 = 0;
 
-fn action(button: wio.Button) void {
+fn actionEvent(event: wio.Event) !void {
+    switch (event) {
+        .button_press, .button_repeat => |button| {
+            if (actions) {
+                try action(button);
+            } else if (button == .left_control or button == .right_control) {
+                actions = true;
+            }
+        },
+        .button_release => |button| {
+            if (button == .left_control or button == .right_control) {
+                actions = false;
+            }
+        },
+        .unfocused => {
+            actions = false;
+            if (request_attention) {
+                window.requestAttention();
+                request_attention = false;
+            }
+        },
+        else => {},
+    }
+}
+
+fn action(button: wio.Button) !void {
     switch (button) {
+        .enter => {
+            if (maybe_window2 == null) {
+                maybe_window2 = try wio.createWindow(.{
+                    .size = .{ .width = 320, .height = 240 },
+                    .scale = 1,
+                    .opengl = .{},
+                });
+            }
+        },
         .@"1" => {
             if (!text_input) {
                 window.enableTextInput(.{ .cursor = .{ .x = 100, .y = 100 } });

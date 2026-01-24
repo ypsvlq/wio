@@ -9,8 +9,6 @@ const vertices = [_]f32{
 };
 
 pub fn init() !void {
-    try gl.load(wio.glGetProcAddress);
-
     gl.clearColor(0, 0, 0, 1);
 
     const vs = gl.createShader(gl.VERTEX_SHADER);
@@ -36,10 +34,6 @@ pub fn init() !void {
     const index: u32 = @bitCast(gl.getAttribLocation(program, "vertex"));
     gl.enableVertexAttribArray(index);
     gl.vertexAttribPointer(index, 2, gl.FLOAT, gl.FALSE, 0, null);
-}
-
-pub fn resize(size: wio.Size) void {
-    gl.viewport(0, 0, size.width, size.height);
 }
 
 pub fn draw() void {
