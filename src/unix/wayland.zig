@@ -657,7 +657,7 @@ fn logEglError(name: []const u8) error{Unexpected} {
 }
 
 fn getWindow(surface: ?*h.wl_surface) ?*Window {
-    const window: *Window = @ptrCast(@alignCast(h.wl_surface_get_user_data(surface) orelse return null));
+    const window: *Window = @ptrCast(@alignCast(h.wl_surface_get_user_data(surface orelse return null) orelse return null));
     return if (windows.contains(window)) window else null;
 }
 
