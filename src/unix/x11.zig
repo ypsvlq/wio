@@ -26,6 +26,7 @@ var imports: extern struct {
     XkbFreeKeyboard: *const @TypeOf(h.XkbFreeKeyboard),
     XkbGetNames: *const @TypeOf(h.XkbGetNames),
     XGetDefault: *const @TypeOf(h.XGetDefault),
+    XFlush: *const @TypeOf(h.XFlush),
     XCreateWindow: *const @TypeOf(h.XCreateWindow),
     XDestroyWindow: *const @TypeOf(h.XDestroyWindow),
     XMapWindow: *const @TypeOf(h.XMapWindow),
@@ -352,6 +353,7 @@ pub const Window = struct {
         }
         _ = c.XDestroyIC(self.ic);
         _ = c.XDestroyWindow(display, self.window);
+        _ = c.XFlush(display);
 
         self.preedit_string.deinit(internal.allocator);
         self.events.deinit();

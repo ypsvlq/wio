@@ -397,12 +397,13 @@ pub const Window = struct {
             if (self.egl.surface) |_| _ = c.eglDestroySurface(egl_display, self.egl.surface);
             if (self.egl.window) |_| c.wl_egl_window_destroy(self.egl.window);
         }
-
         if (self.fractional_scale) |_| h.wp_fractional_scale_v1_destroy(self.fractional_scale);
         if (self.viewport) |_| h.wp_viewport_destroy(self.viewport);
-        self.events.deinit();
         c.libdecor_frame_unref(self.frame);
         h.wl_surface_destroy(self.surface);
+        _ = c.wl_display_dispatch(display);
+
+        self.events.deinit();
         internal.allocator.destroy(self);
     }
 
