@@ -36,9 +36,9 @@ pub fn main() !void {
     });
 
     if (wio.build_options.opengl) {
-        try gl.load(wio.glGetProcAddress);
         window.makeContextCurrent();
         window.swapInterval(1);
+        try gl.load(wio.glGetProcAddress);
         try triangle.init();
     }
 
