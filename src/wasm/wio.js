@@ -84,10 +84,10 @@ const wio = {
             canvas.width = width * devicePixelRatio;
             canvas.height = height * devicePixelRatio;
             events.push(
-                9, (document.fullscreenElement === canvas) ? 2 : 0,
-                6, width, height,
-                7, canvas.width, canvas.height,
-                8, devicePixelRatio,
+                6, (document.fullscreenElement === canvas) ? 2 : 0,
+                7, width, height,
+                8, canvas.width, canvas.height,
+                9, devicePixelRatio,
                 5,
             );
         }).observe(canvas);

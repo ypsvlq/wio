@@ -349,11 +349,11 @@ pub const Event = union(enum) {
     hidden: void,
     draw: void,
 
+    /// Sent before `size`.
+    mode: WindowMode,
     size: Size,
     framebuffer: Size,
     scale: f32,
-    /// Sent before `size`.
-    mode: WindowMode,
 
     char: u21,
     preview_reset: void,

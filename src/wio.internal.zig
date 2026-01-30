@@ -24,7 +24,7 @@ pub const EventQueue = struct {
         }
 
         switch (std.meta.activeTag(event)) {
-            .draw, .framebuffer => |tag| {
+            .draw, .mode, .size, .framebuffer => |tag| {
                 for (self.events.items, 0..) |item, i| {
                     if (item == tag) {
                         _ = self.events.orderedRemove(i);
