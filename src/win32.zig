@@ -271,8 +271,8 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
             var pfd: w.PIXELFORMATDESCRIPTOR = undefined;
             if (wgl.choosePixelFormatARB) |choosePixelFormatARB| {
                 var count: u32 = undefined;
-                _ = choosePixelFormatARB(self.opengl.dc, &.{
-                    0x2011, if (opengl.doublebuffer) 1 else 0,
+                if (choosePixelFormatARB(self.opengl.dc, &.{
+                    0x2011, if (opengl.doublebuffer) w.TRUE else w.FALSE,
                     0x2015, opengl.red_bits,
                     0x2017, opengl.green_bits,
                     0x2019, opengl.blue_bits,
@@ -282,7 +282,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
                     0x2041, if (opengl.samples != 0) 1 else 0,
                     0x2042, opengl.samples,
                     0,
-                }, null, 1, &format, &count);
+                }, null, 1, &format, &count) == w.FALSE) return logLastError("wglChoosePixelFormatARB");
                 if (count != 1) return logLastError("wglChoosePixelFormatARB");
                 _ = w.DescribePixelFormat(self.opengl.dc, format, @sizeOf(w.PIXELFORMATDESCRIPTOR), &pfd);
             } else {
