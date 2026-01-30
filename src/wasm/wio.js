@@ -74,8 +74,8 @@ const wio = {
             events: events,
             input: input,
             text: false,
-            cursor: undefined,
-            cursor_mode: undefined,
+            cursor: "default",
+            cursor_mode: 0,
         };
 
         new ResizeObserver(() => {
@@ -161,6 +161,11 @@ const wio = {
         }
     },
 
+    setSize(id, width, height) {
+        wio.windows[id].canvas.style.width = `${width}px`;
+        wio.windows[id].canvas.style.height = `${height}px`;
+    },
+
     setCursor(id, cursor) {
         wio.windows[id].cursor = {
             0: "default",
@@ -196,11 +201,6 @@ const wio = {
         } else {
             document.exitPointerLock();
         }
-    },
-
-    setSize(id, width, height) {
-        wio.windows[id].canvas.style.width = `${width}px`;
-        wio.windows[id].canvas.style.height = `${height}px`;
     },
 
     setClipboardText(ptr, len) {

@@ -45,10 +45,9 @@ pub fn messageBox(_: wio.MessageBoxStyle, _: []const u8, message: []const u8) vo
 }
 
 pub fn createWindow(options: wio.CreateWindowOptions) !Window {
-    var self = Window{ .id = js.createWindow() };
-    self.setCursor(options.cursor);
-    self.setCursorMode(options.cursor_mode);
-    return self;
+    const id = js.createWindow();
+    if (options.mode == .fullscreen) js.setFullscreen(id, true);
+    return .{ .id = id };
 }
 
 pub const Window = struct {
@@ -97,6 +96,12 @@ pub const Window = struct {
         js.setFullscreen(self.id, mode == .fullscreen);
     }
 
+    pub fn setSize(self: *Window, size: wio.Size) void {
+        js.setSize(self.id, size.width, size.height);
+    }
+
+    pub fn setParent(_: *Window, _: usize) void {}
+
     pub fn setCursor(self: *Window, shape: wio.Cursor) void {
         js.setCursor(self.id, @intFromEnum(shape));
     }
@@ -104,12 +109,6 @@ pub const Window = struct {
     pub fn setCursorMode(self: *Window, mode: wio.CursorMode) void {
         js.setCursorMode(self.id, @intFromEnum(mode));
     }
-
-    pub fn setSize(self: *Window, size: wio.Size) void {
-        js.setSize(self.id, size.width, size.height);
-    }
-
-    pub fn setParent(_: *Window, _: usize) void {}
 
     pub fn requestAttention(_: *Window) void {}
 

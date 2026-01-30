@@ -152,6 +152,12 @@ pub const Window = struct {
         _ = mode;
     }
 
+    pub fn setSize(self: *Window, size: wio.Size) void {
+        wioSetSize(self.window, @floatFromInt(size.width), @floatFromInt(size.height));
+    }
+
+    pub fn setParent(_: *Window, _: usize) void {}
+
     pub fn setCursor(self: *Window, shape: wio.Cursor) void {
         _ = self;
         _ = shape;
@@ -161,12 +167,6 @@ pub const Window = struct {
         _ = self;
         _ = mode;
     }
-
-    pub fn setSize(self: *Window, size: wio.Size) void {
-        wioSetSize(self.window, @floatFromInt(size.width), @floatFromInt(size.height));
-    }
-
-    pub fn setParent(_: *Window, _: usize) void {}
 
     pub fn requestAttention(_: *Window) void {}
 

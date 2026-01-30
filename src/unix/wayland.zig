@@ -288,7 +288,6 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
         .surface = surface,
         .frame = frame,
         .size = options.size,
-        .cursor_mode = options.cursor_mode,
     };
 
     if (viewporter) |_| {
@@ -311,8 +310,6 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
 
     self.setTitle(options.title);
     self.setMode(options.mode);
-    self.setCursor(options.cursor);
-    self.setCursorMode(options.cursor_mode);
 
     h.wl_surface_commit(surface);
     while (!self.configured) {
@@ -369,8 +366,8 @@ pub const Window = struct {
     text_options: ?wio.TextInputOptions = null,
     size: wio.Size,
     scale: f32 = 1,
-    cursor: u32 = undefined,
-    cursor_mode: wio.CursorMode,
+    cursor: u32 = h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_DEFAULT,
+    cursor_mode: wio.CursorMode = .normal,
     egl: if (build_options.opengl) struct {
         window: ?*h.wl_egl_window = null,
         surface: h.EGLSurface = null,
@@ -471,6 +468,15 @@ pub const Window = struct {
         }
     }
 
+    pub fn setSize(self: *Window, size: wio.Size) void {
+        self.resize(size, null);
+    }
+
+    pub fn setParent(self: *Window, parent: usize) void {
+        _ = self;
+        _ = parent;
+    }
+
     pub fn setCursor(self: *Window, shape: wio.Cursor) void {
         self.cursor = switch (shape) {
             .arrow => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_DEFAULT,
@@ -492,15 +498,6 @@ pub const Window = struct {
     pub fn setCursorMode(self: *Window, mode: wio.CursorMode) void {
         self.cursor_mode = mode;
         if (pointer_surface == self.surface) self.applyCursor();
-    }
-
-    pub fn setSize(self: *Window, size: wio.Size) void {
-        self.resize(size, null);
-    }
-
-    pub fn setParent(self: *Window, parent: usize) void {
-        _ = self;
-        _ = parent;
     }
 
     pub fn requestAttention(self: *Window) void {

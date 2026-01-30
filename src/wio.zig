@@ -79,8 +79,6 @@ pub const RelativePosition = struct { x: i16, y: i16 };
 pub const CreateWindowOptions = struct {
     title: []const u8 = "wio",
     mode: WindowMode = .normal,
-    cursor: Cursor = .arrow,
-    cursor_mode: CursorMode = .normal,
 
     size: Size = .{ .width = 640, .height = 480 },
     /// Base scale factor for `size`. If set, adjusts for high-DPI on relevant platforms.
@@ -132,20 +130,21 @@ pub const Window = struct {
         self.backend.setMode(mode);
     }
 
+    pub fn setSize(self: *Window, size: Size) void {
+        self.backend.setSize(size);
+    }
+
+    /// Not functional on all platforms.
+    pub fn setParent(self: *Window, parent: usize) void {
+        self.backend.setParent(parent);
+    }
+
     pub fn setCursor(self: *Window, cursor: Cursor) void {
         self.backend.setCursor(cursor);
     }
 
     pub fn setCursorMode(self: *Window, mode: CursorMode) void {
         self.backend.setCursorMode(mode);
-    }
-
-    pub fn setSize(self: *Window, size: Size) void {
-        self.backend.setSize(size);
-    }
-
-    pub fn setParent(self: *Window, parent: usize) void {
-        self.backend.setParent(parent);
     }
 
     pub fn requestAttention(self: *Window) void {
@@ -178,9 +177,9 @@ pub const Window = struct {
     }
 
     /// Not available on all platforms.
-    pub fn createSurface(self: *Window, instance: usize, vk_allocator: ?*const anyopaque, surface: *u64) i32 {
+    pub fn createSurface(self: *Window, instance: usize, allocator: ?*const anyopaque, surface: *u64) i32 {
         assertFeature(.vulkan);
-        return self.backend.createSurface(instance, vk_allocator, surface);
+        return self.backend.createSurface(instance, allocator, surface);
     }
 };
 

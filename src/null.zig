@@ -56,16 +56,6 @@ pub const Window = struct {
         _ = mode;
     }
 
-    pub fn setCursor(self: *Window, shape: wio.Cursor) void {
-        _ = self;
-        _ = shape;
-    }
-
-    pub fn setCursorMode(self: *Window, mode: wio.CursorMode) void {
-        _ = self;
-        _ = mode;
-    }
-
     pub fn setSize(self: *Window, size: wio.Size) void {
         _ = self;
         _ = size;
@@ -74,6 +64,16 @@ pub const Window = struct {
     pub fn setParent(self: *Window, parent: usize) void {
         _ = self;
         _ = parent;
+    }
+
+    pub fn setCursor(self: *Window, shape: wio.Cursor) void {
+        _ = self;
+        _ = shape;
+    }
+
+    pub fn setCursorMode(self: *Window, mode: wio.CursorMode) void {
+        _ = self;
+        _ = mode;
     }
 
     pub fn requestAttention(self: *Window) void {

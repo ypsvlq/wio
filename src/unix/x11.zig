@@ -42,6 +42,8 @@ var imports: extern struct {
     Xutf8LookupString: *const @TypeOf(h.Xutf8LookupString),
     XSendEvent: *const @TypeOf(h.XSendEvent),
     XSetICValues: *const @TypeOf(h.XSetICValues),
+    XResizeWindow: *const @TypeOf(h.XResizeWindow),
+    XReparentWindow: *const @TypeOf(h.XReparentWindow),
     XcursorLibraryLoadCursor: *const @TypeOf(h.XcursorLibraryLoadCursor),
     XDefineCursor: *const @TypeOf(h.XDefineCursor),
     XCreatePixmap: *const @TypeOf(h.XCreatePixmap),
@@ -52,8 +54,6 @@ var imports: extern struct {
     XGrabPointer: *const @TypeOf(h.XGrabPointer),
     XUngrabPointer: *const @TypeOf(h.XUngrabPointer),
     XWarpPointer: *const @TypeOf(h.XWarpPointer),
-    XResizeWindow: *const @TypeOf(h.XResizeWindow),
-    XReparentWindow: *const @TypeOf(h.XReparentWindow),
     XSetSelectionOwner: *const @TypeOf(h.XSetSelectionOwner),
     XConvertSelection: *const @TypeOf(h.XConvertSelection),
     XCheckTypedWindowEvent: *const @TypeOf(h.XCheckTypedWindowEvent),
@@ -309,15 +309,12 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
         .events = .init(),
         .window = window,
         .ic = ic,
-        .cursor_mode = options.cursor_mode,
         .size = options.size,
         .opengl = if (build_options.opengl) .{ .colormap = attributes.colormap, .context = context } else .{},
     };
 
     self.setTitle(options.title);
     self.setMode(options.mode);
-    self.setCursor(options.cursor);
-    if (options.cursor_mode != .normal) self.setCursorMode(options.cursor_mode);
 
     self.events.push(.visible);
     self.events.push(.{ .scale = scale });
@@ -336,7 +333,7 @@ pub const Window = struct {
     text: bool = false,
     preedit_string: std.ArrayList(u21) = .empty,
     cursor: h.Cursor = h.None,
-    cursor_mode: wio.CursorMode,
+    cursor_mode: wio.CursorMode = .normal,
     size: wio.Size,
     warped: bool = false,
     opengl: if (build_options.opengl) struct {
@@ -398,6 +395,14 @@ pub const Window = struct {
         _ = c.XSendEvent(display, h.DefaultRootWindow(display), h.False, h.SubstructureRedirectMask | h.SubstructureNotifyMask, &event);
     }
 
+    pub fn setSize(self: *Window, size: wio.Size) void {
+        _ = c.XResizeWindow(display, self.window, size.width, size.height);
+    }
+
+    pub fn setParent(self: *Window, parent: usize) void {
+        _ = c.XReparentWindow(display, self.window, parent, 0, 0);
+    }
+
     pub fn setCursor(self: *Window, shape: wio.Cursor) void {
         const name = switch (shape) {
             .arrow => "default",
@@ -438,14 +443,6 @@ pub const Window = struct {
         } else {
             _ = c.XUngrabPointer(display, h.CurrentTime);
         }
-    }
-
-    pub fn setSize(self: *Window, size: wio.Size) void {
-        _ = c.XResizeWindow(display, self.window, size.width, size.height);
-    }
-
-    pub fn setParent(self: *Window, parent: usize) void {
-        _ = c.XReparentWindow(display, self.window, parent, 0, 0);
     }
 
     pub fn requestAttention(self: *Window) void {

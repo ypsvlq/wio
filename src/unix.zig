@@ -220,20 +220,6 @@ pub const Window = union {
         }
     }
 
-    pub fn setCursor(self: *Window, shape: wio.Cursor) void {
-        switch (active) {
-            .x11 => self.x11.setCursor(shape),
-            .wayland => self.wayland.setCursor(shape),
-        }
-    }
-
-    pub fn setCursorMode(self: *Window, mode: wio.CursorMode) void {
-        switch (active) {
-            .x11 => self.x11.setCursorMode(mode),
-            .wayland => self.wayland.setCursorMode(mode),
-        }
-    }
-
     pub fn setSize(self: *Window, size: wio.Size) void {
         switch (active) {
             .x11 => self.x11.setSize(size),
@@ -245,6 +231,20 @@ pub const Window = union {
         switch (active) {
             .x11 => self.x11.setParent(parent),
             .wayland => self.wayland.setParent(parent),
+        }
+    }
+
+    pub fn setCursor(self: *Window, shape: wio.Cursor) void {
+        switch (active) {
+            .x11 => self.x11.setCursor(shape),
+            .wayland => self.wayland.setCursor(shape),
+        }
+    }
+
+    pub fn setCursorMode(self: *Window, mode: wio.CursorMode) void {
+        switch (active) {
+            .x11 => self.x11.setCursorMode(mode),
+            .wayland => self.wayland.setCursorMode(mode),
         }
     }
 

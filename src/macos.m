@@ -459,6 +459,10 @@ void wioSetMode(NSWindow *window, uint8_t mode) {
     if (mode != 2 && mode != [window isZoomed]) [window performZoom:nil];
 }
 
+void wioSetSize(NSWindow *window, uint16_t width, uint16_t height) {
+    [window setContentSize:NSMakeSize(width, height)];
+}
+
 void wioSetCursor(NSWindow *window, uint8_t shape) {
     NSCursor *cursor;
     switch (shape) {
@@ -481,10 +485,6 @@ void wioSetCursorMode(NSWindow *window, uint8_t mode) {
     } else {
         CGAssociateMouseAndMouseCursorPosition(YES);
     }
-}
-
-void wioSetSize(NSWindow *window, uint16_t width, uint16_t height) {
-    [window setContentSize:NSMakeSize(width, height)];
 }
 
 void wioRequestAttention(void) {

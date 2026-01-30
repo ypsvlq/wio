@@ -25,9 +25,9 @@ extern fn wioEnableTextInput(*NSWindow, u16, u16) void;
 extern fn wioDisableTextInput(*NSWindow) void;
 extern fn wioSetTitle(*NSWindow, [*]const u8, usize) void;
 extern fn wioSetMode(*NSWindow, u8) void;
+extern fn wioSetSize(*NSWindow, u16, u16) void;
 extern fn wioSetCursor(*NSWindow, u8) void;
 extern fn wioSetCursorMode(*NSWindow, u8) void;
-extern fn wioSetSize(*NSWindow, u16, u16) void;
 extern fn wioRequestAttention() void;
 extern fn wioSetClipboardText([*]const u8, usize) void;
 extern fn wioGetClipboardText(*const std.mem.Allocator, *usize) ?[*]u8;
@@ -168,8 +168,6 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
 
     self.setTitle(options.title);
     self.setMode(options.mode);
-    self.setCursor(options.cursor);
-    if (options.cursor_mode != .normal) self.setCursorMode(options.cursor_mode);
 
     if (build_options.opengl) {
         if (options.opengl) |opengl| {
@@ -238,14 +236,6 @@ pub const Window = struct {
         wioSetMode(self.window, @intFromEnum(mode));
     }
 
-    pub fn setCursor(self: *Window, shape: wio.Cursor) void {
-        wioSetCursor(self.window, @intFromEnum(shape));
-    }
-
-    pub fn setCursorMode(self: *Window, mode: wio.CursorMode) void {
-        wioSetCursorMode(self.window, @intFromEnum(mode));
-    }
-
     pub fn setSize(self: *Window, size: wio.Size) void {
         wioSetSize(self.window, size.width, size.height);
     }
@@ -253,6 +243,14 @@ pub const Window = struct {
     pub fn setParent(self: *Window, parent: usize) void {
         _ = self;
         _ = parent;
+    }
+
+    pub fn setCursor(self: *Window, shape: wio.Cursor) void {
+        wioSetCursor(self.window, @intFromEnum(shape));
+    }
+
+    pub fn setCursorMode(self: *Window, mode: wio.CursorMode) void {
+        wioSetCursorMode(self.window, @intFromEnum(mode));
     }
 
     pub fn requestAttention(_: *Window) void {

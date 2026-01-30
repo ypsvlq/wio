@@ -249,8 +249,6 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
     self.* = .{
         .events = .init(),
         .window = window,
-        .cursor = loadCursor(options.cursor),
-        .cursor_mode = options.cursor_mode, // WM_SETFOCUS calls clipCursor, so setCursorMode is not needed
     };
     _ = w.SetWindowLongPtrW(window, w.GWLP_USERDATA, @bitCast(@intFromPtr(self)));
 
@@ -322,8 +320,8 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
 pub const Window = struct {
     events: internal.EventQueue,
     window: w.HWND,
-    cursor: w.HCURSOR,
-    cursor_mode: wio.CursorMode,
+    cursor: w.HCURSOR = null,
+    cursor_mode: wio.CursorMode = .normal,
     rect: w.RECT = .{ .left = 0, .top = 0, .right = 0, .bottom = 0 },
     surrogate: u16 = 0,
     left_shift: bool = false,
@@ -413,6 +411,16 @@ pub const Window = struct {
         }
     }
 
+    pub fn setSize(self: *Window, size: wio.Size) void {
+        const style: u32 = @bitCast(@as(i32, @intCast(w.GetWindowLongPtrW(self.window, w.GWL_STYLE))));
+        const window_size = clientToWindow(size, style);
+        _ = w.SetWindowPos(self.window, null, 0, 0, window_size.width, window_size.height, w.SWP_NOMOVE | w.SWP_NOZORDER);
+    }
+
+    pub fn setParent(self: *Window, parent: usize) void {
+        _ = w.SetParent(self.window, @ptrFromInt(parent));
+    }
+
     pub fn setCursor(self: *Window, shape: wio.Cursor) void {
         self.cursor = loadCursor(shape);
 
@@ -434,16 +442,6 @@ pub const Window = struct {
         var pos: w.POINT = undefined;
         _ = w.GetCursorPos(&pos);
         _ = w.SetCursorPos(pos.x, pos.y);
-    }
-
-    pub fn setSize(self: *Window, size: wio.Size) void {
-        const style: u32 = @bitCast(@as(i32, @intCast(w.GetWindowLongPtrW(self.window, w.GWL_STYLE))));
-        const window_size = clientToWindow(size, style);
-        _ = w.SetWindowPos(self.window, null, 0, 0, window_size.width, window_size.height, w.SWP_NOMOVE | w.SWP_NOZORDER);
-    }
-
-    pub fn setParent(self: *Window, parent: usize) void {
-        _ = w.SetParent(self.window, @ptrFromInt(parent));
     }
 
     pub fn requestAttention(self: *Window) void {
@@ -1240,7 +1238,9 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
         },
         w.WM_SETCURSOR => {
             if (LOWORD(lParam) == w.HTCLIENT) {
-                _ = w.SetCursor(self.cursor);
+                if (self.cursor) |_| {
+                    _ = w.SetCursor(self.cursor);
+                }
                 switch (self.cursor_mode) {
                     .normal => while (w.ShowCursor(w.TRUE) < 0) {},
                     .hidden, .relative => while (w.ShowCursor(w.FALSE) >= 0) {},
