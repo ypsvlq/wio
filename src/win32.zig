@@ -39,14 +39,6 @@ pub fn init() !void {
     });
     if (w.RegisterClassW(&class) == 0) return logLastError("RegisterClassW");
 
-    var mouse = w.RAWINPUTDEVICE{
-        .usUsagePage = w.HID_USAGE_PAGE_GENERIC,
-        .usUsage = w.HID_USAGE_GENERIC_MOUSE,
-        .dwFlags = 0,
-        .hwndTarget = null,
-    };
-    if (w.RegisterRawInputDevices(&mouse, 1, @sizeOf(w.RAWINPUTDEVICE)) == w.FALSE) return logLastError("RegisterRawInputDevices");
-
     if (build_options.opengl or build_options.joystick) {
         helper_window = w.CreateWindowExW(
             0,
@@ -434,6 +426,7 @@ pub const Window = struct {
     pub fn setCursorMode(self: *Window, mode: wio.CursorMode) void {
         self.cursor_mode = mode;
         if (mode == .relative) {
+            enableRawMouse();
             self.clipCursor();
         } else {
             _ = w.ClipCursor(null);
@@ -1068,6 +1061,24 @@ fn loadCursor(shape: wio.Cursor) w.HCURSOR {
         .size_nesw => w.IDC_SIZENESW,
         .size_nwse => w.IDC_SIZENWSE,
     });
+}
+
+var raw_mouse_enabled = false;
+
+fn enableRawMouse() void {
+    if (!raw_mouse_enabled) {
+        var mouse = w.RAWINPUTDEVICE{
+            .usUsagePage = w.HID_USAGE_PAGE_GENERIC,
+            .usUsage = w.HID_USAGE_GENERIC_MOUSE,
+            .dwFlags = 0,
+            .hwndTarget = null,
+        };
+        if (w.RegisterRawInputDevices(&mouse, 1, @sizeOf(w.RAWINPUTDEVICE)) == w.FALSE) {
+            logLastError("RegisterRawInputDevices") catch {};
+        } else {
+            raw_mouse_enabled = true;
+        }
+    }
 }
 
 fn logLastError(name: []const u8) error{Unexpected} {
