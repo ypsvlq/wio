@@ -1,0 +1,15 @@
+.{
+    .name = .d3d11,
+    .version = "0.0.0",
+    .fingerprint = 0x905315ab4e2356ad,
+    .dependencies = .{
+        .wio = .{
+            .path = "../..",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}
