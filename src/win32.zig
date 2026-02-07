@@ -249,6 +249,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
     self.* = .{
         .events = .init(),
         .window = window,
+        .cursor = loadCursor(.arrow),
     };
     _ = w.SetWindowLongPtrW(window, w.GWLP_USERDATA, @bitCast(@intFromPtr(self)));
 
@@ -320,7 +321,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
 pub const Window = struct {
     events: internal.EventQueue,
     window: w.HWND,
-    cursor: w.HCURSOR = null,
+    cursor: w.HCURSOR,
     cursor_mode: wio.CursorMode = .normal,
     rect: w.RECT = .{ .left = 0, .top = 0, .right = 0, .bottom = 0 },
     surrogate: u16 = 0,
@@ -1238,9 +1239,7 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
         },
         w.WM_SETCURSOR => {
             if (LOWORD(lParam) == w.HTCLIENT) {
-                if (self.cursor) |_| {
-                    _ = w.SetCursor(self.cursor);
-                }
+                _ = w.SetCursor(self.cursor);
                 switch (self.cursor_mode) {
                     .normal => while (w.ShowCursor(w.TRUE) < 0) {},
                     .hidden, .relative => while (w.ShowCursor(w.FALSE) >= 0) {},
