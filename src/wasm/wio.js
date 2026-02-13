@@ -51,6 +51,8 @@ const wio = {
 
         const input = document.createElement("input");
         input.tabIndex = "-1";
+        input.style.display = "none";
+        input.style.opacity = "0";
         input.style.position = "absolute";
         input.style.border = "0px";
         input.style.padding = "0px";
@@ -67,7 +69,9 @@ const wio = {
                 }
             }
         });
-        canvas.appendChild(input);
+        input.addEventListener("keydown", event => canvas.dispatchEvent(new KeyboardEvent("keydown", event)));
+        input.addEventListener("keyup", event => canvas.dispatchEvent(new KeyboardEvent("keyup", event)));
+        canvas.parentElement.appendChild(input);
 
         const window = {
             canvas: canvas,
@@ -139,8 +143,10 @@ const wio = {
 
     enableTextInput(id, x, y) {
         wio.windows[id].text = true;
-        wio.windows[id].input.style.left = `${x}px`;
-        wio.windows[id].input.style.top = `${y}px`;
+        const rect = wio.windows[id].canvas.getBoundingClientRect();
+        wio.windows[id].input.style.left = `${rect.x + x}px`;
+        wio.windows[id].input.style.top = `${rect.y + y}px`;
+        wio.windows[id].input.style.display = "unset";
         if (document.activeElement === wio.windows[id].canvas) {
             wio.windows[id].input.focus();
         }
@@ -148,6 +154,7 @@ const wio = {
 
     disableTextInput(id) {
         wio.windows[id].text = false;
+        wio.windows[id].input.style.display = "none";
         if (document.activeElement === wio.windows[id].input) {
             wio.windows[id].canvas.focus();
         }
