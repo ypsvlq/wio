@@ -68,16 +68,25 @@ const wio = {
             input.style.border = "0px";
             input.style.padding = "0px";
             input.addEventListener("input", event => {
-                if (event.inputType === "insertText" || event.inputType === "insertCompositionText") {
-                    if (event.inputType === "insertCompositionText") {
-                        events.push(11);
-                    }
-                    for (const char of event.data) {
-                        events.push((event.isComposing ? 12 : 10), char.codePointAt(0));
-                    }
-                    if (!event.isComposing) {
-                        input.value = "";
-                    }
+                switch (event.inputType) {
+                    case "insertText":
+                    case "insertCompositionText":
+                    case "insertFromPaste":
+                    case "insertFromPasteAsQuotation":
+                    case "insertFromDrop":
+                    case "insertTranspose":
+                    case "insertReplacementText":
+                    case "insertFromYank":
+                        if (event.inputType === "insertCompositionText") {
+                            events.push(11);
+                        }
+                        for (const char of event.data) {
+                            events.push((event.isComposing ? 12 : 10), char.codePointAt(0));
+                        }
+                        if (!event.isComposing) {
+                            input.value = "";
+                        }
+                        break;
                 }
             });
             input.addEventListener("keydown", event => canvas.dispatchEvent(new KeyboardEvent("keydown", event)));
