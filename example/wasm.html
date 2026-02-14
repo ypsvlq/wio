@@ -17,7 +17,7 @@
         <script type="module">
             import wio from "../src/wasm/wio.js";
             import { log, gl } from "./wasm.js";
-            WebAssembly.instantiateStreaming(fetch("../zig-out/bin/wio.wasm"), { wio: wio, log: log, gl: gl })
+            WebAssembly.instantiateStreaming(fetch("../zig-out/bin/wio.wasm"), { wio: wio.imports, log: log.imports, gl: gl.imports })
                 .then(result => wio.run(result.instance, [document.getElementById("canvas")]));
         </script>
     </body>
