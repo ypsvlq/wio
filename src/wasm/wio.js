@@ -1,61 +1,55 @@
-const wio = {
-    /** @type {WebAssembly.Instance} */
-    instance: undefined,
+class Wio {
+    constructor(canvases) {
+        /** @type {WebAssembly.Instance} */
+        this.instance = undefined;
 
-    /** @type {HTMLCanvasElement[]} */
-    canvases: undefined,
+        /** @type {HTMLCanvasElement[]} */
+        this.canvases = canvases;
 
-    /** @type {{canvas: HTMLCanvasElement, events: number[], input: HTMLInputElement, text: boolean, cursor: string, cursor_mode: number}[]} */
-    windows: [],
+        /** @type {{canvas: HTMLCanvasElement, events: number[], input: HTMLInputElement, text: boolean, cursor: string, cursor_mode: number}[]} */
+        this.windows = [];
 
-    gamepads: navigator.getGamepads(),
+        this.gamepads = navigator.getGamepads();
+    }
 
-    run(instance, canvases) {
-        wio.instance = instance;
-        wio.canvases = canvases;
-
-        instance.exports._start();
-        requestAnimationFrame(wio.loop);
+    run(instance) {
+        this.instance = instance;
+        this.instance.exports._start();
+        this.loop();
 
         addEventListener("pointerlockchange", () => {
-            for (const window of wio.windows) {
+            for (const window of this.windows) {
                 if (window.cursor_mode === 2) {
                     window.canvas.style.cursor = (window.canvas === document.pointerLockElement) ? "none" : window.cursor;
                 }
             }
         });
 
-        addEventListener("gamepadconnected", event => {
-            wio.gamepads = navigator.getGamepads();
-            wio.instance.exports.wioJoystick(event.gamepad.index);
+        addEventListener("gamepadconnected", (event) => {
+            this.gamepads = navigator.getGamepads();
+            this.instance.exports.wioJoystick(event.gamepad.index);
         });
-    },
+    }
 
     loop() {
-        if (wio.instance.exports.wioLoop()) {
-            requestAnimationFrame(wio.loop);
+        if (this.instance.exports.wioLoop()) {
+            requestAnimationFrame(() => this.loop());
         }
-    },
+    }
 
     getString(ptr, len) {
-        return new TextDecoder().decode(new Uint8Array(wio.instance.exports.memory.buffer, ptr, len));
-    },
+        return new TextDecoder().decode(new Uint8Array(this.instance.exports.memory.buffer, ptr, len));
+    }
 
-    imports: {
-        shift(id) {
-            return wio.windows[id].events.shift();
-        },
+    imports = {
+        shift: (id) => this.windows[id].events.shift(),
 
-        shiftFloat(id) {
-            return wio.windows[id].events.shift();
-        },
+        shiftFloat: (id) => this.windows[id].events.shift(),
 
-        messageBox(ptr, len) {
-            alert(wio.getString(ptr, len));
-        },
+        messageBox: (ptr, len) => alert(this.getString(ptr, len)),
 
-        createWindow() {
-            const canvas = wio.canvases.shift();
+        createWindow: () => {
+            const canvas = this.canvases.shift();
             if (canvas === undefined) throw new Error("no canvas available");
 
             const events = [3];
@@ -67,7 +61,7 @@ const wio = {
             input.style.position = "absolute";
             input.style.border = "0px";
             input.style.padding = "0px";
-            input.addEventListener("input", event => {
+            input.addEventListener("input", (event) => {
                 switch (event.inputType) {
                     case "insertText":
                     case "insertCompositionText":
@@ -89,8 +83,8 @@ const wio = {
                         break;
                 }
             });
-            input.addEventListener("keydown", event => canvas.dispatchEvent(new KeyboardEvent("keydown", event)));
-            input.addEventListener("keyup", event => canvas.dispatchEvent(new KeyboardEvent("keyup", event)));
+            input.addEventListener("keydown", (event) => canvas.dispatchEvent(new KeyboardEvent("keydown", event)));
+            input.addEventListener("keyup", (event) => canvas.dispatchEvent(new KeyboardEvent("keyup", event)));
             canvas.parentElement.appendChild(input);
 
             const window = {
@@ -113,7 +107,7 @@ const wio = {
                     5,
                 );
             }).observe(canvas);
-            canvas.addEventListener("contextmenu", event => event.preventDefault());
+            canvas.addEventListener("contextmenu", (event) => event.preventDefault());
             canvas.addEventListener("focus", () => {
                 events.push(1);
                 if (window.text) {
@@ -125,74 +119,74 @@ const wio = {
                     events.push(2);
                 }
             });
-            canvas.addEventListener("keydown", event => {
+            canvas.addEventListener("keydown", (event) => {
                 event.preventDefault();
-                const key = wio.keys[event.code];
+                const key = Wio.keys[event.code];
                 if (key) events.push(event.repeat ? 15 : 14, key);
             });
-            canvas.addEventListener("keyup", event => {
-                const key = wio.keys[event.code];
+            canvas.addEventListener("keyup", (event) => {
+                const key = Wio.keys[event.code];
                 if (key) events.push(16, key);
             });
-            canvas.addEventListener("mousedown", event => {
-                const button = wio.buttons[event.button];
+            canvas.addEventListener("mousedown", (event) => {
+                const button = Wio.buttons[event.button];
                 if (button !== undefined) events.push(14, button);
                 if (window.cursor_mode === 2) canvas.requestPointerLock({ unadjustedMovement: true });
             });
-            canvas.addEventListener("mouseup", event => {
-                const button = wio.buttons[event.button];
+            canvas.addEventListener("mouseup", (event) => {
+                const button = Wio.buttons[event.button];
                 if (button !== undefined) events.push(16, button);
             });
-            canvas.addEventListener("mousemove", event => {
+            canvas.addEventListener("mousemove", (event) => {
                 if (window.cursor_mode !== 2) {
                     events.push(17, event.offsetX, event.offsetY);
                 } else {
                     events.push(18, event.movementX, event.movementY);
                 }
             });
-            canvas.addEventListener("wheel", event => {
+            canvas.addEventListener("wheel", (event) => {
                 if (event.deltaY !== 0) events.push(19, event.deltaY);
                 if (event.deltaX !== 0) events.push(20, event.deltaX);
             });
 
-            wio.windows.push(window);
-            return wio.windows.length - 1;
+            this.windows.push(window);
+            return this.windows.length - 1;
         },
 
-        enableTextInput(id, x, y) {
-            wio.windows[id].text = true;
-            const rect = wio.windows[id].canvas.getBoundingClientRect();
-            wio.windows[id].input.style.left = `${rect.x + x}px`;
-            wio.windows[id].input.style.top = `${rect.y + y}px`;
-            wio.windows[id].input.style.display = "unset";
-            if (document.activeElement === wio.windows[id].canvas) {
-                wio.windows[id].input.focus();
+        enableTextInput: (id, x, y) => {
+            this.windows[id].text = true;
+            const rect = this.windows[id].canvas.getBoundingClientRect();
+            this.windows[id].input.style.left = `${rect.x + x}px`;
+            this.windows[id].input.style.top = `${rect.y + y}px`;
+            this.windows[id].input.style.display = "unset";
+            if (document.activeElement === this.windows[id].canvas) {
+                this.windows[id].input.focus();
             }
         },
 
-        disableTextInput(id) {
-            wio.windows[id].text = false;
-            wio.windows[id].input.style.display = "none";
-            if (document.activeElement === wio.windows[id].input) {
-                wio.windows[id].canvas.focus();
+        disableTextInput: (id) => {
+            this.windows[id].text = false;
+            this.windows[id].input.style.display = "none";
+            if (document.activeElement === this.windows[id].input) {
+                this.windows[id].canvas.focus();
             }
         },
 
-        setFullscreen(id, fullscreen) {
+        setFullscreen: (id, fullscreen) => {
             if (fullscreen) {
-                wio.windows[id].canvas.requestFullscreen().catch(() => { });
+                this.windows[id].canvas.requestFullscreen().catch(() => { });
             } else {
                 document.exitFullscreen().catch(() => { });
             }
         },
 
-        setSize(id, width, height) {
-            wio.windows[id].canvas.style.width = `${width}px`;
-            wio.windows[id].canvas.style.height = `${height}px`;
+        setSize: (id, width, height) => {
+            this.windows[id].canvas.style.width = `${width}px`;
+            this.windows[id].canvas.style.height = `${height}px`;
         },
 
-        setCursor(id, cursor) {
-            wio.windows[id].cursor = {
+        setCursor: (id, cursor) => {
+            this.windows[id].cursor = {
                 0: "default",
                 1: "progress",
                 2: "wait",
@@ -207,66 +201,64 @@ const wio = {
                 11: "nwse-resize",
             }[cursor];
 
-            if (wio.windows[id].cursor_mode === 0) {
-                wio.windows[id].canvas.style.cursor = wio.windows[id].cursor;
+            if (this.windows[id].cursor_mode === 0) {
+                this.windows[id].canvas.style.cursor = this.windows[id].cursor;
             }
         },
 
-        setCursorMode(id, mode) {
-            wio.windows[id].cursor_mode = mode;
+        setCursorMode: (id, mode) => {
+            this.windows[id].cursor_mode = mode;
 
             if (mode === 0) {
-                wio.windows[id].canvas.style.cursor = wio.windows[id].cursor;
+                this.windows[id].canvas.style.cursor = this.windows[id].cursor;
             } else {
-                wio.windows[id].canvas.style.cursor = "none";
+                this.windows[id].canvas.style.cursor = "none";
             }
 
             if (mode === 2) {
-                wio.windows[id].canvas.requestPointerLock({ unadjustedMovement: true });
+                this.windows[id].canvas.requestPointerLock({ unadjustedMovement: true });
             } else {
                 document.exitPointerLock();
             }
         },
 
-        setClipboardText(ptr, len) {
-            navigator.clipboard.writeText(wio.getString(ptr, len));
+        setClipboardText: (ptr, len) => {
+            navigator.clipboard.writeText(this.getString(ptr, len)).catch(() => { })
         },
 
-        getJoystickCount() {
-            return wio.gamepads.length;
+        getJoystickCount: () => this.gamepads.length,
+
+        getJoystickIdLen: (i) => {
+            return (this.gamepads[i] !== null) ? new TextEncoder().encode(this.gamepads[i].id).length : 0;
         },
 
-        getJoystickIdLen(i) {
-            return (wio.gamepads[i] !== null) ? new TextEncoder().encode(wio.gamepads[i].id).length : 0;
+        getJoystickId: (i, ptr) => {
+            new TextEncoder().encodeInto(this.gamepads[i].id, new Uint8Array(this.instance.exports.memory.buffer, ptr));
         },
 
-        getJoystickId(i, ptr) {
-            new TextEncoder().encodeInto(wio.gamepads[i].id, new Uint8Array(wio.instance.exports.memory.buffer, ptr));
-        },
-
-        openJoystick(i, ptr) {
-            if (wio.gamepads[i] === null || !wio.gamepads[i].connected) return false;
-            const lengths = new Uint32Array(wio.instance.exports.memory.buffer, ptr, 2);
-            lengths[0] = wio.gamepads[i].axes.length;
-            lengths[1] = wio.gamepads[i].buttons.length;
+        openJoystick: (i, ptr) => {
+            if (this.gamepads[i] === null || !this.gamepads[i].connected) return false;
+            const lengths = new Uint32Array(this.instance.exports.memory.buffer, ptr, 2);
+            lengths[0] = this.gamepads[i].axes.length;
+            lengths[1] = this.gamepads[i].buttons.length;
             return true;
         },
 
-        getJoystickState(index, axes_ptr, axes_len, buttons_ptr, buttons_len) {
-            if (wio.gamepads[index] === null || !wio.gamepads[index].connected) return false;
-            const axes = new Uint16Array(wio.instance.exports.memory.buffer, axes_ptr, axes_len);
-            const buttons = new Uint8Array(wio.instance.exports.memory.buffer, buttons_ptr, buttons_len);
+        getJoystickState: (index, axes_ptr, axes_len, buttons_ptr, buttons_len) => {
+            if (this.gamepads[index] === null || !this.gamepads[index].connected) return false;
+            const axes = new Uint16Array(this.instance.exports.memory.buffer, axes_ptr, axes_len);
+            const buttons = new Uint8Array(this.instance.exports.memory.buffer, buttons_ptr, buttons_len);
             for (let i = 0; i < axes_len; i++) {
-                axes[i] = (wio.gamepads[index].axes[i] + 1) * 32767.5;
+                axes[i] = (this.gamepads[index].axes[i] + 1) * 32767.5;
             }
             for (let i = 0; i < buttons_len; i++) {
-                buttons[i] = wio.gamepads[index].buttons[i].pressed;
+                buttons[i] = this.gamepads[index].buttons[i].pressed;
             }
             return true;
         },
-    },
+    };
 
-    keys: {
+    static keys = {
         KeyA: 5,
         KeyB: 6,
         KeyC: 7,
@@ -393,15 +385,15 @@ const wio = {
         ShiftRight: 128,
         AltRight: 129,
         MetaRight: 130,
-    },
+    };
 
-    buttons: {
+    static buttons = {
         0: 0,
         1: 2,
         2: 1,
         3: 3,
         4: 4,
-    },
-};
+    };
+}
 
-export default wio;
+export default Wio;

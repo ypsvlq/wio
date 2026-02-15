@@ -8,17 +8,19 @@
             #canvas {
                 width: 640px;
                 height: 480px;
-                user-select: none;
             }
         </style>
     </head>
     <body>
         <canvas id="canvas" tabindex="-1"></canvas>
         <script type="module">
-            import wio from "../src/wasm/wio.js";
-            import { log, gl } from "./wasm.js";
+            import Wio from "../src/wasm/wio.js";
+            import { Log, GL } from "./wasm.js";
+            const wio = new Wio([document.getElementById("canvas")]);
+            const log = new Log(wio);
+            const gl = new GL(wio);
             WebAssembly.instantiateStreaming(fetch("../zig-out/bin/wio.wasm"), { wio: wio.imports, log: log.imports, gl: gl.imports })
-                .then(result => wio.run(result.instance, [document.getElementById("canvas")]));
+                .then(result => wio.run(result.instance));
         </script>
     </body>
 </html>
