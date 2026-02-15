@@ -7,7 +7,7 @@ const js = struct {
     extern "wio" fn shift(u32) u32;
     extern "wio" fn shiftFloat(u32) f32;
     extern "wio" fn messageBox([*]const u8, usize) void;
-    extern "wio" fn createWindow() u32;
+    extern "wio" fn createWindow(u16, u16) u32;
     extern "wio" fn enableTextInput(u32, u16, u16) void;
     extern "wio" fn disableTextInput(u32) void;
     extern "wio" fn setFullscreen(u32, bool) void;
@@ -51,7 +51,7 @@ pub fn messageBox(_: wio.MessageBoxStyle, _: []const u8, message: []const u8) vo
 }
 
 pub fn createWindow(options: wio.CreateWindowOptions) !Window {
-    const id = js.createWindow();
+    const id = js.createWindow(options.size.width, options.size.height);
     if (options.mode == .fullscreen) js.setFullscreen(id, true);
     if (build_options.opengl and options.opengl != null) gl.createContext(id);
     return .{ .id = id };

@@ -90,6 +90,9 @@ The following libraries are loaded under Linux:
 
 ### WebAssembly
 
+Canvases will be resized according to `CreateWindowOptions.size` unless the
+element has a CSS width/height set.
+
 If OpenGL is enabled, wio imports `createContext` and `makeContextCurrent`
 from the `gl` module. The example directory contains bindings to WebGL 1.
 
