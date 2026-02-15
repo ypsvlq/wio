@@ -17,6 +17,8 @@ class Log {
 
 class GL {
     constructor(wio) {
+        this.contexts = [];
+
         /** @type {WebGLRenderingContext} */
         this.context = undefined;
 
@@ -65,8 +67,12 @@ class GL {
         };
 
         this.imports = {
-            init: () => {
-                this.context = document.getElementById("canvas").getContext("webgl");
+            createContext: (id) => {
+                this.contexts[id] = wio.windows[id].canvas.getContext("webgl");
+            },
+
+            makeContextCurrent: (id) => {
+                this.context = this.contexts[id];
             },
 
             activeTexture: (texture) => this.context.activeTexture(texture),

@@ -1,4 +1,5 @@
 const std = @import("std");
+const build_options = @import("build_options");
 const wio = @import("wio.zig");
 const internal = @import("wio.internal.zig");
 
@@ -19,6 +20,11 @@ const js = struct {
     extern "wio" fn getJoystickId(u32, [*]u8) void;
     extern "wio" fn openJoystick(u32, *[2]u32) bool;
     extern "wio" fn getJoystickState(u32, [*]u16, usize, [*]bool, usize) bool;
+};
+
+const gl = struct {
+    extern "gl" fn createContext(u32) void;
+    extern "gl" fn makeContextCurrent(u32) void;
 };
 
 pub fn init() !void {}
@@ -47,6 +53,7 @@ pub fn messageBox(_: wio.MessageBoxStyle, _: []const u8, message: []const u8) vo
 pub fn createWindow(options: wio.CreateWindowOptions) !Window {
     const id = js.createWindow();
     if (options.mode == .fullscreen) js.setFullscreen(id, true);
+    if (build_options.opengl and options.opengl != null) gl.createContext(id);
     return .{ .id = id };
 }
 
@@ -120,7 +127,9 @@ pub const Window = struct {
         return null;
     }
 
-    pub fn makeContextCurrent(_: *Window) void {}
+    pub fn makeContextCurrent(self: *Window) void {
+        gl.makeContextCurrent(self.id);
+    }
 
     pub fn swapBuffers(_: *Window) void {}
 

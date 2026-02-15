@@ -30,10 +30,8 @@ pub var shaderSource: *const fn (shader: u32, count: SizeI, string: [*c]const [*
 pub var useProgram: *const fn (program: u32) callconv(APIENTRY) void = undefined;
 pub var vertexAttribPointer: *const fn (index: u32, size: i32, type: Enum, normalized: Boolean, stride: SizeI, pointer: ?*const anyopaque) callconv(APIENTRY) void = undefined;
 pub var viewport: *const fn (x: i32, y: i32, width: SizeI, height: SizeI) callconv(APIENTRY) void = undefined;
-extern "gl" fn init() void;
 pub fn load(getProcAddress: anytype) !void {
     if (builtin.cpu.arch.isWasm()) {
-        init();
         inline for (@typeInfo(@This()).@"struct".decls) |decl| {
             switch (@typeInfo(@TypeOf(@field(@This(), decl.name)))) {
                 .pointer => |info| @field(@This(), decl.name) = @extern(*const info.child, .{ .name = decl.name, .library_name = "gl" }),

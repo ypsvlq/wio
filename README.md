@@ -88,6 +88,13 @@ The following libraries are loaded under Linux:
 - `libudev.so.1` (if joysticks are enabled)
 - `libpulse.so.0` (if audio is enabled)
 
+### WebAssembly
+
+If OpenGL is enabled, wio imports `createContext` and `makeContextCurrent`
+from the `gl` module. The example directory contains bindings to WebGL 1.
+
+`glGetProcAddress` always returns null.
+
 ## Platform-specific API
 
 The following variables and fields may be considered part of the public API
