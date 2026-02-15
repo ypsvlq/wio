@@ -4,19 +4,14 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width,initial-scale=1">
         <title>wio</title>
-        <style>
-            #canvas {
-                width: 640px;
-                height: 480px;
-            }
-        </style>
     </head>
     <body>
         <canvas id="canvas" tabindex="-1"></canvas>
+        <canvas id="canvas2" tabindex="-1"></canvas>
         <script type="module">
             import Wio from "../src/wasm/wio.js";
             import { Log, GL } from "./wasm.js";
-            const wio = new Wio([document.getElementById("canvas")]);
+            const wio = new Wio([document.getElementById("canvas"), document.getElementById("canvas2")]);
             const log = new Log(wio);
             const gl = new GL(wio);
             WebAssembly.instantiateStreaming(fetch("../zig-out/bin/wio.wasm"), { wio: wio.imports, log: log.imports, gl: gl.imports })
