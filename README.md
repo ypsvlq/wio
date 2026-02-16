@@ -90,9 +90,6 @@ The following libraries are loaded under Linux:
 
 ### WebAssembly
 
-Canvases will be resized according to `CreateWindowOptions.size` unless the
-element has a CSS width/height set.
-
 If OpenGL is enabled, wio imports `createContext` and `makeContextCurrent`
 from the `gl` module. The example directory contains bindings to WebGL 1.
 
@@ -125,6 +122,10 @@ for a given platform:
 
 - `wio.backend.wayland.display` is the Wayland `wl_display`
 - `Window.backend.wayland.surface` is the Wayland `wl_surface`
+
+### WebAssembly
+
+- `Window.backend.id` is the index into the JavaScript window array
 
 
 [1]: https://github.com/ypsvlq/wio/blob/master/src/wio.zig
