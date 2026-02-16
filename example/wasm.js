@@ -24,6 +24,8 @@ class GL {
 
         this.objects = [,];
 
+        this.uniforms = undefined;
+
         this.getStringZ = (ptr) => {
             const array = new Uint8Array(wio.instance.exports.memory.buffer, ptr);
             let len = 0;
@@ -77,9 +79,9 @@ class GL {
 
             activeTexture: (texture) => this.context.activeTexture(texture),
 
-            attachShader: (program, shader) => this.context.attachShader(this.objects[program], this.objects[shader]),
+            attachShader: (program, shader) => this.context.attachShader(this.objects[program].program, this.objects[shader]),
 
-            bindAttribLocation: (program, index, name) => this.context.bindAttribLocation(this.objects[program], index, this.getStringZ(name)),
+            bindAttribLocation: (program, index, name) => this.context.bindAttribLocation(this.objects[program].program, index, this.getStringZ(name)),
 
             bindBuffer: (target, buffer) => this.context.bindBuffer(target, this.objects[buffer]),
 
@@ -125,7 +127,7 @@ class GL {
 
             copyTexSubImage2D: (target, level, xoffset, yoffset, x, y, width, height) => this.context.copyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height),
 
-            createProgram: () => this.pushObject(this.context.createProgram()),
+            createProgram: () => this.pushObject({ program: this.context.createProgram(), uniforms: { list: [], name: {} } }),
 
             createShader: (type) => this.pushObject(this.context.createShader(type)),
 
@@ -149,7 +151,7 @@ class GL {
 
             depthRangef: (n, f) => this.context.depthRange(n, f),
 
-            detachShader: (program, shader) => this.context.detachShader(this.objects[program], this.objects[shader]),
+            detachShader: (program, shader) => this.context.detachShader(this.objects[program].program, this.objects[shader]),
 
             disable: (cap) => this.context.disable(cap),
 
@@ -204,7 +206,7 @@ class GL {
             },
 
             getActiveAttrib: (program, index, bufSize, length, size, type, name) => {
-                const info = this.context.getActiveAttrib(this.objects[program], index);
+                const info = this.context.getActiveAttrib(this.objects[program].program, index);
                 if (info === null) return;
                 new Int32Array(wio.instance.exports.memory.buffer, size)[0] = info.size;
                 new Uint32Array(wio.instance.exports.memory.buffer, type)[0] = info.type;
@@ -212,7 +214,7 @@ class GL {
             },
 
             getActiveUniform: (program, index, bufSize, length, size, type, name) => {
-                const info = this.context.getActiveUniform(this.objects[program], index);
+                const info = this.context.getActiveUniform(this.objects[program].program, index);
                 if (info === null) return;
                 new Int32Array(wio.instance.exports.memory.buffer, size)[0] = info.size;
                 new Uint32Array(wio.instance.exports.memory.buffer, type)[0] = info.type;
@@ -220,7 +222,7 @@ class GL {
             },
 
             getAttachedShaders: (program, maxCount, count, shaders) => {
-                const indices = this.context.getAttachedShaders(this.objects[program]).map(shader => this.objects.indexOf(shader));
+                const indices = this.context.getAttachedShaders(this.objects[program].program).map(shader => this.objects.indexOf(shader));
                 const buffer = new Uint32Array(wio.instance.exports.memory.buffer, shaders);
                 for (var i = 0; i < maxCount && i < indices.length; i++) {
                     buffer[i] = indices[i];
@@ -230,7 +232,7 @@ class GL {
                 }
             },
 
-            getAttribLocation: (program, name) => this.context.getAttribLocation(this.objects[program], this.getStringZ(name)),
+            getAttribLocation: (program, name) => this.context.getAttribLocation(this.objects[program].program, this.getStringZ(name)),
 
             getBooleanv: (pname, params) => this.setParams(Uint8Array, params, this.context.getParameter(pname)),
 
@@ -250,9 +252,9 @@ class GL {
 
             getIntegerv: (pname, params) => this.setParams(Int32Array, params, this.context.getParameter(pname)),
 
-            getProgramiv: (program, pname, params) => this.setParams(Int32Array, params, this.context.getProgramParameter(this.objects[program], pname)),
+            getProgramiv: (program, pname, params) => this.setParams(Int32Array, params, this.context.getProgramParameter(this.objects[program].program, pname)),
 
-            getProgramInfoLog: (program, maxLength, length, infoLog) => this.setStringZ(infoLog, maxLength, length, this.context.getProgramInfoLog(this.objects[program])),
+            getProgramInfoLog: (program, maxLength, length, infoLog) => this.setStringZ(infoLog, maxLength, length, this.context.getProgramInfoLog(this.objects[program].program)),
 
             getRenderbufferParameteriv: (target, pname, params) => this.setParams(Int32Array, params, this.context.getRenderbufferParameter(target, pname)),
 
@@ -272,11 +274,19 @@ class GL {
 
             getTexParameteriv: (target, pname, params) => this.setParams(Int32Array, params, this.context.getTexParameter(target, pname)),
 
-            getUniformfv: (program, location, params) => this.setParams(Float32Array, params, this.context.getUniform(this.objects[program], location)),
+            getUniformfv: (program, location, params) => this.setParams(Float32Array, params, this.context.getUniform(this.objects[program].program, location)),
 
-            getUniformiv: (program, location, params) => this.setParams(Int32Array, params, this.context.getUniform(this.objects[program], location)),
+            getUniformiv: (program, location, params) => this.setParams(Int32Array, params, this.context.getUniform(this.objects[program].program, location)),
 
-            getUniformLocation: (program, name) => this.context.getUniformLocation(this.objects[program], this.getStringZ(name)),
+            getUniformLocation: (program, name) => {
+                if (this.objects[program].uniforms.name[name] === undefined) {
+                    const uniform = this.context.getUniformLocation(this.objects[program].program, this.getStringZ(name));
+                    if (uniform === null) return -1;
+                    this.objects[program].uniforms.list.push(uniform);
+                    this.objects[program].uniforms.name[name] = this.objects[program].uniforms.list - 1;
+                }
+                return this.objects[program].uniforms.name[name];
+            },
 
             getVertexAttribfv: (index, pname, params) => this.setParams(Float32Array, params, this.context.getVertexAttrib(index, pname)),
 
@@ -292,7 +302,7 @@ class GL {
 
             isFramebuffer: (framebuffer) => this.context.isFramebuffer(this.objects[framebuffer]),
 
-            isProgram: (program) => this.context.isProgram(this.objects[program]),
+            isProgram: (program) => this.context.isProgram(this.objects[program].program),
 
             isRenderbuffer: (renderbuffer) => this.context.isRenderbuffer(this.objects[renderbuffer]),
 
@@ -302,7 +312,7 @@ class GL {
 
             lineWidth: (width) => this.context.lineWidth(width),
 
-            linkProgram: (program) => this.context.linkProgram(this.objects[program]),
+            linkProgram: (program) => this.context.linkProgram(this.objects[program].program),
 
             pixelStorei: (pname, param) => this.context.pixelStorei(pname, param),
 
@@ -346,47 +356,50 @@ class GL {
 
             texSubImage2D: (target, level, xoffset, yoffset, width, height, format, type, pixels) => this.context.texSubImage2D(target, level, xoffset, yoffset, width, height, format, type, new Uint8Array(wio.instance.exports.memory.buffer, pixels)),
 
-            uniform1f: (location, v0) => this.context.uniform1f(location, v0),
+            uniform1f: (location, v0) => this.context.uniform1f(this.uniforms[location], v0),
 
-            uniform1fv: (location, count, value) => this.context.uniform1fv(location, new Float32Array(wio.instance.exports.memory.buffer, value, count)),
+            uniform1fv: (location, count, value) => this.context.uniform1fv(this.uniforms[location], new Float32Array(wio.instance.exports.memory.buffer, value, count)),
 
-            uniform1i: (location, v0) => this.context.uniform1i(location, v0),
+            uniform1i: (location, v0) => this.context.uniform1i(this.uniforms[location], v0),
 
-            uniform1iv: (location, count, value) => this.context.uniform1iv(location, new Int32Array(wio.instance.exports.memory.buffer, value, count)),
+            uniform1iv: (location, count, value) => this.context.uniform1iv(this.uniforms[location], new Int32Array(wio.instance.exports.memory.buffer, value, count)),
 
-            uniform2f: (location, v0, v1) => this.context.uniform2f(location, v0, v1),
+            uniform2f: (location, v0, v1) => this.context.uniform2f(this.uniforms[location], v0, v1),
 
-            uniform2fv: (location, count, value) => this.context.uniform2fv(location, new Float32Array(wio.instance.exports.memory.buffer, value, count)),
+            uniform2fv: (location, count, value) => this.context.uniform2fv(this.uniforms[location], new Float32Array(wio.instance.exports.memory.buffer, value, count * 2)),
 
-            uniform2i: (location, v0, v1) => this.context.uniform2i(location, v0, v1),
+            uniform2i: (location, v0, v1) => this.context.uniform2i(this.uniforms[location], v0, v1),
 
-            uniform2iv: (location, count, value) => this.context.uniform2iv(location, new Int32Array(wio.instance.exports.memory.buffer, value, count)),
+            uniform2iv: (location, count, value) => this.context.uniform2iv(this.uniforms[location], new Int32Array(wio.instance.exports.memory.buffer, value, count * 2)),
 
-            uniform3f: (location, v0, v1, v2) => this.context.uniform3f(location, v0, v1, v2),
+            uniform3f: (location, v0, v1, v2) => this.context.uniform3f(this.uniforms[location], v0, v1, v2),
 
-            uniform3fv: (location, count, value) => this.context.uniform3fv(location, new Float32Array(wio.instance.exports.memory.buffer, value, count)),
+            uniform3fv: (location, count, value) => this.context.uniform3fv(this.uniforms[location], new Float32Array(wio.instance.exports.memory.buffer, value, count * 3)),
 
-            uniform3i: (location, v0, v1, v2) => this.context.uniformif(location, v0, v1, v2),
+            uniform3i: (location, v0, v1, v2) => this.context.uniformif(this.uniforms[location], v0, v1, v2),
 
-            uniform3iv: (location, count, value) => this.context.uniform3iv(location, new Int32Array(wio.instance.exports.memory.buffer, value, count)),
+            uniform3iv: (location, count, value) => this.context.uniform3iv(this.uniforms[location], new Int32Array(wio.instance.exports.memory.buffer, value, count * 3)),
 
-            uniform4f: (location, v0, v1, v2, v3) => this.context.uniform4f(location, v0, v1, v2, v3),
+            uniform4f: (location, v0, v1, v2, v3) => this.context.uniform4f(this.uniforms[location], v0, v1, v2, v3),
 
-            uniform4fv: (location, count, value) => this.context.uniform4fv(location, new Float32Array(wio.instance.exports.memory.buffer, value, count)),
+            uniform4fv: (location, count, value) => this.context.uniform4fv(this.uniforms[location], new Float32Array(wio.instance.exports.memory.buffer, value, count * 4)),
 
-            uniform4i: (location, v0, v1, v2, v3) => this.context.uniform4i(location, v0, v1, v2, v3),
+            uniform4i: (location, v0, v1, v2, v3) => this.context.uniform4i(this.uniforms[location], v0, v1, v2, v3),
 
-            uniform4iv: (location, count, value) => this.context.uniform4iv(location, new Int32Array(wio.instance.exports.memory.buffer, value, count)),
+            uniform4iv: (location, count, value) => this.context.uniform4iv(this.uniforms[location], new Int32Array(wio.instance.exports.memory.buffer, value, count * 4)),
 
-            uniformMatrix2fv: (location, count, transpose, value) => this.context.uniformMatrix2fv(location, transpose, new Float32Array(wio.instance.exports.memory.buffer, value, count)),
+            uniformMatrix2fv: (location, count, transpose, value) => this.context.uniformMatrix2fv(this.uniforms[location], transpose, new Float32Array(wio.instance.exports.memory.buffer, value, count * 4)),
 
-            uniformMatrix3fv: (location, count, transpose, value) => this.context.uniformMatrix3fv(location, transpose, new Float32Array(wio.instance.exports.memory.buffer, value, count)),
+            uniformMatrix3fv: (location, count, transpose, value) => this.context.uniformMatrix3fv(this.uniforms[location], transpose, new Float32Array(wio.instance.exports.memory.buffer, value, count * 9)),
 
-            uniformMatrix4fv: (location, count, transpose, value) => this.context.uniformMatrix4fv(location, transpose, new Float32Array(wio.instance.exports.memory.buffer, value, count)),
+            uniformMatrix4fv: (location, count, transpose, value) => this.context.uniformMatrix4fv(this.uniforms[location], transpose, new Float32Array(wio.instance.exports.memory.buffer, value, count * 16)),
 
-            useProgram: (program) => this.context.useProgram(this.objects[program]),
+            useProgram: (program) => {
+                this.context.useProgram(this.objects[program].program);
+                this.uniforms = this.objects[program].uniforms.list;
+            },
 
-            validateProgram: (program) => this.context.validateProgram(this.objects[program]),
+            validateProgram: (program) => this.context.validateProgram(this.objects[program].program),
 
             vertexAttrib1f: (index, x) => this.context.vertexAttrib1f(index, x),
 
