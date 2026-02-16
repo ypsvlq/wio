@@ -48,12 +48,9 @@ class Wio {
 
         messageBox: (ptr, len) => alert(this.getString(ptr, len)),
 
-        createWindow: (width, height) => {
+        createWindow: () => {
             const canvas = this.canvases.shift();
             if (canvas === undefined) throw new Error("no canvas available");
-
-            if (canvas.style.width === "") canvas.style.width = `${width}px`;
-            if (canvas.style.height === "") canvas.style.height = `${height}px`;
 
             const events = [3];
 
@@ -100,6 +97,11 @@ class Wio {
             };
 
             new ResizeObserver(() => {
+                if (canvas.style.width === "" || canvas.style.width === "") {
+                    const style = getComputedStyle(canvas);
+                    canvas.style.width = style.width;
+                    canvas.style.height = style.height;
+                }
                 canvas.width = canvas.scrollWidth * devicePixelRatio;
                 canvas.height = canvas.scrollHeight * devicePixelRatio;
                 events.push(
