@@ -224,7 +224,7 @@ class GL {
             getAttachedShaders: (program, maxCount, count, shaders) => {
                 const indices = this.context.getAttachedShaders(this.objects[program].program).map(shader => this.objects.indexOf(shader));
                 const buffer = new Uint32Array(wio.instance.exports.memory.buffer, shaders);
-                for (var i = 0; i < maxCount && i < indices.length; i++) {
+                for (let i = 0; i < maxCount && i < indices.length; i++) {
                     buffer[i] = indices[i];
                 }
                 if (count !== 0) {
@@ -329,7 +329,7 @@ class GL {
             shaderSource: (shader, count, strings_ptr, lengths_ptr) => {
                 const strings = new Uint32Array(wio.instance.exports.memory.buffer, strings_ptr, count);
                 const lengths = new Int32Array(wio.instance.exports.memory.buffer, lengths_ptr, count);
-                var string = "";
+                let string = "";
                 for (let i = 0; i < count; i++) {
                     string += (lengths_ptr !== 0 && lengths[i] >= 0) ? wio.getString(strings[i], lengths[i]) : this.getStringZ(strings[i]);
                 }
