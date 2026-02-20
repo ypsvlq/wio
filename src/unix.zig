@@ -127,13 +127,7 @@ pub fn wait() void {
 }
 
 pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
-    if (build_options.wayland and active == .wayland) {
-        if (wayland.focus) |focus| {
-            focus.repeat_key = 0;
-        }
-    }
-
-    var kdialog = std.process.Child.init(&.{
+    const kdialog = &.{
         "kdialog",
         "--title",
         title,
@@ -143,13 +137,11 @@ pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []cons
             .err => "--error",
         },
         message,
-    }, internal.allocator);
+    };
 
-    if (kdialog.spawnAndWait()) |_| {
-        return;
-    } else |_| {}
+    if (spawnAndPoll(kdialog)) return;
 
-    var zenity = std.process.Child.init(&.{
+    const zenity = &.{
         "zenity",
         switch (style) {
             .info => "--info",
@@ -160,11 +152,27 @@ pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []cons
         title,
         "--text",
         message,
-    }, internal.allocator);
+    };
 
-    if (zenity.spawnAndWait()) |_| {
-        return;
-    } else |_| {}
+    if (spawnAndPoll(zenity)) return;
+}
+
+fn spawnAndPoll(args: []const []const u8) bool {
+    var process = std.process.Child.init(args, internal.allocator);
+    process.stdout_behavior = .Pipe;
+    if (process.spawn()) {
+        defer _ = process.wait() catch {};
+        pollfds.append(internal.allocator, .{ .fd = process.stdout.?.handle, .events = std.c.POLL.HUP, .revents = 0 }) catch return false;
+        const index = pollfds.items.len - 1;
+        while (pollfds.items[index].revents == 0) {
+            wait();
+            update();
+        }
+        _ = pollfds.swapRemove(index);
+        return true;
+    } else |_| {
+        return false;
+    }
 }
 
 pub fn createWindow(options: wio.CreateWindowOptions) !Window {

@@ -59,6 +59,8 @@ changing the `CFBundleExecutable` and `CFBundleName` values in Info.plist.
 
 ### Unix
 
+Message boxes are implementing by spawning `kdialog` or `zenity`.
+
 Unix-like systems support different backends in the same executable. By default
 all backends are enabled, the `unix_backends` build option can be used to
 limit the choices.
