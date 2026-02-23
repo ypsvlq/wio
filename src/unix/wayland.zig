@@ -398,7 +398,7 @@ pub const Window = struct {
         if (self.viewport) |_| h.wp_viewport_destroy(self.viewport);
         c.libdecor_frame_unref(self.frame);
         h.wl_surface_destroy(self.surface);
-        _ = c.wl_display_dispatch(display);
+        _ = c.wl_display_roundtrip(display);
 
         self.events.deinit();
         internal.allocator.destroy(self);
