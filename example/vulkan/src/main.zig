@@ -33,6 +33,18 @@ var vki: vk.InstanceWrapper = undefined;
 var instance: vk.InstanceProxy = undefined;
 
 fn createInstance() !void {
+    var enabled_layers: std.ArrayList([*:0]const u8) = .empty;
+    defer enabled_layers.deinit(allocator);
+
+    const layers = try vkb.enumerateInstanceLayerPropertiesAlloc(allocator);
+    defer allocator.free(layers);
+    for (layers) |layer| {
+        const name = std.mem.sliceTo(&layer.layer_name, 0);
+        if (std.mem.eql(u8, name, "VK_LAYER_KHRONOS_validation")) {
+            try enabled_layers.append(allocator, "VK_LAYER_KHRONOS_validation");
+        }
+    }
+
     var enabled_extensions: std.ArrayList([*:0]const u8) = .empty;
     defer enabled_extensions.deinit(allocator);
     try enabled_extensions.appendSlice(allocator, wio.getVulkanExtensions());
@@ -55,6 +67,8 @@ fn createInstance() !void {
             .engine_version = 0,
             .api_version = @bitCast(vk.API_VERSION_1_1),
         },
+        .enabled_layer_count = @intCast(enabled_layers.items.len),
+        .pp_enabled_layer_names = enabled_layers.items.ptr,
         .enabled_extension_count = @intCast(enabled_extensions.items.len),
         .pp_enabled_extension_names = enabled_extensions.items.ptr,
     }, null);
@@ -83,7 +97,8 @@ fn pickPhysicalDevice() !void {
         const extensions = try instance.enumerateDeviceExtensionPropertiesAlloc(handle, null, allocator);
         defer allocator.free(extensions);
         for (extensions) |extension| {
-            if (std.mem.eql(u8, std.mem.sliceTo(&extension.extension_name, 0), "VK_KHR_swapchain")) {
+            const name = std.mem.sliceTo(&extension.extension_name, 0);
+            if (std.mem.eql(u8, name, "VK_KHR_swapchain")) {
                 has_swapchain = true;
             }
         }
