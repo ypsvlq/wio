@@ -73,9 +73,13 @@ pub fn update() void {}
 
 var wait_event: std.Thread.ResetEvent = .{};
 
-pub fn wait() void {
+pub fn wait(options: wio.WaitOptions) void {
     wait_event.reset();
-    wait_event.wait();
+    if (options.timeout_ns) |timeout_ns| {
+        wait_event.timedWait(timeout_ns) catch {};
+    } else {
+        wait_event.wait();
+    }
 }
 
 pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {

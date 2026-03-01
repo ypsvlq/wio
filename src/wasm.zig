@@ -37,7 +37,7 @@ pub fn run(func: fn () anyerror!bool) !void {
     loop = func;
 }
 
-pub fn wait() void {}
+pub fn wait(_: wio.WaitOptions) void {}
 
 export fn wioLoop() bool {
     return loop() catch |err| {

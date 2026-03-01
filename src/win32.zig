@@ -197,8 +197,13 @@ pub fn update() void {
     }
 }
 
-pub fn wait() void {
-    _ = w.MsgWaitForMultipleObjects(0, null, w.FALSE, w.INFINITE, w.QS_ALLINPUT);
+pub fn wait(options: wio.WaitOptions) void {
+    const timeout = if (options.timeout_ns) |timeout_ns|
+        @min(timeout_ns / std.time.ns_per_ms, w.INFINITE - 1)
+    else
+        w.INFINITE;
+
+    _ = w.MsgWaitForMultipleObjects(0, null, w.FALSE, timeout, w.QS_ALLINPUT);
 }
 
 pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {

@@ -114,7 +114,8 @@ pub fn update() void {
     if (build_options.audio) audio.update();
 }
 
-pub fn wait() void {
+pub fn wait(options: wio.WaitOptions) void {
+    _ = options;
     var timeout: c_int = -1;
     if (build_options.wayland and active == .wayland and wayland.repeat_period > 0) {
         if (wayland.focus) |focus| {

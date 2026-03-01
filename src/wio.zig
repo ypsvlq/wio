@@ -48,9 +48,13 @@ pub fn update() void {
     backend.update();
 }
 
+pub const WaitOptions = struct {
+    timeout_ns: ?u64 = null,
+};
+
 /// Sleep until an event is received.
-pub fn wait() void {
-    backend.wait();
+pub fn wait(options: WaitOptions) void {
+    backend.wait(options);
 }
 
 pub const MessageBoxStyle = enum { info, warn, err };

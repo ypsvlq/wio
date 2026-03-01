@@ -13,7 +13,9 @@ pub fn run(func: fn () anyerror!bool) !void {
 
 pub fn update() void {}
 
-pub fn wait() void {}
+pub fn wait(options: wio.WaitOptions) void {
+    _ = options;
+}
 
 pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
     _ = style;

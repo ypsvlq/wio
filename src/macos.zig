@@ -150,7 +150,8 @@ pub fn update() void {
     wioUpdate();
 }
 
-pub fn wait() void {
+pub fn wait(options: wio.WaitOptions) void {
+    _ = options;
     wioWait();
 }
 

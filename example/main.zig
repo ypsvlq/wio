@@ -107,7 +107,7 @@ fn loop() !bool {
     }
 
     joystick.update();
-    wio.wait();
+    wio.wait(.{ .timeout_ns = 1 * std.time.ns_per_s });
 
     return true;
 }
