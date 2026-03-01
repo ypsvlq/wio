@@ -32,7 +32,7 @@ pub fn main() !void {
                 else => {},
             }
         }
-        wio.wait();
+        wio.wait(.{});
     }
 }
 
