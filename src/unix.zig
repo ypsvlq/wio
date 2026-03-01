@@ -115,12 +115,16 @@ pub fn update() void {
 }
 
 pub fn wait(options: wio.WaitOptions) void {
-    _ = options;
     var timeout: c_int = -1;
+    if (options.timeout_ns) |timeout_ns| {
+        timeout = std.math.lossyCast(c_int, timeout_ns / std.time.ns_per_ms);
+    }
     if (build_options.wayland and active == .wayland and wayland.repeat_period > 0) {
-        if (wayland.focus) |focus| {
-            if (focus.repeat_key != 0) {
-                timeout = wayland.repeat_period;
+        if (timeout == -1 or wayland.repeat_period < timeout) {
+            if (wayland.focus) |focus| {
+                if (focus.repeat_key != 0) {
+                    timeout = wayland.repeat_period;
+                }
             }
         }
     }
@@ -166,7 +170,7 @@ fn spawnAndPoll(args: []const []const u8) bool {
         pollfds.append(internal.allocator, .{ .fd = process.stdout.?.handle, .events = std.c.POLL.HUP, .revents = 0 }) catch return false;
         const index = pollfds.items.len - 1;
         while (pollfds.items[index].revents == 0) {
-            wait();
+            wait(.{});
             update();
         }
         _ = pollfds.swapRemove(index);
