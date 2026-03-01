@@ -392,9 +392,10 @@ void wioUpdate(void) {
     [NSApp updateWindows];
 }
 
-void wioWait(void) {
+void wioWait(NSTimeInterval timeout) {
+    NSDate *until = (timeout > 0) ? [NSDate dateWithTimeIntervalSinceNow:timeout] : [NSDate distantFuture];
     NSEvent *event = [NSApp nextEventMatchingMask:NSEventMaskAny
-        untilDate:[NSDate distantFuture]
+        untilDate:until
         inMode:NSDefaultRunLoopMode
         dequeue:YES];
     [NSApp sendEvent:event];

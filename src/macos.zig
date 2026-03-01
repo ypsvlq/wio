@@ -17,7 +17,7 @@ const NSOpenGLContext = opaque {};
 const CAMetalLayer = opaque {};
 extern fn wioInit() void;
 extern fn wioUpdate() void;
-extern fn wioWait() void;
+extern fn wioWait(f64) void;
 extern fn wioMessageBox(u8, [*]const u8, usize) void;
 extern fn wioCreateWindow(*Window, u16, u16) *NSWindow;
 extern fn wioDestroyWindow(*NSWindow) void;
@@ -151,8 +151,11 @@ pub fn update() void {
 }
 
 pub fn wait(options: wio.WaitOptions) void {
-    _ = options;
-    wioWait();
+    if (options.timeout_ns) |timeout_ns| {
+        wioWait(@as(f64, @floatFromInt(timeout_ns)) / std.time.ns_per_s);
+    } else {
+        wioWait(-1);
+    }
 }
 
 pub fn messageBox(style: wio.MessageBoxStyle, _: []const u8, message: []const u8) void {
