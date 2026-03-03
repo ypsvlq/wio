@@ -833,12 +833,14 @@ fn pointerLeave(_: ?*anyopaque, _: ?*h.wl_pointer, _: u32, _: ?*h.wl_surface) ca
 }
 
 fn pointerMotion(_: ?*anyopaque, _: ?*h.wl_pointer, _: u32, surface_x: h.wl_fixed_t, surface_y: h.wl_fixed_t) callconv(.c) void {
-    if (focus) |window| window.events.push(.{ .mouse = .{ .x = std.math.cast(u16, surface_x >> 8) orelse return, .y = std.math.cast(u16, surface_y >> 8) orelse return } });
+    if (getWindow(pointer_surface)) |window| {
+        window.events.push(.{ .mouse = .{ .x = std.math.cast(u16, surface_x >> 8) orelse return, .y = std.math.cast(u16, surface_y >> 8) orelse return } });
+    }
 }
 
 fn pointerButton(_: ?*anyopaque, _: ?*h.wl_pointer, serial: u32, _: u32, button: u32, state: h.wl_pointer_button_state) callconv(.c) void {
     last_serial = serial;
-    if (focus) |window| {
+    if (getWindow(pointer_surface)) |window| {
         const wio_button: wio.Button = switch (button) {
             0x110 => .mouse_left,
             0x111 => .mouse_right,
@@ -852,7 +854,7 @@ fn pointerButton(_: ?*anyopaque, _: ?*h.wl_pointer, serial: u32, _: u32, button:
 }
 
 fn pointerAxis(_: ?*anyopaque, _: ?*h.wl_pointer, _: u32, axis: h.wl_pointer_axis, value: h.wl_fixed_t) callconv(.c) void {
-    if (focus) |window| {
+    if (getWindow(pointer_surface)) |window| {
         const float = @as(f32, @floatFromInt(value)) / 2560;
         switch (axis) {
             h.WL_POINTER_AXIS_VERTICAL_SCROLL => window.events.push(.{ .scroll_vertical = float }),
@@ -867,7 +869,7 @@ const relative_pointer_listener = h.zwp_relative_pointer_v1_listener{
 };
 
 fn relativePointerMotion(_: ?*anyopaque, _: ?*h.zwp_relative_pointer_v1, _: u32, _: u32, _: h.wl_fixed_t, _: h.wl_fixed_t, dx_unaccel: h.wl_fixed_t, dy_unaccel: h.wl_fixed_t) callconv(.c) void {
-    if (focus) |window| {
+    if (getWindow(pointer_surface)) |window| {
         if (window.cursor_mode == .relative) {
             window.events.push(.{ .mouse_relative = .{ .x = std.math.cast(i16, dx_unaccel >> 8) orelse return, .y = std.math.cast(i16, dy_unaccel >> 8) orelse return } });
         }
