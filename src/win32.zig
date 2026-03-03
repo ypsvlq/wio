@@ -1255,14 +1255,12 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
         },
         w.WM_SETCURSOR => {
             if (LOWORD(lParam) == w.HTCLIENT) {
-                _ = w.SetCursor(self.cursor);
                 switch (self.cursor_mode) {
-                    .normal => while (w.ShowCursor(w.TRUE) < 0) {},
-                    .hidden, .relative => while (w.ShowCursor(w.FALSE) >= 0) {},
+                    .normal => _ = w.SetCursor(self.cursor),
+                    .hidden, .relative => _ = w.SetCursor(null),
                 }
                 return w.TRUE;
             } else {
-                while (w.ShowCursor(w.TRUE) < 0) {}
                 return w.DefWindowProcW(window, msg, wParam, lParam);
             }
         },
