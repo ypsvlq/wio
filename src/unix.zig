@@ -121,7 +121,7 @@ pub fn wait(options: wio.WaitOptions) void {
     }
     if (build_options.wayland and active == .wayland and wayland.repeat_period > 0) {
         if (timeout == -1 or wayland.repeat_period < timeout) {
-            if (wayland.focus) |focus| {
+            if (wayland.keyboard_focus) |focus| {
                 if (focus.repeat_key != 0) {
                     timeout = wayland.repeat_period;
                 }

@@ -122,10 +122,10 @@ var compose_state: ?*h.xkb_compose_state = null;
 var libdecor_context: *h.libdecor = undefined;
 
 var windows: std.AutoHashMapUnmanaged(*Window, void) = .empty;
-pub var focus: ?*Window = null;
+pub var keyboard_focus: ?*Window = null;
+var pointer_focus: ?*Window = null;
 var last_serial: u32 = 0;
 var pointer_enter_serial: u32 = 0;
-var pointer_surface: ?*h.wl_surface = null;
 pub var repeat_period: i32 = 0;
 var repeat_delay: i32 = undefined;
 var preedit_string: std.ArrayList(u8) = .empty;
@@ -375,7 +375,8 @@ pub const Window = struct {
     } else struct {} = .{},
 
     pub fn destroy(self: *Window) void {
-        if (focus == self) focus = null;
+        if (pointer_focus == self) pointer_focus = null;
+        if (keyboard_focus == self) keyboard_focus = null;
         _ = windows.remove(self);
 
         while (true) {
@@ -432,7 +433,7 @@ pub const Window = struct {
 
     pub fn enableTextInput(self: *Window, options: wio.TextInputOptions) void {
         self.text_options = options;
-        if (focus == self) {
+        if (keyboard_focus == self) {
             if (text_input) |_| {
                 h.zwp_text_input_v3_enable(text_input);
                 if (options.cursor) |cursor| {
@@ -445,7 +446,7 @@ pub const Window = struct {
 
     pub fn disableTextInput(self: *Window) void {
         self.text_options = null;
-        if (focus == self) {
+        if (keyboard_focus == self) {
             if (text_input) |_| {
                 h.zwp_text_input_v3_disable(text_input);
                 h.zwp_text_input_v3_commit(text_input);
@@ -492,12 +493,12 @@ pub const Window = struct {
             .size_nesw => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_NESW_RESIZE,
             .size_nwse => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_NWSE_RESIZE,
         };
-        if (pointer_surface == self.surface) self.applyCursor();
+        if (pointer_focus == self) self.applyCursor();
     }
 
     pub fn setCursorMode(self: *Window, mode: wio.CursorMode) void {
         self.cursor_mode = mode;
-        if (pointer_surface == self.surface) self.applyCursor();
+        if (pointer_focus == self) self.applyCursor();
     }
 
     pub fn requestAttention(self: *Window) void {
@@ -766,14 +767,14 @@ fn keyboardKeymap(_: ?*anyopaque, _: ?*h.wl_keyboard, _: h.wl_keyboard_keymap_fo
 }
 
 fn keyboardEnter(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, surface: ?*h.wl_surface, _: ?*h.wl_array) callconv(.c) void {
-    focus = getWindow(surface);
-    if (focus) |window| window.events.push(.focused);
+    keyboard_focus = getWindow(surface);
+    if (keyboard_focus) |window| window.events.push(.focused);
 }
 
 fn keyboardLeave(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, surface: ?*h.wl_surface) callconv(.c) void {
-    if (focus) |window| {
+    if (keyboard_focus) |window| {
         if (window.surface == surface) {
-            focus = null;
+            keyboard_focus = null;
             window.repeat_key = 0;
             window.events.push(.unfocused);
         }
@@ -783,7 +784,7 @@ fn keyboardLeave(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, surface: ?*h.wl_sur
 
 fn keyboardKey(_: ?*anyopaque, _: ?*h.wl_keyboard, serial: u32, _: u32, key: u32, state: h.wl_keyboard_key_state) callconv(.c) void {
     last_serial = serial;
-    if (focus) |window| {
+    if (keyboard_focus) |window| {
         if (state == h.WL_KEYBOARD_KEY_STATE_PRESSED) {
             window.pushKeyEvent(key, .button_press);
             if (repeat_period > 0) {
@@ -822,25 +823,25 @@ const pointer_listener = h.wl_pointer_listener{
 
 fn pointerEnter(_: ?*anyopaque, _: ?*h.wl_pointer, serial: u32, surface: ?*h.wl_surface, _: h.wl_fixed_t, _: h.wl_fixed_t) callconv(.c) void {
     pointer_enter_serial = serial;
-    pointer_surface = surface;
-    if (getWindow(surface)) |window| {
+    pointer_focus = getWindow(surface);
+    if (pointer_focus) |window| {
         window.applyCursor();
     }
 }
 
 fn pointerLeave(_: ?*anyopaque, _: ?*h.wl_pointer, _: u32, _: ?*h.wl_surface) callconv(.c) void {
-    pointer_surface = null;
+    pointer_focus = null;
 }
 
 fn pointerMotion(_: ?*anyopaque, _: ?*h.wl_pointer, _: u32, surface_x: h.wl_fixed_t, surface_y: h.wl_fixed_t) callconv(.c) void {
-    if (getWindow(pointer_surface)) |window| {
+    if (pointer_focus) |window| {
         window.events.push(.{ .mouse = .{ .x = std.math.cast(u16, surface_x >> 8) orelse return, .y = std.math.cast(u16, surface_y >> 8) orelse return } });
     }
 }
 
 fn pointerButton(_: ?*anyopaque, _: ?*h.wl_pointer, serial: u32, _: u32, button: u32, state: h.wl_pointer_button_state) callconv(.c) void {
     last_serial = serial;
-    if (getWindow(pointer_surface)) |window| {
+    if (pointer_focus) |window| {
         const wio_button: wio.Button = switch (button) {
             0x110 => .mouse_left,
             0x111 => .mouse_right,
@@ -854,7 +855,7 @@ fn pointerButton(_: ?*anyopaque, _: ?*h.wl_pointer, serial: u32, _: u32, button:
 }
 
 fn pointerAxis(_: ?*anyopaque, _: ?*h.wl_pointer, _: u32, axis: h.wl_pointer_axis, value: h.wl_fixed_t) callconv(.c) void {
-    if (getWindow(pointer_surface)) |window| {
+    if (pointer_focus) |window| {
         const float = @as(f32, @floatFromInt(value)) / 2560;
         switch (axis) {
             h.WL_POINTER_AXIS_VERTICAL_SCROLL => window.events.push(.{ .scroll_vertical = float }),
@@ -869,7 +870,7 @@ const relative_pointer_listener = h.zwp_relative_pointer_v1_listener{
 };
 
 fn relativePointerMotion(_: ?*anyopaque, _: ?*h.zwp_relative_pointer_v1, _: u32, _: u32, _: h.wl_fixed_t, _: h.wl_fixed_t, dx_unaccel: h.wl_fixed_t, dy_unaccel: h.wl_fixed_t) callconv(.c) void {
-    if (getWindow(pointer_surface)) |window| {
+    if (pointer_focus) |window| {
         if (window.cursor_mode == .relative) {
             window.events.push(.{ .mouse_relative = .{ .x = std.math.cast(i16, dx_unaccel >> 8) orelse return, .y = std.math.cast(i16, dy_unaccel >> 8) orelse return } });
         }
@@ -962,7 +963,7 @@ fn textInputLeave(_: ?*anyopaque, _: ?*h.zwp_text_input_v3, surface: ?*h.wl_surf
 }
 
 fn textInputPreeditString(_: ?*anyopaque, _: ?*h.zwp_text_input_v3, text: [*c]const u8, cursor_begin: i32, cursor_end: i32) callconv(.c) void {
-    if (focus) |window| {
+    if (keyboard_focus) |window| {
         window.repeat_key = 0;
     }
     if (text == null) {
@@ -987,7 +988,7 @@ fn textInputDone(_: ?*anyopaque, _: ?*h.zwp_text_input_v3, _: u32) callconv(.c) 
         preedit_string.clearRetainingCapacity();
     }
 
-    if (focus) |window| {
+    if (keyboard_focus) |window| {
         if (preedit_active) {
             window.events.push(.preview_reset);
             if (preedit_string.items.len == 0) {
