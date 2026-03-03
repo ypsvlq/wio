@@ -10,9 +10,9 @@ static const float2 vertices[] = {
 };
 
 static const float3 colors[] = {
-    float3(1.0, 1.0, 0.0),
-    float3(1.0, 0.0, 1.0),
     float3(0.0, 1.0, 1.0),
+    float3(1.0, 0.0, 1.0),
+    float3(1.0, 1.0, 0.0),
 };
 
 PSInput VSMain(uint id : SV_VERTEXID) {
