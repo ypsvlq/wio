@@ -336,6 +336,10 @@ fn recreateSwapchain() !void {
     destroySwapchain();
 
     const capabilities = try instance.getPhysicalDeviceSurfaceCapabilitiesKHR(physical_device, surface);
+
+    size.width = std.math.lossyCast(u16, std.math.clamp(size.width, capabilities.min_image_extent.width, capabilities.max_image_extent.width));
+    size.height = std.math.lossyCast(u16, std.math.clamp(size.height, capabilities.min_image_extent.height, capabilities.max_image_extent.height));
+
     swapchain = try device.createSwapchainKHR(&.{
         .surface = surface,
         .min_image_count = if (capabilities.max_image_count == capabilities.min_image_count) capabilities.min_image_count else capabilities.min_image_count + 1,
