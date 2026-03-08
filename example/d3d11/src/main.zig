@@ -2,20 +2,17 @@ const std = @import("std");
 const wio = @import("wio");
 const w = wio.backend.win32;
 
-var debug_allocator = std.heap.DebugAllocator(.{}).init;
-const allocator = debug_allocator.allocator();
-
-var window: wio.Window = undefined;
-
 pub fn main() !void {
+    var debug_allocator = std.heap.DebugAllocator(.{}).init;
     defer _ = debug_allocator.deinit();
+    const allocator = debug_allocator.allocator();
 
     try wio.init(allocator, .{});
     defer wio.deinit();
-    window = try wio.createWindow(.{ .title = "D3D11", .scale = 1 });
+    var window = try wio.createWindow(.{ .title = "D3D11", .scale = 1 });
     defer window.destroy();
 
-    try createDevice();
+    try createDevice(window);
     defer destroyDevice();
     try createRenderTargetView();
     defer destroyRenderTargetView();
@@ -40,7 +37,7 @@ var swapchain: *w.IDXGISwapChain = undefined;
 var device: *w.ID3D11Device = undefined;
 var device_context: *w.ID3D11DeviceContext = undefined;
 
-fn createDevice() !void {
+fn createDevice(window: wio.Window) !void {
     try SUCCEED(w.D3D11CreateDeviceAndSwapChain(
         null,
         w.D3D_DRIVER_TYPE_HARDWARE,
