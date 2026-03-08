@@ -43,7 +43,7 @@ pub fn run(func: fn () anyerror!bool) !void {
 
 /// Alternative to `run()`, providing user control over the main loop.
 ///
-/// Not available on all platforms.
+/// Not available for WebAssembly.
 pub fn update() void {
     backend.update();
 }
@@ -92,7 +92,7 @@ pub const CreateWindowOptions = struct {
 
     /// Window handle, for embedding.
     ///
-    /// Not functional on all platforms.
+    /// Only functional on Windows and X11.
     parent: usize = 0,
 
     opengl: ?CreateContextOptions = null,
@@ -138,7 +138,7 @@ pub const Window = struct {
         self.backend.setSize(size);
     }
 
-    /// Not functional on all platforms.
+    /// Only functional on Windows and X11.
     pub fn setParent(self: *Window, parent: usize) void {
         self.backend.setParent(parent);
     }
@@ -170,7 +170,7 @@ pub const Window = struct {
 
     /// Must be called on the thread where the context is current.
     ///
-    /// Should not be called when the window is hidden.
+    /// On Wayland, this function may block if the window is hidden.
     pub fn swapBuffers(self: *Window) void {
         self.backend.swapBuffers();
     }
@@ -180,7 +180,7 @@ pub const Window = struct {
         self.backend.swapInterval(interval);
     }
 
-    /// Not available on all platforms.
+    /// Not available for WebAssembly.
     pub fn createSurface(self: *Window, instance: usize, allocator: ?*const anyopaque, surface: *u64) i32 {
         assertFeature(.vulkan);
         return self.backend.createSurface(instance, allocator, surface);
@@ -193,13 +193,13 @@ pub fn glGetProcAddress(name: [:0]const u8) ?*const fn () void {
     return @ptrCast(@alignCast(backend.glGetProcAddress(name)));
 }
 
-/// Not available on all platforms.
+/// Not available for WebAssembly.
 pub fn vkGetInstanceProcAddr(instance: usize, name: [*:0]const u8) ?*const fn () void {
     assertFeature(.vulkan);
     return backend.vkGetInstanceProcAddr(instance, name);
 }
 
-/// Not available on all platforms.
+/// Not available for WebAssembly.
 pub fn getVulkanExtensions() []const [*:0]const u8 {
     return backend.getVulkanExtensions();
 }
