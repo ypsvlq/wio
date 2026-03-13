@@ -543,7 +543,7 @@ pub const Window = struct {
     }
 };
 
-pub fn glGetProcAddress(name: [:0]const u8) ?*const anyopaque {
+pub fn glGetProcAddress(name: [*:0]const u8) ?*const anyopaque {
     return c.glXGetProcAddress(name);
 }
 

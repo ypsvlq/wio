@@ -523,7 +523,7 @@ pub const Window = struct {
     }
 };
 
-pub fn glGetProcAddress(name: [:0]const u8) ?*const anyopaque {
+pub fn glGetProcAddress(name: [*:0]const u8) ?*const anyopaque {
     return w.wglGetProcAddress(name) orelse w.GetProcAddress(w.GetModuleHandleW(w.L("opengl32.dll")), name);
 }
 

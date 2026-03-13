@@ -204,7 +204,7 @@ pub const Window = struct {
     }
 };
 
-pub fn glGetProcAddress(name: [:0]const u8) ?*const anyopaque {
+pub fn glGetProcAddress(name: [*:0]const u8) ?*const anyopaque {
     var location: ?*const anyopaque = undefined;
     return if (get_image_symbol(libGL, name, 0x2, &location) == 0)
         location
