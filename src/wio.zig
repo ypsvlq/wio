@@ -57,6 +57,11 @@ pub fn wait(options: WaitOptions) void {
     backend.wait(options);
 }
 
+/// May be called from any thread.
+pub fn cancelWait() void {
+    backend.cancelWait();
+}
+
 pub const MessageBoxStyle = enum { info, warn, err };
 
 pub fn messageBox(style: MessageBoxStyle, title: []const u8, message: []const u8) void {

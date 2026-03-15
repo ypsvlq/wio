@@ -158,6 +158,8 @@ pub fn wait(options: wio.WaitOptions) void {
     }
 }
 
+pub fn cancelWait() void {}
+
 pub fn messageBox(style: wio.MessageBoxStyle, _: []const u8, message: []const u8) void {
     wioMessageBox(@intFromEnum(style), message.ptr, message.len);
 }

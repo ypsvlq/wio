@@ -82,6 +82,10 @@ pub fn wait(options: wio.WaitOptions) void {
     }
 }
 
+pub fn cancelWait() void {
+    wait_event.set();
+}
+
 pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
     const title_z = internal.allocator.dupeZ(u8, title) catch return;
     defer internal.allocator.free(title_z);

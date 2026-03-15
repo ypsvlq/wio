@@ -23,6 +23,7 @@ pub var active: enum {
 } = undefined;
 
 pub var pollfds: std.ArrayList(std.c.pollfd) = undefined;
+var pipe: [2]std.c.fd_t = undefined;
 
 pub var libvulkan: DynLib = undefined;
 
@@ -31,6 +32,10 @@ pub fn init() !void {
 
     pollfds = .empty;
     errdefer pollfds.deinit(internal.allocator);
+
+    if (std.c.pipe(&pipe) == -1) return error.Unexpected;
+    if (std.c.fcntl(pipe[0], std.c.F.SETFL, @as(u32, @bitCast(std.c.O{ .NONBLOCK = true }))) == -1) return error.Unexpected;
+    try pollfds.append(internal.allocator, .{ .fd = pipe[0], .events = std.c.POLL.IN, .revents = undefined });
 
     if (build_options.vulkan) {
         libvulkan = try .open("libvulkan.so.1");
@@ -129,6 +134,9 @@ pub fn wait(options: wio.WaitOptions) void {
         }
     }
 
+    var buf: [16]u8 = undefined;
+    while (std.c.read(pipe[0], &buf, buf.len) == buf.len) {}
+
     internal.wait = true;
     if (timeout == -1) {
         while (internal.wait) {
@@ -145,6 +153,11 @@ pub fn wait(options: wio.WaitOptions) void {
             timeout -= @truncate(now - start);
         }
     }
+}
+
+pub fn cancelWait() void {
+    internal.wait = false;
+    _ = std.c.write(pipe[1], &.{0}, 1);
 }
 
 pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {

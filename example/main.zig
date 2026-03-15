@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const wio = @import("wio");
 const gl = @import("gl.zig");
 const triangle = @import("triangle.zig");
@@ -7,7 +8,7 @@ const audio = @import("audio.zig");
 
 pub const std_options = std.Options{
     .log_level = .info,
-    .logFn = if (@import("builtin").cpu.arch.isWasm())
+    .logFn = if (builtin.cpu.arch.isWasm())
         @import("wasm.zig").logFn
     else
         std.log.defaultLog,
@@ -148,6 +149,12 @@ fn actionEvent(event: wio.Event) !void {
         .button_release => |button| {
             if (button == .left_control or button == .right_control) {
                 actions = false;
+            } else if (!builtin.cpu.arch.isWasm() and button == .f12) {
+                const thread = try std.Thread.spawn(.{}, cancelWait, .{});
+                thread.detach();
+                const start = std.time.milliTimestamp();
+                wio.wait(.{});
+                std.log.info("waited {}ms", .{std.time.milliTimestamp() - start});
             }
         },
         .unfocused => {
@@ -235,4 +242,9 @@ fn action(button: wio.Button) !void {
         },
         else => {},
     }
+}
+
+fn cancelWait() void {
+    std.Thread.sleep(1 * std.time.ns_per_s);
+    wio.cancelWait();
 }

@@ -39,6 +39,8 @@ pub fn run(func: fn () anyerror!bool) !void {
 
 pub fn wait(_: wio.WaitOptions) void {}
 
+pub fn cancelWait() void {}
+
 export fn wioLoop() bool {
     return loop() catch |err| {
         std.log.err("{s}", .{@errorName(err)});

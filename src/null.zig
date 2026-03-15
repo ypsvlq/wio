@@ -17,6 +17,8 @@ pub fn wait(options: wio.WaitOptions) void {
     _ = options;
 }
 
+pub fn cancelWait() void {}
+
 pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
     _ = style;
     _ = title;
