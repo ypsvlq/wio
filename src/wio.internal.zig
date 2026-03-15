@@ -4,6 +4,7 @@ const log = std.log.scoped(.wio);
 
 pub var allocator: std.mem.Allocator = undefined;
 pub var init_options: wio.InitOptions = undefined;
+pub var wait = false;
 
 pub const EventQueue = struct {
     events: std.ArrayList(wio.Event) = .empty,
@@ -36,6 +37,8 @@ pub const EventQueue = struct {
         }
 
         self.events.append(allocator, event) catch {};
+
+        wait = false;
     }
 
     pub fn pop(self: *EventQueue) ?wio.Event {

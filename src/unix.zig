@@ -128,7 +128,23 @@ pub fn wait(options: wio.WaitOptions) void {
             }
         }
     }
-    _ = std.c.poll(pollfds.items.ptr, @intCast(pollfds.items.len), timeout);
+
+    internal.wait = true;
+    if (timeout == -1) {
+        while (internal.wait) {
+            _ = std.c.poll(pollfds.items.ptr, @intCast(pollfds.items.len), timeout);
+            update();
+        }
+    } else {
+        const start = std.time.milliTimestamp();
+        var now = start;
+        while (internal.wait and now - start < timeout) {
+            _ = std.c.poll(pollfds.items.ptr, @intCast(pollfds.items.len), timeout);
+            update();
+            now = std.time.milliTimestamp();
+            timeout -= @truncate(now - start);
+        }
+    }
 }
 
 pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
@@ -170,7 +186,7 @@ fn spawnAndPoll(args: []const []const u8) bool {
         pollfds.append(internal.allocator, .{ .fd = process.stdout.?.handle, .events = std.c.POLL.HUP, .revents = 0 }) catch return false;
         const index = pollfds.items.len - 1;
         while (pollfds.items[index].revents == 0) {
-            wait(.{});
+            _ = std.c.poll(pollfds.items.ptr, @intCast(pollfds.items.len), -1);
             update();
         }
         _ = pollfds.swapRemove(index);
