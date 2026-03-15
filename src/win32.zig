@@ -39,26 +39,20 @@ pub fn init() !void {
     });
     if (w.RegisterClassW(&class) == 0) return logLastError("RegisterClassW");
 
-    if (build_options.opengl or build_options.joystick) {
-        helper_window = w.CreateWindowExW(
-            0,
-            class_name,
-            w.L("wio"),
-            0,
-            w.CW_USEDEFAULT,
-            w.CW_USEDEFAULT,
-            w.CW_USEDEFAULT,
-            w.CW_USEDEFAULT,
-            null,
-            null,
-            instance,
-            null,
-        ) orelse return logLastError("CreateWindowExW");
-
-        if (build_options.joystick) {
-            _ = w.SetWindowLongPtrW(helper_window, w.GWLP_WNDPROC, @bitCast(@intFromPtr(&helperWindowProc)));
-        }
-    }
+    helper_window = w.CreateWindowExW(
+        0,
+        class_name,
+        w.L("wio"),
+        0,
+        w.CW_USEDEFAULT,
+        w.CW_USEDEFAULT,
+        w.CW_USEDEFAULT,
+        w.CW_USEDEFAULT,
+        null,
+        null,
+        instance,
+        null,
+    ) orelse return logLastError("CreateWindowExW");
 
     if (build_options.opengl) {
         const dc = w.GetDC(helper_window);
@@ -100,6 +94,8 @@ pub fn init() !void {
     }
 
     if (build_options.joystick) {
+        _ = w.SetWindowLongPtrW(helper_window, w.GWLP_WNDPROC, @bitCast(@intFromPtr(&helperWindowProc)));
+
         joysticks = .empty;
 
         var devices = [_]w.RAWINPUTDEVICE{
@@ -146,10 +142,6 @@ pub fn deinit() void {
         _ = w.FreeLibrary(vulkan);
     }
 
-    if (build_options.opengl or build_options.joystick) {
-        _ = w.DestroyWindow(helper_window);
-    }
-
     if (build_options.joystick) {
         internal.allocator.free(helper_input);
 
@@ -162,6 +154,8 @@ pub fn deinit() void {
         _ = mm_device_enumerator.Release();
         w.CoUninitialize();
     }
+
+    _ = w.DestroyWindow(helper_window);
 }
 
 pub fn run(func: fn () anyerror!bool) !void {
@@ -198,15 +192,33 @@ pub fn update() void {
 }
 
 pub fn wait(options: wio.WaitOptions) void {
-    const timeout = if (options.timeout_ns) |timeout_ns|
+    var timeout = if (options.timeout_ns) |timeout_ns|
         @min(timeout_ns / std.time.ns_per_ms, w.INFINITE - 1)
     else
         w.INFINITE;
 
-    _ = w.MsgWaitForMultipleObjects(0, null, w.FALSE, timeout, w.QS_ALLINPUT);
+    internal.wait = true;
+    if (timeout == w.INFINITE) {
+        while (internal.wait) {
+            _ = w.MsgWaitForMultipleObjects(0, null, w.FALSE, timeout, w.QS_ALLINPUT);
+            update();
+        }
+    } else {
+        const start = std.time.milliTimestamp();
+        var now = start;
+        while (internal.wait and now - start < timeout) {
+            _ = w.MsgWaitForMultipleObjects(0, null, w.FALSE, timeout, w.QS_ALLINPUT);
+            update();
+            now = std.time.milliTimestamp();
+            timeout -|= std.math.lossyCast(u32, now - start);
+        }
+    }
 }
 
-pub fn cancelWait() void {}
+pub fn cancelWait() void {
+    internal.wait = false;
+    _ = w.PostMessageW(helper_window, w.WM_NULL, 0, 0);
+}
 
 pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
     const title_w = std.unicode.utf8ToUtf16LeAllocZ(internal.allocator, title) catch return;
