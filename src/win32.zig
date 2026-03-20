@@ -121,14 +121,14 @@ pub fn init() !void {
 
         var device: *w.IMMDevice = undefined;
         if (internal.init_options.audioDefaultOutputFn) |callback| {
-            if (SUCCEED(mm_device_enumerator.GetDefaultAudioEndpoint(w.eRender, w.eConsole, @ptrCast(&device)), "GetDefaultAudioEndpoint")) {
+            if (mm_device_enumerator.GetDefaultAudioEndpoint(w.eRender, w.eConsole, @ptrCast(&device)) == w.S_OK) {
                 callback(.{ .backend = .{ .device = device } });
-            } else |_| {}
+            }
         }
         if (internal.init_options.audioDefaultInputFn) |callback| {
-            if (SUCCEED(mm_device_enumerator.GetDefaultAudioEndpoint(w.eCapture, w.eConsole, @ptrCast(&device)), "GetDefaultAudioEndpoint")) {
+            if (mm_device_enumerator.GetDefaultAudioEndpoint(w.eCapture, w.eConsole, @ptrCast(&device)) == w.S_OK) {
                 callback(.{ .backend = .{ .device = device } });
-            } else |_| {}
+            }
         }
 
         if (internal.init_options.audioDefaultOutputFn != null or internal.init_options.audioDefaultInputFn != null) {
