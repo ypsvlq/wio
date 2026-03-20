@@ -1,5 +1,4 @@
 #import <Cocoa/Cocoa.h>
-#include <objc/objc.h>
 #import <QuartzCore/QuartzCore.h>
 #include <IOKit/hid/IOHIDKeys.h>
 
