@@ -1031,7 +1031,7 @@ const MMNotificationClient = struct {
         if (role == w.eConsole) {
             const maybe_device = if (flow == w.eRender and internal.init_options.audioDefaultOutputFn != null)
                 &mm_notification_client.default_output
-            else if (flow != w.eRender and internal.init_options.audioDefaultInputFn != null)
+            else if (flow == w.eCapture and internal.init_options.audioDefaultInputFn != null)
                 &mm_notification_client.default_input
             else
                 null;
@@ -1042,7 +1042,9 @@ const MMNotificationClient = struct {
                     _ = old.Release();
                     device.* = null;
                 }
-                SUCCEED(mm_device_enumerator.GetDevice(id, @ptrCast(device)), "IMMDeviceEnumerator::GetDevice") catch {};
+                if (id) |_| {
+                    SUCCEED(mm_device_enumerator.GetDevice(id, @ptrCast(device)), "IMMDeviceEnumerator::GetDevice") catch {};
+                }
                 mm_notification_client.mutex.unlock();
             }
         }
