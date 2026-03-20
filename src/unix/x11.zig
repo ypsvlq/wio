@@ -118,8 +118,12 @@ pub fn init() !bool {
     errdefer _ = c.XCloseDisplay(display);
     try unix.pollfds.append(internal.allocator, .{ .fd = h.ConnectionNumber(display), .events = std.c.POLL.IN, .revents = undefined });
 
-    var atom_names: [@typeInfo(@TypeOf(atoms)).@"struct".fields.len][*:0]const u8 = undefined;
-    for (&atom_names, std.meta.fieldNames(@TypeOf(atoms))) |*name_z, name| name_z.* = name;
+    var atom_names = comptime blk: {
+        const fields = @typeInfo(@TypeOf(atoms)).@"struct".fields;
+        var atom_names: [fields.len][*:0]const u8 = undefined;
+        for (&atom_names, fields) |*name, field| name.* = field.name;
+        break :blk atom_names;
+    };
     _ = c.XInternAtoms(display, @ptrCast(&atom_names), atom_names.len, h.False, @ptrCast(&atoms));
 
     windows = .empty;
