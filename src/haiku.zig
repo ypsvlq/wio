@@ -200,11 +200,32 @@ pub const Window = struct {
         self.opengl.vsync = (interval > 0);
     }
 
+    pub fn createSoftwareBuffer(self: *Window, size: wio.Size) !*SoftwareBuffer {
+        _ = self;
+        _ = size;
+        return error.Unexpected;
+    }
+
     fn pushEvent(self: *Window, event: wio.Event) void {
         self.events_mutex.lock();
         defer self.events_mutex.unlock();
         self.events.push(event);
         wait_event.set();
+    }
+};
+
+pub const SoftwareBuffer = struct {
+    pub fn destroy(self: *SoftwareBuffer) void {
+        _ = self;
+    }
+
+    pub fn getPixels(self: *SoftwareBuffer) []u32 {
+        _ = self;
+        return &.{};
+    }
+
+    pub fn present(self: *SoftwareBuffer) void {
+        _ = self;
     }
 };
 

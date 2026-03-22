@@ -59,6 +59,8 @@ var imports: extern struct {
     XCheckTypedWindowEvent: *const @TypeOf(h.XCheckTypedWindowEvent),
     XCreateColormap: *const @TypeOf(h.XCreateColormap),
     XFreeColormap: *const @TypeOf(h.XFreeColormap),
+    XCreateImage: *const @TypeOf(h.XCreateImage),
+    XPutImage: *const @TypeOf(h.XPutImage),
     glXQueryExtensionsString: *const @TypeOf(h.glXQueryExtensionsString),
     glXGetProcAddress: *const @TypeOf(h.glXGetProcAddress),
     glXChooseFBConfig: *const @TypeOf(h.glXChooseFBConfig),
@@ -544,6 +546,64 @@ pub const Window = struct {
             allocator,
             surface,
         );
+    }
+
+    pub fn createSoftwareBuffer(self: *Window, size: wio.Size) !*SoftwareBuffer {
+        const self_buf = try internal.allocator.create(SoftwareBuffer);
+        errdefer internal.allocator.destroy(self_buf);
+
+        const pixel_count = @as(usize, size.width) * @as(usize, size.height);
+        const pixels = try internal.allocator.alloc(u32, pixel_count);
+        errdefer internal.allocator.free(pixels);
+
+        const image = c.XCreateImage(
+            display,
+            h.DefaultVisual(display, h.DefaultScreen(display)),
+            24,
+            h.ZPixmap,
+            0,
+            @ptrCast(pixels.ptr),
+            size.width,
+            size.height,
+            32,
+            0,
+        ) orelse return internal.logUnexpected("XCreateImage");
+
+        const gc = c.XCreateGC(display, self.window, 0, null);
+
+        self_buf.* = .{
+            .image = image,
+            .gc = gc,
+            .xwindow = self.window,
+            .pixels = pixels,
+            .size = size,
+        };
+        return self_buf;
+    }
+};
+
+pub const SoftwareBuffer = struct {
+    image: *h.XImage,
+    gc: h.GC,
+    xwindow: h.Window,
+    pixels: []u32,
+    size: wio.Size,
+
+    pub fn destroy(self: *SoftwareBuffer) void {
+        self.image.data = null;
+        _ = c.XFree(self.image);
+        _ = c.XFreeGC(display, self.gc);
+        internal.allocator.free(self.pixels);
+        internal.allocator.destroy(self);
+    }
+
+    pub fn getPixels(self: *SoftwareBuffer) []u32 {
+        return self.pixels;
+    }
+
+    pub fn present(self: *SoftwareBuffer) void {
+        _ = c.XPutImage(display, self.xwindow, self.gc, self.image, 0, 0, 0, 0, self.size.width, self.size.height);
+        _ = c.XFlush(display);
     }
 };
 

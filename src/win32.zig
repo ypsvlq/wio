@@ -525,6 +525,39 @@ pub const Window = struct {
         );
     }
 
+    pub fn createSoftwareBuffer(self: *Window, size: wio.Size) !*SoftwareBuffer {
+        const self_buf = try internal.allocator.create(SoftwareBuffer);
+        errdefer internal.allocator.destroy(self_buf);
+
+        const dc = w.CreateCompatibleDC(null) orelse return logLastError("CreateCompatibleDC");
+        errdefer _ = w.DeleteDC(dc);
+
+        var info = std.mem.zeroes(w.BITMAPINFO);
+        info.bmiHeader.biSize = @sizeOf(w.BITMAPINFOHEADER);
+        info.bmiHeader.biWidth = size.width;
+        info.bmiHeader.biHeight = -@as(i32, size.height);
+        info.bmiHeader.biPlanes = 1;
+        info.bmiHeader.biBitCount = 32;
+        info.bmiHeader.biCompression = w.BI_RGB;
+
+        var bits: ?*anyopaque = null;
+        const bitmap = w.CreateDIBSection(dc, &info, w.DIB_RGB_COLORS, &bits, null, 0) orelse return logLastError("CreateDIBSection");
+        errdefer _ = w.DeleteObject(bitmap);
+        _ = w.SelectObject(dc, bitmap);
+
+        const pixel_count = @as(usize, size.width) * @as(usize, size.height);
+        const pixels: [*]u32 = @ptrCast(@alignCast(bits.?));
+
+        self_buf.* = .{
+            .dc = dc,
+            .bitmap = bitmap,
+            .pixels = pixels[0..pixel_count],
+            .size = size,
+            .hwnd = self.window,
+        };
+        return self_buf;
+    }
+
     fn isFullscreen(self: *Window) bool {
         return (w.GetWindowLongPtrW(self.window, w.GWL_STYLE) & w.WS_OVERLAPPEDWINDOW != w.WS_OVERLAPPEDWINDOW);
     }
@@ -534,6 +567,30 @@ pub const Window = struct {
         _ = w.GetClientRect(self.window, &rect);
         _ = w.MapWindowPoints(self.window, w.HWND_DESKTOP, @ptrCast(&rect), 2);
         _ = w.ClipCursor(&rect);
+    }
+};
+
+pub const SoftwareBuffer = struct {
+    dc: w.HDC,
+    bitmap: w.HBITMAP,
+    pixels: []u32,
+    size: wio.Size,
+    hwnd: w.HWND,
+
+    pub fn destroy(self: *SoftwareBuffer) void {
+        _ = w.DeleteObject(self.bitmap);
+        _ = w.DeleteDC(self.dc);
+        internal.allocator.destroy(self);
+    }
+
+    pub fn getPixels(self: *SoftwareBuffer) []u32 {
+        return self.pixels;
+    }
+
+    pub fn present(self: *SoftwareBuffer) void {
+        const dc = w.GetDC(self.hwnd);
+        defer _ = w.ReleaseDC(self.hwnd, dc);
+        _ = w.BitBlt(dc, 0, 0, self.size.width, self.size.height, self.dc, 0, 0, w.SRCCOPY);
     }
 };
 

@@ -190,6 +190,28 @@ pub const Window = struct {
         assertFeature(.vulkan);
         return self.backend.createSurface(instance, allocator, surface);
     }
+
+    pub fn createSoftwareBuffer(self: *Window, size: Size) !SoftwareBuffer {
+        assertFeature(.software);
+        return .{ .backend = try self.backend.createSoftwareBuffer(size) };
+    }
+};
+
+pub const SoftwareBuffer = struct {
+    backend: @typeInfo(@typeInfo(@TypeOf(backend.Window.createSoftwareBuffer)).@"fn".return_type.?).error_union.payload,
+
+    pub fn destroy(self: *SoftwareBuffer) void {
+        self.backend.destroy();
+    }
+
+    /// Pixels are XRGB8888 (stored as u32 with layout 0x00RRGGBB on little-endian).
+    pub fn getPixels(self: *SoftwareBuffer) []u32 {
+        return self.backend.getPixels();
+    }
+
+    pub fn present(self: *SoftwareBuffer) void {
+        self.backend.present();
+    }
 };
 
 /// Must be called on the thread where the context is current.

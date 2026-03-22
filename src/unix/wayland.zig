@@ -94,6 +94,7 @@ var libEGL: DynLib = undefined;
 pub var display: *h.wl_display = undefined;
 var registry: *h.wl_registry = undefined;
 var compositor: ?*h.wl_compositor = null;
+var shm: ?*h.wl_shm = null;
 var seat: ?*h.wl_seat = null;
 var keyboard: ?*h.wl_keyboard = null;
 var pointer: ?*h.wl_pointer = null;
@@ -248,6 +249,7 @@ pub fn deinit() void {
 }
 
 fn destroyProxies() void {
+    if (build_options.software) if (shm) |_| h.wl_shm_destroy(shm);
     if (data_source) |_| h.wl_data_source_destroy(data_source);
     if (data_offer) |_| h.wl_data_offer_destroy(data_offer);
     if (data_device) |_| h.wl_data_device_destroy(data_device);
@@ -620,6 +622,53 @@ pub const Window = struct {
         }
     }
 
+    pub fn createSoftwareBuffer(self: *Window, size: wio.Size) !*SoftwareBuffer {
+        const wl_shm = shm orelse return error.Unexpected;
+        const self_buf = try internal.allocator.create(SoftwareBuffer);
+        errdefer internal.allocator.destroy(self_buf);
+
+        const byte_size = @as(usize, size.width) * @as(usize, size.height) * @sizeOf(u32);
+
+        const fd = try std.posix.memfd_create("wio", 0);
+        errdefer std.posix.close(fd);
+
+        try std.posix.ftruncate(fd, byte_size);
+
+        const mapped = try std.posix.mmap(
+            null,
+            byte_size,
+            std.posix.PROT.READ | std.posix.PROT.WRITE,
+            .{ .TYPE = .SHARED },
+            fd,
+            0,
+        );
+        errdefer std.posix.munmap(mapped);
+
+        const pool = h.wl_shm_create_pool(wl_shm, fd, @intCast(byte_size)) orelse return error.Unexpected;
+        defer h.wl_shm_pool_destroy(pool);
+
+        const buffer = h.wl_shm_pool_create_buffer(
+            pool,
+            0,
+            size.width,
+            size.height,
+            @intCast(@as(usize, size.width) * @sizeOf(u32)),
+            h.WL_SHM_FORMAT_XRGB8888,
+        ) orelse return error.Unexpected;
+
+        const pixels: [*]u32 = @ptrCast(@alignCast(mapped.ptr));
+
+        self_buf.* = .{
+            .buffer = buffer,
+            .surface = self.surface,
+            .pixels = pixels[0 .. @as(usize, size.width) * @as(usize, size.height)],
+            .mapped = mapped,
+            .fd = fd,
+            .size = size,
+        };
+        return self_buf;
+    }
+
     fn applyCursor(self: *Window) void {
         if (self.cursor_mode == .normal) {
             if (cursor_shape_device) |_| {
@@ -639,6 +688,33 @@ pub const Window = struct {
                 self.locked_pointer = h.zwp_pointer_constraints_v1_lock_pointer(pointer_constraints, self.surface, pointer, null, h.ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
             }
         }
+    }
+};
+
+pub const SoftwareBuffer = struct {
+    buffer: *h.wl_buffer,
+    surface: *h.wl_surface,
+    pixels: []u32,
+    mapped: []align(std.heap.page_size_min) u8,
+    fd: std.posix.fd_t,
+    size: wio.Size,
+
+    pub fn destroy(self: *SoftwareBuffer) void {
+        h.wl_buffer_destroy(self.buffer);
+        std.posix.munmap(self.mapped);
+        std.posix.close(self.fd);
+        internal.allocator.destroy(self);
+    }
+
+    pub fn getPixels(self: *SoftwareBuffer) []u32 {
+        return self.pixels;
+    }
+
+    pub fn present(self: *SoftwareBuffer) void {
+        h.wl_surface_attach(self.surface, self.buffer, 0, 0);
+        h.wl_surface_damage(self.surface, 0, 0, @intCast(self.size.width), @intCast(self.size.height));
+        h.wl_surface_commit(self.surface);
+        _ = c.wl_display_roundtrip(display);
     }
 };
 
@@ -669,6 +745,8 @@ fn registryGlobal(_: ?*anyopaque, _: ?*h.wl_registry, name: u32, interface_ptr: 
     const interface = std.mem.sliceTo(interface_ptr, 0);
     if (std.mem.eql(u8, interface, "wl_compositor")) {
         compositor = @ptrCast(h.wl_registry_bind(registry, name, &h.wl_compositor_interface, @min(version, 3)));
+    } else if (build_options.software and std.mem.eql(u8, interface, "wl_shm")) {
+        shm = @ptrCast(h.wl_registry_bind(registry, name, &h.wl_shm_interface, @min(version, 1)));
     } else if (std.mem.eql(u8, interface, "wl_seat")) {
         seat = @ptrCast(h.wl_registry_bind(registry, name, &h.wl_seat_interface, @min(version, 4)));
         _ = h.wl_seat_add_listener(seat, &seat_listener, null);
