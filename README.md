@@ -7,7 +7,7 @@ wio is a platform abstraction library, providing:
 - alert dialogs
 - joystick input
 - audio
-- software rendering
+- software framebuffer
 - OpenGL context creation
 - Vulkan WSI
 
@@ -104,7 +104,7 @@ The following libraries are loaded under Linux:
 ### WebAssembly
 
 If OpenGL is enabled, wio imports `createContext` and `makeContextCurrent`
-from the `gl` module. WebGL 1 bindings are provided in [demo/wasm.js][5].
+from the `gl` module. WebGL 1 bindings are provided in [demo/wasm.js][6].
 
 `glGetProcAddress` always returns null.
 
