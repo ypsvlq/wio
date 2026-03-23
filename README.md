@@ -20,7 +20,8 @@ and uses OpenGL.
 
 The [examples][3] directory contains small programs using other rendering APIs.
 
-Some features must be enabled with one of the following build options:
+By default, only a subset of the API is available. The following build options
+enable additional features:
 
 - `enable_software`
 - `enable_opengl`
@@ -66,7 +67,7 @@ and `COINIT_DISABLE_OLE1DDE`.
 ### macOS
 
 An application bundle is provided in [demo/wio.app][5], which can be adapted
-by the changing `CFBundleExecutable` and `CFBundleName` values in Info.plist.
+by changing the `CFBundleExecutable` and `CFBundleName` values in Info.plist.
 
 ### Unix
 
@@ -79,8 +80,8 @@ limit the choices.
 When building a project that uses wio, passing `-fsys=wio` to `zig build` will
 link libraries explicitly (rather than using `dlopen`).
 
-It is recommended to expose `unix_backends` in your build script and document
-the existance of `-fsys=wio`, to assist with packaging your project.
+To assist with packaging your project, it is recommended to expose
+`unix_backends` in your build script and document `-fsys=wio`.
 
 The following libraries are loaded for the X11 backend:
 
@@ -116,7 +117,6 @@ for a given platform:
 ### Windows
 
 - `Window.backend.window` is the Win32 `HWND`
-- `wio.backend.win32` is a set of Win32 API bindings
 
 ### macOS
 
