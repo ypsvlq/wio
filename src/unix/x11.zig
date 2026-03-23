@@ -534,10 +534,14 @@ pub const Window = struct {
         return .{
             .image = image,
             .gc = gc,
-            .xwindow = self.window,
             .pixels = pixels,
             .size = size,
         };
+    }
+
+    pub fn presentFramebuffer(self: *Window, framebuffer: *Framebuffer) void {
+        _ = c.XPutImage(display, self.window, framebuffer.gc, framebuffer.image, 0, 0, 0, 0, framebuffer.size.width, framebuffer.size.height);
+        _ = c.XFlush(display);
     }
 
     pub fn makeContextCurrent(self: *Window) void {
@@ -581,7 +585,6 @@ pub const Window = struct {
 pub const Framebuffer = struct {
     image: *h.XImage,
     gc: h.GC,
-    xwindow: h.Window,
     pixels: []u32,
     size: wio.Size,
 
@@ -594,11 +597,6 @@ pub const Framebuffer = struct {
 
     pub fn getPixels(self: *Framebuffer) []u32 {
         return self.pixels;
-    }
-
-    pub fn present(self: *Framebuffer) void {
-        _ = c.XPutImage(display, self.xwindow, self.gc, self.image, 0, 0, 0, 0, self.size.width, self.size.height);
-        _ = c.XFlush(display);
     }
 };
 

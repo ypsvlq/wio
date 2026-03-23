@@ -173,6 +173,11 @@ pub const Window = struct {
         return .{ .backend = try self.backend.createFramebuffer(size) };
     }
 
+    pub fn presentFramebuffer(self: *Window, framebuffer: *Framebuffer) void {
+        assertFeature(.software);
+        self.backend.presentFramebuffer(&framebuffer.backend);
+    }
+
     /// May be called on any thread.
     pub fn makeContextCurrent(self: *Window) void {
         assertFeature(.opengl);
@@ -210,10 +215,6 @@ pub const Framebuffer = struct {
     /// Pixels are native-endian 8 bpc ARGB (0xAARRGGBB)
     pub fn getPixels(self: *Framebuffer) []u32 {
         return self.backend.getPixels();
-    }
-
-    pub fn present(self: *Framebuffer) void {
-        self.backend.present();
     }
 };
 

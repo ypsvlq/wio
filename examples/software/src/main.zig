@@ -37,7 +37,7 @@ pub fn main() !void {
         }
         if (maybe_buf) |*buf| {
             render(buf.getPixels());
-            buf.present();
+            window.presentFramebuffer(buf);
             t +%= 1;
         }
         wio.wait(.{ .timeout_ns = std.time.ns_per_s / 60 });

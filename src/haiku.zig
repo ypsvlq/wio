@@ -194,6 +194,11 @@ pub const Window = struct {
         return error.Unexpected;
     }
 
+    pub fn presentFramebuffer(self: *Window, framebuffer: *Framebuffer) void {
+        _ = self;
+        _ = framebuffer;
+    }
+
     pub fn makeContextCurrent(self: *Window) void {
         wioMakeContextCurrent(self.opengl.context.?);
     }
@@ -222,10 +227,6 @@ pub const Framebuffer = struct {
     pub fn getPixels(self: *Framebuffer) []u32 {
         _ = self;
         return &.{};
-    }
-
-    pub fn present(self: *Framebuffer) void {
-        _ = self;
     }
 };
 

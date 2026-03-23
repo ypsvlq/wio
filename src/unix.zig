@@ -318,6 +318,13 @@ pub const Window = union {
         }
     }
 
+    pub fn presentFramebuffer(self: *Window, framebuffer: *Framebuffer) void {
+        switch (active) {
+            .x11 => self.x11.presentFramebuffer(&framebuffer.x11),
+            .wayland => self.wayland.presentFramebuffer(&framebuffer.wayland),
+        }
+    }
+
     pub fn makeContextCurrent(self: *Window) void {
         switch (active) {
             .x11 => self.x11.makeContextCurrent(),
@@ -362,13 +369,6 @@ pub const Framebuffer = union {
         switch (active) {
             .x11 => return self.x11.getPixels(),
             .wayland => return self.wayland.getPixels(),
-        }
-    }
-
-    pub fn present(self: *Framebuffer) void {
-        switch (active) {
-            .x11 => self.x11.present(),
-            .wayland => self.wayland.present(),
         }
     }
 };

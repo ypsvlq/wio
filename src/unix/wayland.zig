@@ -548,7 +548,7 @@ pub const Window = struct {
         }
     }
 
-    pub fn createFramebuffer(self: *Window, size: wio.Size) !Framebuffer {
+    pub fn createFramebuffer(_: *Window, size: wio.Size) !Framebuffer {
         if (shm == null) return error.Unexpected;
         if (@import("builtin").os.tag != .linux) return error.Unimplemented;
 
@@ -585,12 +585,18 @@ pub const Window = struct {
 
         return .{
             .buffer = buffer,
-            .surface = self.surface,
             .pixels = pixels[0 .. @as(usize, size.width) * @as(usize, size.height)],
             .mapped = mapped,
             .fd = fd,
             .size = size,
         };
+    }
+
+    pub fn presentFramebuffer(self: *Window, framebuffer: *Framebuffer) void {
+        h.wl_surface_attach(self.surface, framebuffer.buffer, 0, 0);
+        h.wl_surface_damage(self.surface, 0, 0, @intCast(framebuffer.size.width), @intCast(framebuffer.size.height));
+        h.wl_surface_commit(self.surface);
+        _ = c.wl_display_roundtrip(display);
     }
 
     pub fn makeContextCurrent(self: *Window) void {
@@ -691,7 +697,6 @@ pub const Window = struct {
 
 pub const Framebuffer = struct {
     buffer: *h.wl_buffer,
-    surface: *h.wl_surface,
     pixels: []u32,
     mapped: []align(std.heap.page_size_min) u8,
     fd: std.posix.fd_t,
@@ -705,13 +710,6 @@ pub const Framebuffer = struct {
 
     pub fn getPixels(self: *Framebuffer) []u32 {
         return self.pixels;
-    }
-
-    pub fn present(self: *Framebuffer) void {
-        h.wl_surface_attach(self.surface, self.buffer, 0, 0);
-        h.wl_surface_damage(self.surface, 0, 0, @intCast(self.size.width), @intCast(self.size.height));
-        h.wl_surface_commit(self.surface);
-        _ = c.wl_display_roundtrip(display);
     }
 };
 

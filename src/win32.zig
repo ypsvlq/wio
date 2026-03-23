@@ -488,7 +488,7 @@ pub const Window = struct {
         return std.unicode.utf16LeToUtf8Alloc(allocator, std.mem.sliceTo(text, 0)) catch null;
     }
 
-    pub fn createFramebuffer(self: *Window, size: wio.Size) !Framebuffer {
+    pub fn createFramebuffer(_: *Window, size: wio.Size) !Framebuffer {
         const dc = w.CreateCompatibleDC(null) orelse return logLastError("CreateCompatibleDC");
         errdefer _ = w.DeleteDC(dc);
 
@@ -513,8 +513,13 @@ pub const Window = struct {
             .bitmap = bitmap,
             .pixels = pixels[0..pixel_count],
             .size = size,
-            .hwnd = self.window,
         };
+    }
+
+    pub fn presentFramebuffer(self: *Window, framebuffer: *Framebuffer) void {
+        const dc = w.GetDC(self.window);
+        defer _ = w.ReleaseDC(self.window, dc);
+        _ = w.BitBlt(dc, 0, 0, framebuffer.size.width, framebuffer.size.height, framebuffer.dc, 0, 0, w.SRCCOPY);
     }
 
     pub fn makeContextCurrent(self: *Window) void {
@@ -571,7 +576,6 @@ pub const Framebuffer = struct {
     bitmap: w.HBITMAP,
     pixels: []u32,
     size: wio.Size,
-    hwnd: w.HWND,
 
     pub fn destroy(self: *Framebuffer) void {
         _ = w.DeleteObject(self.bitmap);
@@ -580,12 +584,6 @@ pub const Framebuffer = struct {
 
     pub fn getPixels(self: *Framebuffer) []u32 {
         return self.pixels;
-    }
-
-    pub fn present(self: *Framebuffer) void {
-        const dc = w.GetDC(self.hwnd);
-        defer _ = w.ReleaseDC(self.hwnd, dc);
-        _ = w.BitBlt(dc, 0, 0, self.size.width, self.size.height, self.dc, 0, 0, w.SRCCOPY);
     }
 };
 
