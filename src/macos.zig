@@ -3,12 +3,13 @@ const build_options = @import("build_options");
 const wio = @import("wio.zig");
 const internal = @import("wio.internal.zig");
 const c = @cImport({
+    @cInclude("CoreGraphics/CoreGraphics.h");
+    @cInclude("OpenGL/OpenGL.h");
+    @cInclude("dlfcn.h");
     @cInclude("IOKit/hid/IOHIDLib.h");
     @cInclude("CoreAudio/CoreAudio.h");
     @cInclude("AudioUnit/AudioUnit.h");
     @cInclude("AudioToolbox/AudioToolbox.h");
-    @cInclude("OpenGL/OpenGL.h");
-    @cInclude("dlfcn.h");
 });
 const log = std.log.scoped(.wio);
 
@@ -32,6 +33,7 @@ extern fn wioSetCursorMode(*NSWindow, u8) void;
 extern fn wioRequestAttention() void;
 extern fn wioSetClipboardText([*]const u8, usize) void;
 extern fn wioGetClipboardText(*const std.mem.Allocator, *usize) ?[*]u8;
+extern fn wioPresentFramebuffer(*NSWindow, c.CGContextRef) void;
 extern fn wioCreateContext(*NSWindow, [*]const c.CGLPixelFormatAttribute) ?*NSOpenGLContext;
 extern fn wioDestroyContext(?*NSOpenGLContext) void;
 extern fn wioMakeContextCurrent(?*NSOpenGLContext) void;
@@ -285,15 +287,31 @@ pub const Window = struct {
         return text[0..len];
     }
 
-    pub fn createFramebuffer(self: *Window, size: wio.Size) !Framebuffer {
-        _ = self;
-        _ = size;
-        return error.Unexpected;
+    pub fn createFramebuffer(_: *Window, size: wio.Size) !Framebuffer {
+        const pixels = try internal.allocator.alloc(u32, @as(u32, size.width) * size.height);
+        errdefer internal.allocator.free(pixels);
+
+        const colorspace = c.CGColorSpaceCreateDeviceRGB() orelse return error.Unexpected;
+        defer c.CGColorSpaceRelease(colorspace);
+
+        const bitmap = c.CGBitmapContextCreate(
+            pixels.ptr,
+            size.width,
+            size.height,
+            8,
+            size.width * @sizeOf(u32),
+            colorspace,
+            c.kCGBitmapByteOrder32Host | c.kCGImageAlphaPremultipliedFirst,
+        ) orelse return error.Unexpected;
+
+        return .{
+            .pixels = pixels,
+            .bitmap = bitmap,
+        };
     }
 
     pub fn presentFramebuffer(self: *Window, framebuffer: *Framebuffer) void {
-        _ = self;
-        _ = framebuffer;
+        wioPresentFramebuffer(self.window, framebuffer.bitmap);
     }
 
     pub fn makeContextCurrent(self: *Window) void {
@@ -329,13 +347,16 @@ pub const Window = struct {
 };
 
 pub const Framebuffer = struct {
+    pixels: []u32,
+    bitmap: c.CGContextRef,
+
     pub fn destroy(self: *Framebuffer) void {
-        _ = self;
+        c.CGContextRelease(self.bitmap);
+        internal.allocator.free(self.pixels);
     }
 
     pub fn getPixels(self: *Framebuffer) []u32 {
-        _ = self;
-        return &.{};
+        return self.pixels;
     }
 };
 

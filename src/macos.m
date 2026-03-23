@@ -163,6 +163,9 @@ static void warpCursor(NSWindow *window) {
     BOOL textInput;
     uint8_t cursorMode;
     BOOL cursorInside;
+#ifdef WIO_SOFTWARE
+    CGContextRef bitmap;
+#endif
 }
 
 - (instancetype)initWithZigWindow:(void *)value {
@@ -365,6 +368,21 @@ static void warpCursor(NSWindow *window) {
     wioScroll(zig, [event scrollingDeltaX], [event scrollingDeltaY]);
 }
 
+#ifdef WIO_SOFTWARE
+
+- (void)setBitmap:(CGContextRef)value {
+    bitmap = value;
+}
+
+- (void)drawRect:(NSRect)dirtyRect {
+    CGContextRef context = [[NSGraphicsContext currentContext] CGContext];
+    CGImageRef image = CGBitmapContextCreateImage(bitmap);
+    CGContextDrawImage(context, self.bounds, image);
+    CGImageRelease(image);
+}
+
+#endif
+
 @end
 
 void wioInit() {
@@ -508,6 +526,16 @@ char *wioGetClipboardText(const void *ptr, size_t *len) {
     if (!string) return NULL;
     return wioDupeClipboardText(ptr, [string UTF8String], len);
 }
+
+#ifdef WIO_SOFTWARE
+
+void wioPresentFramebuffer(NSWindow *window, CGContextRef bitmap) {
+    WioView *view = [window contentView];
+    [view setBitmap:bitmap];
+    [view setNeedsDisplay:YES];
+}
+
+#endif
 
 #ifdef WIO_OPENGL
 
