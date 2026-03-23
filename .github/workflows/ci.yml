@@ -28,14 +28,17 @@ jobs:
       uses: awalsh128/cache-apt-pkgs-action@v1
       with:
         packages: libx11-dev libxcursor-dev libglvnd-dev libwayland-dev libxkbcommon-dev libdecor-0-dev libvulkan-dev libudev-dev libpulse-dev
-    - name: Build
+    - name: Build demo
       working-directory: demo
       run: zig build -Dtarget=${{ matrix.target }} ${{ matrix.target == 'native' && '-fsys=wio' || '' }}
+    - name: Build software example
+      working-directory: examples/software
+      run: zig build -Dtarget=${{ matrix.target }} ${{ matrix.target == 'native' && '-fsys=wio' || '' }}
     - if: ${{ matrix.target != 'wasm32-freestanding' }}
-      name: Build Vulkan
+      name: Build Vulkan example
       working-directory: examples/vulkan
       run: zig build -Dtarget=${{ matrix.target }} ${{ matrix.target == 'native' && '-fsys=wio' || '' }}
     - if: ${{ endsWith(matrix.target, '-windows') }}
-      name: Build D3D11
+      name: Build D3D11 example
       working-directory: examples/d3d11
       run: zig build -Dtarget=${{ matrix.target }}
