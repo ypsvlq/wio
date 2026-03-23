@@ -104,8 +104,8 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
     self.events.push(.visible);
     self.events.push(.{ .scale = 1 });
     self.events.push(.{ .mode = .normal });
-    self.events.push(.{ .size = options.size });
-    self.events.push(.{ .framebuffer = options.size });
+    self.events.push(.{ .size_logical = options.size });
+    self.events.push(.{ .size_physical = options.size });
     self.events.push(.draw);
 
     const title = try internal.allocator.dupeZ(u8, options.title);
@@ -409,8 +409,8 @@ export fn wioHidden(self: *Window) void {
 }
 
 export fn wioSize(self: *Window, width: u16, height: u16) void {
-    self.pushEvent(.{ .size = .{ .width = width, .height = height } });
-    self.pushEvent(.{ .framebuffer = .{ .width = width, .height = height } });
+    self.pushEvent(.{ .size_logical = .{ .width = width, .height = height } });
+    self.pushEvent(.{ .size_physical = .{ .width = width, .height = height } });
     self.pushEvent(.draw);
 }
 

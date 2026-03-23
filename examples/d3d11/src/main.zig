@@ -24,7 +24,7 @@ pub fn main() !void {
         while (window.getEvent()) |event| {
             switch (event) {
                 .close => return,
-                .framebuffer => |size| try resize(size),
+                .size_physical => |size| try resize(size),
                 .draw => try draw(),
                 else => {},
             }

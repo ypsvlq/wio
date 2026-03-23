@@ -69,7 +69,7 @@ fn loop() !bool {
                     window.swapBuffers();
                 }
             },
-            .framebuffer => |size| {
+            .size_physical => |size| {
                 if (wio.build_options.opengl) {
                     window.makeContextCurrent();
                     gl.viewport(0, 0, size.width, size.height);
@@ -96,7 +96,7 @@ fn loop() !bool {
                         window2.swapBuffers();
                     }
                 },
-                .framebuffer => |size| {
+                .size_physical => |size| {
                     if (wio.build_options.opengl) {
                         window2.makeContextCurrent();
                         gl.viewport(0, 0, size.width, size.height);
@@ -115,7 +115,7 @@ fn loop() !bool {
 
 fn logEvent(event: wio.Event) void {
     switch (event) {
-        .size, .framebuffer => |size| std.log.info("{s} {}x{}", .{ @tagName(event), size.width, size.height }),
+        .size_logical, .size_physical => |size| std.log.info("{s} {}x{}", .{ @tagName(event), size.width, size.height }),
         .scale => |scale| std.log.info("scale {d}", .{scale}),
         .mode => |mode| std.log.info("{s}", .{@tagName(mode)}),
         .char, .preview_char => |char| std.log.info("{s}: {u}", .{ @tagName(event), char }),

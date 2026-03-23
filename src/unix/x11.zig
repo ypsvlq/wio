@@ -324,8 +324,8 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
 
     self.events.push(.visible);
     self.events.push(.{ .scale = scale });
-    self.events.push(.{ .size = size });
-    self.events.push(.{ .framebuffer = size });
+    self.events.push(.{ .size_logical = size });
+    self.events.push(.{ .size_physical = size });
     self.events.push(.draw);
 
     try windows.put(internal.allocator, window, self);
@@ -749,8 +749,8 @@ fn handle(event: *h.XEvent) void {
             window.events.push(.{ .mode = mode });
 
             window.size = wio.Size{ .width = std.math.lossyCast(u16, event.xconfigure.width), .height = std.math.lossyCast(u16, event.xconfigure.height) };
-            window.events.push(.{ .size = window.size });
-            window.events.push(.{ .framebuffer = window.size });
+            window.events.push(.{ .size_logical = window.size });
+            window.events.push(.{ .size_physical = window.size });
             window.events.push(.draw);
         },
         h.KeyPress => handleKeyPress(window, event, false),

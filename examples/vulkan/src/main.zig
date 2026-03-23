@@ -498,7 +498,7 @@ fn loop() !bool {
                 _ = debug_allocator.deinit();
                 return false;
             },
-            .framebuffer => |new_size| {
+            .size_physical => |new_size| {
                 size = new_size;
                 try recreateSwapchain();
             },

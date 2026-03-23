@@ -775,11 +775,11 @@ export fn wioHidden(self: *Window) void {
 
 export fn wioSize(self: *Window, mode: u8, width: u16, height: u16) void {
     self.events.push(.{ .mode = @enumFromInt(mode) });
-    self.events.push(.{ .size = .{ .width = width, .height = height } });
+    self.events.push(.{ .size_logical = .{ .width = width, .height = height } });
 }
 
 export fn wioFramebuffer(self: *Window, width: u16, height: u16) void {
-    self.events.push(.{ .framebuffer = .{ .width = width, .height = height } });
+    self.events.push(.{ .size_physical = .{ .width = width, .height = height } });
     self.events.push(.draw);
 }
 

@@ -641,8 +641,8 @@ pub const Window = struct {
         defer c.libdecor_state_free(state);
         c.libdecor_frame_commit(self.frame, state, configuration);
 
-        self.events.push(.{ .size = size });
-        self.events.push(.{ .framebuffer = framebuffer });
+        self.events.push(.{ .size_logical = size });
+        self.events.push(.{ .size_physical = framebuffer });
         self.events.push(.draw);
     }
 

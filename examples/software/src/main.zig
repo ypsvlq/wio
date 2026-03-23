@@ -24,7 +24,7 @@ pub fn main() !void {
                     if (maybe_buf) |*buf| buf.destroy();
                     return;
                 },
-                .framebuffer => |fb| {
+                .size_physical => |fb| {
                     if (maybe_buf) |*buf| buf.destroy();
                     maybe_buf = null;
                     if (fb.width > 0 and fb.height > 0) {

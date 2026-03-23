@@ -385,8 +385,8 @@ pub const Event = union(enum) {
 
     /// Sent before `size`.
     mode: WindowMode,
-    size: Size,
-    framebuffer: Size,
+    size_logical: Size,
+    size_physical: Size,
     scale: f32,
 
     char: u21,
