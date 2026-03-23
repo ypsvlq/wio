@@ -10,30 +10,11 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
     });
 
-    var enable_opengl = false;
-    var enable_vulkan = false;
-    var enable_joystick = false;
-    var enable_audio = false;
-
-    var enable_software = false;
-
-    const features = b.option([]const u8, "features", "List of enabled features (default: opengl,joystick,audio) (available: vulkan,software)") orelse "opengl,joystick,audio";
-    var feature_iter = std.mem.tokenizeScalar(u8, features, ',');
-    while (feature_iter.next()) |feature| {
-        if (std.mem.eql(u8, feature, "opengl")) {
-            enable_opengl = true;
-        } else if (std.mem.eql(u8, feature, "vulkan")) {
-            enable_vulkan = true;
-        } else if (std.mem.eql(u8, feature, "joystick")) {
-            enable_joystick = true;
-        } else if (std.mem.eql(u8, feature, "audio")) {
-            enable_audio = true;
-        } else if (std.mem.eql(u8, feature, "software")) {
-            enable_software = true;
-        } else {
-            @panic("option 'features' is invalid");
-        }
-    }
+    const enable_software = b.option(bool, "enable_software", "Enable software rendering support (default: false)") orelse false;
+    const enable_opengl = b.option(bool, "enable_opengl", "Enable OpenGL support (default: false)") orelse false;
+    const enable_vulkan = b.option(bool, "enable_vulkan", "Enable Vulkan support (default: false)") orelse false;
+    const enable_joystick = b.option(bool, "enable_joystick", "Enable joystick support (default: false)") orelse false;
+    const enable_audio = b.option(bool, "enable_audio", "Enable audio support (default: false)") orelse false;
 
     var enable_x11 = false;
     var enable_wayland = false;
@@ -52,21 +33,21 @@ pub fn build(b: *std.Build) !void {
 
     const system_integration = b.systemIntegrationOption("wio", .{});
     const options = b.addOptions();
+    options.addOption(bool, "software", enable_software);
     options.addOption(bool, "opengl", enable_opengl);
     options.addOption(bool, "vulkan", enable_vulkan);
     options.addOption(bool, "joystick", enable_joystick);
     options.addOption(bool, "audio", enable_audio);
-    options.addOption(bool, "software", enable_software);
     options.addOption(bool, "x11", enable_x11);
     options.addOption(bool, "wayland", enable_wayland);
     options.addOption(bool, "system_integration", system_integration);
     module.addOptions("build_options", options);
 
+    if (enable_software) module.addCMacro("WIO_SOFTWARE", "");
     if (enable_opengl) module.addCMacro("WIO_OPENGL", "");
     if (enable_vulkan) module.addCMacro("WIO_VULKAN", "");
     if (enable_joystick) module.addCMacro("WIO_JOYSTICK", "");
     if (enable_audio) module.addCMacro("WIO_AUDIO", "");
-    if (enable_software) module.addCMacro("WIO_SOFTWARE", "");
 
     if (b.option(bool, "win32_manifest", "Embed application manifest (default: true)") orelse true) {
         module.addWin32ResourceFile(.{ .file = b.path("src/win32.rc") });
@@ -79,12 +60,11 @@ pub fn build(b: *std.Build) !void {
             }
 
             module.linkSystemLibrary("user32", .{});
-            if (enable_opengl) {
+            if (enable_software or enable_opengl) {
                 module.linkSystemLibrary("gdi32", .{});
-                module.linkSystemLibrary("opengl32", .{});
             }
-            if (enable_software and !enable_opengl) {
-                module.linkSystemLibrary("gdi32", .{});
+            if (enable_opengl) {
+                module.linkSystemLibrary("opengl32", .{});
             }
             if (enable_joystick) {
                 module.linkSystemLibrary("hid", .{});
@@ -193,44 +173,4 @@ pub fn build(b: *std.Build) !void {
             }
         },
     }
-
-    const exe_mod = b.createModule(.{
-        .root_source_file = b.path("example/main.zig"),
-        .target = target,
-        .optimize = optimize,
-        // https://github.com/ziglang/zig/pull/19572
-        .single_threaded = if (target.result.os.tag == .haiku) false else null,
-    });
-    exe_mod.addImport("wio", module);
-
-    const exe = b.addExecutable(.{
-        .name = "wio",
-        .root_module = exe_mod,
-        // https://github.com/ziglang/zig/issues/24140
-        .use_llvm = if (system_integration) null else true,
-    });
-    b.installArtifact(exe);
-
-    const run_cmd = b.addRunArtifact(exe);
-    run_cmd.step.dependOn(b.getInstallStep());
-
-    const run_step = b.step("run", "Run the app");
-    run_step.dependOn(&run_cmd.step);
-
-    const sw_mod = b.createModule(.{
-        .root_source_file = b.path("example/software.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    sw_mod.addImport("wio", module);
-
-    const sw_exe = b.addExecutable(.{
-        .name = "software",
-        .root_module = sw_mod,
-        .use_llvm = if (system_integration) null else true,
-    });
-    const run_sw_cmd = b.addRunArtifact(sw_exe);
-
-    const run_sw_step = b.step("run-sw", "Run the software renderer example");
-    run_sw_step.dependOn(&run_sw_cmd.step);
 }

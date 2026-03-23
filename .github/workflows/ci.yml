@@ -29,12 +29,13 @@ jobs:
       with:
         packages: libx11-dev libxcursor-dev libglvnd-dev libwayland-dev libxkbcommon-dev libdecor-0-dev libvulkan-dev libudev-dev libpulse-dev
     - name: Build
+      working-directory: demo
       run: zig build -Dtarget=${{ matrix.target }} ${{ matrix.target == 'native' && '-fsys=wio' || '' }}
     - if: ${{ matrix.target != 'wasm32-freestanding' }}
       name: Build Vulkan
-      working-directory: example/vulkan
+      working-directory: examples/vulkan
       run: zig build -Dtarget=${{ matrix.target }} ${{ matrix.target == 'native' && '-fsys=wio' || '' }}
     - if: ${{ endsWith(matrix.target, '-windows') }}
       name: Build D3D11
-      working-directory: example/d3d11
+      working-directory: examples/d3d11
       run: zig build -Dtarget=${{ matrix.target }}

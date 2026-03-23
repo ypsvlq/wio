@@ -24,7 +24,7 @@
             const wio = new Wio([document.getElementById("canvas"), document.getElementById("canvas2")]);
             const log = new Log(wio);
             const gl = new GL(wio);
-            WebAssembly.instantiateStreaming(fetch("../zig-out/bin/wio.wasm"), { wio: wio.imports, log: log.imports, gl: gl.imports })
+            WebAssembly.instantiateStreaming(fetch("zig-out/bin/demo.wasm"), { wio: wio.imports, log: log.imports, gl: gl.imports })
                 .then(result => wio.run(result.instance));
         </script>
     </body>

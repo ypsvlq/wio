@@ -7,15 +7,26 @@ wio is a platform abstraction library, providing:
 - alert dialogs
 - joystick input
 - audio
-- OpenGL and Vulkan WSI
+- software rendering
+- OpenGL context creation
+- Vulkan WSI
 
 ## Getting started
 
-The public API can be browsed in [src/wio.zig][1]. The [example][2] directory
-contains a test program covering most features.
+The public API can be browsed in [src/wio.zig][1].
 
-The `features` build option can be used to disable some functions, or enable
-Vulkan support.
+The [demo][2] directory contains a test program which covers most functionality
+and uses OpenGL.
+
+The [examples][3] directory contains small programs using other rendering APIs.
+
+Some features must be enabled with one of the following build options:
+
+- `enable_software`
+- `enable_opengl`
+- `enable_vulkan`
+- `enable_audio`
+- `enable_joystick`
 
 ## Platform support
 
@@ -46,7 +57,7 @@ Not actively tested.
 
 ### Windows
 
-wio embeds an [application manifest][3] by default. To use a custom manifest,
+wio embeds an [application manifest][4] by default. To use a custom manifest,
 set the `win32_manifest` build option to `false`.
 
 If audio is enabled, wio initializes COM with options `COINIT_MULTITHREADED`
@@ -54,8 +65,8 @@ and `COINIT_DISABLE_OLE1DDE`.
 
 ### macOS
 
-The example directory contains an application bundle, which can be adapted by
-changing the `CFBundleExecutable` and `CFBundleName` values in Info.plist.
+An application bundle is provided in [demo/wio.app][5], which can be adapted
+by the changing `CFBundleExecutable` and `CFBundleName` values in Info.plist.
 
 ### Unix
 
@@ -93,7 +104,7 @@ The following libraries are loaded under Linux:
 ### WebAssembly
 
 If OpenGL is enabled, wio imports `createContext` and `makeContextCurrent`
-from the `gl` module. The example directory contains bindings to WebGL 1.
+from the `gl` module. WebGL 1 bindings are provided in [demo/wasm.js][5].
 
 `glGetProcAddress` always returns null.
 
@@ -131,5 +142,8 @@ for a given platform:
 
 
 [1]: https://github.com/ypsvlq/wio/blob/master/src/wio.zig
-[2]: https://github.com/ypsvlq/wio/tree/master/example
-[3]: https://learn.microsoft.com/en-us/windows/win32/sbscs/application-manifests
+[2]: https://github.com/ypsvlq/wio/tree/master/demo
+[3]: https://github.com/ypsvlq/wio/tree/master/examples
+[4]: https://learn.microsoft.com/en-us/windows/win32/sbscs/application-manifests
+[5]: https://github.com/ypsvlq/wio/tree/master/demo/wio.app
+[6]: https://github.com/ypsvlq/wio/blob/master/demo/wasm.js
