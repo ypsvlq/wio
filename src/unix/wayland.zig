@@ -549,7 +549,8 @@ pub const Window = struct {
     }
 
     pub fn createFramebuffer(self: *Window, size: wio.Size) !Framebuffer {
-        const wl_shm = shm orelse return error.Unexpected;
+        if (shm == null) return error.Unexpected;
+        if (@import("builtin").os.tag != .linux) return error.Unimplemented;
 
         const byte_size = @as(usize, size.width) * @as(usize, size.height) * @sizeOf(u32);
 
@@ -568,7 +569,7 @@ pub const Window = struct {
         );
         errdefer std.posix.munmap(mapped);
 
-        const pool = h.wl_shm_create_pool(wl_shm, fd, @intCast(byte_size)) orelse return error.Unexpected;
+        const pool = h.wl_shm_create_pool(shm, fd, @intCast(byte_size)) orelse return error.Unexpected;
         defer h.wl_shm_pool_destroy(pool);
 
         const buffer = h.wl_shm_pool_create_buffer(
