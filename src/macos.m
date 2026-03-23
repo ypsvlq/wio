@@ -7,8 +7,8 @@ extern void wioFocused(void *);
 extern void wioUnfocused(void *);
 extern void wioVisible(void *);
 extern void wioHidden(void *);
-extern void wioSize(void *, UInt8, UInt16, UInt16);
-extern void wioFramebuffer(void *, UInt16, UInt16);
+extern void wioSizeLogical(void *, UInt8, UInt16, UInt16);
+extern void wioSizePhysical(void *, UInt16, UInt16);
 extern void wioScale(void *, Float32);
 extern void wioChars(void *, const char *);
 extern void wioPreviewChars(void *, const char *, uint16_t, uint16_t);
@@ -125,9 +125,9 @@ static void warpCursor(NSWindow *window) {
         mode = 2;
 
     NSRect rect = [view frame];
-    wioSize(zig, mode, rect.size.width, rect.size.height);
+    wioSizeLogical(zig, mode, rect.size.width, rect.size.height);
     NSRect framebuffer = [view convertRectToBacking:rect];
-    wioFramebuffer(zig, framebuffer.size.width, framebuffer.size.height);
+    wioSizePhysical(zig, framebuffer.size.width, framebuffer.size.height);
 
 #ifdef WIO_OPENGL
     [context update];
@@ -142,7 +142,7 @@ static void warpCursor(NSWindow *window) {
     NSRect rect = [view frame];
     wioScale(zig, scale);
     NSRect framebuffer = [view convertRectToBacking:rect];
-    wioFramebuffer(zig, framebuffer.size.width, framebuffer.size.height);
+    wioSizePhysical(zig, framebuffer.size.width, framebuffer.size.height);
 
 #ifdef WIO_OPENGL
     [context update];
@@ -436,9 +436,9 @@ void *wioCreateWindow(void *zig, uint16_t width, uint16_t height) {
     wioScale(zig, [window backingScaleFactor]);
 
     NSRect rect = [view frame];
-    wioSize(zig, 0, rect.size.width, rect.size.height);
+    wioSizeLogical(zig, 0, rect.size.width, rect.size.height);
     NSRect framebuffer = [view convertRectToBacking:rect];
-    wioFramebuffer(zig, framebuffer.size.width, framebuffer.size.height);
+    wioSizePhysical(zig, framebuffer.size.width, framebuffer.size.height);
 
     return (void *)CFBridgingRetain(window);
 }
