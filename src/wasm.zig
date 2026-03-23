@@ -129,7 +129,7 @@ pub const Window = struct {
         return null;
     }
 
-    pub fn createFramebuffer(self: *Window, size: wio.Size) !*Framebuffer {
+    pub fn createFramebuffer(self: *Window, size: wio.Size) !Framebuffer {
         _ = self;
         _ = size;
         return error.Unexpected;

@@ -31,7 +31,8 @@ jobs:
     - name: Build demo
       working-directory: demo
       run: zig build -Dtarget=${{ matrix.target }} ${{ matrix.target == 'native' && '-fsys=wio' || '' }}
-    - name: Build software example
+    - if: ${{ matrix.target != 'wasm32-freestanding' }}
+      name: Build software example
       working-directory: examples/software
       run: zig build -Dtarget=${{ matrix.target }} ${{ matrix.target == 'native' && '-fsys=wio' || '' }}
     - if: ${{ matrix.target != 'wasm32-freestanding' }}
