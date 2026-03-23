@@ -6,6 +6,10 @@
         .wio = .{
             .path = "../..",
         },
+        .win32 = .{
+            .url = "https://github.com/ypsvlq/win32/archive/ee47507f64ab19a4e42a141b7f64f462671308d0.tar.gz",
+            .hash = "win32-0.0.0-4XUubaXr_gKoPQ4I7hiKNGaFCrNCkX09oBQcr-w3OcbI",
+        },
     },
     .paths = .{
         "build.zig",

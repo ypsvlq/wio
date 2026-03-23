@@ -1,6 +1,6 @@
 const std = @import("std");
 const wio = @import("wio");
-const w = wio.backend.win32;
+const w = @import("win32");
 
 pub fn main() !void {
     var debug_allocator = std.heap.DebugAllocator(.{}).init;
