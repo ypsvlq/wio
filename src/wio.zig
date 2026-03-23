@@ -168,8 +168,14 @@ pub const Window = struct {
         return self.backend.getClipboardText(allocator);
     }
 
+    pub fn createFramebuffer(self: *Window, size: Size) !Framebuffer {
+        assertFeature(.software);
+        return .{ .backend = try self.backend.createFramebuffer(size) };
+    }
+
     /// May be called on any thread.
     pub fn makeContextCurrent(self: *Window) void {
+        assertFeature(.opengl);
         self.backend.makeContextCurrent();
     }
 
@@ -177,11 +183,13 @@ pub const Window = struct {
     ///
     /// On Wayland, this function may block if the window is hidden.
     pub fn swapBuffers(self: *Window) void {
+        assertFeature(.opengl);
         self.backend.swapBuffers();
     }
 
     /// Must be called on the thread where the context is current.
     pub fn swapInterval(self: *Window, interval: i32) void {
+        assertFeature(.opengl);
         self.backend.swapInterval(interval);
     }
 
@@ -190,26 +198,21 @@ pub const Window = struct {
         assertFeature(.vulkan);
         return self.backend.createSurface(instance, allocator, surface);
     }
-
-    pub fn createSoftwareBuffer(self: *Window, size: Size) !SoftwareBuffer {
-        assertFeature(.software);
-        return .{ .backend = try self.backend.createSoftwareBuffer(size) };
-    }
 };
 
-pub const SoftwareBuffer = struct {
-    backend: @typeInfo(@typeInfo(@TypeOf(backend.Window.createSoftwareBuffer)).@"fn".return_type.?).error_union.payload,
+pub const Framebuffer = struct {
+    backend: backend.Framebuffer,
 
-    pub fn destroy(self: *SoftwareBuffer) void {
+    pub fn destroy(self: *Framebuffer) void {
         self.backend.destroy();
     }
 
     /// Pixels are XRGB8888 (stored as u32 with layout 0x00RRGGBB on little-endian).
-    pub fn getPixels(self: *SoftwareBuffer) []u32 {
+    pub fn getPixels(self: *Framebuffer) []u32 {
         return self.backend.getPixels();
     }
 
-    pub fn present(self: *SoftwareBuffer) void {
+    pub fn present(self: *Framebuffer) void {
         self.backend.present();
     }
 };

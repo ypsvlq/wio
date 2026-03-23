@@ -285,6 +285,12 @@ pub const Window = struct {
         return text[0..len];
     }
 
+    pub fn createFramebuffer(self: *Window, size: wio.Size) !Framebuffer {
+        _ = self;
+        _ = size;
+        return error.Unexpected;
+    }
+
     pub fn makeContextCurrent(self: *Window) void {
         wioMakeContextCurrent(self.opengl.context);
     }
@@ -315,25 +321,19 @@ pub const Window = struct {
             surface,
         );
     }
-
-    pub fn createSoftwareBuffer(self: *Window, size: wio.Size) !*SoftwareBuffer {
-        _ = self;
-        _ = size;
-        return error.Unexpected;
-    }
 };
 
-pub const SoftwareBuffer = struct {
-    pub fn destroy(self: *SoftwareBuffer) void {
+pub const Framebuffer = struct {
+    pub fn destroy(self: *Framebuffer) void {
         _ = self;
     }
 
-    pub fn getPixels(self: *SoftwareBuffer) []u32 {
+    pub fn getPixels(self: *Framebuffer) []u32 {
         _ = self;
         return &.{};
     }
 
-    pub fn present(self: *SoftwareBuffer) void {
+    pub fn present(self: *Framebuffer) void {
         _ = self;
     }
 };

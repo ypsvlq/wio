@@ -2,7 +2,7 @@ const std = @import("std");
 const wio = @import("wio");
 
 var window: wio.Window = undefined;
-var maybe_buf: ?wio.SoftwareBuffer = null;
+var maybe_buf: ?wio.Framebuffer = null;
 var size: wio.Size = .{ .width = 0, .height = 0 };
 var t: u32 = 0;
 
@@ -28,7 +28,7 @@ pub fn main() !void {
                     if (maybe_buf) |*buf| buf.destroy();
                     maybe_buf = null;
                     if (fb.width > 0 and fb.height > 0) {
-                        maybe_buf = try window.createSoftwareBuffer(fb);
+                        maybe_buf = try window.createFramebuffer(fb);
                         size = fb;
                     }
                 },

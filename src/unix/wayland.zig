@@ -548,6 +548,50 @@ pub const Window = struct {
         }
     }
 
+    pub fn createFramebuffer(self: *Window, size: wio.Size) !Framebuffer {
+        const wl_shm = shm orelse return error.Unexpected;
+
+        const byte_size = @as(usize, size.width) * @as(usize, size.height) * @sizeOf(u32);
+
+        const fd = try std.posix.memfd_create("wio", 0);
+        errdefer std.posix.close(fd);
+
+        try std.posix.ftruncate(fd, byte_size);
+
+        const mapped = try std.posix.mmap(
+            null,
+            byte_size,
+            std.posix.PROT.READ | std.posix.PROT.WRITE,
+            .{ .TYPE = .SHARED },
+            fd,
+            0,
+        );
+        errdefer std.posix.munmap(mapped);
+
+        const pool = h.wl_shm_create_pool(wl_shm, fd, @intCast(byte_size)) orelse return error.Unexpected;
+        defer h.wl_shm_pool_destroy(pool);
+
+        const buffer = h.wl_shm_pool_create_buffer(
+            pool,
+            0,
+            size.width,
+            size.height,
+            @intCast(@as(usize, size.width) * @sizeOf(u32)),
+            h.WL_SHM_FORMAT_XRGB8888,
+        ) orelse return error.Unexpected;
+
+        const pixels: [*]u32 = @ptrCast(@alignCast(mapped.ptr));
+
+        return .{
+            .buffer = buffer,
+            .surface = self.surface,
+            .pixels = pixels[0 .. @as(usize, size.width) * @as(usize, size.height)],
+            .mapped = mapped,
+            .fd = fd,
+            .size = size,
+        };
+    }
+
     pub fn makeContextCurrent(self: *Window) void {
         _ = c.eglMakeCurrent(egl_display, self.egl.surface, self.egl.surface, self.egl.context);
     }
@@ -622,53 +666,6 @@ pub const Window = struct {
         }
     }
 
-    pub fn createSoftwareBuffer(self: *Window, size: wio.Size) !*SoftwareBuffer {
-        const wl_shm = shm orelse return error.Unexpected;
-        const self_buf = try internal.allocator.create(SoftwareBuffer);
-        errdefer internal.allocator.destroy(self_buf);
-
-        const byte_size = @as(usize, size.width) * @as(usize, size.height) * @sizeOf(u32);
-
-        const fd = try std.posix.memfd_create("wio", 0);
-        errdefer std.posix.close(fd);
-
-        try std.posix.ftruncate(fd, byte_size);
-
-        const mapped = try std.posix.mmap(
-            null,
-            byte_size,
-            std.posix.PROT.READ | std.posix.PROT.WRITE,
-            .{ .TYPE = .SHARED },
-            fd,
-            0,
-        );
-        errdefer std.posix.munmap(mapped);
-
-        const pool = h.wl_shm_create_pool(wl_shm, fd, @intCast(byte_size)) orelse return error.Unexpected;
-        defer h.wl_shm_pool_destroy(pool);
-
-        const buffer = h.wl_shm_pool_create_buffer(
-            pool,
-            0,
-            size.width,
-            size.height,
-            @intCast(@as(usize, size.width) * @sizeOf(u32)),
-            h.WL_SHM_FORMAT_XRGB8888,
-        ) orelse return error.Unexpected;
-
-        const pixels: [*]u32 = @ptrCast(@alignCast(mapped.ptr));
-
-        self_buf.* = .{
-            .buffer = buffer,
-            .surface = self.surface,
-            .pixels = pixels[0 .. @as(usize, size.width) * @as(usize, size.height)],
-            .mapped = mapped,
-            .fd = fd,
-            .size = size,
-        };
-        return self_buf;
-    }
-
     fn applyCursor(self: *Window) void {
         if (self.cursor_mode == .normal) {
             if (cursor_shape_device) |_| {
@@ -691,7 +688,7 @@ pub const Window = struct {
     }
 };
 
-pub const SoftwareBuffer = struct {
+pub const Framebuffer = struct {
     buffer: *h.wl_buffer,
     surface: *h.wl_surface,
     pixels: []u32,
@@ -699,18 +696,17 @@ pub const SoftwareBuffer = struct {
     fd: std.posix.fd_t,
     size: wio.Size,
 
-    pub fn destroy(self: *SoftwareBuffer) void {
+    pub fn destroy(self: *Framebuffer) void {
         h.wl_buffer_destroy(self.buffer);
         std.posix.munmap(self.mapped);
         std.posix.close(self.fd);
-        internal.allocator.destroy(self);
     }
 
-    pub fn getPixels(self: *SoftwareBuffer) []u32 {
+    pub fn getPixels(self: *Framebuffer) []u32 {
         return self.pixels;
     }
 
-    pub fn present(self: *SoftwareBuffer) void {
+    pub fn present(self: *Framebuffer) void {
         h.wl_surface_attach(self.surface, self.buffer, 0, 0);
         h.wl_surface_damage(self.surface, 0, 0, @intCast(self.size.width), @intCast(self.size.height));
         h.wl_surface_commit(self.surface);

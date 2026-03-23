@@ -311,6 +311,13 @@ pub const Window = union {
         }
     }
 
+    pub fn createFramebuffer(self: *Window, size: wio.Size) !Framebuffer {
+        switch (active) {
+            .x11 => return .{ .x11 = try self.x11.createFramebuffer(size) },
+            .wayland => return .{ .wayland = try self.wayland.createFramebuffer(size) },
+        }
+    }
+
     pub fn makeContextCurrent(self: *Window) void {
         switch (active) {
             .x11 => self.x11.makeContextCurrent(),
@@ -338,11 +345,30 @@ pub const Window = union {
             .wayland => return self.wayland.createSurface(instance, allocator, surface),
         }
     }
+};
 
-    pub fn createSoftwareBuffer(self: *Window, size: wio.Size) !SoftwareBuffer {
+pub const Framebuffer = union {
+    x11: x11.Framebuffer,
+    wayland: wayland.Framebuffer,
+
+    pub fn destroy(self: *Framebuffer) void {
         switch (active) {
-            .x11 => return .{ .x11 = try self.x11.createSoftwareBuffer(size) },
-            .wayland => return .{ .wayland = try self.wayland.createSoftwareBuffer(size) },
+            .x11 => self.x11.destroy(),
+            .wayland => self.wayland.destroy(),
+        }
+    }
+
+    pub fn getPixels(self: *Framebuffer) []u32 {
+        switch (active) {
+            .x11 => return self.x11.getPixels(),
+            .wayland => return self.wayland.getPixels(),
+        }
+    }
+
+    pub fn present(self: *Framebuffer) void {
+        switch (active) {
+            .x11 => self.x11.present(),
+            .wayland => self.wayland.present(),
         }
     }
 };
@@ -371,29 +397,3 @@ pub const AudioDeviceIterator = audio.AudioDeviceIterator;
 pub const AudioDevice = audio.AudioDevice;
 pub const AudioOutput = audio.AudioOutput;
 pub const AudioInput = audio.AudioInput;
-
-pub const SoftwareBuffer = union {
-    x11: *x11.SoftwareBuffer,
-    wayland: *wayland.SoftwareBuffer,
-
-    pub fn destroy(self: *SoftwareBuffer) void {
-        switch (active) {
-            .x11 => self.x11.destroy(),
-            .wayland => self.wayland.destroy(),
-        }
-    }
-
-    pub fn getPixels(self: *SoftwareBuffer) []u32 {
-        switch (active) {
-            .x11 => return self.x11.getPixels(),
-            .wayland => return self.wayland.getPixels(),
-        }
-    }
-
-    pub fn present(self: *SoftwareBuffer) void {
-        switch (active) {
-            .x11 => self.x11.present(),
-            .wayland => self.wayland.present(),
-        }
-    }
-};
