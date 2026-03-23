@@ -207,7 +207,7 @@ pub const Framebuffer = struct {
         self.backend.destroy();
     }
 
-    /// Pixels are XRGB8888 (stored as u32 with layout 0x00RRGGBB on little-endian).
+    /// Pixels are native-endian 8 bpc ARGB (0xAARRGGBB)
     pub fn getPixels(self: *Framebuffer) []u32 {
         return self.backend.getPixels();
     }

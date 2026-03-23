@@ -45,12 +45,12 @@ pub fn main() !void {
 }
 
 fn render(pixels: []u32) void {
-    const w: u32 = size.width;
-    const h: u32 = size.height;
-    for (0..h) |y| {
-        for (0..w) |x| {
-            const v = @as(u32, @intCast(x)) ^ @as(u32, @intCast(y)) ^ t;
-            pixels[y * w + x] = ((v & 0xff) << 16) | (((v >> 1) & 0xff) << 8) | ((v >> 2) & 0xff);
+    var y: u32 = 0;
+    while (y < size.height) : (y += 1) {
+        var x: u32 = 0;
+        while (x < size.width) : (x += 1) {
+            const v = x ^ y ^ t;
+            pixels[y * size.width + x] = (0xff << 24) | ((v & 0xff) << 16) | (((v >> 1) & 0xff) << 8) | ((v >> 2) & 0xff);
         }
     }
 }

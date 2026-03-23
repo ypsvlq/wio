@@ -578,7 +578,7 @@ pub const Window = struct {
             size.width,
             size.height,
             @intCast(@as(usize, size.width) * @sizeOf(u32)),
-            h.WL_SHM_FORMAT_XRGB8888,
+            h.WL_SHM_FORMAT_ARGB8888,
         ) orelse return error.Unexpected;
 
         const pixels: [*]u32 = @ptrCast(@alignCast(mapped.ptr));
