@@ -16,6 +16,12 @@ pub fn build(b: *std.Build) void {
     });
     exe_mod.addImport("wio", wio.module("wio"));
 
+    const win32 = b.dependency("win32", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    exe_mod.addImport("win32", win32.module("win32"));
+
     const exe = b.addExecutable(.{
         .name = "d3d11",
         .root_module = exe_mod,
