@@ -315,6 +315,27 @@ pub const Window = struct {
             surface,
         );
     }
+
+    pub fn createSoftwareBuffer(self: *Window, size: wio.Size) !*SoftwareBuffer {
+        _ = self;
+        _ = size;
+        return error.Unexpected;
+    }
+};
+
+pub const SoftwareBuffer = struct {
+    pub fn destroy(self: *SoftwareBuffer) void {
+        _ = self;
+    }
+
+    pub fn getPixels(self: *SoftwareBuffer) []u32 {
+        _ = self;
+        return &.{};
+    }
+
+    pub fn present(self: *SoftwareBuffer) void {
+        _ = self;
+    }
 };
 
 pub fn glGetProcAddress(name: [*:0]const u8) ?*const anyopaque {

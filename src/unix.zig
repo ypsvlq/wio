@@ -338,6 +338,13 @@ pub const Window = union {
             .wayland => return self.wayland.createSurface(instance, allocator, surface),
         }
     }
+
+    pub fn createSoftwareBuffer(self: *Window, size: wio.Size) !SoftwareBuffer {
+        switch (active) {
+            .x11 => return .{ .x11 = try self.x11.createSoftwareBuffer(size) },
+            .wayland => return .{ .wayland = try self.wayland.createSoftwareBuffer(size) },
+        }
+    }
 };
 
 pub fn glGetProcAddress(name: [*:0]const u8) ?*const anyopaque {
@@ -364,3 +371,29 @@ pub const AudioDeviceIterator = audio.AudioDeviceIterator;
 pub const AudioDevice = audio.AudioDevice;
 pub const AudioOutput = audio.AudioOutput;
 pub const AudioInput = audio.AudioInput;
+
+pub const SoftwareBuffer = union {
+    x11: *x11.SoftwareBuffer,
+    wayland: *wayland.SoftwareBuffer,
+
+    pub fn destroy(self: *SoftwareBuffer) void {
+        switch (active) {
+            .x11 => self.x11.destroy(),
+            .wayland => self.wayland.destroy(),
+        }
+    }
+
+    pub fn getPixels(self: *SoftwareBuffer) []u32 {
+        switch (active) {
+            .x11 => return self.x11.getPixels(),
+            .wayland => return self.wayland.getPixels(),
+        }
+    }
+
+    pub fn present(self: *SoftwareBuffer) void {
+        switch (active) {
+            .x11 => self.x11.present(),
+            .wayland => self.wayland.present(),
+        }
+    }
+};

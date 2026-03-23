@@ -136,6 +136,27 @@ pub const Window = struct {
     pub fn swapBuffers(_: *Window) void {}
 
     pub fn swapInterval(_: *Window, _: i32) void {}
+
+    pub fn createSoftwareBuffer(self: *Window, size: wio.Size) !*SoftwareBuffer {
+        _ = self;
+        _ = size;
+        return error.Unexpected;
+    }
+};
+
+pub const SoftwareBuffer = struct {
+    pub fn destroy(self: *SoftwareBuffer) void {
+        _ = self;
+    }
+
+    pub fn getPixels(self: *SoftwareBuffer) []u32 {
+        _ = self;
+        return &.{};
+    }
+
+    pub fn present(self: *SoftwareBuffer) void {
+        _ = self;
+    }
 };
 
 pub fn glGetProcAddress(_: [*:0]const u8) ?*const anyopaque {

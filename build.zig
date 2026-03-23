@@ -15,7 +15,9 @@ pub fn build(b: *std.Build) !void {
     var enable_joystick = false;
     var enable_audio = false;
 
-    const features = b.option([]const u8, "features", "List of enabled features (default: opengl,joystick,audio) (available: vulkan)") orelse "opengl,joystick,audio";
+    var enable_software = false;
+
+    const features = b.option([]const u8, "features", "List of enabled features (default: opengl,joystick,audio) (available: vulkan,software)") orelse "opengl,joystick,audio";
     var feature_iter = std.mem.tokenizeScalar(u8, features, ',');
     while (feature_iter.next()) |feature| {
         if (std.mem.eql(u8, feature, "opengl")) {
@@ -26,6 +28,8 @@ pub fn build(b: *std.Build) !void {
             enable_joystick = true;
         } else if (std.mem.eql(u8, feature, "audio")) {
             enable_audio = true;
+        } else if (std.mem.eql(u8, feature, "software")) {
+            enable_software = true;
         } else {
             @panic("option 'features' is invalid");
         }
@@ -52,6 +56,7 @@ pub fn build(b: *std.Build) !void {
     options.addOption(bool, "vulkan", enable_vulkan);
     options.addOption(bool, "joystick", enable_joystick);
     options.addOption(bool, "audio", enable_audio);
+    options.addOption(bool, "software", enable_software);
     options.addOption(bool, "x11", enable_x11);
     options.addOption(bool, "wayland", enable_wayland);
     options.addOption(bool, "system_integration", system_integration);
@@ -61,6 +66,7 @@ pub fn build(b: *std.Build) !void {
     if (enable_vulkan) module.addCMacro("WIO_VULKAN", "");
     if (enable_joystick) module.addCMacro("WIO_JOYSTICK", "");
     if (enable_audio) module.addCMacro("WIO_AUDIO", "");
+    if (enable_software) module.addCMacro("WIO_SOFTWARE", "");
 
     if (b.option(bool, "win32_manifest", "Embed application manifest (default: true)") orelse true) {
         module.addWin32ResourceFile(.{ .file = b.path("src/win32.rc") });
@@ -76,6 +82,9 @@ pub fn build(b: *std.Build) !void {
             if (enable_opengl) {
                 module.linkSystemLibrary("gdi32", .{});
                 module.linkSystemLibrary("opengl32", .{});
+            }
+            if (enable_software and !enable_opengl) {
+                module.linkSystemLibrary("gdi32", .{});
             }
             if (enable_joystick) {
                 module.linkSystemLibrary("hid", .{});
@@ -207,4 +216,21 @@ pub fn build(b: *std.Build) !void {
 
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
+
+    const sw_mod = b.createModule(.{
+        .root_source_file = b.path("example/software.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    sw_mod.addImport("wio", module);
+
+    const sw_exe = b.addExecutable(.{
+        .name = "software",
+        .root_module = sw_mod,
+        .use_llvm = if (system_integration) null else true,
+    });
+    const run_sw_cmd = b.addRunArtifact(sw_exe);
+
+    const run_sw_step = b.step("run-sw", "Run the software renderer example");
+    run_sw_step.dependOn(&run_sw_cmd.step);
 }
