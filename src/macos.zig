@@ -158,9 +158,9 @@ pub fn wait(options: wio.WaitOptions) void {
     if (options.timeout_ns) |timeout_ns| {
         var timeout = @as(f64, @floatFromInt(timeout_ns)) / std.time.ns_per_s;
         while (internal.wait and timeout > 0) {
-            const start = std.time.timestamp();
+            const start = std.time.nanoTimestamp();
             wioWait(timeout);
-            timeout -= @floatFromInt(std.time.timestamp() - start);
+            timeout -= @as(f64, @floatFromInt(std.time.nanoTimestamp() - start)) / std.time.ns_per_s;
         }
     } else {
         while (internal.wait) {
