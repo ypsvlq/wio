@@ -23,7 +23,7 @@ The [examples][3] directory contains small programs using other rendering APIs.
 By default, only a subset of the API is available. The following build options
 enable additional features:
 
-- `enable_software`
+- `enable_framebuffer`
 - `enable_opengl`
 - `enable_vulkan`
 - `enable_audio`
