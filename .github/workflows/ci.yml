@@ -32,8 +32,8 @@ jobs:
       working-directory: demo
       run: zig build -Dtarget=${{ matrix.target }} ${{ matrix.target == 'native' && '-fsys=wio' || '' }}
     - if: ${{ matrix.target != 'wasm32-freestanding' }}
-      name: Build software example
-      working-directory: examples/software
+      name: Build framebuffer example
+      working-directory: examples/framebuffer
       run: zig build -Dtarget=${{ matrix.target }} ${{ matrix.target == 'native' && '-fsys=wio' || '' }}
     - if: ${{ matrix.target != 'wasm32-freestanding' }}
       name: Build Vulkan example
