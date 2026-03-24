@@ -914,6 +914,23 @@ pub const AudioDevice = struct {
     }
 
     fn openAudioClient(self: AudioDevice, format: wio.AudioFormat, guid: *const w.GUID, dataFn: *const fn () void, threadFn: fn (*AudioClient) void) !*AudioClient {
+        // device change notification does not guarantee it is configured, so make multiple attempts in case of AUDCLNT_E_DEVICE_INVALIDATED
+        var attempt: u8 = 1;
+        const max_attempts = 2;
+        while (true) {
+            if (self.openAudioClientInner(format, guid, dataFn, threadFn)) |client| {
+                return client;
+            } else |err| {
+                if (attempt < max_attempts) {
+                    attempt += 1;
+                } else {
+                    return err;
+                }
+            }
+        }
+    }
+
+    fn openAudioClientInner(self: AudioDevice, format: wio.AudioFormat, guid: *const w.GUID, dataFn: *const fn () void, threadFn: fn (*AudioClient) void) !*AudioClient {
         var client: *w.IAudioClient = undefined;
         try SUCCEED(self.device.Activate(&w.IID_IAudioClient, w.CLSCTX_ALL, null, @ptrCast(&client)), "IMMDevice::Activate");
         errdefer _ = client.Release();
