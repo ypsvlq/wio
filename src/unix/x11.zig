@@ -512,8 +512,7 @@ pub const Window = struct {
     }
 
     pub fn createFramebuffer(self: *Window, size: wio.Size) !Framebuffer {
-        const pixel_count = @as(usize, size.width) * @as(usize, size.height);
-        const pixels = try internal.allocator.alloc(u32, pixel_count);
+        const pixels = try internal.allocator.alloc(u32, @as(usize, size.width) * size.height);
         errdefer internal.allocator.free(pixels);
 
         const image = c.XCreateImage(

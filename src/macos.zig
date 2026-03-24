@@ -288,7 +288,7 @@ pub const Window = struct {
     }
 
     pub fn createFramebuffer(_: *Window, size: wio.Size) !Framebuffer {
-        const pixels = try internal.allocator.alloc(u32, @as(u32, size.width) * size.height);
+        const pixels = try internal.allocator.alloc(u32, @as(usize, size.width) * size.height);
         errdefer internal.allocator.free(pixels);
 
         const colorspace = c.CGColorSpaceCreateDeviceRGB() orelse return error.Unexpected;

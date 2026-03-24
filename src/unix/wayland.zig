@@ -552,7 +552,7 @@ pub const Window = struct {
         if (shm == null) return error.Unexpected;
         if (@import("builtin").os.tag != .linux) return error.Unimplemented;
 
-        const byte_size = @as(usize, size.width) * @as(usize, size.height) * @sizeOf(u32);
+        const byte_size = @sizeOf(u32) * @as(usize, size.width) * size.height;
 
         const fd = try std.posix.memfd_create("wio", 0);
         errdefer std.posix.close(fd);
