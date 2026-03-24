@@ -488,6 +488,8 @@ pub const Window = struct {
     }
 
     pub fn createFramebuffer(_: *Window, size: wio.Size) !Framebuffer {
+        if (size.width == 0 or size.height == 0) return .{ .dc = null, .bitmap = null, .pixels = &.{}, .size = size };
+
         const dc = w.CreateCompatibleDC(null) orelse return logLastError("CreateCompatibleDC");
         errdefer _ = w.DeleteDC(dc);
 
