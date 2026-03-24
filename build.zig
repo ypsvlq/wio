@@ -10,7 +10,7 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
     });
 
-    const enable_software = b.option(bool, "enable_software", "Enable software rendering support (default: false)") orelse false;
+    const enable_framebuffer = b.option(bool, "enable_framebuffer", "Enable software framebuffer support (default: false)") orelse false;
     const enable_opengl = b.option(bool, "enable_opengl", "Enable OpenGL support (default: false)") orelse false;
     const enable_vulkan = b.option(bool, "enable_vulkan", "Enable Vulkan support (default: false)") orelse false;
     const enable_joystick = b.option(bool, "enable_joystick", "Enable joystick support (default: false)") orelse false;
@@ -33,7 +33,7 @@ pub fn build(b: *std.Build) !void {
 
     const system_integration = b.systemIntegrationOption("wio", .{});
     const options = b.addOptions();
-    options.addOption(bool, "software", enable_software);
+    options.addOption(bool, "framebuffer", enable_framebuffer);
     options.addOption(bool, "opengl", enable_opengl);
     options.addOption(bool, "vulkan", enable_vulkan);
     options.addOption(bool, "joystick", enable_joystick);
@@ -43,7 +43,7 @@ pub fn build(b: *std.Build) !void {
     options.addOption(bool, "system_integration", system_integration);
     module.addOptions("build_options", options);
 
-    if (enable_software) module.addCMacro("WIO_SOFTWARE", "");
+    if (enable_framebuffer) module.addCMacro("WIO_FRAMEBUFFER", "");
     if (enable_opengl) module.addCMacro("WIO_OPENGL", "");
     if (enable_vulkan) module.addCMacro("WIO_VULKAN", "");
     if (enable_joystick) module.addCMacro("WIO_JOYSTICK", "");
@@ -60,7 +60,7 @@ pub fn build(b: *std.Build) !void {
             }
 
             module.linkSystemLibrary("user32", .{});
-            if (enable_software or enable_opengl) {
+            if (enable_framebuffer or enable_opengl) {
                 module.linkSystemLibrary("gdi32", .{});
             }
             if (enable_opengl) {

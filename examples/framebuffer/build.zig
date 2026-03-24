@@ -13,13 +13,13 @@ pub fn build(b: *std.Build) void {
     const wio = b.dependency("wio", .{
         .target = target,
         .optimize = optimize,
-        .enable_software = true,
+        .enable_framebuffer = true,
         .unix_backends = b.option([]const u8, "unix_backends", "List of enabled wio backends"),
     });
     exe_mod.addImport("wio", wio.module("wio"));
 
     const exe = b.addExecutable(.{
-        .name = "software",
+        .name = "framebuffer",
         .root_module = exe_mod,
         // https://github.com/ziglang/zig/issues/24140
         .use_llvm = true,

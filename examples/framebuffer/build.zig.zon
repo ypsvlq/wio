@@ -1,7 +1,7 @@
 .{
-    .name = .software,
+    .name = .framebuffer,
     .version = "0.0.0",
-    .fingerprint = 0x77d068cf46d834e6,
+    .fingerprint = 0x78baaaacd8aebe92,
     .dependencies = .{
         .wio = .{
             .path = "../..",

@@ -163,7 +163,7 @@ static void warpCursor(NSWindow *window) {
     BOOL textInput;
     uint8_t cursorMode;
     BOOL cursorInside;
-#ifdef WIO_SOFTWARE
+#ifdef WIO_FRAMEBUFFER
     CGContextRef bitmap;
 #endif
 }
@@ -368,7 +368,7 @@ static void warpCursor(NSWindow *window) {
     wioScroll(zig, [event scrollingDeltaX], [event scrollingDeltaY]);
 }
 
-#ifdef WIO_SOFTWARE
+#ifdef WIO_FRAMEBUFFER
 
 - (void)setBitmap:(CGContextRef)value {
     bitmap = value;
@@ -527,7 +527,7 @@ char *wioGetClipboardText(const void *ptr, size_t *len) {
     return wioDupeClipboardText(ptr, [string UTF8String], len);
 }
 
-#ifdef WIO_SOFTWARE
+#ifdef WIO_FRAMEBUFFER
 
 void wioPresentFramebuffer(NSWindow *window, CGContextRef bitmap) {
     WioView *view = [window contentView];

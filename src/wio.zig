@@ -169,12 +169,12 @@ pub const Window = struct {
     }
 
     pub fn createFramebuffer(self: *Window, size: Size) !Framebuffer {
-        assertFeature(.software);
+        assertFeature(.framebuffer);
         return .{ .backend = try self.backend.createFramebuffer(size) };
     }
 
     pub fn presentFramebuffer(self: *Window, framebuffer: *Framebuffer) void {
-        assertFeature(.software);
+        assertFeature(.framebuffer);
         self.backend.presentFramebuffer(&framebuffer.backend);
     }
 

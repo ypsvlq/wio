@@ -249,7 +249,7 @@ pub fn deinit() void {
 }
 
 fn destroyProxies() void {
-    if (build_options.software) if (shm) |_| h.wl_shm_destroy(shm);
+    if (build_options.framebuffer) if (shm) |_| h.wl_shm_destroy(shm);
     if (data_source) |_| h.wl_data_source_destroy(data_source);
     if (data_offer) |_| h.wl_data_offer_destroy(data_offer);
     if (data_device) |_| h.wl_data_device_destroy(data_device);
@@ -740,7 +740,7 @@ fn registryGlobal(_: ?*anyopaque, _: ?*h.wl_registry, name: u32, interface_ptr: 
     const interface = std.mem.sliceTo(interface_ptr, 0);
     if (std.mem.eql(u8, interface, "wl_compositor")) {
         compositor = @ptrCast(h.wl_registry_bind(registry, name, &h.wl_compositor_interface, @min(version, 3)));
-    } else if (build_options.software and std.mem.eql(u8, interface, "wl_shm")) {
+    } else if (build_options.framebuffer and std.mem.eql(u8, interface, "wl_shm")) {
         shm = @ptrCast(h.wl_registry_bind(registry, name, &h.wl_shm_interface, @min(version, 1)));
     } else if (std.mem.eql(u8, interface, "wl_seat")) {
         seat = @ptrCast(h.wl_registry_bind(registry, name, &h.wl_seat_interface, @min(version, 4)));
