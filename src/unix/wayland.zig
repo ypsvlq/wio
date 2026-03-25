@@ -550,11 +550,23 @@ pub const Window = struct {
 
     pub fn createFramebuffer(_: *Window, size: wio.Size) !Framebuffer {
         if (shm == null) return error.Unexpected;
-        if (@import("builtin").os.tag != .linux) return error.Unimplemented;
 
         const byte_size = @sizeOf(u32) * @as(usize, size.width) * size.height;
 
-        const fd = try std.posix.memfd_create("wio", 0);
+        const fd = blk: {
+            var attempt: u8 = 0;
+            while (attempt < 10) : (attempt += 1) {
+                const name = try std.fmt.allocPrintSentinel(internal.allocator, "/wio-{x}", .{std.time.nanoTimestamp()}, 0);
+                defer internal.allocator.free(name);
+
+                const fd = std.c.shm_open(name, @bitCast(std.c.O{ .ACCMODE = .RDWR, .CREAT = true, .EXCL = true }), 0o600);
+                if (fd >= 0) {
+                    _ = std.c.shm_unlink(name);
+                    break :blk fd;
+                }
+            }
+            return error.Unexpected;
+        };
         errdefer std.posix.close(fd);
 
         try std.posix.ftruncate(fd, byte_size);
