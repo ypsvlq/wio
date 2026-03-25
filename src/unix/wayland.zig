@@ -551,8 +551,6 @@ pub const Window = struct {
     pub fn createFramebuffer(_: *Window, size: wio.Size) !Framebuffer {
         if (shm == null) return error.Unexpected;
 
-        const byte_size = @sizeOf(u32) * @as(usize, size.width) * size.height;
-
         const fd = blk: {
             var attempt: u8 = 0;
             while (attempt < 10) : (attempt += 1) {
@@ -567,7 +565,9 @@ pub const Window = struct {
             }
             return error.Unexpected;
         };
-        errdefer std.posix.close(fd);
+        errdefer _ = std.c.close(fd);
+
+        const byte_size = @sizeOf(u32) * @as(usize, size.width) * size.height;
 
         try std.posix.ftruncate(fd, byte_size);
 
@@ -581,7 +581,11 @@ pub const Window = struct {
         );
         errdefer std.posix.munmap(mapped);
 
-        const pool = h.wl_shm_create_pool(shm, fd, @intCast(byte_size)) orelse return error.Unexpected;
+        const pool = h.wl_shm_create_pool(
+            shm,
+            fd,
+            std.math.cast(i32, byte_size) orelse return error.Unexpected,
+        ) orelse return error.Unexpected;
         defer h.wl_shm_pool_destroy(pool);
 
         const buffer = h.wl_shm_pool_create_buffer(
@@ -589,24 +593,20 @@ pub const Window = struct {
             0,
             size.width,
             size.height,
-            @intCast(@as(usize, size.width) * @sizeOf(u32)),
+            @as(i32, size.width) * @sizeOf(u32),
             h.WL_SHM_FORMAT_ARGB8888,
         ) orelse return error.Unexpected;
 
-        const pixels: [*]u32 = @ptrCast(@alignCast(mapped.ptr));
-
         return .{
-            .buffer = buffer,
-            .pixels = pixels[0 .. @as(usize, size.width) * @as(usize, size.height)],
-            .mapped = mapped,
             .fd = fd,
-            .size = size,
+            .mapped = mapped,
+            .buffer = buffer,
         };
     }
 
     pub fn presentFramebuffer(self: *Window, framebuffer: *Framebuffer) void {
         h.wl_surface_attach(self.surface, framebuffer.buffer, 0, 0);
-        h.wl_surface_damage(self.surface, 0, 0, @intCast(framebuffer.size.width), @intCast(framebuffer.size.height));
+        h.wl_surface_damage(self.surface, 0, 0, std.math.maxInt(i32), std.math.maxInt(i32));
         h.wl_surface_commit(self.surface);
         _ = c.wl_display_roundtrip(display);
     }
@@ -708,20 +708,18 @@ pub const Window = struct {
 };
 
 pub const Framebuffer = struct {
-    buffer: *h.wl_buffer,
-    pixels: []u32,
+    fd: std.c.fd_t,
     mapped: []align(std.heap.page_size_min) u8,
-    fd: std.posix.fd_t,
-    size: wio.Size,
+    buffer: *h.wl_buffer,
 
     pub fn destroy(self: *Framebuffer) void {
         h.wl_buffer_destroy(self.buffer);
         std.posix.munmap(self.mapped);
-        std.posix.close(self.fd);
+        _ = std.c.close(self.fd);
     }
 
     pub fn getPixels(self: *Framebuffer) []u32 {
-        return self.pixels;
+        return std.mem.bytesAsSlice(u32, self.mapped);
     }
 };
 
