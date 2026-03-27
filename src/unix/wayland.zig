@@ -192,22 +192,24 @@ pub fn init() !bool {
     errdefer destroyProxies();
     _ = h.wl_registry_add_listener(registry, &registry_listener, null);
     _ = c.wl_display_roundtrip(display);
-    if (compositor == null or seat == null) return error.Unexpected;
+    if (compositor == null) return error.Unexpected;
 
     libdecor_context = c.libdecor_new(display, &libdecor_interface) orelse return error.Unexpected;
     errdefer c.libdecor_unref(libdecor_context);
 
-    if (text_input_manager) |_| {
-        text_input = h.zwp_text_input_manager_v3_get_text_input(text_input_manager, seat);
-        if (text_input) |_| {
-            _ = h.zwp_text_input_v3_add_listener(text_input, &text_input_listener, null);
+    if (seat) |_| {
+        if (text_input_manager) |_| {
+            text_input = h.zwp_text_input_manager_v3_get_text_input(text_input_manager, seat);
+            if (text_input) |_| {
+                _ = h.zwp_text_input_v3_add_listener(text_input, &text_input_listener, null);
+            }
         }
-    }
 
-    if (data_device_manager) |_| {
-        data_device = h.wl_data_device_manager_get_data_device(data_device_manager, seat);
-        if (data_device) |_| {
-            _ = h.wl_data_device_add_listener(data_device, &data_device_listener, null);
+        if (data_device_manager) |_| {
+            data_device = h.wl_data_device_manager_get_data_device(data_device_manager, seat);
+            if (data_device) |_| {
+                _ = h.wl_data_device_add_listener(data_device, &data_device_listener, null);
+            }
         }
     }
 
