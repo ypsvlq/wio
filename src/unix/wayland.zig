@@ -594,7 +594,7 @@ pub const Window = struct {
             size.width,
             size.height,
             @as(i32, size.width) * @sizeOf(u32),
-            h.WL_SHM_FORMAT_ARGB8888,
+            h.WL_SHM_FORMAT_XRGB8888,
         ) orelse return error.Unexpected;
 
         return .{

@@ -45,7 +45,12 @@ fn render(pixels: []u32) void {
         var x: u32 = 0;
         while (x < size.width) : (x += 1) {
             const v = x ^ y ^ t;
-            pixels[y * size.width + x] = (0xFF << 24) | ((v & 0xFF) << 16) | (((v >> 1) & 0xFF) << 8) | ((v >> 2) & 0xFF);
+            std.mem.writeInt(
+                u32,
+                std.mem.asBytes(&pixels[y * size.width + x]),
+                ((v & 0xFF) << 16) | (((v >> 1) & 0xFF) << 8) | ((v >> 2) & 0xFF),
+                .little,
+            );
         }
     }
 }

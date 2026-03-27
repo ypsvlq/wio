@@ -301,7 +301,7 @@ pub const Window = struct {
             8,
             size.width * @sizeOf(u32),
             colorspace,
-            c.kCGBitmapByteOrder32Host | c.kCGImageAlphaPremultipliedFirst,
+            c.kCGImageByteOrder32Little | c.kCGImageAlphaNoneSkipFirst,
         ) orelse return error.Unexpected;
 
         return .{
