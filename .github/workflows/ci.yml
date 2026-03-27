@@ -17,7 +17,7 @@ jobs:
         - native
     runs-on: ubuntu-latest
     env:
-      build: zig build -Dtarget=${{ matrix.target }} ${{ matrix.target == 'native' && '-fsys=wio' || '' }}
+      build: zig build -Dtarget=${{ matrix.target }} ${{ matrix.target == 'native' && '-fsys=wio' || '' }} && ${{ matrix.target == 'native' && 'test "$(timeout 5 xvfb-run zig build run -fsys=wio; echo $?)" = 124' || ':' }}
     steps:
     - name: Checkout
       uses: actions/checkout@v6
