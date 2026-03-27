@@ -10,7 +10,7 @@
             .lazy = true,
         },
         .xcode_frameworks = .{
-            .url = "https://pkg.machengine.org/xcode-frameworks/9a45f3ac977fd25dff77e58c6de1870b6808c4a7.tar.gz",
+            .url = "https://pkg.hexops.org/pkg/hexops/xcode-frameworks/9a45f3ac977fd25dff77e58c6de1870b6808c4a7.tar.gz",
             .hash = "N-V-__8AABHMqAWYuRdIlflwi8gksPnlUMQBiSxAqQAAZFms",
             .lazy = true,
         },
