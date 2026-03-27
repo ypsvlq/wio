@@ -38,6 +38,9 @@ jobs:
       working-directory: examples/framebuffer
       run: ${{ env.build }}
     - if: ${{ matrix.target == 'native' }}
+      name: Run framebuffer example (X11)
+      run: test "$(xvfb-run timeout 10 examples/framebuffer/zig-out/bin/framebuffer >stdout; echo $?; cat stdout >&2)" -eq 124
+    - if: ${{ matrix.target == 'native' }}
       name: Run framebuffer example (Wayland)
       run: test "$(wlheadless-run -- timeout 10 examples/framebuffer/zig-out/bin/framebuffer; echo $?)" -eq 124
     - if: ${{ matrix.target != 'wasm32-freestanding' }}
