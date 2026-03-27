@@ -16,6 +16,8 @@ jobs:
         - wasm32-freestanding
         - native
     runs-on: ubuntu-latest
+    env:
+      build: zig build -Dtarget=${{ matrix.target }} ${{ matrix.target == 'native' && '-fsys=wio' || '' }}
     steps:
     - name: Checkout
       uses: actions/checkout@v6
@@ -30,16 +32,16 @@ jobs:
         packages: libx11-dev libxcursor-dev libglvnd-dev libwayland-dev libxkbcommon-dev libdecor-0-dev libvulkan-dev libudev-dev libpulse-dev
     - name: Build demo
       working-directory: demo
-      run: zig build -Dtarget=${{ matrix.target }} ${{ matrix.target == 'native' && '-fsys=wio' || '' }}
+      run: ${{ env.build }}
     - if: ${{ matrix.target != 'wasm32-freestanding' }}
       name: Build framebuffer example
       working-directory: examples/framebuffer
-      run: zig build -Dtarget=${{ matrix.target }} ${{ matrix.target == 'native' && '-fsys=wio' || '' }}
+      run: ${{ env.build }}
     - if: ${{ matrix.target != 'wasm32-freestanding' }}
       name: Build Vulkan example
       working-directory: examples/vulkan
-      run: zig build -Dtarget=${{ matrix.target }} ${{ matrix.target == 'native' && '-fsys=wio' || '' }}
+      run: ${{ env.build }}
     - if: ${{ endsWith(matrix.target, '-windows') }}
       name: Build D3D11 example
       working-directory: examples/d3d11
-      run: zig build -Dtarget=${{ matrix.target }}
+      run: ${{ env.build }}
