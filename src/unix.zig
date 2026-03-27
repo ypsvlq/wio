@@ -34,6 +34,10 @@ pub fn init() !void {
     errdefer pollfds.deinit(internal.allocator);
 
     if (std.c.pipe(&pipe) == -1) return error.Unexpected;
+    errdefer {
+        _ = std.c.close(pipe[0]);
+        _ = std.c.close(pipe[1]);
+    }
     if (std.c.fcntl(pipe[0], std.c.F.SETFL, @as(u32, @bitCast(std.c.O{ .NONBLOCK = true }))) == -1) return error.Unexpected;
     try pollfds.append(internal.allocator, .{ .fd = pipe[0], .events = std.c.POLL.IN, .revents = undefined });
 
