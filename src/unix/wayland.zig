@@ -189,11 +189,9 @@ pub fn init() !bool {
     if (compose_table) |_| compose_state = c.xkb_compose_state_new(compose_table, h.XKB_COMPOSE_STATE_NO_FLAGS);
 
     registry = h.wl_display_get_registry(display) orelse return error.Unexpected;
-    errdefer h.wl_registry_destroy(registry);
-    _ = h.wl_registry_add_listener(registry, &registry_listener, null);
-
-    _ = c.wl_display_roundtrip(display);
     errdefer destroyProxies();
+    _ = h.wl_registry_add_listener(registry, &registry_listener, null);
+    _ = c.wl_display_roundtrip(display);
     if (compositor == null or seat == null) return error.Unexpected;
 
     libdecor_context = c.libdecor_new(display, &libdecor_interface) orelse return error.Unexpected;
