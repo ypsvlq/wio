@@ -40,6 +40,8 @@ enable additional features:
 
 ### Tier 2
 
+Some optional features may be unimplemented.
+
 Not actively tested, but most code is shared with tier 1 targets.
 
 - OpenBSD
