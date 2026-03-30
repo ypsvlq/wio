@@ -18,6 +18,7 @@ extern void wioButtonPress(void *, UInt8);
 extern void wioButtonRelease(void *, UInt8);
 extern void wioMouse(void *, UInt16, UInt16);
 extern void wioMouseRelative(void *, SInt16, SInt16);
+extern void wioMouseLeave(void *);
 extern void wioScroll(void *, Float32, Float32);
 extern char *wioDupeClipboardText(const void *, const char *, size_t *);
 
@@ -272,16 +273,6 @@ static void warpCursor(NSWindow *window) {
     [cursor set];
 }
 
-- (void)mouseEntered:(NSEvent *)event {
-    if (!cursorInside && cursorMode != 0) [NSCursor hide];
-    cursorInside = YES;
-}
-
-- (void)mouseExited:(NSEvent *)event {
-    if (cursorInside && cursorMode != 0) [NSCursor unhide];
-    cursorInside = NO;
-}
-
 - (void)keyDown:(NSEvent *)event {
     wioKey(zig, [event keyCode], [event isARepeat]);
     if (textInput) {
@@ -362,6 +353,18 @@ static void warpCursor(NSWindow *window) {
 
 - (void)otherMouseDragged:(NSEvent *)event {
     [self mouseMoved:event];
+}
+
+- (void)mouseEntered:(NSEvent *)event {
+    if (!cursorInside && cursorMode != 0) [NSCursor hide];
+    cursorInside = YES;
+}
+
+- (void)mouseExited:(NSEvent *)event {
+    wioMouseLeave(zig);
+
+    if (cursorInside && cursorMode != 0) [NSCursor unhide];
+    cursorInside = NO;
 }
 
 - (void)scrollWheel:(NSEvent *)event {
