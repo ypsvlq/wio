@@ -1,7 +1,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const wio = @import("wio");
-const gl = @import("gl.zig");
+const gl = @import("gl");
 const triangle = @import("triangle.zig");
 const joystick = @import("joystick.zig");
 const audio = @import("audio.zig");
@@ -39,7 +39,13 @@ pub fn main() !void {
     if (wio.build_options.opengl) {
         window.makeContextCurrent();
         window.swapInterval(1);
-        try gl.load(wio.glGetProcAddress);
+        if (!builtin.cpu.arch.isWasm()) {
+            try gl.load(wio.glGetProcAddress);
+        } else {
+            inline for (@typeInfo(@TypeOf(gl.functions)).@"struct".fields) |field| {
+                @field(gl.functions, field.name) = @extern(field.type, .{ .name = field.name, .library_name = "gl" });
+            }
+        }
         try triangle.init();
     }
 

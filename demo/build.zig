@@ -20,6 +20,12 @@ pub fn build(b: *std.Build) void {
     });
     exe_mod.addImport("wio", wio.module("wio"));
 
+    const opengl = b.dependency("opengl", .{
+        .api = .gles2,
+        .major_version = 2,
+    });
+    exe_mod.addImport("gl", opengl.module("opengl"));
+
     const exe = b.addExecutable(.{
         .name = "demo",
         .root_module = exe_mod,

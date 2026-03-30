@@ -1,6 +1,6 @@
 const std = @import("std");
 const wio = @import("wio");
-const gl = @import("gl.zig");
+const gl = @import("gl");
 
 const vertices = [_]f32{
     -0.5, -0.5,

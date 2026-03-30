@@ -6,6 +6,10 @@
         .wio = .{
             .path = "..",
         },
+        .opengl = .{
+            .url = "https://github.com/ypsvlq/opengl/archive/2dfbc2b4994e3333d35fd2c1bbf459340d54fef4.tar.gz",
+            .hash = "opengl-0.0.0-_Vp8-GvsKgCK18nOkOYyRNlkJUn-zWE8hu38AeUPO7Jb",
+        },
     },
     .paths = .{
         "build.zig",

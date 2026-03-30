@@ -270,6 +270,8 @@ class GL {
 
             getShaderSource: (shader, bufSize, length, source) => this.setStringZ(source, bufSize, length, this.context.getShaderSource(this.objects[shader])),
 
+            getString: () => 0,
+
             getTexParameterfv: (target, pname, params) => this.setParams(Float32Array, params, this.context.getTexParameter(target, pname)),
 
             getTexParameteriv: (target, pname, params) => this.setParams(Int32Array, params, this.context.getTexParameter(target, pname)),
@@ -320,11 +322,15 @@ class GL {
 
             readPixels: (x, y, width, height, format, type, pixels) => this.context.readPixels(x, y, width, height, format, type, new Uint8Array(wio.instance.exports.memory.buffer, pixels)),
 
+            releaseShaderCompiler: () => { },
+
             renderbufferStorage: (target, internalformat, width, height) => this.context.renderbufferStorage(target, internalformat, width, height),
 
             sampleCoverage: (value, invert) => this.context.sampleCoverage(value, invert),
 
             scissor: (x, y, width, height) => this.context.scissor(x, y, width, height),
+
+            shaderBinary: () => { },
 
             shaderSource: (shader, count, strings_ptr, lengths_ptr) => {
                 const strings = new Uint32Array(wio.instance.exports.memory.buffer, strings_ptr, count);
@@ -352,7 +358,11 @@ class GL {
 
             texParameterf: (target, pname, param) => this.context.texParameterf(target, pname, param),
 
+            texParameterfv: (target, pname, params) => this.context.texParameterf(target, pname, new Float32Array(wio.instance.exports.memory.buffer, params)),
+
             texParameteri: (target, pname, param) => this.context.texParameteri(target, pname, param),
+
+            texParameteriv: (target, pname, params) => this.context.texParameteri(target, pname, new Int32Array(wio.instance.exports.memory.buffer, params)),
 
             texSubImage2D: (target, level, xoffset, yoffset, width, height, format, type, pixels) => this.context.texSubImage2D(target, level, xoffset, yoffset, width, height, format, type, new Uint8Array(wio.instance.exports.memory.buffer, pixels)),
 
