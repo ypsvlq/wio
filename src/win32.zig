@@ -1501,6 +1501,15 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
                     self.events.push(.{ .mouse = .{ .x = @intCast(x), .y = @intCast(y) } });
                 }
             }
+
+            var track: w.TRACKMOUSEEVENT = .{
+                .cbSize = @sizeOf(w.TRACKMOUSEEVENT),
+                .dwFlags = w.TME_LEAVE,
+                .hwndTrack = window,
+                .dwHoverTime = 0,
+            };
+            _ = w.TrackMouseEvent(&track);
+
             return 0;
         },
         w.WM_INPUT => {
@@ -1524,6 +1533,10 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
                     self.events.push(.{ .mouse_relative = .{ .x = @intCast(raw.data.mouse.lLastX), .y = @intCast(raw.data.mouse.lLastY) } });
                 }
             }
+            return 0;
+        },
+        w.WM_MOUSELEAVE => {
+            self.events.push(.mouse_leave);
             return 0;
         },
         w.WM_MOUSEWHEEL, w.WM_MOUSEHWHEEL => {
