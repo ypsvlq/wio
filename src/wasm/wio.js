@@ -149,9 +149,10 @@ class Wio {
                     events.push(18, event.movementX, event.movementY);
                 }
             });
+            canvas.addEventListener("mouseleave", () => events.push(19));
             canvas.addEventListener("wheel", (event) => {
-                if (event.deltaY !== 0) events.push(19, event.deltaY);
-                if (event.deltaX !== 0) events.push(20, event.deltaX);
+                if (event.deltaY !== 0) events.push(20, event.deltaY);
+                if (event.deltaX !== 0) events.push(21, event.deltaX);
             });
 
             this.windows.push(window);

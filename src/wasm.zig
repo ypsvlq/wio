@@ -84,6 +84,7 @@ pub const Window = struct {
             .button_release => .{ .button_release = @enumFromInt(js.shift(self.id)) },
             .mouse => .{ .mouse = .{ .x = @intCast(js.shift(self.id)), .y = @intCast(js.shift(self.id)) } },
             .mouse_relative => .{ .mouse_relative = .{ .x = @intCast(@as(i32, @bitCast(js.shift(self.id)))), .y = @intCast(@as(i32, @bitCast(js.shift(self.id)))) } },
+            .mouse_leave => .mouse_leave,
             .scroll_vertical => .{ .scroll_vertical = js.shiftFloat(self.id) },
             .scroll_horizontal => .{ .scroll_horizontal = js.shiftFloat(self.id) },
             else => unreachable,

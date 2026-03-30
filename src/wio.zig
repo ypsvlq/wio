@@ -401,6 +401,7 @@ pub const Event = union(enum) {
 
     mouse: Position,
     mouse_relative: RelativePosition,
+    mouse_leave: void,
     scroll_vertical: f32,
     scroll_horizontal: f32,
 

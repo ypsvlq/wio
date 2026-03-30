@@ -913,6 +913,9 @@ fn pointerEnter(_: ?*anyopaque, _: ?*h.wl_pointer, serial: u32, surface: ?*h.wl_
 }
 
 fn pointerLeave(_: ?*anyopaque, _: ?*h.wl_pointer, _: u32, _: ?*h.wl_surface) callconv(.c) void {
+    if (pointer_focus) |window| {
+        window.events.push(.mouse_leave);
+    }
     pointer_focus = null;
 }
 

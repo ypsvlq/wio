@@ -211,7 +211,7 @@ pub fn update() void {
 
 pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
     var attributes: h.XSetWindowAttributes = undefined;
-    attributes.event_mask = h.PropertyChangeMask | h.FocusChangeMask | h.ExposureMask | h.StructureNotifyMask | h.KeyPressMask | h.KeyReleaseMask | h.ButtonPressMask | h.ButtonReleaseMask | h.PointerMotionMask;
+    attributes.event_mask = h.PropertyChangeMask | h.FocusChangeMask | h.ExposureMask | h.StructureNotifyMask | h.KeyPressMask | h.KeyReleaseMask | h.ButtonPressMask | h.ButtonReleaseMask | h.PointerMotionMask | h.LeaveWindowMask;
     attributes.colormap = h.CopyFromParent;
 
     var depth: c_int = h.CopyFromParent;
@@ -805,6 +805,9 @@ fn handle(event: *h.XEvent) void {
                 const y = std.math.cast(u16, event.xmotion.y) orelse return;
                 window.events.push(.{ .mouse = .{ .x = x, .y = y } });
             }
+        },
+        h.LeaveNotify => {
+            window.events.push(.mouse_leave);
         },
         else => {},
     }
