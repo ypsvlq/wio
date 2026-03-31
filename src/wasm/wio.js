@@ -10,6 +10,8 @@ class Wio {
         this.windows = [];
 
         this.gamepads = navigator.getGamepads();
+
+        this.buffer = "";
     }
 
     run(instance) {
@@ -42,6 +44,15 @@ class Wio {
     }
 
     imports = {
+        write: (ptr, len) => {
+            this.buffer += this.getString(ptr, len);
+        },
+
+        flush: () => {
+            console.log(this.buffer);
+            this.buffer = "";
+        },
+
         shift: (id) => this.windows[id].events.shift(),
 
         shiftFloat: (id) => this.windows[id].events.shift(),

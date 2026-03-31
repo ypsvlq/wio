@@ -1,20 +1,3 @@
-class Log {
-    constructor(wio) {
-        this.buffer = "";
-
-        this.imports = {
-            write: (ptr, len) => {
-                this.buffer += wio.getString(ptr, len);
-            },
-
-            flush: () => {
-                console.log(this.buffer);
-                this.buffer = "";
-            },
-        };
-    }
-}
-
 class GL {
     constructor(wio) {
         this.contexts = [];
@@ -434,4 +417,4 @@ class GL {
     }
 }
 
-export { Log, GL };
+export { GL };

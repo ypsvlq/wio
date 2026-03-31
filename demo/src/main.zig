@@ -8,10 +8,7 @@ const audio = @import("audio.zig");
 
 pub const std_options = std.Options{
     .log_level = .info,
-    .logFn = if (builtin.cpu.arch.isWasm())
-        @import("wasm.zig").logFn
-    else
-        std.log.defaultLog,
+    .logFn = wio.logFn,
 };
 
 var debug_allocator = std.heap.DebugAllocator(.{}).init;

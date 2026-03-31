@@ -3,7 +3,25 @@ const build_options = @import("build_options");
 const wio = @import("wio.zig");
 const internal = @import("wio.internal.zig");
 
+var log_writer = std.Io.Writer{
+    .vtable = &.{ .drain = logDrain },
+    .buffer = &.{},
+};
+
+fn logDrain(_: *std.Io.Writer, data: []const []const u8, _: usize) !usize {
+    js.write(data[0].ptr, data[0].len);
+    return data[0].len;
+}
+
+pub fn logFn(comptime level: std.log.Level, comptime scope: @TypeOf(.enum_literal), comptime format: []const u8, args: anytype) void {
+    const prefix = if (scope == .default) ": " else "(" ++ @tagName(scope) ++ "): ";
+    log_writer.print(level.asText() ++ prefix ++ format ++ "\n", args) catch {};
+    js.flush();
+}
+
 const js = struct {
+    extern "wio" fn write([*]const u8, usize) void;
+    extern "wio" fn flush() void;
     extern "wio" fn shift(u32) u32;
     extern "wio" fn shiftFloat(u32) f32;
     extern "wio" fn messageBox([*]const u8, usize) void;

@@ -10,6 +10,8 @@ pub const backend = switch (builtin.os.tag) {
     else => if (builtin.target.cpu.arch.isWasm()) @import("wasm.zig") else @compileError("unsupported platform"),
 };
 
+pub const logFn = if (@hasDecl(backend, "logFn")) backend.logFn else std.log.defaultLog;
+
 pub const InitOptions = struct {
     /// Free with `JoystickDevice.release()`.
     joystickConnectedFn: ?*const fn (JoystickDevice) void = null,
