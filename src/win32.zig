@@ -333,6 +333,7 @@ pub const Window = struct {
     window: w.HWND,
     cursor: w.HCURSOR,
     cursor_mode: wio.CursorMode = .normal,
+    tracking: bool = false,
     rect: w.RECT = .{ .left = 0, .top = 0, .right = 0, .bottom = 0 },
     surrogate: u16 = 0,
     left_shift: bool = false,
@@ -1502,13 +1503,16 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
                 }
             }
 
-            var track: w.TRACKMOUSEEVENT = .{
-                .cbSize = @sizeOf(w.TRACKMOUSEEVENT),
-                .dwFlags = w.TME_LEAVE,
-                .hwndTrack = window,
-                .dwHoverTime = 0,
-            };
-            _ = w.TrackMouseEvent(&track);
+            if (!self.tracking) {
+                var track: w.TRACKMOUSEEVENT = .{
+                    .cbSize = @sizeOf(w.TRACKMOUSEEVENT),
+                    .dwFlags = w.TME_LEAVE,
+                    .hwndTrack = window,
+                    .dwHoverTime = 0,
+                };
+                _ = w.TrackMouseEvent(&track);
+                self.tracking = true;
+            }
 
             return 0;
         },
@@ -1537,6 +1541,7 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
         },
         w.WM_MOUSELEAVE => {
             self.events.push(.mouse_leave);
+            self.tracking = false;
             return 0;
         },
         w.WM_MOUSEWHEEL, w.WM_MOUSEHWHEEL => {
