@@ -97,44 +97,58 @@ pub fn build(b: *std.Build) !void {
             }
         },
         .linux, .openbsd, .netbsd, .freebsd, .dragonfly, .illumos => |tag| {
-            module.link_libc = true;
-
-            if (enable_wayland) {
-                module.addCSourceFile(.{ .file = b.path("src/unix/wayland.c") });
-            }
-
-            if (b.lazyDependency("wio_unix_headers", .{})) |unix_headers| {
-                module.addIncludePath(unix_headers.path("."));
-            }
-
-            if (tag == .openbsd) module.linkSystemLibrary("sndio", .{});
-
-            if (system_integration) {
-                if (enable_x11) {
-                    module.linkSystemLibrary("x11", .{});
-                    module.linkSystemLibrary("xcursor", .{});
-                    if (enable_opengl) {
-                        module.linkSystemLibrary("gl", .{});
-                    }
+            if (target.result.abi.isAndroid()) {
+                if (b.lazyDependency("android", .{})) |android| {
+                    module.addImport("android", android.module("android"));
                 }
-                if (enable_wayland) {
-                    module.linkSystemLibrary("wayland-client", .{});
-                    module.linkSystemLibrary("xkbcommon", .{});
-                    module.linkSystemLibrary("libdecor-0", .{});
-                    if (enable_opengl) {
-                        module.linkSystemLibrary("wayland-egl", .{});
-                        module.linkSystemLibrary("egl", .{});
-                    }
+
+                module.linkSystemLibrary("android", .{});
+                if (enable_opengl) {
+                    module.linkSystemLibrary("EGL", .{});
                 }
                 if (enable_vulkan) {
                     module.linkSystemLibrary("vulkan", .{});
                 }
-                if (tag == .linux) {
-                    if (enable_joystick) {
-                        module.linkSystemLibrary("libudev", .{});
+            } else {
+                module.link_libc = true;
+
+                if (enable_wayland) {
+                    module.addCSourceFile(.{ .file = b.path("src/unix/wayland.c") });
+                }
+
+                if (b.lazyDependency("wio_unix_headers", .{})) |unix_headers| {
+                    module.addIncludePath(unix_headers.path("."));
+                }
+
+                if (tag == .openbsd) module.linkSystemLibrary("sndio", .{});
+
+                if (system_integration) {
+                    if (enable_x11) {
+                        module.linkSystemLibrary("x11", .{});
+                        module.linkSystemLibrary("xcursor", .{});
+                        if (enable_opengl) {
+                            module.linkSystemLibrary("gl", .{});
+                        }
                     }
-                    if (enable_audio) {
-                        module.linkSystemLibrary("libpulse", .{});
+                    if (enable_wayland) {
+                        module.linkSystemLibrary("wayland-client", .{});
+                        module.linkSystemLibrary("xkbcommon", .{});
+                        module.linkSystemLibrary("libdecor-0", .{});
+                        if (enable_opengl) {
+                            module.linkSystemLibrary("wayland-egl", .{});
+                            module.linkSystemLibrary("egl", .{});
+                        }
+                    }
+                    if (enable_vulkan) {
+                        module.linkSystemLibrary("vulkan", .{});
+                    }
+                    if (tag == .linux) {
+                        if (enable_joystick) {
+                            module.linkSystemLibrary("libudev", .{});
+                        }
+                        if (enable_audio) {
+                            module.linkSystemLibrary("libpulse", .{});
+                        }
                     }
                 }
             }
@@ -173,4 +187,10 @@ pub fn build(b: *std.Build) !void {
             }
         },
     }
+}
+
+pub fn setupApk(module: *std.Build.Module, apk: anytype) void {
+    const b = module.owner;
+    module.addIncludePath(.{ .cwd_relative = b.pathJoin(&.{ apk.ndk.path, "sources/android/native_app_glue" }) });
+    module.addCSourceFile(.{ .file = .{ .cwd_relative = b.pathJoin(&.{ apk.ndk.path, "sources/android/native_app_glue/android_native_app_glue.c" }) } });
 }

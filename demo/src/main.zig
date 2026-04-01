@@ -6,6 +6,11 @@ const triangle = @import("triangle.zig");
 const joystick = @import("joystick.zig");
 const audio = @import("audio.zig");
 
+comptime {
+    // for Android
+    _ = wio.backend;
+}
+
 pub const std_options = std.Options{
     .log_level = .info,
     .logFn = wio.logFn,

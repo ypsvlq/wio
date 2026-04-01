@@ -5,7 +5,8 @@ const internal = @import("wio.internal.zig");
 pub const backend = switch (builtin.os.tag) {
     .windows => @import("win32.zig"),
     .macos => @import("macos.zig"),
-    .linux, .openbsd, .netbsd, .freebsd, .dragonfly, .illumos => @import("unix.zig"),
+    .linux => if (builtin.target.abi.isAndroid()) @import("android.zig") else @import("unix.zig"),
+    .openbsd, .netbsd, .freebsd, .dragonfly, .illumos => @import("unix.zig"),
     .haiku => @import("haiku.zig"),
     else => if (builtin.target.cpu.arch.isWasm()) @import("wasm.zig") else @compileError("unsupported platform"),
 };

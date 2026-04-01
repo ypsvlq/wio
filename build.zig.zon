@@ -19,6 +19,11 @@
             .hash = "wio_unix_headers-0.0.0-seffXJKGPgDeI78u4wx_Tk2ZfniEQqj6W5zFVLj8tSbi",
             .lazy = true,
         },
+        .android = .{
+            .url = "https://github.com/silbinarywolf/zig-android-sdk/archive/4a1658a97a7af733966faad3a4549145686c5620.tar.gz",
+            .hash = "android-0.3.0-7iz7QrgGAgBZrHuI-EackndG6h9Bn7YvqH2SoH3rUr51",
+            .lazy = true,
+        },
     },
     .paths = .{
         "build.zig",

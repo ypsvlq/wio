@@ -10,6 +10,11 @@
             .url = "https://github.com/ypsvlq/opengl/archive/2dfbc2b4994e3333d35fd2c1bbf459340d54fef4.tar.gz",
             .hash = "opengl-0.0.0-_Vp8-GvsKgCK18nOkOYyRNlkJUn-zWE8hu38AeUPO7Jb",
         },
+        .android = .{
+            .url = "https://github.com/silbinarywolf/zig-android-sdk/archive/4a1658a97a7af733966faad3a4549145686c5620.tar.gz",
+            .hash = "android-0.3.0-7iz7QrgGAgBZrHuI-EackndG6h9Bn7YvqH2SoH3rUr51",
+            .lazy = true,
+        },
     },
     .paths = .{
         "build.zig",
