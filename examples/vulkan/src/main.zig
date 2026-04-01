@@ -352,7 +352,7 @@ fn recreateSwapchain() !void {
         .queue_family_index_count = if (graphics_queue_index != present_queue_index) 2 else 0,
         .p_queue_family_indices = &.{ graphics_queue_index, present_queue_index },
         .pre_transform = capabilities.current_transform,
-        .composite_alpha = .{ .opaque_bit_khr = true },
+        .composite_alpha = if (capabilities.supported_composite_alpha.opaque_bit_khr) .{ .opaque_bit_khr = true } else .{ .inherit_bit_khr = true },
         .present_mode = .fifo_khr,
         .clipped = vk.TRUE,
     }, null);
