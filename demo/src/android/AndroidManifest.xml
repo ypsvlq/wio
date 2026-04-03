@@ -3,11 +3,10 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     package="net.tiredsleepy.wio.demo">
     <application
-        android:label="@string/app_name"
-        android:hasCode="false">
+        android:label="@string/app_name">
         <activity
-            android:name="android.app.NativeActivity"
-            android:configChanges="orientation"
+            android:name="net.tiredsleepy.wio.WioActivity"
+            android:configChanges="orientation|screenLayout|screenSize"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

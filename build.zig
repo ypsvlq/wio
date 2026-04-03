@@ -189,8 +189,7 @@ pub fn build(b: *std.Build) !void {
     }
 }
 
-pub fn setupApk(module: *std.Build.Module, apk: anytype) void {
-    const b = module.owner;
-    module.addIncludePath(.{ .cwd_relative = b.pathJoin(&.{ apk.ndk.path, "sources/android/native_app_glue" }) });
-    module.addCSourceFile(.{ .file = .{ .cwd_relative = b.pathJoin(&.{ apk.ndk.path, "sources/android/native_app_glue/android_native_app_glue.c" }) } });
+pub fn setupApk(wio: *std.Build.Module, apk: anytype) void {
+    const b = wio.owner;
+    apk.addJavaSourceFile(.{ .file = b.path("src/android/WioActivity.java") });
 }

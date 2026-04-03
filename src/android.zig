@@ -5,7 +5,9 @@ const wio = @import("wio.zig");
 const internal = @import("wio.internal.zig");
 const log = std.log.scoped(.wio);
 const c = @cImport({
-    @cInclude("android_native_app_glue.h");
+    @cInclude("jni.h");
+    @cInclude("android/input.h");
+    @cInclude("android/native_window_jni.h");
     @cInclude("EGL/egl.h");
     @cInclude("vulkan/vulkan.h");
     @cInclude("vulkan/vulkan_android.h");
@@ -13,16 +15,34 @@ const c = @cImport({
 
 pub const logFn = android.logFn;
 
-export fn android_main(state: *c.android_app) void {
-    app = state;
+export fn JNI_OnLoad(vm: *c.JavaVM, _: ?*anyopaque) c.jint {
+    var env: *c.JNIEnv = undefined;
+    if (vm.*.*.GetEnv.?(vm, @ptrCast(&env), c.JNI_VERSION_1_6) != c.JNI_OK) return c.JNI_ERR;
+
+    const class = env.*.*.FindClass.?(env, "net/tiredsleepy/wio/WioActivity") orelse return c.JNI_ERR;
+    if (env.*.*.RegisterNatives.?(env, class, &jni_methods, jni_methods.len) != c.JNI_OK) return c.JNI_ERR;
+
+    const thread = std.Thread.spawn(.{}, main, .{}) catch |err| {
+        std.log.err("{s}", .{@errorName(err)});
+        return c.JNI_ERR;
+    };
+    thread.detach();
+
+    return c.JNI_VERSION_1_6;
+}
+
+fn main() void {
     @import("root").main() catch |err| {
         std.log.err("{s}", .{@errorName(err)});
     };
     std.process.exit(0);
 }
 
-var app: *c.android_app = undefined;
 var events: internal.EventQueue = .{};
+var events_mutex: std.Thread.Mutex = .{};
+var wait_event: std.Thread.ResetEvent = .{};
+
+var window: ?*c.ANativeWindow = null;
 
 var egl_display: c.EGLDisplay = undefined;
 var egl_config: c.EGLConfig = undefined;
@@ -31,9 +51,6 @@ var egl_surface: c.EGLSurface = null;
 var egl_surface_mutex: std.Thread.Mutex = .{};
 
 pub fn init() !void {
-    app.onAppCmd = onAppCmd;
-    app.onInputEvent = onInputEvent;
-
     if (build_options.opengl) {
         egl_display = c.eglGetDisplay(c.EGL_DEFAULT_DISPLAY) orelse return logUnexpectedEgl("eglGetDisplay");
         if (c.eglInitialize(egl_display, null, null) == c.EGL_FALSE) return logUnexpectedEgl("eglInitialize");
@@ -52,20 +69,19 @@ pub fn run(func: fn () anyerror!bool) !void {
     }
 }
 
-pub fn update() void {
-    wait(.{ .timeout_ns = 0 });
-}
+pub fn update() void {}
 
 pub fn wait(options: wio.WaitOptions) void {
-    var maybe_source: ?*c.android_poll_source = null;
-    _ = c.ALooper_pollOnce(if (options.timeout_ns) |timeout| std.math.lossyCast(c_int, timeout / std.time.ns_per_ms) else -1, null, null, @ptrCast(&maybe_source));
-    if (maybe_source) |source| {
-        source.process.?(app, source);
+    wait_event.reset();
+    if (options.timeout_ns) |timeout_ns| {
+        wait_event.timedWait(timeout_ns) catch {};
+    } else {
+        wait_event.wait();
     }
 }
 
 pub fn cancelWait() void {
-    _ = c.ALooper_wake(app.looper);
+    wait_event.set();
 }
 
 pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
@@ -119,6 +135,8 @@ pub const Window = struct {
     }
 
     pub fn getEvent(_: *Window) ?wio.Event {
+        events_mutex.lock();
+        defer events_mutex.unlock();
         return events.pop();
     }
 
@@ -210,7 +228,7 @@ pub const Window = struct {
                 .sType = c.VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR,
                 .pNext = null,
                 .flags = 0,
-                .window = app.window,
+                .window = window,
             },
             @ptrCast(@alignCast(allocator)),
             @ptrCast(surface),
@@ -350,80 +368,107 @@ pub const AudioInput = struct {
     }
 };
 
-fn onAppCmd(_: ?*c.android_app, cmd: i32) callconv(.c) void {
-    switch (cmd) {
-        c.APP_CMD_INIT_WINDOW => {
-            events.push(.visible);
-            if (build_options.opengl) {
-                if (egl_context) |_| {
-                    egl_surface_mutex.lock();
-                    defer egl_surface_mutex.unlock();
-                    egl_surface = c.eglCreateWindowSurface(egl_display, egl_config, app.window, null) orelse {
-                        logEglError("eglCreateWindowSurface");
-                        return;
-                    };
-                }
-            }
-        },
-        c.APP_CMD_TERM_WINDOW => {
-            events.push(.hidden);
-            if (build_options.opengl) {
-                if (egl_surface) |_| {
-                    egl_surface_mutex.lock();
-                    defer egl_surface_mutex.unlock();
-                    _ = c.eglDestroySurface(egl_display, egl_surface);
-                    egl_surface = null;
-                }
-            }
-        },
-        c.APP_CMD_WINDOW_RESIZED => {
-            const density: f32 = @floatFromInt(c.AConfiguration_getDensity(app.config));
-            events.push(.{ .scale = density / c.ACONFIGURATION_DENSITY_MEDIUM });
-            const size: wio.Size = .{ .width = std.math.lossyCast(u16, c.ANativeWindow_getWidth(app.window)), .height = std.math.lossyCast(u16, c.ANativeWindow_getHeight(app.window)) };
-            events.push(.{ .size_logical = size });
-            events.push(.{ .size_physical = size });
-            events.push(.draw);
-        },
-        c.APP_CMD_WINDOW_REDRAW_NEEDED => events.push(.draw),
-        c.APP_CMD_GAINED_FOCUS => events.push(.focused),
-        c.APP_CMD_LOST_FOCUS => events.push(.unfocused),
-        c.APP_CMD_DESTROY => events.push(.close),
-        else => {},
-    }
+fn pushEvent(event: wio.Event) void {
+    events_mutex.lock();
+    defer events_mutex.unlock();
+    events.push(event);
+    wait_event.set();
 }
 
-fn onInputEvent(_: ?*c.android_app, event: ?*c.AInputEvent) callconv(.c) i32 {
-    switch (c.AInputEvent_getType(event)) {
-        c.AINPUT_EVENT_TYPE_KEY => {
-            if (keycodeToButton(c.AKeyEvent_getKeyCode(event))) |button| {
-                switch (c.AKeyEvent_getAction(event)) {
-                    c.AKEY_EVENT_ACTION_DOWN => events.push(.{ .button_press = button }),
-                    c.AKEY_EVENT_ACTION_UP => events.push(.{ .button_release = button }),
-                    c.AKEY_EVENT_ACTION_MULTIPLE => events.push(.{ .button_repeat = button }),
-                    else => {},
-                }
-                return 1;
-            }
-        },
-        c.AINPUT_EVENT_TYPE_MOTION => {
-            const data = c.AMotionEvent_getAction(event);
-            const action = data & c.AMOTION_EVENT_ACTION_MASK;
+const jni_methods = [_]c.JNINativeMethod{
+    .{ .name = "onDestroyNative", .signature = "()V", .fnPtr = @ptrCast(@constCast(&jni.onDestroyNative)) },
+    .{ .name = "onWindowFocusChangedNative", .signature = "(Z)V", .fnPtr = @ptrCast(@constCast(&jni.onWindowFocusChanged)) },
+    .{ .name = "onTouchEventNative", .signature = "(IIII)V", .fnPtr = @ptrCast(@constCast(&jni.onTouchEvent)) },
+    .{ .name = "onKeyDownNative", .signature = "(II)Z", .fnPtr = @ptrCast(@constCast(&jni.onKeyDown)) },
+    .{ .name = "onKeyUpNative", .signature = "(I)Z", .fnPtr = @ptrCast(@constCast(&jni.onKeyUp)) },
+    .{ .name = "surfaceCreatedNative", .signature = "(Landroid/view/Surface;)V", .fnPtr = @ptrCast(@constCast(&jni.surfaceCreated)) },
+    .{ .name = "surfaceChangedNative", .signature = "(FII)V", .fnPtr = @ptrCast(@constCast(&jni.surfaceChanged)) },
+    .{ .name = "surfaceDestroyedNative", .signature = "()V", .fnPtr = @ptrCast(@constCast(&jni.surfaceDestroyed)) },
+    .{ .name = "onGlobalLayoutNative", .signature = "()V", .fnPtr = @ptrCast(@constCast(&jni.onGlobalLayout)) },
+};
 
-            switch (action) {
-                c.AMOTION_EVENT_ACTION_DOWN, c.AMOTION_EVENT_ACTION_MOVE => events.push(.{ .touch = .{
-                    .id = 0,
-                    .x = @intFromFloat(c.AMotionEvent_getX(event, 0)),
-                    .y = @intFromFloat(c.AMotionEvent_getY(event, 0)),
-                } }),
-                c.AMOTION_EVENT_ACTION_UP => events.push(.{ .touch_end = .{ .id = 0, .ignore = false } }),
-                c.AMOTION_EVENT_ACTION_CANCEL => events.push(.{ .touch_end = .{ .id = 0, .ignore = true } }),
-                else => {},
-            }
-        },
-        else => {},
+const jni = struct {
+    fn onDestroyNative(_: *c.JNIEnv, _: c.jobject) callconv(.c) void {
+        pushEvent(.close);
     }
-    return 0;
-}
+
+    fn onWindowFocusChanged(_: *c.JNIEnv, _: c.jobject, focused: c.jboolean) callconv(.c) void {
+        pushEvent(if (focused == c.JNI_TRUE) .focused else .unfocused);
+    }
+
+    fn onTouchEvent(_: *c.JNIEnv, _: c.jobject, action: c.jint, id_j: c.jint, x: c.jint, y: c.jint) callconv(.c) void {
+        const id = std.math.cast(u8, id_j) orelse return;
+        switch (action) {
+            c.AMOTION_EVENT_ACTION_DOWN,
+            c.AMOTION_EVENT_ACTION_MOVE,
+            c.AMOTION_EVENT_ACTION_POINTER_DOWN,
+            => pushEvent(.{ .touch = .{ .id = id, .x = std.math.cast(u16, x) orelse return, .y = std.math.cast(u16, y) orelse return } }),
+
+            c.AMOTION_EVENT_ACTION_UP,
+            c.AMOTION_EVENT_ACTION_POINTER_UP,
+            => pushEvent(.{ .touch_end = .{ .id = id, .ignore = false } }),
+
+            c.AMOTION_EVENT_ACTION_CANCEL,
+            => pushEvent(.{ .touch_end = .{ .id = id, .ignore = true } }),
+
+            else => {},
+        }
+    }
+
+    fn onKeyDown(_: *c.JNIEnv, _: c.jobject, keycode: c.jint, repeat: c.jint) callconv(.c) c.jboolean {
+        const button = keycodeToButton(keycode) orelse return c.JNI_FALSE;
+        pushEvent(if (repeat == 0) .{ .button_press = button } else .{ .button_repeat = button });
+        return c.JNI_TRUE;
+    }
+
+    fn onKeyUp(_: *c.JNIEnv, _: c.jobject, keycode: c.jint) callconv(.c) c.jboolean {
+        const button = keycodeToButton(keycode) orelse return c.JNI_FALSE;
+        pushEvent(.{ .button_release = button });
+        return c.JNI_TRUE;
+    }
+
+    fn surfaceCreated(env: *c.JNIEnv, _: c.jobject, surface: c.jobject) callconv(.c) void {
+        window = c.ANativeWindow_fromSurface(env, surface);
+        pushEvent(.visible);
+
+        if (build_options.opengl) {
+            if (egl_context) |_| {
+                egl_surface_mutex.lock();
+                defer egl_surface_mutex.unlock();
+                egl_surface = c.eglCreateWindowSurface(egl_display, egl_config, window, null) orelse {
+                    logEglError("eglCreateWindowSurface");
+                    return;
+                };
+            }
+        }
+    }
+
+    fn surfaceChanged(_: *c.JNIEnv, _: c.jobject, density: c.jfloat, width: c.jint, height: c.jint) callconv(.c) void {
+        const size: wio.Size = .{ .width = std.math.lossyCast(u16, width), .height = std.math.lossyCast(u16, height) };
+        pushEvent(.{ .scale = density });
+        pushEvent(.{ .size_logical = size });
+        pushEvent(.{ .size_physical = size });
+    }
+
+    fn surfaceDestroyed(_: *c.JNIEnv, _: c.jobject) callconv(.c) void {
+        c.ANativeWindow_release(window);
+        window = null;
+        pushEvent(.hidden);
+
+        if (build_options.opengl) {
+            if (egl_surface) |_| {
+                egl_surface_mutex.lock();
+                defer egl_surface_mutex.unlock();
+                _ = c.eglDestroySurface(egl_display, egl_surface);
+                egl_surface = null;
+            }
+        }
+    }
+
+    fn onGlobalLayout(_: *c.JNIEnv, _: c.jobject) callconv(.c) void {
+        pushEvent(.draw);
+    }
+};
 
 fn logUnexpectedEgl(name: []const u8) error{Unexpected} {
     logEglError(name);
