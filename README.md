@@ -31,18 +31,15 @@ enable additional features:
 
 ## Platform support
 
-### Tier 1
+Actively tested:
 
 - Windows
 - macOS (10.13+)
 - Linux
+- Android
 - WebAssembly
 
-### Tier 2
-
-Some optional features may be unimplemented.
-
-Not actively tested, but most code is shared with tier 1 targets.
+Not actively tested, but most code is shared with Linux:
 
 - OpenBSD
 - NetBSD
@@ -50,11 +47,20 @@ Not actively tested, but most code is shared with tier 1 targets.
 - DragonFlyBSD
 - illumos
 
-### Tier 3
-
-Not actively tested.
+Not actively tested:
 
 - Haiku
+
+### API support
+
+The framebuffer API is not currently implemented for Android, WebAssembly, or
+Haiku.
+
+The joystick API is not currently implemented for Android, OpenBSD, NetBSD,
+FreeBSD, DragonFlyBSD, or illumos.
+
+The audio API is not currently implemented for Android, WebAssembly, NetBSD,
+FreeBSD, DragonFlyBSD, or illumos.
 
 ## Platform notes
 
