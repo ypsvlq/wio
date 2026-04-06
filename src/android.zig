@@ -194,15 +194,39 @@ pub const Window = struct {
         return null;
     }
 
-    pub fn createFramebuffer(self: *Window, size: wio.Size) !Framebuffer {
-        _ = self;
-        _ = size;
-        return error.Unexpected;
+    pub fn createFramebuffer(_: *Window, size: wio.Size) !Framebuffer {
+        const pixels = try internal.allocator.alloc(u32, @as(usize, size.width) * size.height);
+        return .{
+            .pixels = pixels,
+            .size = size,
+        };
     }
 
-    pub fn presentFramebuffer(self: *Window, framebuffer: *Framebuffer) void {
-        _ = self;
-        _ = framebuffer;
+    pub fn presentFramebuffer(_: *Window, framebuffer: *Framebuffer) void {
+        if (window == null) return;
+
+        const width = framebuffer.size.width;
+        const height = framebuffer.size.height;
+        if (c.ANativeWindow_setBuffersGeometry(window, width, height, c.AHARDWAREBUFFER_FORMAT_R8G8B8X8_UNORM) != 0) return;
+
+        var buffer: c.ANativeWindow_Buffer = undefined;
+        if (c.ANativeWindow_lock(window, &buffer, null) != 0) return;
+        defer _ = c.ANativeWindow_unlockAndPost(window);
+
+        const bitmap: [*]u32 = @ptrCast(@alignCast(buffer.bits));
+        const stride: u32 = @bitCast(buffer.stride);
+        var y: u32 = 0;
+        while (y < height) : (y += 1) {
+            var x: u32 = 0;
+            while (x < width) : (x += 1) {
+                std.mem.writeInt(
+                    u32,
+                    std.mem.asBytes(&bitmap[y * stride + x]),
+                    std.math.rotl(u32, framebuffer.pixels[y * width + x], 8),
+                    .big,
+                );
+            }
+        }
     }
 
     pub fn makeContextCurrent(_: *Window) void {
@@ -237,13 +261,15 @@ pub const Window = struct {
 };
 
 pub const Framebuffer = struct {
+    pixels: []u32,
+    size: wio.Size,
+
     pub fn destroy(self: *Framebuffer) void {
-        _ = self;
+        internal.allocator.free(self.pixels);
     }
 
     pub fn getPixels(self: *Framebuffer) []u32 {
-        _ = self;
-        return &.{};
+        return self.pixels;
     }
 };
 
