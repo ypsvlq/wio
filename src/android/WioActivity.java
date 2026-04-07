@@ -22,7 +22,7 @@ public class WioActivity extends Activity implements SurfaceHolder.Callback, OnG
 
     native void onCreateNative();
     static native void onDestroyNative();
-    static native void onWindowFocusChangedNative(boolean focused);
+    native void onWindowFocusChangedNative(boolean focused);
     static native void onTouchEventNative(int action, int id, int x, int y);
     static native void pushMouseEventNative(int x, int y, int buttons);
     static native void pushScrollEventNative(float vertical, float horizontal);

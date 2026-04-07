@@ -451,8 +451,12 @@ const native = struct {
         pushEvent(.close);
     }
 
-    fn onWindowFocusChanged(_: *c.JNIEnv, _: c.jobject, focused: c.jboolean) callconv(.c) void {
+    fn onWindowFocusChanged(env: *c.JNIEnv, instance: c.jobject, focused: c.jboolean) callconv(.c) void {
         pushEvent(if (focused == c.JNI_TRUE) .focused else .unfocused);
+
+        if (focused == c.JNI_TRUE and cursor_mode == .relative) {
+            env.*.*.CallVoidMethod.?(env, instance, java.setCursorMode, @as(c.jint, @intFromEnum(cursor_mode)));
+        }
     }
 
     fn onTouchEvent(_: *c.JNIEnv, _: c.jobject, action: c.jint, id_j: c.jint, x: c.jint, y: c.jint) callconv(.c) void {
