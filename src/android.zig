@@ -130,20 +130,11 @@ pub const Window = struct {
         _ = title;
     }
 
-    pub fn setMode(self: *Window, mode: wio.WindowMode) void {
-        _ = self;
-        _ = mode;
-    }
+    pub fn setMode(_: *Window, _: wio.WindowMode) void {}
 
-    pub fn setSize(self: *Window, size: wio.Size) void {
-        _ = self;
-        _ = size;
-    }
+    pub fn setSize(_: *Window, _: wio.Size) void {}
 
-    pub fn setParent(self: *Window, parent: usize) void {
-        _ = self;
-        _ = parent;
-    }
+    pub fn setParent(_: *Window, _: usize) void {}
 
     pub fn setCursor(self: *Window, shape: wio.Cursor) void {
         _ = self;
@@ -155,9 +146,7 @@ pub const Window = struct {
         _ = mode;
     }
 
-    pub fn requestAttention(self: *Window) void {
-        _ = self;
-    }
+    pub fn requestAttention(_: *Window) void {}
 
     pub fn setClipboardText(self: *Window, text: []const u8) void {
         _ = self;
