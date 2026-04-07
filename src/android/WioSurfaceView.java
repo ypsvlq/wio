@@ -14,7 +14,6 @@ public class WioSurfaceView extends SurfaceView {
 
     @Override
     public InputConnection onCreateInputConnection(EditorInfo outAttrs) {
-        outAttrs.inputType = EditorInfo.TYPE_CLASS_TEXT;
         return inputConnection;
     }
 }
