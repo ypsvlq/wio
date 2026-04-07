@@ -32,6 +32,7 @@ public class WioActivity extends Activity implements SurfaceHolder.Callback, OnG
     static native void surfaceChangedNative(float density, int width, int height);
     static native void surfaceDestroyedNative();
     static native void onGlobalLayoutNative();
+    static native void onCapturedPointerEventNative(int x, int y);
     static native void pushCharEventNative(int codepoint);
 
     @Override
@@ -171,6 +172,14 @@ public class WioActivity extends Activity implements SurfaceHolder.Callback, OnG
 
     public void setCursor(int cursor) {
         getCurrentFocus().setPointerIcon(PointerIcon.getSystemIcon(this, cursors[cursor + 1]));
+    }
+
+    public void setCursorMode(int mode) {
+        if (mode == 2) {
+            getCurrentFocus().requestPointerCapture();
+        } else {
+            getCurrentFocus().releasePointerCapture();
+        }
     }
 
     public void setClipboardText(String text) {

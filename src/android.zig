@@ -21,6 +21,9 @@ var wait_event: std.Thread.ResetEvent = .{};
 
 var window: ?*c.ANativeWindow = null;
 
+var cursor: c.jint = @intFromEnum(wio.Cursor.arrow);
+var cursor_mode: wio.CursorMode = .normal;
+
 var egl_display: c.EGLDisplay = undefined;
 var egl_config: c.EGLConfig = undefined;
 var egl_context: c.EGLContext = null;
@@ -136,14 +139,16 @@ pub const Window = struct {
 
     pub fn setParent(_: *Window, _: usize) void {}
 
-    var cursor: c.jint = @intFromEnum(wio.Cursor.arrow);
-
     pub fn setCursor(_: *Window, shape: wio.Cursor) void {
         cursor = @intFromEnum(shape);
-        java.env.*.*.CallVoidMethod.?(java.env, java.activity, java.setCursor, cursor);
+        if (cursor_mode == .normal) {
+            java.env.*.*.CallVoidMethod.?(java.env, java.activity, java.setCursor, cursor);
+        }
     }
 
     pub fn setCursorMode(_: *Window, mode: wio.CursorMode) void {
+        cursor_mode = mode;
+        java.env.*.*.CallVoidMethod.?(java.env, java.activity, java.setCursorMode, @as(c.jint, @intFromEnum(mode)));
         java.env.*.*.CallVoidMethod.?(java.env, java.activity, java.setCursor, if (mode == .normal) cursor else -1);
     }
 
@@ -380,6 +385,7 @@ export fn JNI_OnLoad(vm: *c.JavaVM, _: ?*anyopaque) c.jint {
     java.enableTextInput = env.*.*.GetMethodID.?(env, class, "enableTextInput", "()V") orelse return c.JNI_ERR;
     java.disableTextInput = env.*.*.GetMethodID.?(env, class, "disableTextInput", "()V") orelse return c.JNI_ERR;
     java.setCursor = env.*.*.GetMethodID.?(env, class, "setCursor", "(I)V") orelse return c.JNI_ERR;
+    java.setCursorMode = env.*.*.GetMethodID.?(env, class, "setCursorMode", "(I)V") orelse return c.JNI_ERR;
     java.setClipboardText = env.*.*.GetMethodID.?(env, class, "setClipboardText", "(Ljava/lang/String;)V") orelse return c.JNI_ERR;
     java.getClipboardText = env.*.*.GetMethodID.?(env, class, "getClipboardText", "()Ljava/lang/String;") orelse return c.JNI_ERR;
 
@@ -408,6 +414,7 @@ const java = struct {
     var enableTextInput: c.jmethodID = undefined;
     var disableTextInput: c.jmethodID = undefined;
     var setCursor: c.jmethodID = undefined;
+    var setCursorMode: c.jmethodID = undefined;
     var setClipboardText: c.jmethodID = undefined;
     var getClipboardText: c.jmethodID = undefined;
 };
@@ -426,6 +433,7 @@ const native = struct {
         .{ .name = "surfaceChangedNative", .signature = "(FII)V", .fnPtr = @ptrCast(@constCast(&surfaceChanged)) },
         .{ .name = "surfaceDestroyedNative", .signature = "()V", .fnPtr = @ptrCast(@constCast(&surfaceDestroyed)) },
         .{ .name = "onGlobalLayoutNative", .signature = "()V", .fnPtr = @ptrCast(@constCast(&onGlobalLayout)) },
+        .{ .name = "onCapturedPointerEventNative", .signature = "(II)V", .fnPtr = @ptrCast(@constCast(&onCapturedPointerEventNative)) },
         .{ .name = "pushCharEventNative", .signature = "(I)V", .fnPtr = @ptrCast(@constCast(&pushCharEvent)) },
     };
 
@@ -552,6 +560,10 @@ const native = struct {
 
     fn onGlobalLayout(_: *c.JNIEnv, _: c.jobject) callconv(.c) void {
         pushEvent(.draw);
+    }
+
+    fn onCapturedPointerEventNative(_: *c.JNIEnv, _: c.jobject, x: c.jint, y: c.jint) callconv(.c) void {
+        pushEvent(.{ .mouse_relative = .{ .x = std.math.cast(i16, x) orelse return, .y = std.math.cast(i16, y) orelse return } });
     }
 
     fn pushCharEvent(_: *c.JNIEnv, _: c.jobject, codepoint: c.jint) callconv(.c) void {
