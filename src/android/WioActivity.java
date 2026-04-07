@@ -1,6 +1,8 @@
 package net.tiredsleepy.wio;
 
 import android.app.Activity;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.os.Bundle;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
@@ -122,5 +124,19 @@ public class WioActivity extends Activity implements SurfaceHolder.Callback, OnG
     public void disableTextInput() {
         InputMethodManager imm = (InputMethodManager)getSystemService(INPUT_METHOD_SERVICE);
         imm.hideSoftInputFromWindow(getCurrentFocus().getWindowToken(), 0);
+    }
+
+    public void setClipboardText(String text) {
+        ClipboardManager clipboard = (ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
+        clipboard.setPrimaryClip(ClipData.newPlainText(null, text));
+    }
+
+    public String getClipboardText() {
+        ClipboardManager clipboard = (ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
+        try {
+            return clipboard.getPrimaryClip().getItemAt(0).getText().toString();
+        } catch (NullPointerException e) {
+            return null;
+        }
     }
 }

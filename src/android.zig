@@ -148,15 +148,24 @@ pub const Window = struct {
 
     pub fn requestAttention(_: *Window) void {}
 
-    pub fn setClipboardText(self: *Window, text: []const u8) void {
-        _ = self;
-        _ = text;
+    pub fn setClipboardText(_: *Window, text: []const u8) void {
+        const text_z = internal.allocator.dupeZ(u8, text) catch return;
+        defer internal.allocator.free(text_z);
+
+        const text_j = java.env.*.*.NewStringUTF.?(java.env, text_z) orelse return;
+        defer java.env.*.*.DeleteLocalRef.?(java.env, text_j);
+
+        java.env.*.*.CallVoidMethod.?(java.env, java.activity, java.setClipboardText, text_j);
     }
 
-    pub fn getClipboardText(self: *Window, allocator: std.mem.Allocator) ?[]u8 {
-        _ = self;
-        _ = allocator;
-        return null;
+    pub fn getClipboardText(_: *Window, allocator: std.mem.Allocator) ?[]u8 {
+        const text_j = java.env.*.*.CallObjectMethod.?(java.env, java.activity, java.getClipboardText) orelse return null;
+        defer java.env.*.*.DeleteLocalRef.?(java.env, text_j);
+
+        const text_z = java.env.*.*.GetStringUTFChars.?(java.env, text_j, null) orelse return null;
+        defer java.env.*.*.ReleaseStringUTFChars.?(java.env, text_j, text_z);
+
+        return allocator.dupe(u8, std.mem.sliceTo(text_z, 0)) catch null;
     }
 
     pub fn createFramebuffer(_: *Window, size: wio.Size) !Framebuffer {
@@ -369,6 +378,8 @@ export fn JNI_OnLoad(vm: *c.JavaVM, _: ?*anyopaque) c.jint {
     java.vm = vm;
     java.enableTextInput = env.*.*.GetMethodID.?(env, class, "enableTextInput", "()V") orelse return c.JNI_ERR;
     java.disableTextInput = env.*.*.GetMethodID.?(env, class, "disableTextInput", "()V") orelse return c.JNI_ERR;
+    java.setClipboardText = env.*.*.GetMethodID.?(env, class, "setClipboardText", "(Ljava/lang/String;)V") orelse return c.JNI_ERR;
+    java.getClipboardText = env.*.*.GetMethodID.?(env, class, "getClipboardText", "()Ljava/lang/String;") orelse return c.JNI_ERR;
 
     return c.JNI_VERSION_1_6;
 }
@@ -394,6 +405,8 @@ const java = struct {
 
     var enableTextInput: c.jmethodID = undefined;
     var disableTextInput: c.jmethodID = undefined;
+    var setClipboardText: c.jmethodID = undefined;
+    var getClipboardText: c.jmethodID = undefined;
 };
 
 const native = struct {
