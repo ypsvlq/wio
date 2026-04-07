@@ -136,14 +136,15 @@ pub const Window = struct {
 
     pub fn setParent(_: *Window, _: usize) void {}
 
-    pub fn setCursor(self: *Window, shape: wio.Cursor) void {
-        _ = self;
-        _ = shape;
+    var cursor: c.jint = @intFromEnum(wio.Cursor.arrow);
+
+    pub fn setCursor(_: *Window, shape: wio.Cursor) void {
+        cursor = @intFromEnum(shape);
+        java.env.*.*.CallVoidMethod.?(java.env, java.activity, java.setCursor, cursor);
     }
 
-    pub fn setCursorMode(self: *Window, mode: wio.CursorMode) void {
-        _ = self;
-        _ = mode;
+    pub fn setCursorMode(_: *Window, mode: wio.CursorMode) void {
+        java.env.*.*.CallVoidMethod.?(java.env, java.activity, java.setCursor, if (mode == .normal) cursor else -1);
     }
 
     pub fn requestAttention(_: *Window) void {}
@@ -378,6 +379,7 @@ export fn JNI_OnLoad(vm: *c.JavaVM, _: ?*anyopaque) c.jint {
     java.vm = vm;
     java.enableTextInput = env.*.*.GetMethodID.?(env, class, "enableTextInput", "()V") orelse return c.JNI_ERR;
     java.disableTextInput = env.*.*.GetMethodID.?(env, class, "disableTextInput", "()V") orelse return c.JNI_ERR;
+    java.setCursor = env.*.*.GetMethodID.?(env, class, "setCursor", "(I)V") orelse return c.JNI_ERR;
     java.setClipboardText = env.*.*.GetMethodID.?(env, class, "setClipboardText", "(Ljava/lang/String;)V") orelse return c.JNI_ERR;
     java.getClipboardText = env.*.*.GetMethodID.?(env, class, "getClipboardText", "()Ljava/lang/String;") orelse return c.JNI_ERR;
 
@@ -405,6 +407,7 @@ const java = struct {
 
     var enableTextInput: c.jmethodID = undefined;
     var disableTextInput: c.jmethodID = undefined;
+    var setCursor: c.jmethodID = undefined;
     var setClipboardText: c.jmethodID = undefined;
     var getClipboardText: c.jmethodID = undefined;
 };

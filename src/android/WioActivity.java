@@ -6,6 +6,7 @@ import android.content.ClipboardManager;
 import android.os.Bundle;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
+import android.view.PointerIcon;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
@@ -124,6 +125,26 @@ public class WioActivity extends Activity implements SurfaceHolder.Callback, OnG
     public void disableTextInput() {
         InputMethodManager imm = (InputMethodManager)getSystemService(INPUT_METHOD_SERVICE);
         imm.hideSoftInputFromWindow(getCurrentFocus().getWindowToken(), 0);
+    }
+
+    static int cursors[] = {
+        PointerIcon.TYPE_NULL,
+        PointerIcon.TYPE_ARROW,
+        PointerIcon.TYPE_ARROW, // .arrow_busy
+        PointerIcon.TYPE_WAIT,
+        PointerIcon.TYPE_TEXT,
+        PointerIcon.TYPE_HAND,
+        PointerIcon.TYPE_CROSSHAIR,
+        PointerIcon.TYPE_ARROW, // .forbidden
+        PointerIcon.TYPE_ALL_SCROLL,
+        PointerIcon.TYPE_VERTICAL_DOUBLE_ARROW,
+        PointerIcon.TYPE_HORIZONTAL_DOUBLE_ARROW,
+        PointerIcon.TYPE_TOP_RIGHT_DIAGONAL_DOUBLE_ARROW,
+        PointerIcon.TYPE_TOP_LEFT_DIAGONAL_DOUBLE_ARROW,
+    };
+
+    public void setCursor(int cursor) {
+        getCurrentFocus().setPointerIcon(PointerIcon.getSystemIcon(this, cursors[cursor + 1]));
     }
 
     public void setClipboardText(String text) {
