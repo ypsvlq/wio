@@ -418,6 +418,8 @@ const native = struct {
         .{ .name = "onDestroyNative", .signature = "()V", .fnPtr = @ptrCast(@constCast(&onDestroy)) },
         .{ .name = "onWindowFocusChangedNative", .signature = "(Z)V", .fnPtr = @ptrCast(@constCast(&onWindowFocusChanged)) },
         .{ .name = "onTouchEventNative", .signature = "(IIII)V", .fnPtr = @ptrCast(@constCast(&onTouchEvent)) },
+        .{ .name = "pushMouseEventNative", .signature = "(III)V", .fnPtr = @ptrCast(@constCast(&pushMouseEvent)) },
+        .{ .name = "pushScrollEventNative", .signature = "(FF)V", .fnPtr = @ptrCast(@constCast(&pushScrollEvent)) },
         .{ .name = "onKeyDownNative", .signature = "(II)Z", .fnPtr = @ptrCast(@constCast(&onKeyDown)) },
         .{ .name = "onKeyUpNative", .signature = "(I)Z", .fnPtr = @ptrCast(@constCast(&onKeyUp)) },
         .{ .name = "surfaceCreatedNative", .signature = "(Landroid/view/Surface;)V", .fnPtr = @ptrCast(@constCast(&surfaceCreated)) },
@@ -462,6 +464,40 @@ const native = struct {
 
             else => {},
         }
+    }
+
+    var last_buttons: c.jint = 0;
+
+    fn pushMouseEvent(_: *c.JNIEnv, _: c.jobject, x: c.jint, y: c.jint, buttons: c.jint) callconv(.c) void {
+        pushEvent(.{ .mouse = .{ .x = std.math.cast(u16, x) orelse return, .y = std.math.cast(u16, y) orelse return } });
+
+        const changes = last_buttons ^ buttons;
+        if (changes != 0) {
+            last_buttons = buttons;
+            var i = c.AMOTION_EVENT_BUTTON_PRIMARY;
+            while (i <= c.AMOTION_EVENT_BUTTON_FORWARD) : (i <<= 1) {
+                if (changes & i != 0) {
+                    const button: wio.Button = switch (i) {
+                        c.AMOTION_EVENT_BUTTON_PRIMARY => .mouse_left,
+                        c.AMOTION_EVENT_BUTTON_SECONDARY => .mouse_right,
+                        c.AMOTION_EVENT_BUTTON_TERTIARY => .mouse_middle,
+                        c.AMOTION_EVENT_BUTTON_BACK => .mouse_back,
+                        c.AMOTION_EVENT_BUTTON_FORWARD => .mouse_forward,
+                        else => unreachable,
+                    };
+                    if (buttons & i != 0) {
+                        pushEvent(.{ .button_press = button });
+                    } else {
+                        pushEvent(.{ .button_release = button });
+                    }
+                }
+            }
+        }
+    }
+
+    fn pushScrollEvent(_: *c.JNIEnv, _: c.jobject, vertical: c.jfloat, horizontal: c.jfloat) callconv(.c) void {
+        if (vertical != 0) pushEvent(.{ .scroll_vertical = -vertical });
+        if (horizontal != 0) pushEvent(.{ .scroll_horizontal = -horizontal });
     }
 
     fn onKeyDown(_: *c.JNIEnv, _: c.jobject, keycode: c.jint, repeat: c.jint) callconv(.c) c.jboolean {

@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.os.Bundle;
+import android.view.InputDevice;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.PointerIcon;
@@ -23,6 +24,8 @@ public class WioActivity extends Activity implements SurfaceHolder.Callback, OnG
     static native void onDestroyNative();
     static native void onWindowFocusChangedNative(boolean focused);
     static native void onTouchEventNative(int action, int id, int x, int y);
+    static native void pushMouseEventNative(int x, int y, int buttons);
+    static native void pushScrollEventNative(float vertical, float horizontal);
     static native boolean onKeyDownNative(int keycode, int repeat);
     static native boolean onKeyUpNative(int keycode);
     static native void surfaceCreatedNative(Surface surface);
@@ -62,19 +65,42 @@ public class WioActivity extends Activity implements SurfaceHolder.Callback, OnG
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        int action = event.getActionMasked();
-        switch (action) {
-            case MotionEvent.ACTION_DOWN:
-            case MotionEvent.ACTION_MOVE:
-            case MotionEvent.ACTION_UP:
-            case MotionEvent.ACTION_CANCEL:
-                for (int i = 0; i < event.getPointerCount(); i++) {
-                    onTouchEventNative(action, event.getPointerId(i), (int)event.getX(i), (int)event.getY(i));
+        onGenericMotionEvent(event);
+        return true;
+    }
+
+    @Override
+    public boolean onGenericMotionEvent(MotionEvent event) {
+        switch (event.getSource()) {
+            case InputDevice.SOURCE_TOUCHSCREEN:
+                int action = event.getActionMasked();
+                switch (action) {
+                    case MotionEvent.ACTION_DOWN:
+                    case MotionEvent.ACTION_MOVE:
+                    case MotionEvent.ACTION_UP:
+                    case MotionEvent.ACTION_CANCEL:
+                        for (int i = 0; i < event.getPointerCount(); i++) {
+                            onTouchEventNative(action, event.getPointerId(i), (int)event.getX(i), (int)event.getY(i));
+                        }
+                        break;
+                    case MotionEvent.ACTION_POINTER_DOWN:
+                    case MotionEvent.ACTION_POINTER_UP:
+                        onTouchEventNative(action, event.getPointerId(event.getActionIndex()), 0, 0);
+                        break;
                 }
                 break;
-            case MotionEvent.ACTION_POINTER_DOWN:
-            case MotionEvent.ACTION_POINTER_UP:
-                onTouchEventNative(action, event.getPointerId(event.getActionIndex()), 0, 0);
+            case InputDevice.SOURCE_MOUSE:
+                switch (event.getActionMasked()) {
+                    case MotionEvent.ACTION_DOWN:
+                    case MotionEvent.ACTION_UP:
+                    case MotionEvent.ACTION_MOVE:
+                    case MotionEvent.ACTION_HOVER_MOVE:
+                        pushMouseEventNative((int)event.getX(0), (int)event.getY(0), event.getButtonState());
+                        break;
+                    case MotionEvent.ACTION_SCROLL:
+                        pushScrollEventNative(event.getAxisValue(MotionEvent.AXIS_VSCROLL), event.getAxisValue(MotionEvent.AXIS_HSCROLL));
+                        break;
+                }
                 break;
         }
         return true;
