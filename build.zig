@@ -191,5 +191,12 @@ pub fn build(b: *std.Build) !void {
 
 pub fn setupApk(wio: *std.Build.Module, apk: anytype) void {
     const b = wio.owner;
-    apk.addJavaSourceFile(.{ .file = b.path("src/android/WioActivity.java") });
+    apk.addJavaSourceFiles(.{
+        .root = b.path("src/android"),
+        .files = &.{
+            "WioActivity.java",
+            "WioSurfaceView.java",
+            "WioInputConnection.java",
+        },
+    });
 }

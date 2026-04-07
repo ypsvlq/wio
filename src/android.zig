@@ -15,29 +15,6 @@ const c = @cImport({
 
 pub const logFn = android.logFn;
 
-export fn JNI_OnLoad(vm: *c.JavaVM, _: ?*anyopaque) c.jint {
-    var env: *c.JNIEnv = undefined;
-    if (vm.*.*.GetEnv.?(vm, @ptrCast(&env), c.JNI_VERSION_1_6) != c.JNI_OK) return c.JNI_ERR;
-
-    const class = env.*.*.FindClass.?(env, "net/tiredsleepy/wio/WioActivity") orelse return c.JNI_ERR;
-    if (env.*.*.RegisterNatives.?(env, class, &jni_methods, jni_methods.len) != c.JNI_OK) return c.JNI_ERR;
-
-    const thread = std.Thread.spawn(.{}, main, .{}) catch |err| {
-        std.log.err("{s}", .{@errorName(err)});
-        return c.JNI_ERR;
-    };
-    thread.detach();
-
-    return c.JNI_VERSION_1_6;
-}
-
-fn main() void {
-    @import("root").main() catch |err| {
-        std.log.err("{s}", .{@errorName(err)});
-    };
-    std.process.exit(0);
-}
-
 var events: internal.EventQueue = .{};
 var events_mutex: std.Thread.Mutex = .{};
 var wait_event: std.Thread.ResetEvent = .{};
@@ -140,13 +117,12 @@ pub const Window = struct {
         return events.pop();
     }
 
-    pub fn enableTextInput(self: *Window, options: wio.TextInputOptions) void {
-        _ = self;
-        _ = options;
+    pub fn enableTextInput(_: *Window, _: wio.TextInputOptions) void {
+        java.env.*.*.CallVoidMethod.?(java.env, java.activity, java.enableTextInput);
     }
 
-    pub fn disableTextInput(self: *Window) void {
-        _ = self;
+    pub fn disableTextInput(_: *Window) void {
+        java.env.*.*.CallVoidMethod.?(java.env, java.activity, java.disableTextInput);
     }
 
     pub fn setTitle(self: *Window, title: []const u8) void {
@@ -394,27 +370,69 @@ pub const AudioInput = struct {
     }
 };
 
-fn pushEvent(event: wio.Event) void {
-    events_mutex.lock();
-    defer events_mutex.unlock();
-    events.push(event);
-    wait_event.set();
+export fn JNI_OnLoad(vm: *c.JavaVM, _: ?*anyopaque) c.jint {
+    var env: *c.JNIEnv = undefined;
+    if (vm.*.*.GetEnv.?(vm, @ptrCast(&env), c.JNI_VERSION_1_6) != c.JNI_OK) return c.JNI_ERR;
+
+    const class = env.*.*.FindClass.?(env, "net/tiredsleepy/wio/WioActivity") orelse return c.JNI_ERR;
+    if (env.*.*.RegisterNatives.?(env, class, &native.methods, native.methods.len) != c.JNI_OK) return c.JNI_ERR;
+
+    java.vm = vm;
+    java.enableTextInput = env.*.*.GetMethodID.?(env, class, "enableTextInput", "()V") orelse return c.JNI_ERR;
+    java.disableTextInput = env.*.*.GetMethodID.?(env, class, "disableTextInput", "()V") orelse return c.JNI_ERR;
+
+    return c.JNI_VERSION_1_6;
 }
 
-const jni_methods = [_]c.JNINativeMethod{
-    .{ .name = "onDestroyNative", .signature = "()V", .fnPtr = @ptrCast(@constCast(&jni.onDestroyNative)) },
-    .{ .name = "onWindowFocusChangedNative", .signature = "(Z)V", .fnPtr = @ptrCast(@constCast(&jni.onWindowFocusChanged)) },
-    .{ .name = "onTouchEventNative", .signature = "(IIII)V", .fnPtr = @ptrCast(@constCast(&jni.onTouchEvent)) },
-    .{ .name = "onKeyDownNative", .signature = "(II)Z", .fnPtr = @ptrCast(@constCast(&jni.onKeyDown)) },
-    .{ .name = "onKeyUpNative", .signature = "(I)Z", .fnPtr = @ptrCast(@constCast(&jni.onKeyUp)) },
-    .{ .name = "surfaceCreatedNative", .signature = "(Landroid/view/Surface;)V", .fnPtr = @ptrCast(@constCast(&jni.surfaceCreated)) },
-    .{ .name = "surfaceChangedNative", .signature = "(FII)V", .fnPtr = @ptrCast(@constCast(&jni.surfaceChanged)) },
-    .{ .name = "surfaceDestroyedNative", .signature = "()V", .fnPtr = @ptrCast(@constCast(&jni.surfaceDestroyed)) },
-    .{ .name = "onGlobalLayoutNative", .signature = "()V", .fnPtr = @ptrCast(@constCast(&jni.onGlobalLayout)) },
+fn main() void {
+    if (java.vm.*.*.AttachCurrentThread.?(java.vm, @ptrCast(&java.env), null) != c.JNI_OK) {
+        log.err("AttachCurrentThread failed", .{});
+        return;
+    }
+
+    @import("root").main() catch |err| {
+        std.log.err("{s}", .{@errorName(err)});
+    };
+
+    std.process.exit(0);
+}
+
+const java = struct {
+    var vm: *c.JavaVM = undefined;
+    var env: *c.JNIEnv = undefined;
+
+    var activity: c.jobject = undefined;
+
+    var enableTextInput: c.jmethodID = undefined;
+    var disableTextInput: c.jmethodID = undefined;
 };
 
-const jni = struct {
-    fn onDestroyNative(_: *c.JNIEnv, _: c.jobject) callconv(.c) void {
+const native = struct {
+    const methods = [_]c.JNINativeMethod{
+        .{ .name = "onCreateNative", .signature = "()V", .fnPtr = @ptrCast(@constCast(&onCreate)) },
+        .{ .name = "onDestroyNative", .signature = "()V", .fnPtr = @ptrCast(@constCast(&onDestroy)) },
+        .{ .name = "onWindowFocusChangedNative", .signature = "(Z)V", .fnPtr = @ptrCast(@constCast(&onWindowFocusChanged)) },
+        .{ .name = "onTouchEventNative", .signature = "(IIII)V", .fnPtr = @ptrCast(@constCast(&onTouchEvent)) },
+        .{ .name = "onKeyDownNative", .signature = "(II)Z", .fnPtr = @ptrCast(@constCast(&onKeyDown)) },
+        .{ .name = "onKeyUpNative", .signature = "(I)Z", .fnPtr = @ptrCast(@constCast(&onKeyUp)) },
+        .{ .name = "surfaceCreatedNative", .signature = "(Landroid/view/Surface;)V", .fnPtr = @ptrCast(@constCast(&surfaceCreated)) },
+        .{ .name = "surfaceChangedNative", .signature = "(FII)V", .fnPtr = @ptrCast(@constCast(&surfaceChanged)) },
+        .{ .name = "surfaceDestroyedNative", .signature = "()V", .fnPtr = @ptrCast(@constCast(&surfaceDestroyed)) },
+        .{ .name = "onGlobalLayoutNative", .signature = "()V", .fnPtr = @ptrCast(@constCast(&onGlobalLayout)) },
+        .{ .name = "pushCharEventNative", .signature = "(I)V", .fnPtr = @ptrCast(@constCast(&pushCharEvent)) },
+    };
+
+    fn onCreate(env: *c.JNIEnv, instance: c.jobject) callconv(.c) void {
+        java.activity = env.*.*.NewGlobalRef.?(env, instance);
+
+        const thread = std.Thread.spawn(.{}, main, .{}) catch |err| {
+            std.log.err("{s}", .{@errorName(err)});
+            return;
+        };
+        thread.detach();
+    }
+
+    fn onDestroy(_: *c.JNIEnv, _: c.jobject) callconv(.c) void {
         pushEvent(.close);
     }
 
@@ -494,7 +512,18 @@ const jni = struct {
     fn onGlobalLayout(_: *c.JNIEnv, _: c.jobject) callconv(.c) void {
         pushEvent(.draw);
     }
+
+    fn pushCharEvent(_: *c.JNIEnv, _: c.jobject, codepoint: c.jint) callconv(.c) void {
+        pushEvent(.{ .char = std.math.cast(u21, codepoint) orelse return });
+    }
 };
+
+fn pushEvent(event: wio.Event) void {
+    events_mutex.lock();
+    defer events_mutex.unlock();
+    events.push(event);
+    wait_event.set();
+}
 
 fn logUnexpectedEgl(name: []const u8) error{Unexpected} {
     logEglError(name);

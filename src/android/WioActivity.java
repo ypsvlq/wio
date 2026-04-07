@@ -9,34 +9,41 @@ import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.ViewTreeObserver.OnGlobalLayoutListener;
 import android.view.Window;
+import android.view.inputmethod.InputMethodManager;
 
 public class WioActivity extends Activity implements SurfaceHolder.Callback, OnGlobalLayoutListener {
     static {
         System.loadLibrary("main");
     }
 
-    private native void onDestroyNative();
-    private native void onWindowFocusChangedNative(boolean focused);
-    private native void onTouchEventNative(int action, int id, int x, int y);
-    private native boolean onKeyDownNative(int keycode, int repeat);
-    private native boolean onKeyUpNative(int keycode);
-    private native void surfaceCreatedNative(Surface surface);
-    private native void surfaceChangedNative(float density, int width, int height);
-    private native void surfaceDestroyedNative();
-    private native void onGlobalLayoutNative();
+    native void onCreateNative();
+    static native void onDestroyNative();
+    static native void onWindowFocusChangedNative(boolean focused);
+    static native void onTouchEventNative(int action, int id, int x, int y);
+    static native boolean onKeyDownNative(int keycode, int repeat);
+    static native boolean onKeyUpNative(int keycode);
+    static native void surfaceCreatedNative(Surface surface);
+    static native void surfaceChangedNative(float density, int width, int height);
+    static native void surfaceDestroyedNative();
+    static native void onGlobalLayoutNative();
+    static native void pushCharEventNative(int codepoint);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        Window window = getWindow();
-        window.requestFeature(Window.FEATURE_NO_TITLE);
+        requestWindowFeature(Window.FEATURE_NO_TITLE);
 
-        SurfaceView view = new SurfaceView(this);
+        WioSurfaceView view = new WioSurfaceView(this);
         setContentView(view);
+
+        view.setFocusableInTouchMode(true);
+        view.requestFocus();
 
         view.getHolder().addCallback(this);
         view.getViewTreeObserver().addOnGlobalLayoutListener(this);
+
+        onCreateNative();
     }
 
     @Override
@@ -93,7 +100,7 @@ public class WioActivity extends Activity implements SurfaceHolder.Callback, OnG
 
     @Override
     public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-        float density = getWindow().getWindowManager().getCurrentWindowMetrics().getDensity();
+        float density = getWindowManager().getCurrentWindowMetrics().getDensity();
         surfaceChangedNative(density, width, height);
     }
 
@@ -105,5 +112,15 @@ public class WioActivity extends Activity implements SurfaceHolder.Callback, OnG
     @Override
     public void onGlobalLayout() {
         onGlobalLayoutNative();
+    }
+
+    public void enableTextInput() {
+        InputMethodManager imm = (InputMethodManager)getSystemService(INPUT_METHOD_SERVICE);
+        imm.showSoftInput(getCurrentFocus(), 0);
+    }
+
+    public void disableTextInput() {
+        InputMethodManager imm = (InputMethodManager)getSystemService(INPUT_METHOD_SERVICE);
+        imm.hideSoftInputFromWindow(getCurrentFocus().getWindowToken(), 0);
     }
 }
