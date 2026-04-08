@@ -61,6 +61,7 @@ var imports: extern struct {
     libdecor_state_free: *const @TypeOf(h.libdecor_state_free),
     libdecor_frame_commit: *const @TypeOf(h.libdecor_frame_commit),
     libdecor_frame_set_title: *const @TypeOf(h.libdecor_frame_set_title),
+    libdecor_frame_set_app_id: *const @TypeOf(h.libdecor_frame_set_app_id),
     libdecor_frame_set_maximized: *const @TypeOf(h.libdecor_frame_set_maximized),
     libdecor_frame_unset_maximized: *const @TypeOf(h.libdecor_frame_unset_maximized),
     libdecor_frame_set_fullscreen: *const @TypeOf(h.libdecor_frame_set_fullscreen),
@@ -312,6 +313,12 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
 
     self.setTitle(options.title);
     self.setMode(options.mode);
+
+    {
+        const id = try internal.allocator.dupeZ(u8, options.app_id orelse options.title);
+        defer internal.allocator.free(id);
+        c.libdecor_frame_set_app_id(self.frame, id.ptr);
+    }
 
     h.wl_surface_commit(surface);
     while (!self.configured) {
