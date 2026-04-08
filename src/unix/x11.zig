@@ -54,6 +54,7 @@ var imports: extern struct {
     XGrabPointer: *const @TypeOf(h.XGrabPointer),
     XUngrabPointer: *const @TypeOf(h.XUngrabPointer),
     XWarpPointer: *const @TypeOf(h.XWarpPointer),
+    XSetClassHint: *const @TypeOf(h.XSetClassHint),
     XSetSelectionOwner: *const @TypeOf(h.XSetSelectionOwner),
     XConvertSelection: *const @TypeOf(h.XConvertSelection),
     XCheckTypedWindowEvent: *const @TypeOf(h.XCheckTypedWindowEvent),
@@ -321,6 +322,13 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
 
     self.setTitle(options.title);
     self.setMode(options.mode);
+
+    {
+        const id = try internal.allocator.dupeZ(u8, options.app_id orelse options.title);
+        defer internal.allocator.free(id);
+        var class_hint = h.XClassHint{ .res_name = @constCast(id.ptr), .res_class = @constCast(id.ptr) };
+        _ = c.XSetClassHint(display, window, &class_hint);
+    }
 
     self.events.push(.visible);
     self.events.push(.{ .scale = scale });
