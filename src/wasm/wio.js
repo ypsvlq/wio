@@ -255,6 +255,12 @@ class Wio {
             navigator.clipboard.writeText(this.getString(ptr, len)).catch(() => { })
         },
 
+        presentFramebuffer: (id, ptr, width, height) => {
+            const framebuffer = new Uint8ClampedArray(this.instance.exports.memory.buffer, ptr, width * height * 4);
+            const image = new ImageData(framebuffer, width, height);
+            this.windows[id].canvas.getContext("2d").putImageData(image, 0, 0);
+        },
+
         getJoystickCount: () => this.gamepads.length,
 
         getJoystickIdLen: (i) => {

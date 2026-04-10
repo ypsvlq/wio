@@ -35,6 +35,7 @@ const js = struct {
     extern "wio" fn setCursorMode(u32, u8) void;
     extern "wio" fn setSize(u32, u16, u16) void;
     extern "wio" fn setClipboardText([*]const u8, usize) void;
+    extern "wio" fn presentFramebuffer(u32, [*]const u32, u16, u16) void;
     extern "wio" fn getJoystickCount() u32;
     extern "wio" fn getJoystickIdLen(u32) u32;
     extern "wio" fn getJoystickId(u32, [*]u8) void;
@@ -159,15 +160,13 @@ pub const Window = struct {
         return null;
     }
 
-    pub fn createFramebuffer(self: *Window, size: wio.Size) !Framebuffer {
-        _ = self;
-        _ = size;
-        return error.Unexpected;
+    pub fn createFramebuffer(_: *Window, size: wio.Size) !Framebuffer {
+        const pixels = try internal.allocator.alloc(u32, @as(usize, size.width) * size.height);
+        return .{ .pixels = pixels, .size = size };
     }
 
     pub fn presentFramebuffer(self: *Window, framebuffer: *Framebuffer) void {
-        _ = self;
-        _ = framebuffer;
+        js.presentFramebuffer(self.id, framebuffer.pixels.ptr, framebuffer.size.width, framebuffer.size.height);
     }
 
     pub fn makeContextCurrent(self: *Window) void {
@@ -180,14 +179,15 @@ pub const Window = struct {
 };
 
 pub const Framebuffer = struct {
+    pixels: []u32,
+    size: wio.Size,
+
     pub fn destroy(self: *Framebuffer) void {
-        _ = self;
+        internal.allocator.free(self.pixels);
     }
 
     pub fn setPixel(self: *Framebuffer, index: usize, rgb: u32) void {
-        _ = self;
-        _ = index;
-        _ = rgb;
+        self.pixels[index] = 0xFF000000 | ((rgb & 0xFF0000) >> 16) | (rgb & 0xFF00) | ((rgb & 0xFF) << 16);
     }
 };
 

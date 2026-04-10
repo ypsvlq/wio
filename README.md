@@ -53,7 +53,7 @@ Not actively tested:
 
 ### API support
 
-The framebuffer API is not currently implemented for WebAssembly or Haiku.
+The framebuffer API is not currently implemented for Haiku.
 
 The joystick API is not currently implemented for Android, OpenBSD, NetBSD,
 FreeBSD, DragonFlyBSD, or illumos.
