@@ -70,6 +70,12 @@ fn loop() !bool {
 
                 return false;
             },
+            .focused => {
+                const modifiers = wio.getModifiers();
+                if (modifiers.control or modifiers.shift or modifiers.alt) {
+                    std.log.scoped(.modifiers).info("{s}{s}{s}", .{ if (modifiers.control) "control " else "", if (modifiers.shift) "shift " else "", if (modifiers.alt) "alt " else "" });
+                }
+            },
             .draw => {
                 if (wio.build_options.opengl) {
                     window.makeContextCurrent();
