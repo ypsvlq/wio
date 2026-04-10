@@ -460,6 +460,8 @@ pub const CursorMode = enum {
 };
 
 pub const CreateContextOptions = struct {
+    api: enum { gl, gles1, gles2 } = .gl,
+
     major_version: u8 = 1,
     minor_version: u8 = 0,
     profile: enum { core, compatibility } = .core,

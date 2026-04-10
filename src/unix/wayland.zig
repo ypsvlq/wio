@@ -332,12 +332,39 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
 
     if (build_options.opengl) {
         if (options.opengl) |opengl| {
-            if (c.eglBindAPI(h.EGL_OPENGL_API) == h.EGL_FALSE) return logEglError("eglBindAPI");
+            const api: c_uint = switch (opengl.api) {
+                .gl => h.EGL_OPENGL_API,
+                .gles1, .gles2 => h.EGL_OPENGL_ES_API,
+            };
+
+            const renderable_type = switch (opengl.api) {
+                .gl => h.EGL_OPENGL_BIT,
+                .gles1 => h.EGL_OPENGL_ES_BIT,
+                .gles2 => h.EGL_OPENGL_ES2_BIT,
+            };
+
+            const context_attribs: [*]const i32 = switch (opengl.api) {
+                .gl => &[_]i32{
+                    h.EGL_CONTEXT_MAJOR_VERSION,             opengl.major_version,
+                    h.EGL_CONTEXT_MINOR_VERSION,             opengl.minor_version,
+                    h.EGL_CONTEXT_OPENGL_PROFILE_MASK,       if (opengl.profile == .core) h.EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT else h.EGL_CONTEXT_OPENGL_COMPATIBILITY_PROFILE_BIT,
+                    h.EGL_CONTEXT_OPENGL_FORWARD_COMPATIBLE, if (opengl.forward_compatible) h.EGL_TRUE else h.EGL_FALSE,
+                    h.EGL_CONTEXT_OPENGL_DEBUG,              if (opengl.debug) h.EGL_TRUE else h.EGL_FALSE,
+                    h.EGL_NONE,
+                },
+                .gles1, .gles2 => &[_]i32{
+                    h.EGL_CONTEXT_MAJOR_VERSION, opengl.major_version,
+                    h.EGL_CONTEXT_MINOR_VERSION, opengl.minor_version,
+                    h.EGL_NONE,
+                },
+            };
+
+            if (c.eglBindAPI(api) == h.EGL_FALSE) return logEglError("eglBindAPI");
 
             var config: h.EGLConfig = undefined;
             var count: i32 = undefined;
             if (c.eglChooseConfig(egl_display, &[_]i32{
-                h.EGL_RENDERABLE_TYPE, h.EGL_OPENGL_BIT,
+                h.EGL_RENDERABLE_TYPE, renderable_type,
                 h.EGL_RED_SIZE,        opengl.red_bits,
                 h.EGL_GREEN_SIZE,      opengl.green_bits,
                 h.EGL_BLUE_SIZE,       opengl.blue_bits,
@@ -351,14 +378,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
 
             self.egl.window = c.wl_egl_window_create(self.surface, options.size.width, options.size.height);
             self.egl.surface = c.eglCreateWindowSurface(egl_display, config, self.egl.window, null) orelse return logEglError("eglCreateWindowSurface");
-            self.egl.context = c.eglCreateContext(egl_display, config, h.EGL_NO_CONTEXT, &[_]i32{
-                h.EGL_CONTEXT_MAJOR_VERSION,             opengl.major_version,
-                h.EGL_CONTEXT_MINOR_VERSION,             opengl.minor_version,
-                h.EGL_CONTEXT_OPENGL_PROFILE_MASK,       if (opengl.profile == .core) h.EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT else h.EGL_CONTEXT_OPENGL_COMPATIBILITY_PROFILE_BIT,
-                h.EGL_CONTEXT_OPENGL_FORWARD_COMPATIBLE, if (opengl.forward_compatible) h.EGL_TRUE else h.EGL_FALSE,
-                h.EGL_CONTEXT_OPENGL_DEBUG,              if (opengl.debug) h.EGL_TRUE else h.EGL_FALSE,
-                h.EGL_NONE,
-            }) orelse return logEglError("eglCreateContext");
+            self.egl.context = c.eglCreateContext(egl_display, config, h.EGL_NO_CONTEXT, context_attribs) orelse return logEglError("eglCreateContext");
         }
     }
 
