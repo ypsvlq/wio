@@ -26,6 +26,7 @@ const js = struct {
     extern "wio" fn shift(u32) u32;
     extern "wio" fn shiftFloat(u32) f32;
     extern "wio" fn messageBox([*]const u8, usize) void;
+    extern "wio" fn getModifiers() u8;
     extern "wio" fn createWindow() u32;
     extern "wio" fn enableTextInput(u32, u16, u16) void;
     extern "wio" fn disableTextInput(u32) void;
@@ -72,8 +73,12 @@ pub fn messageBox(_: wio.MessageBoxStyle, _: []const u8, message: []const u8) vo
 }
 
 pub fn getModifiers() wio.Modifiers {
-    log.warn("getModifiers() is not implemented for wasm", .{});
-    return .{ .control = false, .shift = false, .alt = false };
+    const modifiers = js.getModifiers();
+    return .{
+        .control = (modifiers & 1 != 0),
+        .shift = (modifiers & 2 != 0),
+        .alt = (modifiers & 4 != 0),
+    };
 }
 
 pub fn createWindow(options: wio.CreateWindowOptions) !Window {

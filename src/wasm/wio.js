@@ -9,6 +9,8 @@ class Wio {
         /** @type {{canvas: HTMLCanvasElement, events: number[], input: HTMLInputElement, text: boolean, cursor: string, cursor_mode: number}[]} */
         this.windows = [];
 
+        this.modifiers = 0;
+
         this.gamepads = navigator.getGamepads();
 
         this.buffer = "";
@@ -43,6 +45,10 @@ class Wio {
         return new TextDecoder().decode(new Uint8Array(this.instance.exports.memory.buffer, ptr, len));
     }
 
+    updateModifiers(event) {
+        this.modifiers = (event.ctrlKey | event.shiftKey << 1 | event.altKey << 2);
+    }
+
     imports = {
         write: (ptr, len) => {
             this.buffer += this.getString(ptr, len);
@@ -58,6 +64,8 @@ class Wio {
         shiftFloat: (id) => this.windows[id].events.shift(),
 
         messageBox: (ptr, len) => alert(this.getString(ptr, len)),
+
+        getModifiers: () => this.modifiers,
 
         createWindow: () => {
             const canvas = this.canvases.shift();
@@ -139,15 +147,18 @@ class Wio {
                 event.preventDefault();
                 const key = Wio.keys[event.code];
                 if (key) events.push(event.repeat ? 15 : 14, key);
+                this.updateModifiers(event);
             });
             canvas.addEventListener("keyup", (event) => {
                 const key = Wio.keys[event.code];
                 if (key) events.push(16, key);
+                this.updateModifiers(event);
             });
             canvas.addEventListener("mousedown", (event) => {
                 const button = Wio.buttons[event.button];
                 if (button !== undefined) events.push(14, button);
                 if (window.cursor_mode === 2) canvas.requestPointerLock({ unadjustedMovement: true });
+                this.updateModifiers(event);
             });
             canvas.addEventListener("mouseup", (event) => {
                 const button = Wio.buttons[event.button];
@@ -159,6 +170,7 @@ class Wio {
                 } else {
                     events.push(18, event.movementX, event.movementY);
                 }
+                this.updateModifiers(event);
             });
             canvas.addEventListener("mouseleave", () => events.push(19));
             canvas.addEventListener("wheel", (event) => {
