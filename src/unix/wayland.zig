@@ -730,8 +730,8 @@ pub const Framebuffer = struct {
         _ = std.c.close(self.fd);
     }
 
-    pub fn getPixels(self: *Framebuffer) []u32 {
-        return std.mem.bytesAsSlice(u32, self.mapped);
+    pub fn setPixel(self: *Framebuffer, index: usize, rgb: u32) void {
+        std.mem.writeInt(u32, std.mem.asBytes(&std.mem.bytesAsSlice(u32, self.mapped)[index]), rgb, .little);
     }
 };
 

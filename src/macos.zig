@@ -360,8 +360,8 @@ pub const Framebuffer = struct {
         internal.allocator.free(self.pixels);
     }
 
-    pub fn getPixels(self: *Framebuffer) []u32 {
-        return self.pixels;
+    pub fn setPixel(self: *Framebuffer, index: usize, rgb: u32) void {
+        std.mem.writeInt(u32, std.mem.asBytes(&self.pixels[index]), rgb, .little);
     }
 };
 

@@ -137,9 +137,10 @@ pub const Framebuffer = struct {
         _ = self;
     }
 
-    pub fn getPixels(self: *Framebuffer) []u32 {
+    pub fn setPixel(self: *Framebuffer, index: usize, rgb: u32) void {
         _ = self;
-        return &.{};
+        _ = index;
+        _ = rgb;
     }
 };
 

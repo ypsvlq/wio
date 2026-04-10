@@ -1,9 +1,6 @@
 const std = @import("std");
 const wio = @import("wio");
 
-var size: wio.Size = .{ .width = 640, .height = 480 };
-var t: u16 = 0;
-
 pub fn main() !void {
     var debug_allocator = std.heap.DebugAllocator(.{}).init;
     defer _ = debug_allocator.deinit();
@@ -11,11 +8,14 @@ pub fn main() !void {
     try wio.init(debug_allocator.allocator(), .{});
     defer wio.deinit();
 
+    var size: wio.Size = .{ .width = 640, .height = 480 };
     var window = try wio.createWindow(.{ .title = "software", .size = size, .scale = 1 });
     defer window.destroy();
 
     var fb = try window.createFramebuffer(size);
     defer fb.destroy();
+
+    var t: u16 = 0;
 
     while (true) {
         wio.update();
@@ -32,25 +32,20 @@ pub fn main() !void {
                 else => {},
             }
         }
-        render(fb.getPixels());
+        render(&fb, size, t);
         window.presentFramebuffer(&fb);
         t +%= 1;
         wio.wait(.{ .timeout_ns = std.time.ns_per_s / 60 });
     }
 }
 
-fn render(pixels: []u32) void {
+fn render(fb: *wio.Framebuffer, size: wio.Size, t: u16) void {
     var y: u32 = 0;
     while (y < size.height) : (y += 1) {
         var x: u32 = 0;
         while (x < size.width) : (x += 1) {
             const v = x ^ y ^ t;
-            std.mem.writeInt(
-                u32,
-                std.mem.asBytes(&pixels[y * size.width + x]),
-                ((v & 0xFF) << 16) | (((v >> 1) & 0xFF) << 8) | ((v >> 2) & 0xFF),
-                .little,
-            );
+            fb.setPixel(y * size.width + x, ((v & 0xFF) << 16) | (((v >> 1) & 0xFF) << 8) | ((v >> 2) & 0xFF));
         }
     }
 }

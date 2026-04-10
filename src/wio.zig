@@ -228,9 +228,10 @@ pub const Framebuffer = struct {
         self.backend.destroy();
     }
 
-    /// Pixels are stored as little-endian 8 bpc XRGB (0x00RRGGBB)
-    pub fn getPixels(self: *Framebuffer) []u32 {
-        return self.backend.getPixels();
+    /// - `index` is the pixel index (y * width + x).
+    /// - `rgb` is stored as 0xRRGGBB.
+    pub fn setPixel(self: *Framebuffer, index: usize, rgb: u32) void {
+        self.backend.setPixel(index, rgb);
     }
 };
 
