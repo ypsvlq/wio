@@ -178,6 +178,11 @@ pub fn messageBox(style: wio.MessageBoxStyle, _: []const u8, message: []const u8
     wioMessageBox(@intFromEnum(style), message.ptr, message.len);
 }
 
+pub fn getModifiers() wio.Modifiers {
+    log.warn("getModifiers() is not implemented for macos", .{});
+    return .{ .control = false, .shift = false, .alt = false };
+}
+
 pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
     const self = try internal.allocator.create(Window);
     self.* = .{

@@ -195,6 +195,10 @@ fn action(button: wio.Button) !void {
             }
             text_input = !text_input;
         },
+        .l => {
+            const modifiers = wio.getModifiers();
+            std.log.scoped(.modifiers).info("{s}{s}{s}", .{ if (modifiers.control) "control " else "", if (modifiers.shift) "shift " else "", if (modifiers.alt) "alt " else "" });
+        },
         .t => window.setTitle("retitled wio example"),
         .w => window.setMode(.normal),
         .m => window.setMode(.maximized),

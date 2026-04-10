@@ -213,6 +213,13 @@ fn spawnAndPoll(args: []const []const u8) bool {
     }
 }
 
+pub fn getModifiers() wio.Modifiers {
+    return switch (active) {
+        .x11 => x11.getModifiers(),
+        .wayland => wayland.getModifiers(),
+    };
+}
+
 pub fn createWindow(options: wio.CreateWindowOptions) !Window {
     switch (active) {
         .x11 => return .{ .x11 = try x11.createWindow(options) },

@@ -2,6 +2,7 @@ const std = @import("std");
 const build_options = @import("build_options");
 const wio = @import("wio.zig");
 const internal = @import("wio.internal.zig");
+const log = std.log.scoped(.wio);
 
 var log_writer = std.Io.Writer{
     .vtable = &.{ .drain = logDrain },
@@ -68,6 +69,11 @@ export fn wioLoop() bool {
 
 pub fn messageBox(_: wio.MessageBoxStyle, _: []const u8, message: []const u8) void {
     js.messageBox(message.ptr, message.len);
+}
+
+pub fn getModifiers() wio.Modifiers {
+    log.warn("getModifiers() is not implemented for wasm", .{});
+    return .{ .control = false, .shift = false, .alt = false };
 }
 
 pub fn createWindow(options: wio.CreateWindowOptions) !Window {

@@ -234,6 +234,11 @@ pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []cons
     _ = w.MessageBoxW(null, message_w, title_w, flags);
 }
 
+pub fn getModifiers() wio.Modifiers {
+    log.warn("getModifiers() is not implemented for win32", .{});
+    return .{ .control = false, .shift = false, .alt = false };
+}
+
 pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
     const title = try std.unicode.utf8ToUtf16LeAllocZ(internal.allocator, options.title);
     defer internal.allocator.free(title);

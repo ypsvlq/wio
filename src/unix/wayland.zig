@@ -126,6 +126,7 @@ var libdecor_context: *h.libdecor = undefined;
 var windows: std.AutoHashMapUnmanaged(*Window, void) = .empty;
 pub var keyboard_focus: ?*Window = null;
 var pointer_focus: ?*Window = null;
+var modifiers: wio.Modifiers = .{ .control = false, .shift = false, .alt = false };
 var last_serial: u32 = 0;
 var pointer_enter_serial: u32 = 0;
 pub var repeat_period: i32 = 0;
@@ -274,6 +275,10 @@ fn destroyProxies() void {
 
 pub fn update() void {
     _ = c.wl_display_roundtrip(display);
+}
+
+pub fn getModifiers() wio.Modifiers {
+    return modifiers;
 }
 
 pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
@@ -893,6 +898,12 @@ fn keyboardKey(_: ?*anyopaque, _: ?*h.wl_keyboard, serial: u32, _: u32, key: u32
 }
 
 fn keyboardModifiers(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, mods_depressed: u32, mods_latched: u32, mods_locked: u32, _: u32) callconv(.c) void {
+    const mods = mods_depressed | mods_latched | mods_locked;
+    modifiers = .{
+        .control = (mods & 4 != 0),
+        .shift = (mods & 1 != 0),
+        .alt = (mods & 8 != 0),
+    };
     _ = c.xkb_state_update_mask(xkb_state, mods_depressed, mods_latched, mods_locked, 0, 0, 0);
 }
 

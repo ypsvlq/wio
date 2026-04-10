@@ -70,6 +70,11 @@ pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []cons
     _ = message;
 }
 
+pub fn getModifiers() wio.Modifiers {
+    log.warn("getModifiers() is not implemented for android", .{});
+    return .{ .control = false, .shift = false, .alt = false };
+}
+
 var created = false;
 
 pub fn createWindow(options: wio.CreateWindowOptions) !Window {

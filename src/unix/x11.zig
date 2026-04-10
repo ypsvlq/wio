@@ -26,6 +26,7 @@ var imports: extern struct {
     XkbFreeKeyboard: *const @TypeOf(h.XkbFreeKeyboard),
     XkbGetNames: *const @TypeOf(h.XkbGetNames),
     XGetDefault: *const @TypeOf(h.XGetDefault),
+    XkbGetState: *const @TypeOf(h.XkbGetState),
     XFlush: *const @TypeOf(h.XFlush),
     XCreateWindow: *const @TypeOf(h.XCreateWindow),
     XDestroyWindow: *const @TypeOf(h.XDestroyWindow),
@@ -208,6 +209,16 @@ pub fn update() void {
         _ = c.XNextEvent(display, &event);
         handle(&event);
     }
+}
+
+pub fn getModifiers() wio.Modifiers {
+    var state: h.XkbStateRec = undefined;
+    _ = c.XkbGetState(display, h.XkbUseCoreKbd, &state);
+    return .{
+        .control = (state.mods & h.ControlMask != 0),
+        .shift = (state.mods & h.ShiftMask != 0),
+        .alt = (state.mods & h.Mod1Mask != 0),
+    };
 }
 
 pub fn createWindow(options: wio.CreateWindowOptions) !*Window {

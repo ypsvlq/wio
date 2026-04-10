@@ -71,6 +71,16 @@ pub fn messageBox(style: MessageBoxStyle, title: []const u8, message: []const u8
     backend.messageBox(style, title, message);
 }
 
+pub fn getModifiers() Modifiers {
+    return backend.getModifiers();
+}
+
+pub const Modifiers = struct {
+    control: bool,
+    shift: bool,
+    alt: bool,
+};
+
 pub const Size = struct {
     width: u16,
     height: u16,
