@@ -21,6 +21,7 @@ var wait_event: std.Thread.ResetEvent = .{};
 
 var window: ?*c.ANativeWindow = null;
 
+var modifiers: wio.Modifiers = .{ .control = false, .shift = false, .alt = false };
 var cursor: c.jint = @intFromEnum(wio.Cursor.arrow);
 var cursor_mode: wio.CursorMode = .normal;
 
@@ -71,8 +72,7 @@ pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []cons
 }
 
 pub fn getModifiers() wio.Modifiers {
-    log.warn("getModifiers() is not implemented for android", .{});
-    return .{ .control = false, .shift = false, .alt = false };
+    return modifiers;
 }
 
 var created = false;
@@ -453,6 +453,8 @@ const native = struct {
         if (focused == c.JNI_TRUE and cursor_mode == .relative) {
             env.*.*.CallVoidMethod.?(env, instance, java.setCursorMode, @as(c.jint, @intFromEnum(cursor_mode)));
         }
+
+        modifiers = .{ .control = false, .shift = false, .alt = false };
     }
 
     fn onTouchEvent(_: *c.JNIEnv, _: c.jobject, action: c.jint, id_j: c.jint, x: c.jint, y: c.jint) callconv(.c) void {
@@ -511,12 +513,24 @@ const native = struct {
     fn onKeyDown(_: *c.JNIEnv, _: c.jobject, keycode: c.jint, repeat: c.jint) callconv(.c) c.jboolean {
         const button = keycodeToButton(keycode) orelse return c.JNI_FALSE;
         pushEvent(if (repeat == 0) .{ .button_press = button } else .{ .button_repeat = button });
+        switch (button) {
+            .left_control, .right_control => modifiers.control = true,
+            .left_shift, .right_shift => modifiers.shift = true,
+            .left_alt, .right_alt => modifiers.alt = true,
+            else => {},
+        }
         return c.JNI_TRUE;
     }
 
     fn onKeyUp(_: *c.JNIEnv, _: c.jobject, keycode: c.jint) callconv(.c) c.jboolean {
         const button = keycodeToButton(keycode) orelse return c.JNI_FALSE;
         pushEvent(.{ .button_release = button });
+        switch (button) {
+            .left_control, .right_control => modifiers.control = false,
+            .left_shift, .right_shift => modifiers.shift = false,
+            .left_alt, .right_alt => modifiers.alt = false,
+            else => {},
+        }
         return c.JNI_TRUE;
     }
 
