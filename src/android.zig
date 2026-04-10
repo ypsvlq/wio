@@ -202,15 +202,7 @@ pub const Window = struct {
         const stride: u32 = @bitCast(buffer.stride);
         var y: u32 = 0;
         while (y < height) : (y += 1) {
-            var x: u32 = 0;
-            while (x < width) : (x += 1) {
-                std.mem.writeInt(
-                    u32,
-                    std.mem.asBytes(&bitmap[y * stride + x]),
-                    std.math.rotl(u32, framebuffer.pixels[y * width + x], 8),
-                    .big,
-                );
-            }
+            @memcpy(bitmap[y * stride .. y * stride + width], framebuffer.pixels[y * width .. (y + 1) * width]);
         }
     }
 
@@ -254,7 +246,7 @@ pub const Framebuffer = struct {
     }
 
     pub fn setPixel(self: *Framebuffer, index: usize, rgb: u32) void {
-        std.mem.writeInt(u32, std.mem.asBytes(&self.pixels[index]), rgb, .little);
+        self.pixels[index] = ((rgb & 0xFF0000) >> 16) | (rgb & 0xFF00) | ((rgb & 0xFF) << 16);
     }
 };
 
