@@ -99,7 +99,6 @@ pub fn createWindow(options: wio.CreateWindowOptions) !Window {
             egl_context = c.eglCreateContext(egl_display, egl_config, c.EGL_NO_CONTEXT, &[_]i32{
                 c.EGL_CONTEXT_MAJOR_VERSION, opengl.major_version,
                 c.EGL_CONTEXT_MINOR_VERSION, opengl.minor_version,
-                c.EGL_CONTEXT_OPENGL_DEBUG,  if (opengl.debug) c.EGL_TRUE else c.EGL_FALSE,
                 c.EGL_NONE,
             }) orelse return logUnexpectedEgl("eglCreateContext");
         }
