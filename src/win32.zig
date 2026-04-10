@@ -235,8 +235,11 @@ pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []cons
 }
 
 pub fn getModifiers() wio.Modifiers {
-    log.warn("getModifiers() is not implemented for win32", .{});
-    return .{ .control = false, .shift = false, .alt = false };
+    return .{
+        .control = (w.GetAsyncKeyState(w.VK_CONTROL) < 0),
+        .shift = (w.GetAsyncKeyState(w.VK_SHIFT) < 0),
+        .alt = (w.GetAsyncKeyState(w.VK_MENU) < 0),
+    };
 }
 
 pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
