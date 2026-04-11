@@ -79,6 +79,7 @@ pub const Modifiers = struct {
     control: bool,
     shift: bool,
     alt: bool,
+    gui: bool,
 };
 
 pub const Size = struct {

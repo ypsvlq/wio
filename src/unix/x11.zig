@@ -218,6 +218,7 @@ pub fn getModifiers() wio.Modifiers {
         .control = (state.mods & h.ControlMask != 0),
         .shift = (state.mods & h.ShiftMask != 0),
         .alt = (state.mods & h.Mod1Mask != 0),
+        .gui = (state.mods & h.Mod4Mask != 0),
     };
 }
 
