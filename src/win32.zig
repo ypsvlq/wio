@@ -1377,16 +1377,16 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
         },
         w.WM_GETMINMAXINFO => {
             if (!self.resizable) {
-                var rect: w.RECT = undefined;
-                _ = w.GetWindowRect(window, &rect);
-                const cx = rect.right - rect.left;
-                const cy = rect.bottom - rect.top;
-                const mmi: *w.MINMAXINFO = @ptrFromInt(@as(usize, @bitCast(lParam)));
-                mmi.ptMaxSize = .{ .x = cx, .y = cy };
-                mmi.ptMaxPosition = .{ .x = rect.left, .y = rect.top };
-                mmi.ptMinTrackSize = .{ .x = cx, .y = cy };
-                mmi.ptMaxTrackSize = .{ .x = cx, .y = cy };
-                return 0;
+                const cx = self.rect.right - self.rect.left;
+                const cy = self.rect.bottom - self.rect.top;
+                if (cx > 0 and cy > 0) {
+                    const mmi: *w.MINMAXINFO = @ptrFromInt(@as(usize, @bitCast(lParam)));
+                    mmi.ptMaxSize = .{ .x = cx, .y = cy };
+                    mmi.ptMaxPosition = .{ .x = self.rect.left, .y = self.rect.top };
+                    mmi.ptMinTrackSize = .{ .x = cx, .y = cy };
+                    mmi.ptMaxTrackSize = .{ .x = cx, .y = cy };
+                    return 0;
+                }
             }
             return w.DefWindowProcW(window, msg, wParam, lParam);
         },
