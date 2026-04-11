@@ -150,6 +150,7 @@ var actions = false;
 var request_attention = false;
 var text_input = false;
 var cursor: u8 = 0;
+var resizable = true;
 
 fn actionEvent(event: wio.Event) !void {
     switch (event) {
@@ -189,9 +190,14 @@ fn action(button: wio.Button) !void {
                 maybe_window2 = try wio.createWindow(.{
                     .size = .{ .width = 320, .height = 240 },
                     .scale = 1,
+                    .resizable = false,
                     .opengl = .{},
                 });
             }
+        },
+        .b => {
+            resizable = !resizable;
+            window.setResizable(resizable);
         },
         .@"1" => {
             if (!text_input) {

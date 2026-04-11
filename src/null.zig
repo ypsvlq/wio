@@ -69,6 +69,11 @@ pub const Window = struct {
         _ = size;
     }
 
+    pub fn setResizable(self: *Window, resizable: bool) void {
+        _ = self;
+        _ = resizable;
+    }
+
     pub fn setParent(self: *Window, parent: usize) void {
         _ = self;
         _ = parent;

@@ -28,6 +28,7 @@ extern fn wioDisableTextInput(*NSWindow) void;
 extern fn wioSetTitle(*NSWindow, [*]const u8, usize) void;
 extern fn wioSetMode(*NSWindow, u8) void;
 extern fn wioSetSize(*NSWindow, u16, u16) void;
+extern fn wioSetResizable(*NSWindow, bool) void;
 extern fn wioSetCursor(*NSWindow, u8) void;
 extern fn wioSetCursorMode(*NSWindow, u8) void;
 extern fn wioRequestAttention() void;
@@ -193,6 +194,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
 
     self.setTitle(options.title);
     self.setMode(options.mode);
+    if (!options.resizable) self.setResizable(false);
 
     if (build_options.opengl) {
         if (options.opengl) |opengl| {
@@ -263,6 +265,10 @@ pub const Window = struct {
 
     pub fn setSize(self: *Window, size: wio.Size) void {
         wioSetSize(self.window, size.width, size.height);
+    }
+
+    pub fn setResizable(self: *Window, resizable: bool) void {
+        wioSetResizable(self.window, resizable);
     }
 
     pub fn setParent(self: *Window, parent: usize) void {

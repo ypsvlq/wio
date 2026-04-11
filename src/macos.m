@@ -490,6 +490,14 @@ void wioSetSize(NSWindow *window, uint16_t width, uint16_t height) {
     [window setContentSize:NSMakeSize(width, height)];
 }
 
+void wioSetResizable(NSWindow *window, bool resizable) {
+    if (resizable) {
+        [window setStyleMask:[window styleMask] | NSWindowStyleMaskResizable];
+    } else {
+        [window setStyleMask:[window styleMask] & ~NSWindowStyleMaskResizable];
+    }
+}
+
 void wioSetCursor(NSWindow *window, uint8_t shape) {
     NSCursor *cursor;
     switch (shape) {

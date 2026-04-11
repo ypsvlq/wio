@@ -66,6 +66,8 @@ var imports: extern struct {
     libdecor_frame_unset_maximized: *const @TypeOf(h.libdecor_frame_unset_maximized),
     libdecor_frame_set_fullscreen: *const @TypeOf(h.libdecor_frame_set_fullscreen),
     libdecor_frame_unset_fullscreen: *const @TypeOf(h.libdecor_frame_unset_fullscreen),
+    libdecor_frame_set_capabilities: *const @TypeOf(h.libdecor_frame_set_capabilities),
+    libdecor_frame_unset_capabilities: *const @TypeOf(h.libdecor_frame_unset_capabilities),
     wl_egl_window_create: *const @TypeOf(h.wl_egl_window_create),
     wl_egl_window_destroy: *const @TypeOf(h.wl_egl_window_destroy),
     wl_egl_window_resize: *const @TypeOf(h.wl_egl_window_resize),
@@ -318,6 +320,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
 
     self.setTitle(options.title);
     self.setMode(options.mode);
+    if (!options.resizable) self.setResizable(false);
 
     {
         const id = try internal.allocator.dupeZ(u8, options.app_id orelse options.title);
@@ -500,6 +503,14 @@ pub const Window = struct {
             .normal => c.libdecor_frame_unset_maximized(self.frame),
             .maximized => c.libdecor_frame_set_maximized(self.frame),
             .fullscreen => c.libdecor_frame_set_fullscreen(self.frame, null),
+        }
+    }
+
+    pub fn setResizable(self: *Window, resizable: bool) void {
+        if (resizable) {
+            c.libdecor_frame_set_capabilities(self.frame, h.LIBDECOR_ACTION_RESIZE);
+        } else {
+            c.libdecor_frame_unset_capabilities(self.frame, h.LIBDECOR_ACTION_RESIZE);
         }
     }
 

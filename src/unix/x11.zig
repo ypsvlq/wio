@@ -8,6 +8,7 @@ const h = @cImport({
     @cInclude("X11/Xlib.h");
     @cInclude("X11/Xatom.h");
     @cInclude("X11/XKBlib.h");
+    @cInclude("X11/Xutil.h");
     @cInclude("X11/Xcursor/Xcursor.h");
     @cInclude("GL/glx.h");
 });
@@ -56,6 +57,7 @@ var imports: extern struct {
     XUngrabPointer: *const @TypeOf(h.XUngrabPointer),
     XWarpPointer: *const @TypeOf(h.XWarpPointer),
     XSetClassHint: *const @TypeOf(h.XSetClassHint),
+    XSetWMNormalHints: *const @TypeOf(h.XSetWMNormalHints),
     XSetSelectionOwner: *const @TypeOf(h.XSetSelectionOwner),
     XConvertSelection: *const @TypeOf(h.XConvertSelection),
     XCheckTypedWindowEvent: *const @TypeOf(h.XCheckTypedWindowEvent),
@@ -328,11 +330,13 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
         .window = window,
         .ic = ic,
         .size = options.size,
+        .resizable = options.resizable,
         .opengl = if (build_options.opengl) .{ .colormap = attributes.colormap, .context = context } else .{},
     };
 
     self.setTitle(options.title);
     self.setMode(options.mode);
+    if (!options.resizable) self.setResizable(false);
 
     {
         const id = try internal.allocator.dupeZ(u8, options.app_id orelse options.title);
@@ -360,6 +364,7 @@ pub const Window = struct {
     cursor: h.Cursor = h.None,
     cursor_mode: wio.CursorMode = .normal,
     size: wio.Size,
+    resizable: bool = true,
     warped: bool = false,
     opengl: if (build_options.opengl) struct {
         colormap: h.Colormap,
@@ -422,6 +427,19 @@ pub const Window = struct {
 
     pub fn setSize(self: *Window, size: wio.Size) void {
         _ = c.XResizeWindow(display, self.window, size.width, size.height);
+    }
+
+    pub fn setResizable(self: *Window, resizable: bool) void {
+        self.resizable = resizable;
+        var hints = std.mem.zeroes(h.XSizeHints);
+        if (!resizable) {
+            hints.flags = h.PMinSize | h.PMaxSize;
+            hints.min_width = self.size.width;
+            hints.min_height = self.size.height;
+            hints.max_width = self.size.width;
+            hints.max_height = self.size.height;
+        }
+        c.XSetWMNormalHints(display, self.window, &hints);
     }
 
     pub fn setParent(self: *Window, parent: usize) void {

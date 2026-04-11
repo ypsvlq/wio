@@ -140,6 +140,8 @@ pub const Window = struct {
         js.setSize(self.id, size.width, size.height);
     }
 
+    pub fn setResizable(_: *Window, _: bool) void {}
+
     pub fn setParent(_: *Window, _: usize) void {}
 
     pub fn setCursor(self: *Window, shape: wio.Cursor) void {

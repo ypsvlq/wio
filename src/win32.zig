@@ -245,7 +245,7 @@ pub fn getModifiers() wio.Modifiers {
 pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
     const title = try std.unicode.utf8ToUtf16LeAllocZ(internal.allocator, options.title);
     defer internal.allocator.free(title);
-    const style: u32 = w.WS_OVERLAPPEDWINDOW;
+    const style: u32 = if (options.resizable) w.WS_OVERLAPPEDWINDOW else w.WS_OVERLAPPEDWINDOW & ~@as(u32, w.WS_THICKFRAME | w.WS_MAXIMIZEBOX);
     const size = clientToWindow(options.size, style);
     const window = w.CreateWindowExW(
         0,
@@ -268,6 +268,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
         .events = .init(),
         .window = window,
         .cursor = loadCursor(.arrow),
+        .resizable = options.resizable,
     };
     _ = w.SetWindowLongPtrW(window, w.GWLP_USERDATA, @bitCast(@intFromPtr(self)));
 
@@ -342,6 +343,7 @@ pub const Window = struct {
     cursor: w.HCURSOR,
     cursor_mode: wio.CursorMode = .normal,
     tracking: bool = false,
+    resizable: bool = true,
     rect: w.RECT = .{ .left = 0, .top = 0, .right = 0, .bottom = 0 },
     surrogate: u16 = 0,
     left_shift: bool = false,
@@ -391,11 +393,16 @@ pub const Window = struct {
         _ = w.SetWindowTextW(self.window, title_w);
     }
 
+    fn normalStyle(self: *Window) u32 {
+        if (self.resizable) return w.WS_OVERLAPPEDWINDOW;
+        return w.WS_OVERLAPPEDWINDOW & ~@as(u32, w.WS_THICKFRAME | w.WS_MAXIMIZEBOX);
+    }
+
     pub fn setMode(self: *Window, mode: wio.WindowMode) void {
         switch (mode) {
             .normal, .maximized => {
                 if (self.isFullscreen()) {
-                    _ = w.SetWindowLongPtrW(self.window, w.GWL_STYLE, w.WS_OVERLAPPEDWINDOW);
+                    _ = w.SetWindowLongPtrW(self.window, w.GWL_STYLE, self.normalStyle());
                     _ = w.SetWindowPos(
                         self.window,
                         null,
@@ -435,6 +442,14 @@ pub const Window = struct {
         const style: u32 = @bitCast(@as(i32, @intCast(w.GetWindowLongPtrW(self.window, w.GWL_STYLE))));
         const window_size = clientToWindow(size, style);
         _ = w.SetWindowPos(self.window, null, 0, 0, window_size.width, window_size.height, w.SWP_NOMOVE | w.SWP_NOZORDER);
+    }
+
+    pub fn setResizable(self: *Window, resizable: bool) void {
+        self.resizable = resizable;
+        if (!self.isFullscreen()) {
+            _ = w.SetWindowLongPtrW(self.window, w.GWL_STYLE, self.normalStyle());
+            _ = w.SetWindowPos(self.window, null, 0, 0, 0, 0, w.SWP_NOMOVE | w.SWP_NOSIZE | w.SWP_NOZORDER | w.SWP_FRAMECHANGED);
+        }
     }
 
     pub fn setParent(self: *Window, parent: usize) void {

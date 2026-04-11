@@ -16,6 +16,7 @@ extern fn wioCreateWindow(*Window, [*:0]const u8, u16, u16) *BWindow;
 extern fn wioDestroyWindow(*BWindow) void;
 extern fn wioSetTitle(*BWindow, [*:0]const u8) void;
 extern fn wioSetSize(*BWindow, f32, f32) void;
+extern fn wioSetResizable(*BWindow, bool) void;
 extern fn wioSetClipboardText([*]const u8, usize) void;
 extern fn wioGetClipboardText(*usize) ?[*]const u8;
 extern fn wioCreateContext(*BWindow, bool, bool, bool, bool) *BGLView;
@@ -116,6 +117,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
     const title = try internal.allocator.dupeZ(u8, options.title);
     defer internal.allocator.free(title);
     self.window = wioCreateWindow(self, title, options.size.width, options.size.height);
+    if (!options.resizable) self.setResizable(false);
 
     if (build_options.opengl) {
         if (options.opengl) |opengl| {
@@ -167,6 +169,10 @@ pub const Window = struct {
 
     pub fn setSize(self: *Window, size: wio.Size) void {
         wioSetSize(self.window, @floatFromInt(size.width), @floatFromInt(size.height));
+    }
+
+    pub fn setResizable(self: *Window, resizable: bool) void {
+        wioSetResizable(self.window, resizable);
     }
 
     pub fn setParent(_: *Window, _: usize) void {}

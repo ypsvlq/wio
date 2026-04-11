@@ -104,6 +104,7 @@ pub const CreateWindowOptions = struct {
     /// Defaults to the title if empty.
     app_id: ?[]const u8 = null,
     mode: WindowMode = .normal,
+    resizable: bool = true,
 
     size: Size = .{ .width = 640, .height = 480 },
     /// Base scale factor for `size`. If set, adjusts for high-DPI on relevant platforms.
@@ -157,6 +158,10 @@ pub const Window = struct {
 
     pub fn setSize(self: *Window, size: Size) void {
         self.backend.setSize(size);
+    }
+
+    pub fn setResizable(self: *Window, resizable: bool) void {
+        self.backend.setResizable(resizable);
     }
 
     /// Only functional on Windows and X11.
