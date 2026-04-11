@@ -76,10 +76,10 @@ pub fn getModifiers() Modifiers {
 }
 
 pub const Modifiers = struct {
-    control: bool,
-    shift: bool,
-    alt: bool,
-    gui: bool,
+    control: bool = false,
+    shift: bool = false,
+    alt: bool = false,
+    gui: bool = false,
 };
 
 pub const Size = struct {
