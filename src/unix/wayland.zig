@@ -320,7 +320,6 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
 
     self.setTitle(options.title);
     self.setMode(options.mode);
-    if (!options.resizable) self.setResizable(false);
 
     {
         const id = try internal.allocator.dupeZ(u8, options.app_id orelse options.title);

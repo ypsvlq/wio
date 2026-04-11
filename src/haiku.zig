@@ -117,7 +117,6 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
     const title = try internal.allocator.dupeZ(u8, options.title);
     defer internal.allocator.free(title);
     self.window = wioCreateWindow(self, title, options.size.width, options.size.height);
-    if (!options.resizable) self.setResizable(false);
 
     if (build_options.opengl) {
         if (options.opengl) |opengl| {

@@ -190,9 +190,9 @@ fn action(button: wio.Button) !void {
                 maybe_window2 = try wio.createWindow(.{
                     .size = .{ .width = 320, .height = 240 },
                     .scale = 1,
-                    .resizable = false,
                     .opengl = .{},
                 });
+                maybe_window2.?.setResizable(false);
             }
         },
         .b => {

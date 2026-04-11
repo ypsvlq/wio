@@ -245,7 +245,7 @@ pub fn getModifiers() wio.Modifiers {
 pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
     const title = try std.unicode.utf8ToUtf16LeAllocZ(internal.allocator, options.title);
     defer internal.allocator.free(title);
-    const style: u32 = if (options.resizable) w.WS_OVERLAPPEDWINDOW else w.WS_OVERLAPPEDWINDOW & ~@as(u32, w.WS_THICKFRAME | w.WS_MAXIMIZEBOX);
+    const style: u32 = w.WS_OVERLAPPEDWINDOW;
     const size = clientToWindow(options.size, style);
     const window = w.CreateWindowExW(
         0,
@@ -268,7 +268,6 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
         .events = .init(),
         .window = window,
         .cursor = loadCursor(.arrow),
-        .resizable = options.resizable,
     };
     _ = w.SetWindowLongPtrW(window, w.GWLP_USERDATA, @bitCast(@intFromPtr(self)));
 
@@ -446,10 +445,14 @@ pub const Window = struct {
 
     pub fn setResizable(self: *Window, resizable: bool) void {
         self.resizable = resizable;
-        if (!self.isFullscreen()) {
-            _ = w.SetWindowLongPtrW(self.window, w.GWL_STYLE, self.normalStyle());
-            _ = w.SetWindowPos(self.window, null, 0, 0, 0, 0, w.SWP_NOMOVE | w.SWP_NOSIZE | w.SWP_NOZORDER | w.SWP_FRAMECHANGED);
+        var style: u32 = @bitCast(@as(i32, @intCast(w.GetWindowLongPtrW(self.window, w.GWL_STYLE))));
+        if (resizable) {
+            style |= w.WS_THICKFRAME | w.WS_MAXIMIZEBOX;
+        } else {
+            style &= ~@as(u32, w.WS_THICKFRAME | w.WS_MAXIMIZEBOX);
         }
+        _ = w.SetWindowLongPtrW(self.window, w.GWL_STYLE, style);
+        _ = w.SetWindowPos(self.window, null, 0, 0, 0, 0, w.SWP_NOMOVE | w.SWP_NOSIZE | w.SWP_NOZORDER | w.SWP_FRAMECHANGED);
     }
 
     pub fn setParent(self: *Window, parent: usize) void {
@@ -1371,6 +1374,21 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
             } else {
                 return w.DefWindowProcW(window, msg, wParam, lParam);
             }
+        },
+        w.WM_GETMINMAXINFO => {
+            if (!self.resizable) {
+                var rect: w.RECT = undefined;
+                _ = w.GetWindowRect(window, &rect);
+                const cx = rect.right - rect.left;
+                const cy = rect.bottom - rect.top;
+                const mmi: *w.MINMAXINFO = @ptrFromInt(@as(usize, @bitCast(lParam)));
+                mmi.ptMaxSize = .{ .x = cx, .y = cy };
+                mmi.ptMaxPosition = .{ .x = rect.left, .y = rect.top };
+                mmi.ptMinTrackSize = .{ .x = cx, .y = cy };
+                mmi.ptMaxTrackSize = .{ .x = cx, .y = cy };
+                return 0;
+            }
+            return w.DefWindowProcW(window, msg, wParam, lParam);
         },
         w.WM_CLOSE => {
             self.events.push(.close);

@@ -194,7 +194,6 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
 
     self.setTitle(options.title);
     self.setMode(options.mode);
-    if (!options.resizable) self.setResizable(false);
 
     if (build_options.opengl) {
         if (options.opengl) |opengl| {

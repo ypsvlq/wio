@@ -330,13 +330,11 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
         .window = window,
         .ic = ic,
         .size = options.size,
-        .resizable = options.resizable,
         .opengl = if (build_options.opengl) .{ .colormap = attributes.colormap, .context = context } else .{},
     };
 
     self.setTitle(options.title);
     self.setMode(options.mode);
-    if (!options.resizable) self.setResizable(false);
 
     {
         const id = try internal.allocator.dupeZ(u8, options.app_id orelse options.title);
@@ -426,7 +424,9 @@ pub const Window = struct {
     }
 
     pub fn setSize(self: *Window, size: wio.Size) void {
+        self.size = size;
         _ = c.XResizeWindow(display, self.window, size.width, size.height);
+        if (!self.resizable) self.setResizable(false);
     }
 
     pub fn setResizable(self: *Window, resizable: bool) void {
