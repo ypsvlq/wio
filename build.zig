@@ -189,8 +189,8 @@ pub fn build(b: *std.Build) !void {
     }
 }
 
-pub fn setupApk(wio: *std.Build.Module, apk: anytype) void {
-    const b = wio.owner;
+pub fn setupApk(wio: *std.Build.Dependency, apk: anytype) void {
+    const b = wio.builder;
     apk.addJavaSourceFiles(.{
         .root = b.path("src/android"),
         .files = &.{
