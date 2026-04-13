@@ -288,6 +288,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
 
             var format: i32 = undefined;
             var pfd: w.PIXELFORMATDESCRIPTOR = undefined;
+            var valid_pfd = false;
             if (wgl.choosePixelFormatARB) |choosePixelFormatARB| {
                 var count: u32 = undefined;
                 if (choosePixelFormatARB(self.opengl.dc, &.{
@@ -302,9 +303,13 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
                     0x2042, opengl.samples,
                     0,
                 }, null, 1, &format, &count) == w.FALSE) return logLastError("wglChoosePixelFormatARB");
-                if (count != 1) return logLastError("wglChoosePixelFormatARB");
-                _ = w.DescribePixelFormat(self.opengl.dc, format, @sizeOf(w.PIXELFORMATDESCRIPTOR), &pfd);
-            } else {
+                if (count == 1) {
+                    if (w.DescribePixelFormat(self.opengl.dc, format, @sizeOf(w.PIXELFORMATDESCRIPTOR), &pfd) != 0) {
+                        valid_pfd = true;
+                    }
+                }
+            }
+            if (!valid_pfd) {
                 pfd = std.mem.zeroInit(w.PIXELFORMATDESCRIPTOR, .{
                     .nSize = @sizeOf(w.PIXELFORMATDESCRIPTOR),
                     .nVersion = 1,
