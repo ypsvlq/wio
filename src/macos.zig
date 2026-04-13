@@ -28,7 +28,6 @@ extern fn wioDisableTextInput(*NSWindow) void;
 extern fn wioSetTitle(*NSWindow, [*]const u8, usize) void;
 extern fn wioSetMode(*NSWindow, u8) void;
 extern fn wioSetSize(*NSWindow, u16, u16) void;
-extern fn wioSetResizable(*NSWindow, bool) void;
 extern fn wioSetCursor(*NSWindow, u8) void;
 extern fn wioSetCursorMode(*NSWindow, u8) void;
 extern fn wioRequestAttention() void;
@@ -266,8 +265,9 @@ pub const Window = struct {
         wioSetSize(self.window, size.width, size.height);
     }
 
-    pub fn setResizable(self: *Window, resizable: bool) void {
-        wioSetResizable(self.window, resizable);
+    pub fn setSizeLimits(self: *Window, limits: wio.SizeLimits) void {
+        _ = self;
+        _ = limits;
     }
 
     pub fn setParent(self: *Window, parent: usize) void {

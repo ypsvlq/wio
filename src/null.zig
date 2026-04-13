@@ -69,9 +69,9 @@ pub const Window = struct {
         _ = size;
     }
 
-    pub fn setResizable(self: *Window, resizable: bool) void {
+    pub fn setSizeLimits(self: *Window, limits: wio.SizeLimits) void {
         _ = self;
-        _ = resizable;
+        _ = limits;
     }
 
     pub fn setParent(self: *Window, parent: usize) void {

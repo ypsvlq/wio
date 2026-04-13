@@ -280,10 +280,10 @@ pub const Window = union {
         }
     }
 
-    pub fn setResizable(self: *Window, resizable: bool) void {
+    pub fn setSizeLimits(self: *Window, limits: wio.SizeLimits) void {
         switch (active) {
-            .x11 => self.x11.setResizable(resizable),
-            .wayland => self.wayland.setResizable(resizable),
+            .x11 => self.x11.setSizeLimits(limits),
+            .wayland => self.wayland.setSizeLimits(limits),
         }
     }
 

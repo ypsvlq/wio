@@ -16,7 +16,6 @@ extern fn wioCreateWindow(*Window, [*:0]const u8, u16, u16) *BWindow;
 extern fn wioDestroyWindow(*BWindow) void;
 extern fn wioSetTitle(*BWindow, [*:0]const u8) void;
 extern fn wioSetSize(*BWindow, f32, f32) void;
-extern fn wioSetResizable(*BWindow, bool) void;
 extern fn wioSetClipboardText([*]const u8, usize) void;
 extern fn wioGetClipboardText(*usize) ?[*]const u8;
 extern fn wioCreateContext(*BWindow, bool, bool, bool, bool) *BGLView;
@@ -170,8 +169,9 @@ pub const Window = struct {
         wioSetSize(self.window, @floatFromInt(size.width), @floatFromInt(size.height));
     }
 
-    pub fn setResizable(self: *Window, resizable: bool) void {
-        wioSetResizable(self.window, resizable);
+    pub fn setSizeLimits(self: *Window, limits: wio.SizeLimits) void {
+        _ = self;
+        _ = limits;
     }
 
     pub fn setParent(_: *Window, _: usize) void {}

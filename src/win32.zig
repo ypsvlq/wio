@@ -342,8 +342,8 @@ pub const Window = struct {
     cursor: w.HCURSOR,
     cursor_mode: wio.CursorMode = .normal,
     tracking: bool = false,
-    resizable: bool = true,
     rect: w.RECT = .{ .left = 0, .top = 0, .right = 0, .bottom = 0 },
+    limits: wio.SizeLimits = .{},
     surrogate: u16 = 0,
     left_shift: bool = false,
     right_shift: bool = false,
@@ -392,11 +392,6 @@ pub const Window = struct {
         _ = w.SetWindowTextW(self.window, title_w);
     }
 
-    fn normalStyle(self: *Window) u32 {
-        if (self.resizable) return w.WS_OVERLAPPEDWINDOW;
-        return w.WS_OVERLAPPEDWINDOW & ~@as(u32, w.WS_THICKFRAME | w.WS_MAXIMIZEBOX);
-    }
-
     pub fn setMode(self: *Window, mode: wio.WindowMode) void {
         switch (mode) {
             .normal, .maximized => {
@@ -438,18 +433,18 @@ pub const Window = struct {
     }
 
     pub fn setSize(self: *Window, size: wio.Size) void {
-        const style: u32 = @bitCast(@as(i32, @intCast(w.GetWindowLongPtrW(self.window, w.GWL_STYLE))));
+        const style: u32 = @truncate(@as(usize, @bitCast(w.GetWindowLongPtrW(self.window, w.GWL_STYLE))));
         const window_size = clientToWindow(size, style);
         _ = w.SetWindowPos(self.window, null, 0, 0, window_size.width, window_size.height, w.SWP_NOMOVE | w.SWP_NOZORDER);
     }
 
-    pub fn setResizable(self: *Window, resizable: bool) void {
-        self.resizable = resizable;
+    pub fn setSizeLimits(self: *Window, limits: wio.SizeLimits) void {
+        self.limits = limits;
         var style: u32 = @bitCast(@as(i32, @intCast(w.GetWindowLongPtrW(self.window, w.GWL_STYLE))));
-        if (resizable) {
-            style |= w.WS_THICKFRAME | w.WS_MAXIMIZEBOX;
-        } else {
+        if (limits.min.equals(limits.max)) {
             style &= ~@as(u32, w.WS_THICKFRAME | w.WS_MAXIMIZEBOX);
+        } else {
+            style |= w.WS_THICKFRAME | w.WS_MAXIMIZEBOX;
         }
         _ = w.SetWindowLongPtrW(self.window, w.GWL_STYLE, style);
         _ = w.SetWindowPos(self.window, null, 0, 0, 0, 0, w.SWP_NOMOVE | w.SWP_NOSIZE | w.SWP_NOZORDER | w.SWP_FRAMECHANGED);
@@ -589,6 +584,11 @@ pub const Window = struct {
 
     fn isFullscreen(self: *Window) bool {
         return (w.GetWindowLongPtrW(self.window, w.GWL_STYLE) & w.WS_OVERLAPPEDWINDOW != w.WS_OVERLAPPEDWINDOW);
+    }
+
+    fn normalStyle(self: *Window) isize {
+        if (self.limits.min.equals(self.limits.max)) return w.WS_OVERLAPPEDWINDOW & ~@as(u32, w.WS_THICKFRAME | w.WS_MAXIMIZEBOX);
+        return w.WS_OVERLAPPEDWINDOW;
     }
 
     fn clipCursor(self: *Window) void {
@@ -1159,7 +1159,7 @@ fn clientToWindow(size: wio.Size, style: u32) wio.Size {
         .bottom = size.height,
     };
     _ = w.AdjustWindowRect(&rect, style, w.FALSE);
-    return .{ .width = @intCast(rect.right - rect.left), .height = @intCast(rect.bottom - rect.top) };
+    return .{ .width = std.math.lossyCast(u16, rect.right - rect.left), .height = std.math.lossyCast(u16, rect.bottom - rect.top) };
 }
 
 fn loadCursor(shape: wio.Cursor) w.HCURSOR {
@@ -1376,19 +1376,14 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
             }
         },
         w.WM_GETMINMAXINFO => {
-            if (!self.resizable) {
-                const cx = self.rect.right - self.rect.left;
-                const cy = self.rect.bottom - self.rect.top;
-                if (cx > 0 and cy > 0) {
-                    const mmi: *w.MINMAXINFO = @ptrFromInt(@as(usize, @bitCast(lParam)));
-                    mmi.ptMaxSize = .{ .x = cx, .y = cy };
-                    mmi.ptMaxPosition = .{ .x = self.rect.left, .y = self.rect.top };
-                    mmi.ptMinTrackSize = .{ .x = cx, .y = cy };
-                    mmi.ptMaxTrackSize = .{ .x = cx, .y = cy };
-                    return 0;
-                }
-            }
-            return w.DefWindowProcW(window, msg, wParam, lParam);
+            const style: u32 = @truncate(@as(usize, @bitCast(w.GetWindowLongPtrW(self.window, w.GWL_STYLE))));
+            const min = clientToWindow(self.limits.min, style);
+            const max = clientToWindow(self.limits.max, style);
+
+            const info: *w.MINMAXINFO = @ptrFromInt(@as(usize, @bitCast(lParam)));
+            info.ptMinTrackSize = .{ .x = min.width, .y = min.height };
+            info.ptMaxTrackSize = .{ .x = max.width, .y = max.height };
+            return 0;
         },
         w.WM_CLOSE => {
             self.events.push(.close);

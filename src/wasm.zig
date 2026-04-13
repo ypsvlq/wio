@@ -140,7 +140,7 @@ pub const Window = struct {
         js.setSize(self.id, size.width, size.height);
     }
 
-    pub fn setResizable(_: *Window, _: bool) void {}
+    pub fn setSizeLimits(_: *Window, _: wio.SizeLimits) void {}
 
     pub fn setParent(_: *Window, _: usize) void {}
 

@@ -66,8 +66,8 @@ var imports: extern struct {
     libdecor_frame_unset_maximized: *const @TypeOf(h.libdecor_frame_unset_maximized),
     libdecor_frame_set_fullscreen: *const @TypeOf(h.libdecor_frame_set_fullscreen),
     libdecor_frame_unset_fullscreen: *const @TypeOf(h.libdecor_frame_unset_fullscreen),
-    libdecor_frame_set_capabilities: *const @TypeOf(h.libdecor_frame_set_capabilities),
-    libdecor_frame_unset_capabilities: *const @TypeOf(h.libdecor_frame_unset_capabilities),
+    libdecor_frame_set_min_content_size: *const @TypeOf(h.libdecor_frame_set_min_content_size),
+    libdecor_frame_set_max_content_size: *const @TypeOf(h.libdecor_frame_set_max_content_size),
     wl_egl_window_create: *const @TypeOf(h.wl_egl_window_create),
     wl_egl_window_destroy: *const @TypeOf(h.wl_egl_window_destroy),
     wl_egl_window_resize: *const @TypeOf(h.wl_egl_window_resize),
@@ -505,16 +505,13 @@ pub const Window = struct {
         }
     }
 
-    pub fn setResizable(self: *Window, resizable: bool) void {
-        if (resizable) {
-            c.libdecor_frame_set_capabilities(self.frame, h.LIBDECOR_ACTION_RESIZE);
-        } else {
-            c.libdecor_frame_unset_capabilities(self.frame, h.LIBDECOR_ACTION_RESIZE);
-        }
-    }
-
     pub fn setSize(self: *Window, size: wio.Size) void {
         self.resize(size, null);
+    }
+
+    pub fn setSizeLimits(self: *Window, limits: wio.SizeLimits) void {
+        c.libdecor_frame_set_min_content_size(self.frame, limits.min.width, limits.min.height);
+        c.libdecor_frame_set_max_content_size(self.frame, limits.max.width, limits.max.height);
     }
 
     pub fn setParent(self: *Window, parent: usize) void {

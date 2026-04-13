@@ -192,12 +192,11 @@ fn action(button: wio.Button) !void {
                     .scale = 1,
                     .opengl = .{},
                 });
-                maybe_window2.?.setResizable(false);
             }
         },
         .b => {
             resizable = !resizable;
-            window.setResizable(resizable);
+            window.setSizeLimits(if (resizable) .{} else .{ .min = .{ .width = 640, .height = 480 }, .max = .{ .width = 640, .height = 480 } });
         },
         .@"1" => {
             if (!text_input) {

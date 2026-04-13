@@ -138,18 +138,6 @@ extern "C" {
         window->ResizeTo(width, height);
     }
 
-    void wioSetResizable(WioWindow *window, bool resizable) {
-        uint32 flags = window->Flags();
-        if (resizable) {
-            flags &= ~B_NOT_RESIZABLE;
-            flags &= ~B_NOT_ZOOMABLE;
-        } else {
-            flags |= B_NOT_RESIZABLE;
-            flags |= B_NOT_ZOOMABLE;
-        }
-        window->SetFlags(flags);
-    }
-
     void wioSetClipboardText(const char *text, size_t len) {
         if (be_clipboard->Lock()) {
             be_clipboard->Clear();

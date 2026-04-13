@@ -85,6 +85,10 @@ pub const Size = struct {
     width: u16,
     height: u16,
 
+    pub fn equals(self: Size, other: Size) bool {
+        return (self.width == other.width and self.height == other.height);
+    }
+
     pub fn multiply(self: Size, scale: f32) Size {
         const width: f32 = @floatFromInt(self.width);
         const height: f32 = @floatFromInt(self.height);
@@ -159,8 +163,8 @@ pub const Window = struct {
         self.backend.setSize(size);
     }
 
-    pub fn setResizable(self: *Window, resizable: bool) void {
-        self.backend.setResizable(resizable);
+    pub fn setSizeLimits(self: *Window, limits: SizeLimits) void {
+        self.backend.setSizeLimits(limits);
     }
 
     /// Only functional on Windows and X11.
@@ -440,6 +444,11 @@ pub const WindowMode = enum {
 
 pub const TextInputOptions = struct {
     cursor: ?Position = null,
+};
+
+pub const SizeLimits = struct {
+    min: Size = .{ .width = 0, .height = 0 },
+    max: Size = .{ .width = std.math.maxInt(u16), .height = std.math.maxInt(u16) },
 };
 
 pub const Cursor = enum {

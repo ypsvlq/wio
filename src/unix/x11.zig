@@ -362,7 +362,6 @@ pub const Window = struct {
     cursor: h.Cursor = h.None,
     cursor_mode: wio.CursorMode = .normal,
     size: wio.Size,
-    resizable: bool = true,
     warped: bool = false,
     opengl: if (build_options.opengl) struct {
         colormap: h.Colormap,
@@ -426,19 +425,15 @@ pub const Window = struct {
     pub fn setSize(self: *Window, size: wio.Size) void {
         self.size = size;
         _ = c.XResizeWindow(display, self.window, size.width, size.height);
-        if (!self.resizable) self.setResizable(false);
     }
 
-    pub fn setResizable(self: *Window, resizable: bool) void {
-        self.resizable = resizable;
+    pub fn setSizeLimits(self: *Window, limits: wio.SizeLimits) void {
         var hints = std.mem.zeroes(h.XSizeHints);
-        if (!resizable) {
-            hints.flags = h.PMinSize | h.PMaxSize;
-            hints.min_width = self.size.width;
-            hints.min_height = self.size.height;
-            hints.max_width = self.size.width;
-            hints.max_height = self.size.height;
-        }
+        hints.flags = h.PMinSize | h.PMaxSize;
+        hints.min_width = limits.min.width;
+        hints.min_height = limits.min.height;
+        hints.max_width = limits.max.width;
+        hints.max_height = limits.max.height;
         c.XSetWMNormalHints(display, self.window, &hints);
     }
 
