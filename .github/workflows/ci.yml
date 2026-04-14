@@ -8,12 +8,14 @@ jobs:
       fail-fast: false
       matrix:
         target:
+        - native
+        - x86-windows
         - aarch64-windows
         - aarch64-macos
         - arm-linux-gnueabi
+        - powerpc64-openbsd
         - riscv64-freebsd
         - wasm32-freestanding
-        - native
     runs-on: ubuntu-latest
     env:
       build: zig build -Dtarget=${{ matrix.target }} ${{ matrix.target == 'native' && '-fsys=wio' || '' }}
