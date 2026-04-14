@@ -11,7 +11,6 @@ jobs:
         - aarch64-windows
         - aarch64-macos
         - arm-linux-gnueabi
-        - mips-netbsd
         - riscv64-freebsd
         - wasm32-freestanding
         - native
