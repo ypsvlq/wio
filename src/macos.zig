@@ -1126,6 +1126,10 @@ const c = struct {
     pub const struct___CFDictionary = opaque {};
     pub const CFDictionaryRef = ?*const struct___CFDictionary;
     pub extern fn CFDictionaryCreate(allocator: CFAllocatorRef, keys: [*c]?*const anyopaque, values: [*c]?*const anyopaque, numValues: CFIndex, keyCallBacks: [*c]const CFDictionaryKeyCallBacks, valueCallBacks: [*c]const CFDictionaryValueCallBacks) CFDictionaryRef;
+    pub const struct_CGContext = opaque {};
+    pub const CGContextRef = ?*struct_CGContext;
+    pub const struct_CGColorSpace = opaque {};
+    pub const CGColorSpaceRef = ?*struct_CGColorSpace;
     pub const CFArrayRetainCallBack = ?*const fn (CFAllocatorRef, ?*const anyopaque) callconv(.c) ?*const anyopaque;
     pub const CFArrayReleaseCallBack = ?*const fn (CFAllocatorRef, ?*const anyopaque) callconv(.c) void;
     pub const CFArrayCopyDescriptionCallBack = ?*const fn (?*const anyopaque) callconv(.c) CFStringRef;
@@ -1147,6 +1151,12 @@ const c = struct {
     pub const kCFStringEncodingUTF8: c_int = 134217984;
     pub extern fn CFStringGetLength(theString: CFStringRef) CFIndex;
     pub extern fn CFStringGetBytes(theString: CFStringRef, range: CFRange, encoding: CFStringEncoding, lossByte: UInt8, isExternalRepresentation: Boolean, buffer: [*c]UInt8, maxBufLen: CFIndex, usedBufLen: [*c]CFIndex) CFIndex;
+    pub extern fn CGColorSpaceCreateDeviceRGB() CGColorSpaceRef;
+    pub extern fn CGColorSpaceRelease(space: CGColorSpaceRef) void;
+    pub const kCGImageAlphaNoneSkipFirst: c_int = 6;
+    pub const kCGImageByteOrder32Little: c_int = 8192;
+    pub extern fn CGContextRelease(c: CGContextRef) void;
+    pub extern fn CGBitmapContextCreate(data: ?*anyopaque, width: usize, height: usize, bitsPerComponent: usize, bytesPerRow: usize, space: CGColorSpaceRef, bitmapInfo: u32) CGContextRef;
     pub const CFNumberType = CFIndex;
     pub const kCFNumberSInt32Type: c_int = 3;
     pub const struct___CFNumber = opaque {};
