@@ -6,7 +6,18 @@ const unix = @import("../unix.zig");
 const DynLib = @import("DynLib.zig");
 const log = std.log.scoped(.wio);
 const h = @cImport({
-    if (build_options.system_integration) {} else @cInclude("wio-wayland.h");
+    if (build_options.system_integration) {} else {
+        @cInclude("wio-wayland.h");
+        @cInclude("wayland-protocol.c");
+    }
+    @cInclude("viewporter-protocol.c");
+    @cInclude("fractional-scale-v1-protocol.c");
+    @cInclude("text-input-v3-protocol.c");
+    @cInclude("tablet-v2-protocol.c");
+    @cInclude("cursor-shape-v1-protocol.c");
+    @cInclude("pointer-constraints-v1-protocol.c");
+    @cInclude("relative-pointer-v1-protocol.c");
+    @cInclude("xdg-activation-v1-protocol.c");
     @cInclude("wayland-client-protocol.h");
     @cInclude("viewporter-client-protocol.h");
     @cInclude("fractional-scale-v1-client-protocol.h");
@@ -444,7 +455,7 @@ pub const Window = struct {
 
         if (repeat_period > 0) {
             if (!self.repeat_ignore) {
-                const now = std.time.milliTimestamp();
+                const now = std.Io.Clock.awake.now(internal.io).toMilliseconds();
                 if (self.repeat_key != 0 and now > self.repeat_timestamp) {
                     self.pushKeyEvent(self.repeat_key, .button_repeat);
                     self.repeat_timestamp = now + repeat_period;
@@ -563,19 +574,21 @@ pub const Window = struct {
         h.wl_data_offer_receive(data_offer, "text/plain;charset=utf-8", pipe[1]);
         _ = c.wl_display_roundtrip(display);
         _ = std.c.close(pipe[1]);
-        return readClipboardText(allocator, .{ .handle = pipe[0] }) catch null;
+        return readClipboardText(allocator, pipe[0]) catch null;
     }
 
-    fn readClipboardText(allocator: std.mem.Allocator, file: std.fs.File) ![]u8 {
+    fn readClipboardText(allocator: std.mem.Allocator, fd: i32) ![]u8 {
         var buffer: [1024]u8 = undefined;
         var text: std.ArrayList(u8) = .empty;
         errdefer text.deinit(allocator);
         while (true) {
-            const count = try file.read(&buffer);
-            if (count > 0) {
-                try text.appendSlice(allocator, buffer[0..count]);
-            } else {
+            const count = std.c.read(fd, &buffer, buffer.len);
+            if (std.c.errno(count) != .SUCCESS) {
+                return error.Unexpected;
+            } else if (count == 0) {
                 return text.toOwnedSlice(allocator);
+            } else {
+                try text.appendSlice(allocator, buffer[0..@intCast(count)]);
             }
         }
     }
@@ -586,7 +599,8 @@ pub const Window = struct {
         const fd = blk: {
             var attempt: u8 = 0;
             while (attempt < 10) : (attempt += 1) {
-                const name = try std.fmt.allocPrintSentinel(internal.allocator, "/wio-{x}", .{std.time.nanoTimestamp()}, 0);
+                const now = std.Io.Clock.awake.now(internal.io).nanoseconds;
+                const name = try std.fmt.allocPrintSentinel(internal.allocator, "/wio-{x}", .{now}, 0);
                 defer internal.allocator.free(name);
 
                 const fd = std.c.shm_open(name, @bitCast(std.c.O{ .ACCMODE = .RDWR, .CREAT = true, .EXCL = true }), 0o600);
@@ -601,12 +615,12 @@ pub const Window = struct {
 
         const byte_size = @sizeOf(u32) * @as(usize, size.width) * size.height;
 
-        try std.posix.ftruncate(fd, byte_size);
+        if (std.c.errno(std.c.ftruncate(fd, std.math.cast(std.c.off_t, byte_size) orelse return error.Unexpected)) != .SUCCESS) return error.Unexpected;
 
         const mapped = try std.posix.mmap(
             null,
             byte_size,
-            std.posix.PROT.READ | std.posix.PROT.WRITE,
+            .{ .READ = true, .WRITE = true },
             .{ .TYPE = .SHARED },
             fd,
             0,
@@ -874,7 +888,7 @@ fn keyboardKeymap(_: ?*anyopaque, _: ?*h.wl_keyboard, _: h.wl_keyboard_keymap_fo
     c.xkb_keymap_unref(keymap);
     c.xkb_state_unref(xkb_state);
 
-    const string = std.c.mmap(null, size, std.c.PROT.READ, .{ .TYPE = .PRIVATE }, fd, 0);
+    const string = std.c.mmap(null, size, .{ .READ = true }, .{ .TYPE = .PRIVATE }, fd, 0);
     defer _ = std.c.munmap(@alignCast(string), size);
 
     keymap = c.xkb_keymap_new_from_string(xkb, @ptrCast(string), h.XKB_KEYMAP_FORMAT_TEXT_V1, h.XKB_KEYMAP_COMPILE_NO_FLAGS);
@@ -904,7 +918,7 @@ fn keyboardKey(_: ?*anyopaque, _: ?*h.wl_keyboard, serial: u32, _: u32, key: u32
             window.pushKeyEvent(key, .button_press);
             if (repeat_period > 0) {
                 window.repeat_key = key;
-                window.repeat_timestamp = std.time.milliTimestamp() + repeat_delay;
+                window.repeat_timestamp = std.Io.Clock.awake.now(internal.io).toMilliseconds() + repeat_delay;
             }
         } else {
             if (keyToButton(key)) |button| {
@@ -1176,9 +1190,7 @@ fn dataSourceTarget(_: ?*anyopaque, _: ?*h.wl_data_source, _: [*c]const u8) call
 
 fn dataSourceSend(_: ?*anyopaque, _: ?*h.wl_data_source, _: [*c]const u8, fd: i32) callconv(.c) void {
     defer _ = std.c.close(fd);
-    const file = std.fs.File{ .handle = fd };
-    var writer = file.writer(&.{});
-    writer.interface.writeAll(clipboard_text) catch {};
+    _ = std.c.write(fd, clipboard_text.ptr, clipboard_text.len);
 }
 
 fn dataSourceCancelled(_: ?*anyopaque, _: ?*h.wl_data_source) callconv(.c) void {}

@@ -2,15 +2,6 @@ const std = @import("std");
 const build_options = @import("build_options");
 const wio = @import("wio.zig");
 const internal = @import("wio.internal.zig");
-const c = @cImport({
-    @cInclude("CoreGraphics/CoreGraphics.h");
-    @cInclude("OpenGL/OpenGL.h");
-    @cInclude("dlfcn.h");
-    @cInclude("IOKit/hid/IOHIDLib.h");
-    @cInclude("CoreAudio/CoreAudio.h");
-    @cInclude("AudioUnit/AudioUnit.h");
-    @cInclude("AudioToolbox/AudioToolbox.h");
-});
 const log = std.log.scoped(.wio);
 
 const NSWindow = opaque {};
@@ -158,9 +149,10 @@ pub fn wait(options: wio.WaitOptions) void {
     if (options.timeout_ns) |timeout_ns| {
         var timeout = @as(f64, @floatFromInt(timeout_ns)) / std.time.ns_per_s;
         while (internal.wait and timeout > 0) {
-            const start = std.time.nanoTimestamp();
+            const start = std.Io.Clock.awake.now(internal.io).nanoseconds;
             wioWait(timeout);
-            timeout -= @as(f64, @floatFromInt(std.time.nanoTimestamp() - start)) / std.time.ns_per_s;
+            const end = std.Io.Clock.awake.now(internal.io).nanoseconds;
+            timeout -= @as(f64, @floatFromInt(end - start)) / std.time.ns_per_s;
         }
     } else {
         while (internal.wait) {
@@ -719,7 +711,7 @@ pub const AudioOutput = struct {
 
     fn callback(data: ?*anyopaque, _: [*c]c.AudioUnitRenderActionFlags, _: [*c]const c.AudioTimeStamp, _: u32, _: u32, list: [*c]c.AudioBufferList) callconv(.c) c.OSStatus {
         const writeFn: *const fn ([]f32) void = @ptrCast(@alignCast(data));
-        const buffer = list.*.mBuffers[0];
+        const buffer = list.*.mBuffers[0][0];
         const ptr: [*]f32 = @ptrCast(@alignCast(buffer.mData));
         writeFn(ptr[0 .. buffer.mDataByteSize / @sizeOf(f32)]);
         return c.noErr;
@@ -774,7 +766,7 @@ pub const AudioInput = struct {
 
     fn inputProc(_: c.AudioConverterRef, packets: [*c]u32, list: [*c]c.AudioBufferList, _: [*c][*c]c.AudioStreamPacketDescription, data: ?*anyopaque) callconv(.c) c.OSStatus {
         const buffer: *c.AudioBuffer = @ptrCast(@alignCast(data));
-        list.*.mBuffers[0] = buffer.*;
+        list.*.mBuffers[0][0] = buffer.*;
         packets.* = buffer.mDataByteSize / buffer.mNumberChannels / @sizeOf(f32);
         return c.noErr;
     }
@@ -1071,3 +1063,296 @@ fn keycodeToButton(keycode: u16) ?wio.Button {
     };
     return if (keycode < table.len and table[keycode] != .mouse_left) table[keycode] else null;
 }
+
+const c = struct {
+    pub const UInt8 = u8;
+    pub const SInt16 = c_short;
+    pub const UInt32 = c_uint;
+    pub const SInt32 = c_int;
+    pub const SInt64 = c_longlong;
+    pub const UInt64 = c_ulonglong;
+    pub const Float64 = f64;
+    pub const OSStatus = SInt32;
+    pub const FourCharCode = UInt32;
+    pub const OSType = FourCharCode;
+    pub const Boolean = u8;
+    pub const noErr: c_int = 0;
+    pub const CFHashCode = c_ulong;
+    pub const CFIndex = c_long;
+    pub const CFTypeRef = ?*const anyopaque;
+    pub const struct___CFString = opaque {};
+    pub const CFStringRef = ?*const struct___CFString;
+    pub const CFRange = extern struct {
+        location: CFIndex = @import("std").mem.zeroes(CFIndex),
+        length: CFIndex = @import("std").mem.zeroes(CFIndex),
+    };
+    pub inline fn CFRangeMake(arg_loc: CFIndex, arg_len: CFIndex) CFRange {
+        var loc = arg_loc;
+        _ = &loc;
+        var len = arg_len;
+        _ = &len;
+        var range: CFRange = undefined;
+        _ = &range;
+        range.location = loc;
+        range.length = len;
+        return range;
+    }
+    pub const struct___CFAllocator = opaque {};
+    pub const CFAllocatorRef = ?*const struct___CFAllocator;
+    pub extern const kCFAllocatorDefault: CFAllocatorRef;
+    pub extern fn CFRelease(cf: CFTypeRef) void;
+    pub const CFDictionaryRetainCallBack = ?*const fn (CFAllocatorRef, ?*const anyopaque) callconv(.c) ?*const anyopaque;
+    pub const CFDictionaryReleaseCallBack = ?*const fn (CFAllocatorRef, ?*const anyopaque) callconv(.c) void;
+    pub const CFDictionaryCopyDescriptionCallBack = ?*const fn (?*const anyopaque) callconv(.c) CFStringRef;
+    pub const CFDictionaryEqualCallBack = ?*const fn (?*const anyopaque, ?*const anyopaque) callconv(.c) Boolean;
+    pub const CFDictionaryHashCallBack = ?*const fn (?*const anyopaque) callconv(.c) CFHashCode;
+    pub const CFDictionaryKeyCallBacks = extern struct {
+        version: CFIndex = @import("std").mem.zeroes(CFIndex),
+        retain: CFDictionaryRetainCallBack = @import("std").mem.zeroes(CFDictionaryRetainCallBack),
+        release: CFDictionaryReleaseCallBack = @import("std").mem.zeroes(CFDictionaryReleaseCallBack),
+        copyDescription: CFDictionaryCopyDescriptionCallBack = @import("std").mem.zeroes(CFDictionaryCopyDescriptionCallBack),
+        equal: CFDictionaryEqualCallBack = @import("std").mem.zeroes(CFDictionaryEqualCallBack),
+        hash: CFDictionaryHashCallBack = @import("std").mem.zeroes(CFDictionaryHashCallBack),
+    };
+    pub extern const kCFTypeDictionaryKeyCallBacks: CFDictionaryKeyCallBacks;
+    pub const CFDictionaryValueCallBacks = extern struct {
+        version: CFIndex = @import("std").mem.zeroes(CFIndex),
+        retain: CFDictionaryRetainCallBack = @import("std").mem.zeroes(CFDictionaryRetainCallBack),
+        release: CFDictionaryReleaseCallBack = @import("std").mem.zeroes(CFDictionaryReleaseCallBack),
+        copyDescription: CFDictionaryCopyDescriptionCallBack = @import("std").mem.zeroes(CFDictionaryCopyDescriptionCallBack),
+        equal: CFDictionaryEqualCallBack = @import("std").mem.zeroes(CFDictionaryEqualCallBack),
+    };
+    pub extern const kCFTypeDictionaryValueCallBacks: CFDictionaryValueCallBacks;
+    pub const struct___CFDictionary = opaque {};
+    pub const CFDictionaryRef = ?*const struct___CFDictionary;
+    pub extern fn CFDictionaryCreate(allocator: CFAllocatorRef, keys: [*c]?*const anyopaque, values: [*c]?*const anyopaque, numValues: CFIndex, keyCallBacks: [*c]const CFDictionaryKeyCallBacks, valueCallBacks: [*c]const CFDictionaryValueCallBacks) CFDictionaryRef;
+    pub const CFArrayRetainCallBack = ?*const fn (CFAllocatorRef, ?*const anyopaque) callconv(.c) ?*const anyopaque;
+    pub const CFArrayReleaseCallBack = ?*const fn (CFAllocatorRef, ?*const anyopaque) callconv(.c) void;
+    pub const CFArrayCopyDescriptionCallBack = ?*const fn (?*const anyopaque) callconv(.c) CFStringRef;
+    pub const CFArrayEqualCallBack = ?*const fn (?*const anyopaque, ?*const anyopaque) callconv(.c) Boolean;
+    pub const CFArrayCallBacks = extern struct {
+        version: CFIndex = @import("std").mem.zeroes(CFIndex),
+        retain: CFArrayRetainCallBack = @import("std").mem.zeroes(CFArrayRetainCallBack),
+        release: CFArrayReleaseCallBack = @import("std").mem.zeroes(CFArrayReleaseCallBack),
+        copyDescription: CFArrayCopyDescriptionCallBack = @import("std").mem.zeroes(CFArrayCopyDescriptionCallBack),
+        equal: CFArrayEqualCallBack = @import("std").mem.zeroes(CFArrayEqualCallBack),
+    };
+    pub extern const kCFTypeArrayCallBacks: CFArrayCallBacks;
+    pub const struct___CFArray = opaque {};
+    pub const CFArrayRef = ?*const struct___CFArray;
+    pub extern fn CFArrayCreate(allocator: CFAllocatorRef, values: [*c]?*const anyopaque, numValues: CFIndex, callBacks: [*c]const CFArrayCallBacks) CFArrayRef;
+    pub extern fn CFArrayGetCount(theArray: CFArrayRef) CFIndex;
+    pub extern fn CFArrayGetValueAtIndex(theArray: CFArrayRef, idx: CFIndex) ?*const anyopaque;
+    pub const CFStringEncoding = UInt32;
+    pub const kCFStringEncodingUTF8: c_int = 134217984;
+    pub extern fn CFStringGetLength(theString: CFStringRef) CFIndex;
+    pub extern fn CFStringGetBytes(theString: CFStringRef, range: CFRange, encoding: CFStringEncoding, lossByte: UInt8, isExternalRepresentation: Boolean, buffer: [*c]UInt8, maxBufLen: CFIndex, usedBufLen: [*c]CFIndex) CFIndex;
+    pub const CFNumberType = CFIndex;
+    pub const kCFNumberSInt32Type: c_int = 3;
+    pub const struct___CFNumber = opaque {};
+    pub const CFNumberRef = ?*const struct___CFNumber;
+    pub extern fn CFNumberCreate(allocator: CFAllocatorRef, theType: CFNumberType, valuePtr: ?*const anyopaque) CFNumberRef;
+    pub extern fn CFNumberGetValue(number: CFNumberRef, theType: CFNumberType, valuePtr: ?*anyopaque) Boolean;
+    pub const CFRunLoopMode = CFStringRef;
+    pub const struct___CFRunLoop = opaque {};
+    pub const CFRunLoopRef = ?*struct___CFRunLoop;
+    pub extern const kCFRunLoopDefaultMode: CFRunLoopMode;
+    pub extern fn CFRunLoopGetMain() CFRunLoopRef;
+    pub const kern_return_t = c_int;
+    pub const struct___CFSet = opaque {};
+    pub const CFSetRef = ?*const struct___CFSet;
+    pub extern fn CFSetGetCount(theSet: CFSetRef) CFIndex;
+    pub extern fn CFSetGetValues(theSet: CFSetRef, values: [*c]?*const anyopaque) void;
+    pub const IOReturn = kern_return_t;
+    pub const IOOptionBits = UInt32;
+    pub const kCGLPFADoubleBuffer: c_int = 5;
+    pub const kCGLPFAColorSize: c_int = 8;
+    pub const kCGLPFAAlphaSize: c_int = 11;
+    pub const kCGLPFADepthSize: c_int = 12;
+    pub const kCGLPFAStencilSize: c_int = 13;
+    pub const kCGLPFASampleBuffers: c_int = 55;
+    pub const kCGLPFASamples: c_int = 56;
+    pub const kCGLPFAOpenGLProfile: c_int = 99;
+    pub const enum__CGLPixelFormatAttribute = c_uint;
+    pub const CGLPixelFormatAttribute = enum__CGLPixelFormatAttribute;
+    pub const kCGLOGLPVersion_Legacy: c_int = 4096;
+    pub const kCGLOGLPVersion_GL3_Core: c_int = 12800;
+    pub const kCGLOGLPVersion_GL4_Core: c_int = 16640;
+    pub extern fn dlsym(__handle: ?*anyopaque, __symbol: [*c]const u8) ?*anyopaque;
+    pub const kIOHIDElementTypeInput_Button: c_int = 2;
+    pub const enum_IOHIDElementType = c_uint;
+    pub const IOHIDElementType = enum_IOHIDElementType;
+    pub const kIOHIDOptionsTypeNone: c_int = 0;
+    pub const struct___IOHIDDevice = opaque {};
+    pub const IOHIDDeviceRef = ?*struct___IOHIDDevice;
+    pub const struct___IOHIDElement = opaque {};
+    pub const IOHIDElementRef = ?*struct___IOHIDElement;
+    pub const struct___IOHIDValue = opaque {};
+    pub const IOHIDValueRef = ?*struct___IOHIDValue;
+    pub const IOHIDDeviceCallback = ?*const fn (?*anyopaque, IOReturn, ?*anyopaque, IOHIDDeviceRef) callconv(.c) void;
+    pub extern fn IOHIDDeviceGetProperty(device: IOHIDDeviceRef, key: CFStringRef) CFTypeRef;
+    pub extern fn IOHIDDeviceCopyMatchingElements(device: IOHIDDeviceRef, matching: CFDictionaryRef, options: IOOptionBits) CFArrayRef;
+    pub extern fn IOHIDDeviceGetValue(device: IOHIDDeviceRef, element: IOHIDElementRef, pValue: [*c]IOHIDValueRef) IOReturn;
+    pub extern fn IOHIDElementGetType(element: IOHIDElementRef) IOHIDElementType;
+    pub extern fn IOHIDElementGetUsagePage(element: IOHIDElementRef) u32;
+    pub extern fn IOHIDElementGetUsage(element: IOHIDElementRef) u32;
+    pub extern fn IOHIDElementGetLogicalMin(element: IOHIDElementRef) CFIndex;
+    pub extern fn IOHIDElementGetLogicalMax(element: IOHIDElementRef) CFIndex;
+    pub const struct___IOHIDManager = opaque {};
+    pub const IOHIDManagerRef = ?*struct___IOHIDManager;
+    pub extern fn IOHIDManagerCreate(allocator: CFAllocatorRef, options: IOOptionBits) IOHIDManagerRef;
+    pub extern fn IOHIDManagerOpen(manager: IOHIDManagerRef, options: IOOptionBits) IOReturn;
+    pub extern fn IOHIDManagerScheduleWithRunLoop(manager: IOHIDManagerRef, runLoop: CFRunLoopRef, runLoopMode: CFStringRef) void;
+    pub extern fn IOHIDManagerSetDeviceMatchingMultiple(manager: IOHIDManagerRef, multiple: CFArrayRef) void;
+    pub extern fn IOHIDManagerCopyDevices(manager: IOHIDManagerRef) CFSetRef;
+    pub extern fn IOHIDManagerRegisterDeviceMatchingCallback(manager: IOHIDManagerRef, callback: IOHIDDeviceCallback, context: ?*anyopaque) void;
+    pub extern fn IOHIDManagerRegisterDeviceRemovalCallback(manager: IOHIDManagerRef, callback: IOHIDDeviceCallback, context: ?*anyopaque) void;
+    pub const kHIDPage_GenericDesktop: c_int = 1;
+    pub const kHIDUsage_GD_Joystick: c_int = 4;
+    pub const kHIDUsage_GD_GamePad: c_int = 5;
+    pub const kHIDUsage_GD_X: c_int = 48;
+    pub const kHIDUsage_GD_Y: c_int = 49;
+    pub const kHIDUsage_GD_Z: c_int = 50;
+    pub const kHIDUsage_GD_Rx: c_int = 51;
+    pub const kHIDUsage_GD_Ry: c_int = 52;
+    pub const kHIDUsage_GD_Rz: c_int = 53;
+    pub const kHIDUsage_GD_Slider: c_int = 54;
+    pub const kHIDUsage_GD_Dial: c_int = 55;
+    pub const kHIDUsage_GD_Wheel: c_int = 56;
+    pub const kHIDUsage_GD_Hatswitch: c_int = 57;
+    pub extern fn IOHIDValueGetIntegerValue(value: IOHIDValueRef) CFIndex;
+    pub const struct_AudioBuffer = extern struct {
+        mNumberChannels: UInt32 = @import("std").mem.zeroes(UInt32),
+        mDataByteSize: UInt32 = @import("std").mem.zeroes(UInt32),
+        mData: ?*anyopaque = @import("std").mem.zeroes(?*anyopaque),
+    };
+    pub const AudioBuffer = struct_AudioBuffer;
+    pub const struct_AudioBufferList = extern struct {
+        mNumberBuffers: UInt32 = @import("std").mem.zeroes(UInt32),
+        mBuffers: [1]AudioBuffer = @import("std").mem.zeroes([1]AudioBuffer),
+    };
+    pub const AudioBufferList = struct_AudioBufferList;
+    pub const AudioFormatID = UInt32;
+    pub const AudioFormatFlags = UInt32;
+    pub const struct_AudioStreamBasicDescription = extern struct {
+        mSampleRate: Float64 = @import("std").mem.zeroes(Float64),
+        mFormatID: AudioFormatID = @import("std").mem.zeroes(AudioFormatID),
+        mFormatFlags: AudioFormatFlags = @import("std").mem.zeroes(AudioFormatFlags),
+        mBytesPerPacket: UInt32 = @import("std").mem.zeroes(UInt32),
+        mFramesPerPacket: UInt32 = @import("std").mem.zeroes(UInt32),
+        mBytesPerFrame: UInt32 = @import("std").mem.zeroes(UInt32),
+        mChannelsPerFrame: UInt32 = @import("std").mem.zeroes(UInt32),
+        mBitsPerChannel: UInt32 = @import("std").mem.zeroes(UInt32),
+        mReserved: UInt32 = @import("std").mem.zeroes(UInt32),
+    };
+    pub const AudioStreamBasicDescription = struct_AudioStreamBasicDescription;
+    pub const kAudioFormatLinearPCM: c_int = 1819304813;
+    pub const kAudioFormatFlagIsFloat: c_uint = 1;
+    pub const struct_AudioStreamPacketDescription = extern struct {
+        mStartOffset: SInt64 = @import("std").mem.zeroes(SInt64),
+        mVariableFramesInPacket: UInt32 = @import("std").mem.zeroes(UInt32),
+        mDataByteSize: UInt32 = @import("std").mem.zeroes(UInt32),
+    };
+    pub const AudioStreamPacketDescription = struct_AudioStreamPacketDescription;
+    pub const SMPTETimeType = UInt32;
+    pub const SMPTETimeFlags = UInt32;
+    pub const struct_SMPTETime = extern struct {
+        mSubframes: SInt16 = @import("std").mem.zeroes(SInt16),
+        mSubframeDivisor: SInt16 = @import("std").mem.zeroes(SInt16),
+        mCounter: UInt32 = @import("std").mem.zeroes(UInt32),
+        mType: SMPTETimeType = @import("std").mem.zeroes(SMPTETimeType),
+        mFlags: SMPTETimeFlags = @import("std").mem.zeroes(SMPTETimeFlags),
+        mHours: SInt16 = @import("std").mem.zeroes(SInt16),
+        mMinutes: SInt16 = @import("std").mem.zeroes(SInt16),
+        mSeconds: SInt16 = @import("std").mem.zeroes(SInt16),
+        mFrames: SInt16 = @import("std").mem.zeroes(SInt16),
+    };
+    pub const SMPTETime = struct_SMPTETime;
+    pub const AudioTimeStampFlags = UInt32;
+    pub const struct_AudioTimeStamp = extern struct {
+        mSampleTime: Float64 = @import("std").mem.zeroes(Float64),
+        mHostTime: UInt64 = @import("std").mem.zeroes(UInt64),
+        mRateScalar: Float64 = @import("std").mem.zeroes(Float64),
+        mWordClockTime: UInt64 = @import("std").mem.zeroes(UInt64),
+        mSMPTETime: SMPTETime = @import("std").mem.zeroes(SMPTETime),
+        mFlags: AudioTimeStampFlags = @import("std").mem.zeroes(AudioTimeStampFlags),
+        mReserved: UInt32 = @import("std").mem.zeroes(UInt32),
+    };
+    pub const AudioTimeStamp = struct_AudioTimeStamp;
+    pub const AudioObjectID = UInt32;
+    pub const AudioObjectPropertySelector = UInt32;
+    pub const AudioObjectPropertyScope = UInt32;
+    pub const AudioObjectPropertyElement = UInt32;
+    pub const struct_AudioObjectPropertyAddress = extern struct {
+        mSelector: AudioObjectPropertySelector = @import("std").mem.zeroes(AudioObjectPropertySelector),
+        mScope: AudioObjectPropertyScope = @import("std").mem.zeroes(AudioObjectPropertyScope),
+        mElement: AudioObjectPropertyElement = @import("std").mem.zeroes(AudioObjectPropertyElement),
+    };
+    pub const AudioObjectPropertyAddress = struct_AudioObjectPropertyAddress;
+    pub const kAudioObjectPropertyScopeGlobal: c_int = 1735159650;
+    pub const kAudioObjectPropertyElementMain: c_int = 0;
+    pub const kAudioObjectPropertyName: c_int = 1819173229;
+    pub const kAudioDevicePropertyDeviceUID: c_int = 1969841184;
+    pub const kAudioDevicePropertyStreams: c_int = 1937009955;
+    pub const kAudioObjectSystemObject: c_int = 1;
+    pub const AudioObjectPropertyListenerProc = ?*const fn (AudioObjectID, UInt32, [*c]const AudioObjectPropertyAddress, ?*anyopaque) callconv(.c) OSStatus;
+    pub extern fn AudioObjectGetPropertyDataSize(inObjectID: AudioObjectID, inAddress: [*c]const AudioObjectPropertyAddress, inQualifierDataSize: UInt32, inQualifierData: ?*const anyopaque, outDataSize: [*c]UInt32) OSStatus;
+    pub extern fn AudioObjectGetPropertyData(inObjectID: AudioObjectID, inAddress: [*c]const AudioObjectPropertyAddress, inQualifierDataSize: UInt32, inQualifierData: ?*const anyopaque, ioDataSize: [*c]UInt32, outData: ?*anyopaque) OSStatus;
+    pub extern fn AudioObjectAddPropertyListener(inObjectID: AudioObjectID, inAddress: [*c]const AudioObjectPropertyAddress, inListener: AudioObjectPropertyListenerProc, inClientData: ?*anyopaque) OSStatus;
+    pub const kAudioHardwarePropertyDevices: c_int = 1684370979;
+    pub const kAudioHardwarePropertyDefaultInputDevice: c_int = 1682533920;
+    pub const kAudioHardwarePropertyDefaultOutputDevice: c_int = 1682929012;
+    pub const kAudioDevicePropertyScopeInput: c_int = 1768845428;
+    pub const kAudioDevicePropertyScopeOutput: c_int = 1869968496;
+    pub const AudioDeviceID = AudioObjectID;
+    pub const struct_AudioComponentDescription = extern struct {
+        componentType: OSType = @import("std").mem.zeroes(OSType),
+        componentSubType: OSType = @import("std").mem.zeroes(OSType),
+        componentManufacturer: OSType = @import("std").mem.zeroes(OSType),
+        componentFlags: UInt32 = @import("std").mem.zeroes(UInt32),
+        componentFlagsMask: UInt32 = @import("std").mem.zeroes(UInt32),
+    };
+    pub const AudioComponentDescription = struct_AudioComponentDescription;
+    pub const struct_OpaqueAudioComponent = opaque {};
+    pub const AudioComponent = ?*struct_OpaqueAudioComponent;
+    pub const struct_ComponentInstanceRecord = opaque {};
+    pub const AudioComponentInstance = ?*struct_ComponentInstanceRecord;
+    pub extern fn AudioComponentFindNext(inComponent: AudioComponent, inDesc: [*c]const AudioComponentDescription) AudioComponent;
+    pub extern fn AudioComponentInstanceNew(inComponent: AudioComponent, outInstance: [*c]AudioComponentInstance) OSStatus;
+    pub const AudioUnit = AudioComponentInstance;
+    pub const kAudioUnitType_Output: c_int = 1635086197;
+    pub const kAudioUnitManufacturer_Apple: c_int = 1634758764;
+    pub const kAudioUnitSubType_HALOutput: c_int = 1634230636;
+    pub const AudioUnitRenderActionFlags = UInt32;
+    pub const AudioUnitPropertyID = UInt32;
+    pub const AudioUnitScope = UInt32;
+    pub const AudioUnitElement = UInt32;
+    pub const AURenderCallback = ?*const fn (?*anyopaque, [*c]AudioUnitRenderActionFlags, [*c]const AudioTimeStamp, UInt32, UInt32, [*c]AudioBufferList) callconv(.c) OSStatus;
+    pub extern fn AudioUnitInitialize(inUnit: AudioUnit) OSStatus;
+    pub extern fn AudioUnitUninitialize(inUnit: AudioUnit) OSStatus;
+    pub extern fn AudioUnitGetProperty(inUnit: AudioUnit, inID: AudioUnitPropertyID, inScope: AudioUnitScope, inElement: AudioUnitElement, outData: ?*anyopaque, ioDataSize: [*c]UInt32) OSStatus;
+    pub extern fn AudioUnitSetProperty(inUnit: AudioUnit, inID: AudioUnitPropertyID, inScope: AudioUnitScope, inElement: AudioUnitElement, inData: ?*const anyopaque, inDataSize: UInt32) OSStatus;
+    pub extern fn AudioUnitRender(inUnit: AudioUnit, ioActionFlags: [*c]AudioUnitRenderActionFlags, inTimeStamp: [*c]const AudioTimeStamp, inOutputBusNumber: UInt32, inNumberFrames: UInt32, ioData: [*c]AudioBufferList) OSStatus;
+    pub extern fn AudioOutputUnitStart(ci: AudioUnit) OSStatus;
+    pub const kAudioUnitScope_Global: c_int = 0;
+    pub const kAudioUnitScope_Input: c_int = 1;
+    pub const kAudioUnitScope_Output: c_int = 2;
+    pub const kAudioUnitProperty_SampleRate: c_int = 2;
+    pub const kAudioUnitProperty_StreamFormat: c_int = 8;
+    pub const kAudioUnitProperty_SetRenderCallback: c_int = 23;
+    pub const struct_AURenderCallbackStruct = extern struct {
+        inputProc: AURenderCallback = @import("std").mem.zeroes(AURenderCallback),
+        inputProcRefCon: ?*anyopaque = @import("std").mem.zeroes(?*anyopaque),
+    };
+    pub const AURenderCallbackStruct = struct_AURenderCallbackStruct;
+    pub const kAudioOutputUnitProperty_CurrentDevice: c_int = 2000;
+    pub const kAudioOutputUnitProperty_EnableIO: c_int = 2003;
+    pub const kAudioOutputUnitProperty_SetInputCallback: c_int = 2005;
+    pub const struct_OpaqueAudioConverter = opaque {};
+    pub const AudioConverterRef = ?*struct_OpaqueAudioConverter;
+    pub extern fn AudioConverterNew(inSourceFormat: [*c]const AudioStreamBasicDescription, inDestinationFormat: [*c]const AudioStreamBasicDescription, outAudioConverter: [*c]AudioConverterRef) OSStatus;
+    pub extern fn AudioConverterDispose(inAudioConverter: AudioConverterRef) OSStatus;
+    pub const AudioConverterComplexInputDataProc = ?*const fn (AudioConverterRef, [*c]UInt32, [*c]AudioBufferList, [*c][*c]AudioStreamPacketDescription, ?*anyopaque) callconv(.c) OSStatus;
+    pub extern fn AudioConverterFillComplexBuffer(inAudioConverter: AudioConverterRef, inInputDataProc: AudioConverterComplexInputDataProc, inInputDataProcUserData: ?*anyopaque, ioOutputDataPacketSize: [*c]UInt32, outOutputData: [*c]AudioBufferList, outPacketDescription: [*c]AudioStreamPacketDescription) OSStatus;
+    pub const RTLD_DEFAULT = @import("std").zig.c_translation.helpers.cast(?*anyopaque, -@as(c_int, 2));
+};

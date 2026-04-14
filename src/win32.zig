@@ -174,17 +174,17 @@ pub fn update() void {
     if (build_options.audio) {
         var maybe_device: ?*w.IMMDevice = undefined;
         if (internal.init_options.audioDefaultOutputFn) |callback| {
-            mm_notification_client.mutex.lock();
+            mm_notification_client.mutex.lockUncancelable(internal.io);
             maybe_device = mm_notification_client.default_output;
             mm_notification_client.default_output = null;
-            mm_notification_client.mutex.unlock();
+            mm_notification_client.mutex.unlock(internal.io);
             if (maybe_device) |device| callback(.{ .backend = .{ .device = device } });
         }
         if (internal.init_options.audioDefaultInputFn) |callback| {
-            mm_notification_client.mutex.lock();
+            mm_notification_client.mutex.lockUncancelable(internal.io);
             maybe_device = mm_notification_client.default_input;
             mm_notification_client.default_input = null;
-            mm_notification_client.mutex.unlock();
+            mm_notification_client.mutex.unlock(internal.io);
             if (maybe_device) |device| callback(.{ .backend = .{ .device = device } });
         }
     }
@@ -203,12 +203,12 @@ pub fn wait(options: wio.WaitOptions) void {
             update();
         }
     } else {
-        const start = std.time.milliTimestamp();
+        const start = std.Io.Clock.awake.now(internal.io).toMilliseconds();
         var now = start;
         while (internal.wait and now - start < timeout) {
             _ = w.MsgWaitForMultipleObjects(0, null, w.FALSE, timeout, w.QS_ALLINPUT);
             update();
-            now = std.time.milliTimestamp();
+            now = std.Io.Clock.awake.now(internal.io).toMilliseconds();
             timeout -|= std.math.lossyCast(u32, now - start);
         }
     }
@@ -1081,7 +1081,7 @@ const MMNotificationClient = struct {
         .OnDefaultDeviceChanged = OnDefaultDeviceChanged,
         .OnPropertyValueChanged = OnPropertyValueChanged,
     } },
-    mutex: std.Thread.Mutex = .{},
+    mutex: std.Io.Mutex = .init,
     default_output: ?*w.IMMDevice = null,
     default_input: ?*w.IMMDevice = null,
 
@@ -1119,7 +1119,7 @@ const MMNotificationClient = struct {
                 null;
 
             if (maybe_device) |device| {
-                mm_notification_client.mutex.lock();
+                mm_notification_client.mutex.lockUncancelable(internal.io);
                 if (device.*) |old| {
                     _ = old.Release();
                     device.* = null;
@@ -1127,7 +1127,7 @@ const MMNotificationClient = struct {
                 if (id) |_| {
                     SUCCEED(mm_device_enumerator.GetDevice(id, @ptrCast(device)), "IMMDeviceEnumerator::GetDevice") catch {};
                 }
-                mm_notification_client.mutex.unlock();
+                mm_notification_client.mutex.unlock(internal.io);
             }
         }
         return w.S_OK;

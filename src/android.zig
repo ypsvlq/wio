@@ -16,8 +16,8 @@ const c = @cImport({
 pub const logFn = android.logFn;
 
 var events: internal.EventQueue = .{};
-var events_mutex: std.Thread.Mutex = .{};
-var wait_event: std.Thread.ResetEvent = .{};
+var events_mutex: std.Io.Mutex = .init;
+var wait_event: std.Io.Event = .unset;
 
 var window: ?*c.ANativeWindow = null;
 
@@ -29,7 +29,7 @@ var egl_display: c.EGLDisplay = undefined;
 var egl_config: c.EGLConfig = undefined;
 var egl_context: c.EGLContext = null;
 var egl_surface: c.EGLSurface = null;
-var egl_surface_mutex: std.Thread.Mutex = .{};
+var egl_surface_mutex: std.Io.Mutex = .init;
 
 pub fn init() !void {
     if (build_options.opengl) {
@@ -55,14 +55,14 @@ pub fn update() void {}
 pub fn wait(options: wio.WaitOptions) void {
     wait_event.reset();
     if (options.timeout_ns) |timeout_ns| {
-        wait_event.timedWait(timeout_ns) catch {};
+        wait_event.waitTimeout(internal.io, .{ .duration = .{ .clock = std.Io.Clock.awake, .raw = .{ .nanoseconds = timeout_ns } } }) catch {};
     } else {
-        wait_event.wait();
+        wait_event.waitUncancelable(internal.io);
     }
 }
 
 pub fn cancelWait() void {
-    wait_event.set();
+    wait_event.set(internal.io);
 }
 
 pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
@@ -119,8 +119,8 @@ pub const Window = struct {
     }
 
     pub fn getEvent(_: *Window) ?wio.Event {
-        events_mutex.lock();
-        defer events_mutex.unlock();
+        events_mutex.lockUncancelable(internal.io);
+        defer events_mutex.unlock(internal.io);
         return events.pop();
     }
 
@@ -206,14 +206,14 @@ pub const Window = struct {
     }
 
     pub fn makeContextCurrent(_: *Window) void {
-        egl_surface_mutex.lock();
-        defer egl_surface_mutex.unlock();
+        egl_surface_mutex.lockUncancelable(internal.io);
+        defer egl_surface_mutex.unlock(internal.io);
         _ = c.eglMakeCurrent(egl_display, egl_surface, egl_surface, egl_context);
     }
 
     pub fn swapBuffers(_: *Window) void {
-        egl_surface_mutex.lock();
-        defer egl_surface_mutex.unlock();
+        egl_surface_mutex.lockUncancelable(internal.io);
+        defer egl_surface_mutex.unlock(internal.io);
         _ = c.eglSwapBuffers(egl_display, egl_surface);
     }
 
@@ -540,8 +540,8 @@ const native = struct {
 
         if (build_options.opengl) {
             if (egl_context) |_| {
-                egl_surface_mutex.lock();
-                defer egl_surface_mutex.unlock();
+                egl_surface_mutex.lockUncancelable(internal.io);
+                defer egl_surface_mutex.unlock(internal.io);
                 egl_surface = c.eglCreateWindowSurface(egl_display, egl_config, window, null) orelse {
                     logEglError("eglCreateWindowSurface");
                     return;
@@ -564,8 +564,8 @@ const native = struct {
 
         if (build_options.opengl) {
             if (egl_surface) |_| {
-                egl_surface_mutex.lock();
-                defer egl_surface_mutex.unlock();
+                egl_surface_mutex.lockUncancelable(internal.io);
+                defer egl_surface_mutex.unlock(internal.io);
                 _ = c.eglDestroySurface(egl_display, egl_surface);
                 egl_surface = null;
             }
@@ -586,10 +586,10 @@ const native = struct {
 };
 
 fn pushEvent(event: wio.Event) void {
-    events_mutex.lock();
-    defer events_mutex.unlock();
+    events_mutex.lockUncancelable(internal.io);
+    defer events_mutex.unlock(internal.io);
     events.push(event);
-    wait_event.set();
+    wait_event.set(internal.io);
 }
 
 fn logUnexpectedEgl(name: []const u8) error{Unexpected} {

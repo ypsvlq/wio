@@ -3,6 +3,7 @@ const wio = @import("wio.zig");
 const log = std.log.scoped(.wio);
 
 pub var allocator: std.mem.Allocator = undefined;
+pub var io: std.Io = undefined;
 pub var init_options: wio.InitOptions = undefined;
 pub var wait = false;
 

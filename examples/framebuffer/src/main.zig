@@ -4,8 +4,12 @@ const wio = @import("wio");
 pub fn main() !void {
     var debug_allocator = std.heap.DebugAllocator(.{}).init;
     defer _ = debug_allocator.deinit();
+    const allocator = debug_allocator.allocator();
 
-    try wio.init(debug_allocator.allocator(), .{});
+    var threaded = std.Io.Threaded.init(allocator, .{});
+    defer threaded.deinit();
+
+    try wio.init(allocator, threaded.io(), .{});
     defer wio.deinit();
 
     var size: wio.Size = .{ .width = 640, .height = 480 };

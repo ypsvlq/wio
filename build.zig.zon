@@ -2,11 +2,11 @@
     .name = .wio,
     .version = "0.0.0",
     .fingerprint = 0xc7cd0be0afeb11f3,
-    .minimum_zig_version = "0.15.1",
+    .minimum_zig_version = "0.16.0",
     .dependencies = .{
         .win32 = .{
-            .url = "https://github.com/ypsvlq/win32/archive/ee47507f64ab19a4e42a141b7f64f462671308d0.tar.gz",
-            .hash = "win32-0.0.0-4XUubaXr_gKoPQ4I7hiKNGaFCrNCkX09oBQcr-w3OcbI",
+            .url = "https://github.com/ypsvlq/win32/archive/5edca53ffbd415e19170f022932d5b7063e2cccf.tar.gz",
+            .hash = "win32-0.0.0-4XUuba3r_gIzIdDxDJM72L90Kf4kTUI1mAqYjE-llhAZ",
             .lazy = true,
         },
         .xcode_frameworks = .{

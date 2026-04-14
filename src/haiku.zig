@@ -71,19 +71,19 @@ pub fn run(func: fn () anyerror!bool) !void {
 
 pub fn update() void {}
 
-var wait_event: std.Thread.ResetEvent = .{};
+var wait_event: std.Io.Event = .unset;
 
 pub fn wait(options: wio.WaitOptions) void {
     wait_event.reset();
     if (options.timeout_ns) |timeout_ns| {
-        wait_event.timedWait(timeout_ns) catch {};
+        wait_event.waitTimeout(internal.io, timeout_ns) catch {};
     } else {
-        wait_event.wait();
+        wait_event.waitUncancelable(internal.io);
     }
 }
 
 pub fn cancelWait() void {
-    wait_event.set();
+    wait_event.set(internal.io);
 }
 
 pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
@@ -129,7 +129,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
 pub const Window = struct {
     window: *BWindow,
     events: internal.EventQueue,
-    events_mutex: std.Thread.Mutex = .{},
+    events_mutex: std.Io.Mutex = .{},
     buttons: std.StaticBitSet(5) = .initEmpty(),
     text: bool = false,
     opengl: if (build_options.opengl) struct { context: ?*BGLView = null, vsync: bool = false } else struct {} = .{},
@@ -141,8 +141,8 @@ pub const Window = struct {
     }
 
     pub fn getEvent(self: *Window) ?wio.Event {
-        self.events_mutex.lock();
-        defer self.events_mutex.unlock();
+        self.events_mutex.lockUncancelable(internal.io);
+        defer self.events_mutex.unlock(internal.io);
         return self.events.pop();
     }
 
@@ -217,10 +217,10 @@ pub const Window = struct {
     }
 
     fn pushEvent(self: *Window, event: wio.Event) void {
-        self.events_mutex.lock();
-        defer self.events_mutex.unlock();
+        self.events_mutex.lockUncancelable(internal.io);
+        defer self.events_mutex.unlock(internal.io);
         self.events.push(event);
-        wait_event.set();
+        wait_event.set(internal.io);
     }
 };
 

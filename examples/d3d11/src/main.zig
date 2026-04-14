@@ -7,8 +7,12 @@ pub fn main() !void {
     defer _ = debug_allocator.deinit();
     const allocator = debug_allocator.allocator();
 
-    try wio.init(allocator, .{});
+    var threaded = std.Io.Threaded.init(allocator, .{});
+    defer threaded.deinit();
+
+    try wio.init(allocator, threaded.io(), .{});
     defer wio.deinit();
+
     var window = try wio.createWindow(.{ .title = "D3D11", .scale = 1 });
     defer window.destroy();
 

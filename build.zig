@@ -112,10 +112,6 @@ pub fn build(b: *std.Build) !void {
             } else {
                 module.link_libc = true;
 
-                if (enable_wayland) {
-                    module.addCSourceFile(.{ .file = b.path("src/unix/wayland.c") });
-                }
-
                 if (b.lazyDependency("wio_unix_headers", .{})) |unix_headers| {
                     module.addIncludePath(unix_headers.path("."));
                 }

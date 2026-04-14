@@ -5,6 +5,8 @@ const vk = @import("vulkan");
 var debug_allocator = std.heap.DebugAllocator(.{}).init;
 const allocator = debug_allocator.allocator();
 
+var threaded: std.Io.Threaded = undefined;
+
 var window: wio.Window = undefined;
 var size = wio.Size{ .width = 640, .height = 480 };
 var visible = true;
@@ -12,7 +14,9 @@ var visible = true;
 var vkb: vk.BaseWrapper = undefined;
 
 pub fn main() !void {
-    try wio.init(allocator, .{});
+    threaded = .init(allocator, .{});
+
+    try wio.init(allocator, threaded.io(), .{});
     window = try wio.createWindow(.{ .title = "Vulkan", .size = size, .scale = 1 });
 
     vkb = .load(@as(*const fn (vk.Instance, [*:0]const u8) ?*const fn () void, @ptrCast(&wio.vkGetInstanceProcAddr)));
@@ -120,7 +124,7 @@ fn pickPhysicalDevice() !void {
                 graphics_queue_index = index;
                 has_graphics = true;
             }
-            if (!has_present and try instance.getPhysicalDeviceSurfaceSupportKHR(handle, index, surface) == vk.TRUE) {
+            if (!has_present and try instance.getPhysicalDeviceSurfaceSupportKHR(handle, index, surface) == .true) {
                 present_queue_index = index;
                 has_present = true;
             }
@@ -240,7 +244,7 @@ fn createGraphicsPipeline() !void {
     defer device.destroyShaderModule(fragment_module, null);
 
     pipeline_layout = try device.createPipelineLayout(&.{}, null);
-    _ = try device.createGraphicsPipelines(.null_handle, 1, &.{.{
+    _ = try device.createGraphicsPipelines(.null_handle, &.{.{
         .stage_count = 2,
         .p_stages = &.{
             .{ .stage = .{ .vertex_bit = true }, .module = vertex_module, .p_name = "main" },
@@ -249,37 +253,37 @@ fn createGraphicsPipeline() !void {
         .p_vertex_input_state = &.{},
         .p_input_assembly_state = &.{
             .topology = .triangle_list,
-            .primitive_restart_enable = vk.FALSE,
+            .primitive_restart_enable = .false,
         },
         .p_viewport_state = &.{
             .viewport_count = 1,
             .scissor_count = 1,
         },
         .p_rasterization_state = &.{
-            .depth_clamp_enable = vk.FALSE,
-            .rasterizer_discard_enable = vk.FALSE,
+            .depth_clamp_enable = .false,
+            .rasterizer_discard_enable = .false,
             .polygon_mode = .fill,
             .cull_mode = .{ .back_bit = true },
             .front_face = .clockwise,
-            .depth_bias_enable = vk.FALSE,
+            .depth_bias_enable = .false,
             .depth_bias_constant_factor = 0,
             .depth_bias_clamp = 0,
             .depth_bias_slope_factor = 0,
             .line_width = 1,
         },
         .p_multisample_state = &.{
-            .sample_shading_enable = vk.FALSE,
+            .sample_shading_enable = .false,
             .rasterization_samples = .{ .@"1_bit" = true },
             .min_sample_shading = 1,
-            .alpha_to_coverage_enable = vk.FALSE,
-            .alpha_to_one_enable = vk.FALSE,
+            .alpha_to_coverage_enable = .false,
+            .alpha_to_one_enable = .false,
         },
         .p_color_blend_state = &.{
-            .logic_op_enable = vk.FALSE,
+            .logic_op_enable = .false,
             .logic_op = .copy,
             .attachment_count = 1,
             .p_attachments = &.{.{
-                .blend_enable = vk.TRUE,
+                .blend_enable = .true,
                 .src_color_blend_factor = .src_alpha,
                 .dst_color_blend_factor = .one_minus_src_alpha,
                 .color_blend_op = .add,
@@ -354,7 +358,7 @@ fn recreateSwapchain() !void {
         .pre_transform = capabilities.current_transform,
         .composite_alpha = if (capabilities.supported_composite_alpha.opaque_bit_khr) .{ .opaque_bit_khr = true } else .{ .inherit_bit_khr = true },
         .present_mode = .fifo_khr,
-        .clipped = vk.TRUE,
+        .clipped = .true,
     }, null);
 
     images = try device.getSwapchainImagesAllocKHR(swapchain, allocator);
@@ -425,7 +429,7 @@ fn recordCommandBuffer(image_index: u32) !void {
 
     device.cmdBindPipeline(command_buffer, .graphics, pipeline);
 
-    device.cmdSetViewport(command_buffer, 0, 1, &.{.{
+    device.cmdSetViewport(command_buffer, 0, &.{.{
         .x = 0,
         .y = 0,
         .width = @floatFromInt(size.width),
@@ -434,7 +438,7 @@ fn recordCommandBuffer(image_index: u32) !void {
         .max_depth = 1,
     }});
 
-    device.cmdSetScissor(command_buffer, 0, 1, &.{.{
+    device.cmdSetScissor(command_buffer, 0, &.{.{
         .offset = .{ .x = 0, .y = 0 },
         .extent = extent,
     }});
@@ -447,16 +451,15 @@ fn recordCommandBuffer(image_index: u32) !void {
 }
 
 fn drawFrame() !void {
-    _ = try device.waitForFences(1, &.{in_flight_fence}, vk.TRUE, std.math.maxInt(u64));
+    _ = try device.waitForFences(&.{in_flight_fence}, .true, std.math.maxInt(u64));
 
     const image_index = (try device.acquireNextImageKHR(swapchain, std.math.maxInt(u64), image_available_semaphore, .null_handle)).image_index;
     try device.resetCommandBuffer(command_buffer, .{});
     try recordCommandBuffer(image_index);
 
-    try device.resetFences(1, &.{in_flight_fence});
+    try device.resetFences(&.{in_flight_fence});
     try device.queueSubmit(
         graphics_queue,
-        1,
         &.{.{
             .wait_semaphore_count = 1,
             .p_wait_semaphores = &.{image_available_semaphore},

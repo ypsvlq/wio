@@ -116,7 +116,7 @@ fn makeDevice(path: []const u8, device: *h.udev_device) ?JoystickDevice {
     var buf: [std.fs.max_path_bytes:0]u8 = undefined;
     _ = std.fmt.bufPrintZ(&buf, "/dev/input/{s}", .{basename}) catch return null;
     const result = std.os.linux.open(&buf, .{ .NONBLOCK = true }, 0);
-    if (std.os.linux.E.init(result) != .SUCCESS) return null;
+    if (std.os.linux.errno(result) != .SUCCESS) return null;
     return .{
         .fd = @intCast(result),
         .serial = if (c.udev_device_get_property_value(device, "ID_SERIAL_SHORT")) |serial|
@@ -137,12 +137,12 @@ pub const JoystickDevice = struct {
 
     pub fn open(self: JoystickDevice) !Joystick {
         const result = std.os.linux.dup(self.fd);
-        if (std.os.linux.E.init(result) != .SUCCESS) return error.Unexpected;
+        if (std.os.linux.errno(result) != .SUCCESS) return error.Unexpected;
         const fd: i32 = @intCast(result);
         errdefer _ = std.os.linux.close(fd);
 
         var abs_bits = std.bit_set.ArrayBitSet(u8, h.ABS_CNT).initEmpty();
-        if (std.os.linux.E.init(std.os.linux.ioctl(fd, h.EVIOCGBIT(h.EV_ABS, @sizeOf(@TypeOf(abs_bits.masks))), @intFromPtr(&abs_bits.masks))) != .SUCCESS) return error.Unexpected;
+        if (std.os.linux.errno(std.os.linux.ioctl(fd, h.EVIOCGBIT(h.EV_ABS, @sizeOf(@TypeOf(abs_bits.masks))), @intFromPtr(&abs_bits.masks))) != .SUCCESS) return error.Unexpected;
         var abs_iter = abs_bits.iterator(.{});
         var abs_map = [1]u8{0} ** h.ABS_CNT;
         var axis_count: u8 = 0;
@@ -171,7 +171,7 @@ pub const JoystickDevice = struct {
         }
 
         var key_bits = std.bit_set.ArrayBitSet(u8, h.KEY_CNT).initEmpty();
-        if (std.os.linux.E.init(std.os.linux.ioctl(fd, h.EVIOCGBIT(h.EV_KEY, @sizeOf(@TypeOf(key_bits.masks))), @intFromPtr(&key_bits.masks))) != .SUCCESS) return error.Unexpected;
+        if (std.os.linux.errno(std.os.linux.ioctl(fd, h.EVIOCGBIT(h.EV_KEY, @sizeOf(@TypeOf(key_bits.masks))), @intFromPtr(&key_bits.masks))) != .SUCCESS) return error.Unexpected;
         var key_iter = key_bits.iterator(.{});
         var key_map = [1]u16{0} ** h.KEY_CNT;
         var button_count: u16 = 0;
@@ -204,7 +204,7 @@ pub const JoystickDevice = struct {
     pub fn getName(self: JoystickDevice, allocator: std.mem.Allocator) ![]u8 {
         var name: [512]u8 = undefined;
         var name_len = std.os.linux.ioctl(self.fd, h.EVIOCGNAME(name.len), @intFromPtr(&name));
-        if (std.os.linux.E.init(name_len) != .SUCCESS) return error.Unexpected;
+        if (std.os.linux.errno(name_len) != .SUCCESS) return error.Unexpected;
         name_len -= 1; // null terminator
         return allocator.dupe(u8, name[0..name_len]);
     }
@@ -238,7 +238,7 @@ pub const Joystick = struct {
     pub fn poll(self: *Joystick) ?wio.JoystickState {
         var event: h.input_event = undefined;
         while (true) {
-            switch (std.os.linux.E.init(std.os.linux.read(self.fd, @ptrCast(&event), @sizeOf(h.input_event)))) {
+            switch (std.os.linux.errno(std.os.linux.read(self.fd, @ptrCast(&event), @sizeOf(h.input_event)))) {
                 .SUCCESS => {},
                 .AGAIN => break,
                 .NODEV => return null,

@@ -148,12 +148,12 @@ pub fn wait(options: wio.WaitOptions) void {
             update();
         }
     } else {
-        const start = std.time.milliTimestamp();
+        const start = std.Io.Clock.awake.now(internal.io).toMilliseconds();
         var now = start;
         while (internal.wait and now - start < timeout) {
             _ = std.c.poll(pollfds.items.ptr, @intCast(pollfds.items.len), timeout);
             update();
-            now = std.time.milliTimestamp();
+            now = std.Io.Clock.awake.now(internal.io).toMilliseconds();
             timeout -= @truncate(now - start);
         }
     }
@@ -196,21 +196,16 @@ pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []cons
 }
 
 fn spawnAndPoll(args: []const []const u8) bool {
-    var process = std.process.Child.init(args, internal.allocator);
-    process.stdout_behavior = .Pipe;
-    if (process.spawn()) {
-        defer _ = process.wait() catch {};
-        pollfds.append(internal.allocator, .{ .fd = process.stdout.?.handle, .events = std.c.POLL.HUP, .revents = 0 }) catch return false;
-        const index = pollfds.items.len - 1;
-        while (pollfds.items[index].revents == 0) {
-            _ = std.c.poll(pollfds.items.ptr, @intCast(pollfds.items.len), -1);
-            update();
-        }
-        _ = pollfds.swapRemove(index);
-        return true;
-    } else |_| {
-        return false;
+    var process = std.process.spawn(internal.io, .{ .argv = args, .stdout = .pipe }) catch return false;
+    defer _ = process.wait(internal.io) catch {};
+    pollfds.append(internal.allocator, .{ .fd = process.stdout.?.handle, .events = std.c.POLL.HUP, .revents = 0 }) catch return false;
+    const index = pollfds.items.len - 1;
+    while (pollfds.items[index].revents == 0) {
+        _ = std.c.poll(pollfds.items.ptr, @intCast(pollfds.items.len), -1);
+        update();
     }
+    _ = pollfds.swapRemove(index);
+    return true;
 }
 
 pub fn getModifiers() wio.Modifiers {

@@ -17,13 +17,24 @@ pub const std_options = std.Options{
 };
 
 var debug_allocator = std.heap.DebugAllocator(.{}).init;
-pub const allocator = debug_allocator.allocator();
+pub var allocator: std.mem.Allocator = undefined;
+
+var threaded: std.Io.Threaded = undefined;
+var io: std.Io = undefined;
 
 var window: wio.Window = undefined;
 var maybe_window2: ?wio.Window = null;
 
 pub fn main() !void {
-    try wio.init(allocator, .{
+    if (builtin.cpu.arch.isWasm()) {
+        allocator = std.heap.wasm_allocator;
+    } else {
+        allocator = debug_allocator.allocator();
+        threaded = std.Io.Threaded.init(allocator, .{});
+        io = threaded.io();
+    }
+
+    try wio.init(allocator, io, .{
         .joystickConnectedFn = joystick.connected,
         .audioDefaultOutputFn = audio.defaultOutput,
         .audioDefaultInputFn = audio.defaultInput,
@@ -66,7 +77,10 @@ fn loop() !bool {
                 window.destroy();
 
                 wio.deinit();
-                _ = debug_allocator.deinit();
+                if (!builtin.cpu.arch.isWasm()) {
+                    threaded.deinit();
+                    _ = debug_allocator.deinit();
+                }
 
                 return false;
             },
@@ -166,9 +180,10 @@ fn actionEvent(event: wio.Event) !void {
             } else if (!builtin.cpu.arch.isWasm() and button == .f12) {
                 const thread = try std.Thread.spawn(.{}, cancelWait, .{});
                 thread.detach();
-                const start = std.time.milliTimestamp();
+                const start = std.Io.Clock.awake.now(io).toMilliseconds();
                 wio.wait(.{});
-                std.log.info("waited {}ms", .{std.time.milliTimestamp() - start});
+                const end = std.Io.Clock.awake.now(io).toMilliseconds();
+                std.log.info("waited {}ms", .{end - start});
             }
         },
         .unfocused => {
@@ -263,6 +278,6 @@ fn action(button: wio.Button) !void {
 }
 
 fn cancelWait() void {
-    std.Thread.sleep(1 * std.time.ns_per_s);
+    std.Io.sleep(io, .fromSeconds(1), std.Io.Clock.awake) catch {};
     wio.cancelWait();
 }

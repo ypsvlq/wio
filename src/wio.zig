@@ -25,8 +25,9 @@ pub const InitOptions = struct {
 /// Must be called only once.
 ///
 /// Unless otherwise noted, all calls to wio functions must be made on the same thread.
-pub fn init(allocator: std.mem.Allocator, options: InitOptions) !void {
+pub fn init(allocator: std.mem.Allocator, io: std.Io, options: InitOptions) !void {
     internal.allocator = allocator;
+    internal.io = io;
     internal.init_options = options;
     try backend.init();
 }
