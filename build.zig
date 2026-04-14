@@ -116,8 +116,6 @@ pub fn build(b: *std.Build) !void {
                     module.addIncludePath(unix_headers.path("."));
                 }
 
-                if (tag == .openbsd) module.linkSystemLibrary("sndio", .{});
-
                 if (system_integration) {
                     if (enable_x11) {
                         module.linkSystemLibrary("x11", .{});
@@ -138,13 +136,21 @@ pub fn build(b: *std.Build) !void {
                     if (enable_vulkan) {
                         module.linkSystemLibrary("vulkan", .{});
                     }
-                    if (tag == .linux) {
-                        if (enable_joystick) {
-                            module.linkSystemLibrary("libudev", .{});
-                        }
-                        if (enable_audio) {
-                            module.linkSystemLibrary("libpulse", .{});
-                        }
+                    switch (tag) {
+                        .linux => {
+                            if (enable_joystick) {
+                                module.linkSystemLibrary("libudev", .{});
+                            }
+                            if (enable_audio) {
+                                module.linkSystemLibrary("libpulse", .{});
+                            }
+                        },
+                        .openbsd => {
+                            if (enable_audio) {
+                                module.linkSystemLibrary("sndio", .{});
+                            }
+                        },
+                        else => {},
                     }
                 }
             }

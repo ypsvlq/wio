@@ -1,14 +1,35 @@
 const std = @import("std");
+const build_options = @import("build_options");
 const wio = @import("../../wio.zig");
 const internal = @import("../../wio.internal.zig");
-const c = @cImport(@cInclude("sndio.h"));
+const DynLib = @import("../DynLib.zig");
+const h = @cImport(@cInclude("sndio.h"));
+
+var imports: extern struct {
+    sio_open: *const @TypeOf(h.sio_open),
+    sio_close: *const @TypeOf(h.sio_close),
+    sio_initpar: *const @TypeOf(h.sio_initpar),
+    sio_setpar: *const @TypeOf(h.sio_setpar),
+    sio_getpar: *const @TypeOf(h.sio_getpar),
+    sio_start: *const @TypeOf(h.sio_start),
+    sio_eof: *const @TypeOf(h.sio_eof),
+    sio_write: *const @TypeOf(h.sio_write),
+    sio_read: *const @TypeOf(h.sio_read),
+} = undefined;
+const c = if (build_options.system_integration) h else &imports;
+
+var libsndio: DynLib = undefined;
 
 pub fn init() !void {
+    try DynLib.load(&imports, &.{.{ .handle = &libsndio, .name = "libsndio.so.7" }});
+
     if (internal.init_options.audioDefaultOutputFn) |callback| callback(.{ .backend = .{} });
     if (internal.init_options.audioDefaultInputFn) |callback| callback(.{ .backend = .{} });
 }
 
-pub fn deinit() void {}
+pub fn deinit() void {
+    libsndio.close();
+}
 
 pub fn update() void {}
 
@@ -40,15 +61,15 @@ pub const AudioDevice = struct {
     }
 
     fn open(comptime mode: wio.AudioDeviceType, format: wio.AudioFormat, dataFn: *const fn () void) !*AudioSession {
-        const handle = c.sio_open(c.SIO_DEVANY, if (mode == .output) c.SIO_PLAY else c.SIO_REC, 0) orelse return error.Unexpected;
+        const handle = c.sio_open(h.SIO_DEVANY, if (mode == .output) h.SIO_PLAY else h.SIO_REC, 0) orelse return error.Unexpected;
         errdefer c.sio_close(handle);
 
-        var param: c.sio_par = undefined;
+        var param: h.sio_par = undefined;
         c.sio_initpar(&param);
         param.bits = 32;
         param.bps = 4;
         param.sig = 1;
-        param.le = c.SIO_LE_NATIVE;
+        param.le = h.SIO_LE_NATIVE;
         (if (mode == .output) param.pchan else param.rchan) = format.channels;
         param.rate = format.sample_rate;
 
@@ -81,7 +102,7 @@ pub const AudioDevice = struct {
 };
 
 const AudioSession = struct {
-    handle: *c.sio_hdl,
+    handle: *h.sio_hdl,
     buffer: []f32,
     dataFn: *const fn () void,
     thread: std.Thread,
@@ -102,7 +123,7 @@ const AudioSession = struct {
             writeFn(self.buffer);
             for (self.buffer) |*float| {
                 const int: *i32 = @ptrCast(float);
-                int.* = @intFromFloat(float.* * std.math.maxInt(i32));
+                int.* = @intFromFloat(float.* * @as(f32, @floatFromInt(std.math.maxInt(i32))));
             }
             _ = c.sio_write(self.handle, self.buffer.ptr, self.buffer.len * 4);
         }
@@ -116,7 +137,7 @@ const AudioSession = struct {
             for (buffer) |*float| {
                 const int: *i32 = @ptrCast(float);
                 float.* = @floatFromInt(int.*);
-                float.* /= std.math.maxInt(i32);
+                float.* /= @floatFromInt(std.math.maxInt(i32));
             }
             readFn(buffer);
         }
