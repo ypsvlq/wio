@@ -1151,6 +1151,9 @@ const c = struct {
     pub const kCFStringEncodingUTF8: c_int = 134217984;
     pub extern fn CFStringGetLength(theString: CFStringRef) CFIndex;
     pub extern fn CFStringGetBytes(theString: CFStringRef, range: CFRange, encoding: CFStringEncoding, lossByte: UInt8, isExternalRepresentation: Boolean, buffer: [*c]UInt8, maxBufLen: CFIndex, usedBufLen: [*c]CFIndex) CFIndex;
+    pub const struct___CFURL = opaque {};
+    pub const CFURLRef = ?*const struct___CFURL;
+    pub extern fn CFURLGetFileSystemRepresentation(url: CFURLRef, resolveAgainstBase: Boolean, buffer: [*c]UInt8, maxBufLen: CFIndex) Boolean;
     pub extern fn CGColorSpaceCreateDeviceRGB() CGColorSpaceRef;
     pub extern fn CGColorSpaceRelease(space: CGColorSpaceRef) void;
     pub const kCGImageAlphaNoneSkipFirst: c_int = 6;
@@ -1173,6 +1176,10 @@ const c = struct {
     pub const CFSetRef = ?*const struct___CFSet;
     pub extern fn CFSetGetCount(theSet: CFSetRef) CFIndex;
     pub extern fn CFSetGetValues(theSet: CFSetRef, values: [*c]?*const anyopaque) void;
+    pub const struct___CFBundle = opaque {};
+    pub const CFBundleRef = ?*struct___CFBundle;
+    pub extern fn CFBundleGetMainBundle() CFBundleRef;
+    pub extern fn CFBundleCopyPrivateFrameworksURL(bundle: CFBundleRef) CFURLRef;
     pub const IOReturn = kern_return_t;
     pub const IOOptionBits = UInt32;
     pub const kCGLPFADoubleBuffer: c_int = 5;
