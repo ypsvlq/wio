@@ -119,6 +119,10 @@ extern "C" {
         alert->Go();
     }
 
+    uint32 wioGetModifiers(void) {
+        return modifiers();
+    }
+
     WioWindow *wioCreateWindow(void *zig, const char *title, uint16 width, uint16 height) {
         WioWindow *window = new WioWindow(zig, BRect(370, 70, 370 + width, 70 + height), title);
         window->Show();

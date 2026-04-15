@@ -12,6 +12,7 @@ const BJoystick = opaque {};
 const BSoundPlayer = opaque {};
 extern fn wioInit() void;
 extern fn wioMessageBox(u8, [*:0]const u8, [*:0]const u8) void;
+extern fn wioGetModifiers() u32;
 extern fn wioCreateWindow(*Window, [*:0]const u8, u16, u16) *BWindow;
 extern fn wioDestroyWindow(*BWindow) void;
 extern fn wioSetTitle(*BWindow, [*:0]const u8) void;
@@ -95,8 +96,13 @@ pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []cons
 }
 
 pub fn getModifiers() wio.Modifiers {
-    log.warn("getModifiers() is not implemented for haiku", .{});
-    return .{ .control = false, .shift = false, .alt = false };
+    const modifiers = wioGetModifiers();
+    return .{
+        .control = (modifiers & (1 << 2) != 0),
+        .shift = (modifiers & (1 << 0) != 0),
+        .alt = (modifiers & (1 << 1) != 0),
+        .gui = (modifiers & (1 << 6) != 0),
+    };
 }
 
 pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
