@@ -87,7 +87,7 @@ fn loop() !bool {
             .focused => {
                 const modifiers = wio.getModifiers();
                 if (modifiers.control or modifiers.shift or modifiers.alt) {
-                    std.log.scoped(.modifiers).info("{s}{s}{s}", .{ if (modifiers.control) "control " else "", if (modifiers.shift) "shift " else "", if (modifiers.alt) "alt " else "" });
+                    std.log.scoped(.modifiers).info("{s}{s}{s}{s}", .{ if (modifiers.control) "control " else "", if (modifiers.shift) "shift " else "", if (modifiers.alt) "alt " else "", if (modifiers.gui) "gui " else "" });
                 }
             },
             .draw => {
@@ -218,7 +218,7 @@ fn action(button: wio.Button) !void {
         },
         .l => {
             const modifiers = wio.getModifiers();
-            std.log.scoped(.modifiers).info("{s}{s}{s}", .{ if (modifiers.control) "control " else "", if (modifiers.shift) "shift " else "", if (modifiers.alt) "alt " else "" });
+            std.log.scoped(.modifiers).info("{s}{s}{s}{s}", .{ if (modifiers.control) "control " else "", if (modifiers.shift) "shift " else "", if (modifiers.alt) "alt " else "", if (modifiers.gui) "gui " else "" });
         },
         .t => window.setTitle("retitled wio example"),
         .w => window.setMode(.normal),
