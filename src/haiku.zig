@@ -76,7 +76,7 @@ var wait_event: std.Io.Event = .unset;
 pub fn wait(options: wio.WaitOptions) void {
     wait_event.reset();
     if (options.timeout_ns) |timeout_ns| {
-        wait_event.waitTimeout(internal.io, timeout_ns) catch {};
+        wait_event.waitTimeout(internal.io, .{ .duration = .{ .clock = std.Io.Clock.awake, .raw = .{ .nanoseconds = timeout_ns } } }) catch {};
     } else {
         wait_event.waitUncancelable(internal.io);
     }
@@ -129,7 +129,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
 pub const Window = struct {
     window: *BWindow,
     events: internal.EventQueue,
-    events_mutex: std.Io.Mutex = .{},
+    events_mutex: std.Io.Mutex = .init,
     buttons: std.StaticBitSet(5) = .initEmpty(),
     text: bool = false,
     opengl: if (build_options.opengl) struct { context: ?*BGLView = null, vsync: bool = false } else struct {} = .{},
