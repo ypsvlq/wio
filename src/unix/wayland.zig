@@ -22,7 +22,6 @@ var imports: extern struct {
     xkb_context_new: *const @TypeOf(h.xkb_context_new),
     xkb_context_unref: *const @TypeOf(h.xkb_context_unref),
     xkb_keymap_new_from_string: *const @TypeOf(h.xkb_keymap_new_from_string),
-    xkb_keymap_mod_get_index: *const @TypeOf(h.xkb_keymap_mod_get_index),
     xkb_keymap_unref: *const @TypeOf(h.xkb_keymap_unref),
     xkb_state_new: *const @TypeOf(h.xkb_state_new),
     xkb_state_unref: *const @TypeOf(h.xkb_state_unref),
@@ -106,17 +105,13 @@ var xkb: *h.xkb_context = undefined;
 var keymap: ?*h.xkb_keymap = null;
 var xkb_state: ?*h.xkb_state = null;
 var compose_state: ?*h.xkb_compose_state = null;
-var xkb_mod_index_shift: h.xkb_mod_index_t = 0;
-var xkb_mod_index_ctrl: h.xkb_mod_index_t = 0;
-var xkb_mod_index_alt: h.xkb_mod_index_t = 0;
-var xkb_mod_index_logo: h.xkb_mod_index_t = 0;
 
 var libdecor_context: *h.libdecor = undefined;
 
 var windows: std.AutoHashMapUnmanaged(*Window, void) = .empty;
 pub var keyboard_focus: ?*Window = null;
 var pointer_focus: ?*Window = null;
-var modifiers: wio.Modifiers = .{ .control = false, .shift = false, .alt = false, .gui = false };
+var modifiers: wio.Modifiers = .{};
 var last_serial: u32 = 0;
 var pointer_enter_serial: u32 = 0;
 pub var repeat_period: i32 = 0;
@@ -872,11 +867,6 @@ fn keyboardKeymap(_: ?*anyopaque, _: ?*h.wl_keyboard, _: h.wl_keyboard_keymap_fo
 
     keymap = c.xkb_keymap_new_from_string(xkb, @ptrCast(string), h.XKB_KEYMAP_FORMAT_TEXT_V1, h.XKB_KEYMAP_COMPILE_NO_FLAGS);
     xkb_state = c.xkb_state_new(keymap);
-
-    xkb_mod_index_shift = c.xkb_keymap_mod_get_index(keymap, h.XKB_MOD_NAME_SHIFT);
-    xkb_mod_index_ctrl = c.xkb_keymap_mod_get_index(keymap, h.XKB_MOD_NAME_CTRL);
-    xkb_mod_index_alt = c.xkb_keymap_mod_get_index(keymap, h.XKB_MOD_NAME_ALT);
-    xkb_mod_index_logo = c.xkb_keymap_mod_get_index(keymap, h.XKB_MOD_NAME_LOGO);
 }
 
 fn keyboardEnter(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, surface: ?*h.wl_surface, _: ?*h.wl_array) callconv(.c) void {
@@ -918,10 +908,10 @@ fn keyboardKey(_: ?*anyopaque, _: ?*h.wl_keyboard, serial: u32, _: u32, key: u32
 fn keyboardModifiers(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, mods_depressed: u32, mods_latched: u32, mods_locked: u32, _: u32) callconv(.c) void {
     const mods = mods_depressed | mods_latched | mods_locked;
     modifiers = .{
-        .control = (mods & (@as(u32, 1) << @as(u5, @intCast(xkb_mod_index_ctrl))) != 0),
-        .shift = (mods & (@as(u32, 1) << @as(u5, @intCast(xkb_mod_index_shift))) != 0),
-        .alt = (mods & (@as(u32, 1) << @as(u5, @intCast(xkb_mod_index_alt))) != 0),
-        .gui = (mods & (@as(u32, 1) << @as(u5, @intCast(xkb_mod_index_logo))) != 0),
+        .control = (mods & (1 << 2) != 0),
+        .shift = (mods & (1 << 0) != 0),
+        .alt = (mods & (1 << 3) != 0),
+        .gui = (mods & (1 << 6) != 0),
     };
     _ = c.xkb_state_update_mask(xkb_state, mods_depressed, mods_latched, mods_locked, 0, 0, 0);
 }
