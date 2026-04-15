@@ -19,7 +19,7 @@
         <canvas id="canvas" tabindex="-1"></canvas>
         <canvas id="canvas2" tabindex="-1"></canvas>
         <script type="module">
-            import Wio from "../src/wasm/wio.js";
+            import Wio from "../src/wasm/Wio.js";
             import { GL } from "./wasm.js";
             const wio = new Wio([document.getElementById("canvas"), document.getElementById("canvas2")]);
             const gl = new GL(wio);
