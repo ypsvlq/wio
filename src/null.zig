@@ -26,7 +26,7 @@ pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []cons
 }
 
 pub fn getModifiers() wio.Modifiers {
-    return .{ .control = false, .shift = false, .alt = false };
+    return .{};
 }
 
 pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
