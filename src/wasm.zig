@@ -76,9 +76,10 @@ pub fn messageBox(_: wio.MessageBoxStyle, _: []const u8, message: []const u8) vo
 pub fn getModifiers() wio.Modifiers {
     const modifiers = js.getModifiers();
     return .{
-        .control = (modifiers & 1 != 0),
-        .shift = (modifiers & 2 != 0),
-        .alt = (modifiers & 4 != 0),
+        .control = (modifiers & (1 << 0) != 0),
+        .shift = (modifiers & (1 << 1) != 0),
+        .alt = (modifiers & (1 << 2) != 0),
+        .gui = (modifiers & (1 << 3) != 0),
     };
 }
 

@@ -46,7 +46,7 @@ class Wio {
     }
 
     updateModifiers(event) {
-        this.modifiers = (event.ctrlKey | event.shiftKey << 1 | event.altKey << 2);
+        this.modifiers = (event.ctrlKey | event.shiftKey << 1 | event.altKey << 2 | event.metaKey << 3);
     }
 
     imports = {
