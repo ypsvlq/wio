@@ -1,37 +1,11 @@
 const std = @import("std");
 const build_options = @import("build_options");
+const h = @import("c");
 const wio = @import("../wio.zig");
 const internal = @import("../wio.internal.zig");
 const unix = @import("../unix.zig");
 const DynLib = @import("DynLib.zig");
 const log = std.log.scoped(.wio);
-const h = @cImport({
-    if (build_options.system_integration) {} else {
-        @cInclude("wio-wayland.h");
-        @cInclude("wayland-protocol.c");
-    }
-    @cInclude("viewporter-protocol.c");
-    @cInclude("fractional-scale-v1-protocol.c");
-    @cInclude("text-input-v3-protocol.c");
-    @cInclude("tablet-v2-protocol.c");
-    @cInclude("cursor-shape-v1-protocol.c");
-    @cInclude("pointer-constraints-v1-protocol.c");
-    @cInclude("relative-pointer-v1-protocol.c");
-    @cInclude("xdg-activation-v1-protocol.c");
-    @cInclude("wayland-client-protocol.h");
-    @cInclude("viewporter-client-protocol.h");
-    @cInclude("fractional-scale-v1-client-protocol.h");
-    @cInclude("text-input-v3-client-protocol.h");
-    @cInclude("cursor-shape-v1-client-protocol.h");
-    @cInclude("pointer-constraints-v1-client-protocol.h");
-    @cInclude("relative-pointer-v1-client-protocol.h");
-    @cInclude("xdg-activation-v1-client-protocol.h");
-    @cInclude("xkbcommon/xkbcommon.h");
-    @cInclude("xkbcommon/xkbcommon-compose.h");
-    @cInclude("libdecor.h");
-    @cInclude("wayland-egl.h");
-    @cInclude("EGL/egl.h");
-});
 
 var imports: extern struct {
     wl_display_connect: *const @TypeOf(h.wl_display_connect),

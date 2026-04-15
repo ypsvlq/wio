@@ -1,13 +1,10 @@
 const std = @import("std");
 const build_options = @import("build_options");
+const h = @import("c");
 const wio = @import("../../wio.zig");
 const internal = @import("../../wio.internal.zig");
 const unix = @import("../../unix.zig");
 const DynLib = @import("../DynLib.zig");
-const h = @cImport({
-    @cInclude("linux/input.h");
-    @cInclude("libudev.h");
-});
 const log = std.log.scoped(.wio);
 
 var imports: extern struct {

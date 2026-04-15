@@ -1,16 +1,10 @@
 const std = @import("std");
 const build_options = @import("build_options");
+const h = @import("c");
 const wio = @import("../wio.zig");
 const internal = @import("../wio.internal.zig");
 const unix = @import("../unix.zig");
 const DynLib = @import("DynLib.zig");
-const h = @cImport({
-    @cInclude("X11/Xlib.h");
-    @cInclude("X11/Xatom.h");
-    @cInclude("X11/XKBlib.h");
-    @cInclude("X11/Xcursor/Xcursor.h");
-    @cInclude("GL/glx.h");
-});
 const log = std.log.scoped(.wio);
 
 var imports: extern struct {

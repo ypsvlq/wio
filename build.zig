@@ -110,11 +110,80 @@ pub fn build(b: *std.Build) !void {
                     module.linkSystemLibrary("vulkan", .{});
                 }
             } else {
-                module.link_libc = true;
-
-                if (b.lazyDependency("wio_unix_headers", .{})) |unix_headers| {
-                    module.addIncludePath(unix_headers.path("."));
+                var cimport: std.ArrayList(u8) = .empty;
+                if (enable_x11) {
+                    try cimport.appendSlice(b.allocator,
+                        \\#include <X11/Xlib.h>
+                        \\#include <X11/Xatom.h>
+                        \\#include <X11/XKBlib.h>
+                        \\#include <X11/Xcursor/Xcursor.h>
+                        \\#include <GL/glx.h>
+                        \\
+                    );
                 }
+                if (enable_wayland) {
+                    if (!system_integration) {
+                        try cimport.appendSlice(b.allocator,
+                            \\#include <wio-wayland.h>
+                            \\#include <wayland-protocol.c>
+                            \\
+                        );
+                    }
+                    try cimport.appendSlice(b.allocator,
+                        \\#include <viewporter-protocol.c>
+                        \\#include <fractional-scale-v1-protocol.c>
+                        \\#include <text-input-v3-protocol.c>
+                        \\#include <tablet-v2-protocol.c>
+                        \\#include <cursor-shape-v1-protocol.c>
+                        \\#include <pointer-constraints-v1-protocol.c>
+                        \\#include <relative-pointer-v1-protocol.c>
+                        \\#include <xdg-activation-v1-protocol.c>
+                        \\#include <wayland-client-protocol.h>
+                        \\#include <viewporter-client-protocol.h>
+                        \\#include <fractional-scale-v1-client-protocol.h>
+                        \\#include <text-input-v3-client-protocol.h>
+                        \\#include <cursor-shape-v1-client-protocol.h>
+                        \\#include <pointer-constraints-v1-client-protocol.h>
+                        \\#include <relative-pointer-v1-client-protocol.h>
+                        \\#include <xdg-activation-v1-client-protocol.h>
+                        \\#include <xkbcommon/xkbcommon.h>
+                        \\#include <xkbcommon/xkbcommon-compose.h>
+                        \\#include <libdecor.h>
+                        \\#include <wayland-egl.h>
+                        \\#include <EGL/egl.h>
+                        \\
+                    );
+                }
+                switch (tag) {
+                    .linux => {
+                        if (enable_joystick) {
+                            try cimport.appendSlice(b.allocator,
+                                \\#include <linux/input.h>
+                                \\#include <libudev.h>
+                                \\
+                            );
+                        }
+                        if (enable_audio) {
+                            try cimport.appendSlice(b.allocator, "#include <pulse/pulseaudio.h>\n");
+                        }
+                    },
+                    .openbsd => {
+                        if (enable_audio) {
+                            try cimport.appendSlice(b.allocator, "#include <sndio.h>\n");
+                        }
+                    },
+                    else => {},
+                }
+
+                const translate_c = b.addTranslateC(.{
+                    .root_source_file = b.addWriteFiles().add("cimport.c", cimport.items),
+                    .target = target,
+                    .optimize = optimize,
+                });
+                if (b.lazyDependency("wio_unix_headers", .{})) |unix_headers| {
+                    translate_c.addIncludePath(unix_headers.path("."));
+                }
+                module.addImport("c", translate_c.createModule());
 
                 if (system_integration) {
                     if (enable_x11) {

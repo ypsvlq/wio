@@ -1,9 +1,9 @@
 const std = @import("std");
 const build_options = @import("build_options");
+const h = @import("c");
 const wio = @import("../../wio.zig");
 const internal = @import("../../wio.internal.zig");
 const DynLib = @import("../DynLib.zig");
-const h = @cImport(@cInclude("sndio.h"));
 
 var imports: extern struct {
     sio_open: *const @TypeOf(h.sio_open),
