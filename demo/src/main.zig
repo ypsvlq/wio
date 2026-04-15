@@ -86,7 +86,7 @@ fn loop() !bool {
             },
             .focused => {
                 const modifiers = wio.getModifiers();
-                if (modifiers.control or modifiers.shift or modifiers.alt) {
+                if (modifiers.control or modifiers.shift or modifiers.alt or modifiers.gui) {
                     std.log.scoped(.modifiers).info("{s}{s}{s}{s}", .{ if (modifiers.control) "control " else "", if (modifiers.shift) "shift " else "", if (modifiers.alt) "alt " else "", if (modifiers.gui) "gui " else "" });
                 }
             },
