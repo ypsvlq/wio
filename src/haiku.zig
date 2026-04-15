@@ -235,9 +235,10 @@ pub const Framebuffer = struct {
         _ = self;
     }
 
-    pub fn setPixel(self: *Framebuffer, index: usize, rgb: u32) void {
+    pub fn setPixel(self: *Framebuffer, x: usize, y: usize, rgb: u32) void {
         _ = self;
-        _ = index;
+        _ = x;
+        _ = y;
         _ = rgb;
     }
 };

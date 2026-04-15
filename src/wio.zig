@@ -230,10 +230,9 @@ pub const Framebuffer = struct {
         self.backend.destroy();
     }
 
-    /// - `index` is the pixel index (y * width + x).
-    /// - `rgb` is stored as 0xRRGGBB.
-    pub fn setPixel(self: *Framebuffer, index: usize, rgb: u32) void {
-        self.backend.setPixel(index, rgb);
+    /// `rgb` is stored as 0xRRGGBB.
+    pub fn setPixel(self: *Framebuffer, x: usize, y: usize, rgb: u32) void {
+        self.backend.setPixel(x, y, rgb);
     }
 };
 

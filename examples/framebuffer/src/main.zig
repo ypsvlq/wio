@@ -49,7 +49,7 @@ fn render(fb: *wio.Framebuffer, size: wio.Size, t: u16) void {
         var x: u32 = 0;
         while (x < size.width) : (x += 1) {
             const v = x ^ y ^ t;
-            fb.setPixel(y * size.width + x, ((v & 0xFF) << 16) | (((v >> 1) & 0xFF) << 8) | ((v >> 2) & 0xFF));
+            fb.setPixel(x, y, ((v & 0xFF) << 16) | (((v >> 1) & 0xFF) << 8) | ((v >> 2) & 0xFF));
         }
     }
 }

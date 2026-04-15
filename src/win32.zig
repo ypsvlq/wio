@@ -597,8 +597,8 @@ pub const Framebuffer = struct {
         _ = w.DeleteDC(self.dc);
     }
 
-    pub fn setPixel(self: *Framebuffer, index: usize, rgb: u32) void {
-        std.mem.writeInt(u32, std.mem.asBytes(&self.pixels[index]), rgb, .little);
+    pub fn setPixel(self: *Framebuffer, x: usize, y: usize, rgb: u32) void {
+        std.mem.writeInt(u32, std.mem.asBytes(&self.pixels[y * self.size.width + x]), rgb, .little);
     }
 };
 

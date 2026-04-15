@@ -371,10 +371,10 @@ pub const Framebuffer = union {
         }
     }
 
-    pub fn setPixel(self: *Framebuffer, index: usize, rgb: u32) void {
+    pub fn setPixel(self: *Framebuffer, x: usize, y: usize, rgb: u32) void {
         switch (active) {
-            .x11 => self.x11.setPixel(index, rgb),
-            .wayland => self.wayland.setPixel(index, rgb),
+            .x11 => self.x11.setPixel(x, y, rgb),
+            .wayland => self.wayland.setPixel(x, y, rgb),
         }
     }
 };

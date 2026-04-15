@@ -244,8 +244,8 @@ pub const Framebuffer = struct {
         internal.allocator.free(self.pixels);
     }
 
-    pub fn setPixel(self: *Framebuffer, index: usize, rgb: u32) void {
-        self.pixels[index] = ((rgb & 0xFF0000) >> 16) | (rgb & 0xFF00) | ((rgb & 0xFF) << 16);
+    pub fn setPixel(self: *Framebuffer, x: usize, y: usize, rgb: u32) void {
+        self.pixels[y * self.size.width + x] = ((rgb & 0xFF0000) >> 16) | (rgb & 0xFF00) | ((rgb & 0xFF) << 16);
     }
 };
 

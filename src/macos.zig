@@ -304,6 +304,7 @@ pub const Window = struct {
         return .{
             .pixels = pixels,
             .bitmap = bitmap,
+            .width = size.width,
         };
     }
 
@@ -346,14 +347,15 @@ pub const Window = struct {
 pub const Framebuffer = struct {
     pixels: []u32,
     bitmap: c.CGContextRef,
+    width: u16,
 
     pub fn destroy(self: *Framebuffer) void {
         c.CGContextRelease(self.bitmap);
         internal.allocator.free(self.pixels);
     }
 
-    pub fn setPixel(self: *Framebuffer, index: usize, rgb: u32) void {
-        std.mem.writeInt(u32, std.mem.asBytes(&self.pixels[index]), rgb, .little);
+    pub fn setPixel(self: *Framebuffer, x: usize, y: usize, rgb: u32) void {
+        std.mem.writeInt(u32, std.mem.asBytes(&self.pixels[y * self.width + x]), rgb, .little);
     }
 };
 

@@ -621,6 +621,7 @@ pub const Window = struct {
             .fd = fd,
             .mapped = mapped,
             .buffer = buffer,
+            .width = size.width,
         };
     }
 
@@ -731,6 +732,7 @@ pub const Framebuffer = struct {
     fd: std.c.fd_t,
     mapped: []align(std.heap.page_size_min) u8,
     buffer: *h.wl_buffer,
+    width: u16,
 
     pub fn destroy(self: *Framebuffer) void {
         h.wl_buffer_destroy(self.buffer);
@@ -738,8 +740,8 @@ pub const Framebuffer = struct {
         _ = std.c.close(self.fd);
     }
 
-    pub fn setPixel(self: *Framebuffer, index: usize, rgb: u32) void {
-        std.mem.writeInt(u32, std.mem.asBytes(&std.mem.bytesAsSlice(u32, self.mapped)[index]), rgb, .little);
+    pub fn setPixel(self: *Framebuffer, x: usize, y: usize, rgb: u32) void {
+        std.mem.writeInt(u32, std.mem.asBytes(&std.mem.bytesAsSlice(u32, self.mapped)[y * self.width + x]), rgb, .little);
     }
 };
 
