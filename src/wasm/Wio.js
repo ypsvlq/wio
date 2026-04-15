@@ -29,10 +29,12 @@ class Wio {
             }
         });
 
-        addEventListener("gamepadconnected", (event) => {
-            this.gamepads = navigator.getGamepads();
-            this.instance.exports.wioJoystick(event.gamepad.index);
-        });
+        if (this.instance.exports.wioJoystick !== undefined) {
+            addEventListener("gamepadconnected", (event) => {
+                this.gamepads = navigator.getGamepads();
+                this.instance.exports.wioJoystick(event.gamepad.index);
+            });
+        }
     }
 
     loop() {
