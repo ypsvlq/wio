@@ -26,6 +26,9 @@ private:
 public:
     WioWindow(void *zig, BRect frame, const char *title) : BWindow(frame, title, B_TITLED_WINDOW, 0) {
         this->zig = zig;
+#ifdef WIO_FRAMEBUFFER
+        AddChild(new BView(Bounds(), "wio", B_FOLLOW_ALL_SIDES, 0));
+#endif
     }
 
     void DispatchMessage(BMessage *message, BHandler *target) {
@@ -163,6 +166,33 @@ extern "C" {
         data->FindData("text/plain", B_MIME_TYPE, (const void **)&text, (ssize_t *)len);
         return text;
     }
+
+#ifdef WIO_FRAMEBUFFER
+
+    struct WioFramebuffer {
+        BBitmap *bitmap;
+        uint8 *bits;
+        uint32 bytes_per_row;
+    };
+
+    WioFramebuffer wioCreateFramebuffer(uint16 width, uint16 height) {
+        BBitmap *bitmap = new BBitmap(BRect(0, 0, width, height), B_RGB32);
+        WioFramebuffer result = { bitmap, (uint8 *)bitmap->Bits(), (uint32)bitmap->BytesPerRow() };
+        return result;
+    }
+
+    void wioFramebufferDestroy(BBitmap *bitmap) {
+        delete bitmap;
+    }
+
+    void wioPresentFramebuffer(WioWindow *window, BBitmap *bitmap) {
+        if (window->Lock()) {
+            window->ChildAt(0)->SetViewBitmap(bitmap);
+            window->Unlock();
+        }
+    }
+
+#endif
 
 #ifdef WIO_OPENGL
 

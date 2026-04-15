@@ -7,6 +7,7 @@ const log = std.log.scoped(.wio);
 extern "root" fn get_image_symbol(u32, [*:0]const u8, i32, *?*const anyopaque) std.c.status_t;
 
 const BWindow = opaque {};
+const BBitmap = opaque {};
 const BGLView = opaque {};
 const BJoystick = opaque {};
 const BSoundPlayer = opaque {};
@@ -19,6 +20,9 @@ extern fn wioSetTitle(*BWindow, [*:0]const u8) void;
 extern fn wioSetSize(*BWindow, f32, f32) void;
 extern fn wioSetClipboardText([*]const u8, usize) void;
 extern fn wioGetClipboardText(*usize) ?[*]const u8;
+extern fn wioCreateFramebuffer(u16, u16) Framebuffer;
+extern fn wioFramebufferDestroy(*BBitmap) void;
+extern fn wioPresentFramebuffer(*BWindow, *BBitmap) void;
 extern fn wioCreateContext(*BWindow, bool, bool, bool, bool) *BGLView;
 extern fn wioMakeContextCurrent(*BGLView) void;
 extern fn wioSwapBuffers(bool) void;
@@ -199,15 +203,12 @@ pub const Window = struct {
         return allocator.dupe(u8, ptr[0..len]) catch return null;
     }
 
-    pub fn createFramebuffer(self: *Window, size: wio.Size) !Framebuffer {
-        _ = self;
-        _ = size;
-        return error.Unexpected;
+    pub fn createFramebuffer(_: *Window, size: wio.Size) !Framebuffer {
+        return wioCreateFramebuffer(size.width, size.height);
     }
 
     pub fn presentFramebuffer(self: *Window, framebuffer: *Framebuffer) void {
-        _ = self;
-        _ = framebuffer;
+        wioPresentFramebuffer(self.window, framebuffer.bitmap);
     }
 
     pub fn makeContextCurrent(self: *Window) void {
@@ -230,16 +231,18 @@ pub const Window = struct {
     }
 };
 
-pub const Framebuffer = struct {
+pub const Framebuffer = extern struct {
+    bitmap: *BBitmap,
+    bits: [*]u8,
+    bytes_per_row: u32,
+
     pub fn destroy(self: *Framebuffer) void {
-        _ = self;
+        wioFramebufferDestroy(self.bitmap);
     }
 
     pub fn setPixel(self: *Framebuffer, x: usize, y: usize, rgb: u32) void {
-        _ = self;
-        _ = x;
-        _ = y;
-        _ = rgb;
+        const index = (y * self.bytes_per_row) + (x * @sizeOf(u32));
+        std.mem.writeInt(u32, self.bits[index..][0..4], rgb, .little);
     }
 };
 
