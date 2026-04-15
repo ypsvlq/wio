@@ -21,7 +21,7 @@ var wait_event: std.Io.Event = .unset;
 
 var window: ?*c.ANativeWindow = null;
 
-var modifiers: wio.Modifiers = .{ .control = false, .shift = false, .alt = false };
+var modifiers: wio.Modifiers = .{};
 var cursor: c.jint = @intFromEnum(wio.Cursor.arrow);
 var cursor_mode: wio.CursorMode = .normal;
 
@@ -454,7 +454,7 @@ const native = struct {
             env.*.*.CallVoidMethod.?(env, instance, java.setCursorMode, @as(c.jint, @intFromEnum(cursor_mode)));
         }
 
-        modifiers = .{ .control = false, .shift = false, .alt = false };
+        modifiers = .{};
     }
 
     fn onTouchEvent(_: *c.JNIEnv, _: c.jobject, action: c.jint, id_j: c.jint, x: c.jint, y: c.jint) callconv(.c) void {
