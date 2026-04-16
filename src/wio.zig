@@ -11,6 +11,10 @@ pub const backend = switch (builtin.os.tag) {
     else => if (builtin.target.cpu.arch.isWasm()) @import("wasm.zig") else @compileError("unsupported platform"),
 };
 
+comptime {
+    _ = backend;
+}
+
 pub const logFn = if (@hasDecl(backend, "logFn")) backend.logFn else std.log.defaultLog;
 
 pub const InitOptions = struct {

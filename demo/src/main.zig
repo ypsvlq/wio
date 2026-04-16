@@ -7,8 +7,8 @@ const joystick = @import("joystick.zig");
 const audio = @import("audio.zig");
 
 comptime {
-    // for Android
-    _ = wio.backend;
+    // for Android (shared library export)
+    _ = wio;
 }
 
 pub const std_options = std.Options{
