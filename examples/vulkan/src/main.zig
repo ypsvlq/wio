@@ -69,7 +69,7 @@ fn createInstance() !void {
         .p_application_info = &.{
             .application_version = 0,
             .engine_version = 0,
-            .api_version = @bitCast(vk.API_VERSION_1_1),
+            .api_version = @bitCast(vk.API_VERSION_1_2),
         },
         .enabled_layer_count = @intCast(enabled_layers.items.len),
         .pp_enabled_layer_names = enabled_layers.items.ptr,
@@ -173,6 +173,12 @@ fn createLogicalDevice() !void {
         },
         .enabled_extension_count = @intCast(enabled_extensions.items.len),
         .pp_enabled_extension_names = enabled_extensions.items.ptr,
+        .p_enabled_features = &.{
+            .shader_int_16 = .true,
+        },
+        .p_next = &vk.PhysicalDeviceShaderFloat16Int8Features{
+            .shader_int_8 = .true,
+        },
     }, null);
 
     vkd = .load(handle, vki.dispatch.vkGetDeviceProcAddr.?);
@@ -235,8 +241,8 @@ var pipeline_layout: vk.PipelineLayout = undefined;
 var pipeline: vk.Pipeline = undefined;
 
 fn createGraphicsPipeline() !void {
-    const vertex_code = @embedFile("shader.vert.spv");
-    const fragment_code = @embedFile("shader.frag.spv");
+    const vertex_code = @embedFile("vertex");
+    const fragment_code = @embedFile("fragment");
 
     const vertex_module = try device.createShaderModule(&.{ .code_size = vertex_code.len, .p_code = @ptrCast(@alignCast(vertex_code)) }, null);
     defer device.destroyShaderModule(vertex_module, null);
