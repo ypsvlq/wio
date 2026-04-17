@@ -44,8 +44,6 @@ pub fn build(b: *std.Build) void {
         const exe = b.addExecutable(.{
             .name = "demo",
             .root_module = createModule(b, target, optimize, unix_backends),
-            // https://github.com/ziglang/zig/issues/24140
-            .use_llvm = true,
         });
         b.installArtifact(exe);
 
