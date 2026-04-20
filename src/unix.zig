@@ -98,13 +98,13 @@ pub fn init() !void {
 }
 
 pub fn deinit() void {
-    if (build_options.audio) audio.deinit();
-    if (build_options.joystick) joystick.deinit();
-    if (build_options.vulkan) libvulkan.close();
     switch (active) {
         .x11 => x11.deinit(),
         .wayland => wayland.deinit(),
     }
+    if (build_options.audio) audio.deinit();
+    if (build_options.joystick) joystick.deinit();
+    if (build_options.vulkan) libvulkan.close();
     pollfds.deinit(internal.allocator);
 }
 
