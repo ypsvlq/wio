@@ -557,21 +557,21 @@ pub const Window = struct {
         _ = c.XFlush(display);
     }
 
-    pub fn makeContextCurrent(self: *Window) void {
+    pub fn glMakeContextCurrent(self: *Window) void {
         _ = c.glXMakeCurrent(display, self.window, self.opengl.context);
     }
 
-    pub fn swapBuffers(self: *Window) void {
+    pub fn glSwapBuffers(self: *Window) void {
         c.glXSwapBuffers(display, self.window);
     }
 
-    pub fn swapInterval(self: *Window, interval: i32) void {
+    pub fn glSwapInterval(self: *Window, interval: i32) void {
         if (glx.swapIntervalEXT) |swapIntervalEXT| {
             swapIntervalEXT(display, self.window, interval);
         }
     }
 
-    pub fn createSurface(self: Window, instance: usize, allocator: ?*const anyopaque, surface: *u64) i32 {
+    pub fn vkCreateSurface(self: Window, instance: usize, allocation_callbacks: ?*const anyopaque, surface: *u64) i32 {
         const VkXlibSurfaceCreateInfoKHR = extern struct {
             sType: i32 = 1000004000,
             pNext: ?*const anyopaque = null,
@@ -589,7 +589,7 @@ pub const Window = struct {
                 .dpy = display,
                 .window = self.window,
             },
-            allocator,
+            allocation_callbacks,
             surface,
         );
     }
@@ -617,7 +617,7 @@ pub fn glGetProcAddress(name: [*:0]const u8) ?*const anyopaque {
     return c.glXGetProcAddress(name);
 }
 
-pub fn getVulkanExtensions() []const [*:0]const u8 {
+pub fn getRequiredVulkanInstanceExtensions() []const [*:0]const u8 {
     return &.{ "VK_KHR_surface", "VK_KHR_xlib_surface" };
 }
 

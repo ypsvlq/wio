@@ -51,7 +51,7 @@ fn createInstance() !void {
 
     var enabled_extensions: std.ArrayList([*:0]const u8) = .empty;
     defer enabled_extensions.deinit(allocator);
-    try enabled_extensions.appendSlice(allocator, wio.getVulkanExtensions());
+    try enabled_extensions.appendSlice(allocator, wio.getRequiredVulkanInstanceExtensions());
 
     var has_portability = false;
     const extensions = try vkb.enumerateInstanceExtensionPropertiesAlloc(null, allocator);
@@ -84,7 +84,7 @@ fn createInstance() !void {
 var surface: vk.SurfaceKHR = undefined;
 
 fn createSurface() !void {
-    const result: vk.Result = @enumFromInt(window.createSurface(@intFromEnum(instance.handle), null, @ptrCast(&surface)));
+    const result: vk.Result = @enumFromInt(window.vkCreateSurface(@intFromEnum(instance.handle), null, @ptrCast(&surface)));
     if (result != .success) return error.Unknown;
 }
 

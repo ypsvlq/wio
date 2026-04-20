@@ -331,31 +331,31 @@ pub const Window = union {
         }
     }
 
-    pub fn makeContextCurrent(self: *Window) void {
+    pub fn glMakeContextCurrent(self: *Window) void {
         switch (active) {
-            .x11 => self.x11.makeContextCurrent(),
-            .wayland => self.wayland.makeContextCurrent(),
+            .x11 => self.x11.glMakeContextCurrent(),
+            .wayland => self.wayland.glMakeContextCurrent(),
         }
     }
 
-    pub fn swapBuffers(self: *Window) void {
+    pub fn glSwapBuffers(self: *Window) void {
         switch (active) {
-            .x11 => self.x11.swapBuffers(),
-            .wayland => self.wayland.swapBuffers(),
+            .x11 => self.x11.glSwapBuffers(),
+            .wayland => self.wayland.glSwapBuffers(),
         }
     }
 
-    pub fn swapInterval(self: *Window, interval: i32) void {
+    pub fn glSwapInterval(self: *Window, interval: i32) void {
         switch (active) {
-            .x11 => self.x11.swapInterval(interval),
-            .wayland => self.wayland.swapInterval(interval),
+            .x11 => self.x11.glSwapInterval(interval),
+            .wayland => self.wayland.glSwapInterval(interval),
         }
     }
 
-    pub fn createSurface(self: Window, instance: usize, allocator: ?*const anyopaque, surface: *u64) i32 {
+    pub fn vkCreateSurface(self: Window, instance: usize, allocation_callbacks: ?*const anyopaque, surface: *u64) i32 {
         switch (active) {
-            .x11 => return self.x11.createSurface(instance, allocator, surface),
-            .wayland => return self.wayland.createSurface(instance, allocator, surface),
+            .x11 => return self.x11.vkCreateSurface(instance, allocation_callbacks, surface),
+            .wayland => return self.wayland.vkCreateSurface(instance, allocation_callbacks, surface),
         }
     }
 };
@@ -388,10 +388,10 @@ pub fn glGetProcAddress(name: [*:0]const u8) ?*const anyopaque {
 
 pub var vkGetInstanceProcAddr: *const fn (usize, [*:0]const u8) callconv(.c) ?*const fn () void = undefined;
 
-pub fn getVulkanExtensions() []const [*:0]const u8 {
+pub fn getRequiredVulkanInstanceExtensions() []const [*:0]const u8 {
     switch (active) {
-        .x11 => return x11.getVulkanExtensions(),
-        .wayland => return wayland.getVulkanExtensions(),
+        .x11 => return x11.getRequiredVulkanInstanceExtensions(),
+        .wayland => return wayland.getRequiredVulkanInstanceExtensions(),
     }
 }
 

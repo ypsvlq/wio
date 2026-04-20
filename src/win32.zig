@@ -537,21 +537,21 @@ pub const Window = struct {
         _ = w.BitBlt(dc, 0, 0, framebuffer.size.width, framebuffer.size.height, framebuffer.dc, 0, 0, w.SRCCOPY);
     }
 
-    pub fn makeContextCurrent(self: *Window) void {
+    pub fn glMakeContextCurrent(self: *Window) void {
         _ = w.wglMakeCurrent(self.opengl.dc, self.opengl.rc);
     }
 
-    pub fn swapBuffers(self: *Window) void {
+    pub fn glSwapBuffers(self: *Window) void {
         _ = w.SwapBuffers(self.opengl.dc);
     }
 
-    pub fn swapInterval(_: Window, interval: i32) void {
+    pub fn glSwapInterval(_: Window, interval: i32) void {
         if (wgl.swapIntervalEXT) |swapIntervalEXT| {
             _ = swapIntervalEXT(interval);
         }
     }
 
-    pub fn createSurface(self: Window, instance: usize, allocator: ?*const anyopaque, surface: *u64) i32 {
+    pub fn vkCreateSurface(self: Window, instance: usize, allocation_callbacks: ?*const anyopaque, surface: *u64) i32 {
         const VkWin32SurfaceCreateInfoKHR = extern struct {
             sType: i32 = 1000009000,
             pNext: ?*const anyopaque = null,
@@ -569,7 +569,7 @@ pub const Window = struct {
                 .hinstance = w.GetModuleHandleW(null),
                 .hwnd = self.window,
             },
-            allocator,
+            allocation_callbacks,
             surface,
         );
     }
@@ -608,7 +608,7 @@ pub fn glGetProcAddress(name: [*:0]const u8) ?*const anyopaque {
 
 pub var vkGetInstanceProcAddr: *const fn (usize, [*:0]const u8) callconv(.winapi) ?*const fn () void = undefined;
 
-pub fn getVulkanExtensions() []const [*:0]const u8 {
+pub fn getRequiredVulkanInstanceExtensions() []const [*:0]const u8 {
     return &.{ "VK_KHR_surface", "VK_KHR_win32_surface" };
 }
 

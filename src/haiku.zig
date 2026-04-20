@@ -211,15 +211,15 @@ pub const Window = struct {
         wioPresentFramebuffer(self.window, framebuffer.bitmap);
     }
 
-    pub fn makeContextCurrent(self: *Window) void {
+    pub fn glMakeContextCurrent(self: *Window) void {
         wioMakeContextCurrent(self.opengl.context.?);
     }
 
-    pub fn swapBuffers(self: *Window) void {
+    pub fn glSwapBuffers(self: *Window) void {
         wioSwapBuffers(self.opengl.vsync);
     }
 
-    pub fn swapInterval(self: *Window, interval: i32) void {
+    pub fn glSwapInterval(self: *Window, interval: i32) void {
         self.opengl.vsync = (interval > 0);
     }
 

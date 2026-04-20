@@ -312,19 +312,19 @@ pub const Window = struct {
         wioPresentFramebuffer(self.window, framebuffer.bitmap);
     }
 
-    pub fn makeContextCurrent(self: *Window) void {
+    pub fn glMakeContextCurrent(self: *Window) void {
         wioMakeContextCurrent(self.opengl.context);
     }
 
-    pub fn swapBuffers(self: *Window) void {
+    pub fn glSwapBuffers(self: *Window) void {
         wioSwapBuffers(self.window, self.opengl.context);
     }
 
-    pub fn swapInterval(self: *Window, interval: i32) void {
+    pub fn glSwapInterval(self: *Window, interval: i32) void {
         wioSwapInterval(self.opengl.context, interval);
     }
 
-    pub fn createSurface(self: Window, instance: usize, allocator: ?*const anyopaque, surface: *u64) i32 {
+    pub fn vkCreateSurface(self: Window, instance: usize, allocation_callbacks: ?*const anyopaque, surface: *u64) i32 {
         const VkMetalSurfaceCreateInfoEXT = extern struct {
             sType: i32 = 1000217000,
             pNext: ?*const anyopaque = null,
@@ -338,7 +338,7 @@ pub const Window = struct {
         return vkCreateMetalSurfaceEXT(
             instance,
             &.{ .pLayer = wioCreateMetalLayer(self.window) },
-            allocator,
+            allocation_callbacks,
             surface,
         );
     }
@@ -365,7 +365,7 @@ pub fn glGetProcAddress(name: [*:0]const u8) ?*const anyopaque {
 
 pub var vkGetInstanceProcAddr: *const fn (usize, [*:0]const u8) callconv(.c) ?*const fn () void = undefined;
 
-pub fn getVulkanExtensions() []const [*:0]const u8 {
+pub fn getRequiredVulkanInstanceExtensions() []const [*:0]const u8 {
     return &.{ "VK_KHR_surface", "VK_EXT_metal_surface" };
 }
 

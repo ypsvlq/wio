@@ -110,23 +110,23 @@ pub const Window = struct {
         _ = framebuffer;
     }
 
-    pub fn makeContextCurrent(self: *Window) void {
+    pub fn glMakeContextCurrent(self: *Window) void {
         _ = self;
     }
 
-    pub fn swapBuffers(self: *Window) void {
+    pub fn glSwapBuffers(self: *Window) void {
         _ = self;
     }
 
-    pub fn swapInterval(self: *Window, interval: i32) void {
+    pub fn glSwapInterval(self: *Window, interval: i32) void {
         _ = self;
         _ = interval;
     }
 
-    pub fn createSurface(self: *Window, instance: usize, allocator: ?*const anyopaque, surface: *u64) i32 {
+    pub fn vkCreateSurface(self: *Window, instance: usize, allocation_callbacks: ?*const anyopaque, surface: *u64) i32 {
         _ = self;
         _ = instance;
-        _ = allocator;
+        _ = allocation_callbacks;
         _ = surface;
         return 0;
     }
@@ -156,7 +156,7 @@ pub fn vkGetInstanceProcAddr(instance: usize, name: [*:0]const u8) ?*const fn ()
     return null;
 }
 
-pub fn getVulkanExtensions() []const [*:0]const u8 {
+pub fn getRequiredVulkanInstanceExtensions() []const [*:0]const u8 {
     return &.{};
 }
 

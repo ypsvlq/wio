@@ -50,8 +50,8 @@ pub fn main() !void {
     });
 
     if (wio.build_options.opengl) {
-        window.makeContextCurrent();
-        window.swapInterval(1);
+        window.glMakeContextCurrent();
+        window.glSwapInterval(1);
         if (!builtin.cpu.arch.isWasm()) {
             try gl.load(wio.glGetProcAddress);
         } else {
@@ -92,14 +92,14 @@ fn loop() !bool {
             },
             .draw => {
                 if (wio.build_options.opengl) {
-                    window.makeContextCurrent();
+                    window.glMakeContextCurrent();
                     triangle.draw();
-                    window.swapBuffers();
+                    window.glSwapBuffers();
                 }
             },
             .size_physical => |size| {
                 if (wio.build_options.opengl) {
-                    window.makeContextCurrent();
+                    window.glMakeContextCurrent();
                     gl.viewport(0, 0, size.width, size.height);
                 }
             },
@@ -118,15 +118,15 @@ fn loop() !bool {
                 },
                 .draw => {
                     if (wio.build_options.opengl) {
-                        window2.makeContextCurrent();
+                        window2.glMakeContextCurrent();
                         gl.clearColor(0.5, 0.5, 0.5, 1);
                         gl.clear(gl.COLOR_BUFFER_BIT);
-                        window2.swapBuffers();
+                        window2.glSwapBuffers();
                     }
                 },
                 .size_physical => |size| {
                     if (wio.build_options.opengl) {
-                        window2.makeContextCurrent();
+                        window2.glMakeContextCurrent();
                         gl.viewport(0, 0, size.width, size.height);
                     }
                 },

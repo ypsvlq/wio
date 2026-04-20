@@ -205,23 +205,23 @@ pub const Window = struct {
         }
     }
 
-    pub fn makeContextCurrent(_: *Window) void {
+    pub fn glMakeContextCurrent(_: *Window) void {
         egl_surface_mutex.lockUncancelable(internal.io);
         defer egl_surface_mutex.unlock(internal.io);
         _ = c.eglMakeCurrent(egl_display, egl_surface, egl_surface, egl_context);
     }
 
-    pub fn swapBuffers(_: *Window) void {
+    pub fn glSwapBuffers(_: *Window) void {
         egl_surface_mutex.lockUncancelable(internal.io);
         defer egl_surface_mutex.unlock(internal.io);
         _ = c.eglSwapBuffers(egl_display, egl_surface);
     }
 
-    pub fn swapInterval(_: *Window, interval: i32) void {
+    pub fn glSwapInterval(_: *Window, interval: i32) void {
         _ = c.eglSwapInterval(egl_display, interval);
     }
 
-    pub fn createSurface(_: *Window, instance: usize, allocator: ?*const anyopaque, surface: *u64) i32 {
+    pub fn vkCreateSurface(_: *Window, instance: usize, allocation_callbacks: ?*const anyopaque, surface: *u64) i32 {
         return c.vkCreateAndroidSurfaceKHR(
             @ptrFromInt(instance),
             &.{
@@ -230,7 +230,7 @@ pub const Window = struct {
                 .flags = 0,
                 .window = window,
             },
-            @ptrCast(@alignCast(allocator)),
+            @ptrCast(@alignCast(allocation_callbacks)),
             @ptrCast(surface),
         );
     }
@@ -257,7 +257,7 @@ pub fn vkGetInstanceProcAddr(instance: usize, name: [*:0]const u8) ?*const fn ()
     return @ptrCast(c.vkGetInstanceProcAddr(@ptrFromInt(instance), name));
 }
 
-pub fn getVulkanExtensions() []const [*:0]const u8 {
+pub fn getRequiredVulkanInstanceExtensions() []const [*:0]const u8 {
     return &.{ "VK_KHR_surface", "VK_KHR_android_surface" };
 }
 

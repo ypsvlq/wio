@@ -170,13 +170,13 @@ pub const Window = struct {
         js.presentFramebuffer(self.id, framebuffer.pixels.ptr, framebuffer.size.width, framebuffer.size.height);
     }
 
-    pub fn makeContextCurrent(self: *Window) void {
+    pub fn glMakeContextCurrent(self: *Window) void {
         gl.makeContextCurrent(self.id);
     }
 
-    pub fn swapBuffers(_: *Window) void {}
+    pub fn glSwapBuffers(_: *Window) void {}
 
-    pub fn swapInterval(_: *Window, _: i32) void {}
+    pub fn glSwapInterval(_: *Window, _: i32) void {}
 };
 
 pub const Framebuffer = struct {

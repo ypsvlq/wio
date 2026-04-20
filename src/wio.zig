@@ -201,29 +201,29 @@ pub const Window = struct {
     }
 
     /// May be called on any thread.
-    pub fn makeContextCurrent(self: *Window) void {
+    pub fn glMakeContextCurrent(self: *Window) void {
         assertFeature(.opengl);
-        self.backend.makeContextCurrent();
+        self.backend.glMakeContextCurrent();
     }
 
     /// Must be called on the thread where the context is current.
     ///
     /// On Wayland, this function may block if the window is hidden.
-    pub fn swapBuffers(self: *Window) void {
+    pub fn glSwapBuffers(self: *Window) void {
         assertFeature(.opengl);
-        self.backend.swapBuffers();
+        self.backend.glSwapBuffers();
     }
 
     /// Must be called on the thread where the context is current.
-    pub fn swapInterval(self: *Window, interval: i32) void {
+    pub fn glSwapInterval(self: *Window, interval: i32) void {
         assertFeature(.opengl);
-        self.backend.swapInterval(interval);
+        self.backend.glSwapInterval(interval);
     }
 
-    /// Not available for WebAssembly.
-    pub fn createSurface(self: *Window, instance: usize, allocator: ?*const anyopaque, surface: *u64) i32 {
+    /// Not available for WebAssembly or Haiku.
+    pub fn vkCreateSurface(self: *Window, instance: usize, allocation_callbacks: ?*const anyopaque, surface: *u64) i32 {
         assertFeature(.vulkan);
-        return self.backend.createSurface(instance, allocator, surface);
+        return self.backend.vkCreateSurface(instance, allocation_callbacks, surface);
     }
 };
 
@@ -234,7 +234,7 @@ pub const Framebuffer = struct {
         self.backend.destroy();
     }
 
-    /// `rgb` is stored as 0xRRGGBB.
+    /// `rgb` is encoded as 0xRRGGBB.
     pub fn setPixel(self: *Framebuffer, x: usize, y: usize, rgb: u32) void {
         self.backend.setPixel(x, y, rgb);
     }
@@ -246,15 +246,15 @@ pub fn glGetProcAddress(name: [*:0]const u8) ?*const fn () void {
     return @ptrCast(@alignCast(backend.glGetProcAddress(name)));
 }
 
-/// Not available for WebAssembly.
+/// Not available for WebAssembly or Haiku.
 pub fn vkGetInstanceProcAddr(instance: usize, name: [*:0]const u8) ?*const fn () void {
     assertFeature(.vulkan);
     return backend.vkGetInstanceProcAddr(instance, name);
 }
 
-/// Not available for WebAssembly.
-pub fn getVulkanExtensions() []const [*:0]const u8 {
-    return backend.getVulkanExtensions();
+/// Not available for WebAssembly or Haiku.
+pub fn getRequiredVulkanInstanceExtensions() []const [*:0]const u8 {
+    return backend.getRequiredVulkanInstanceExtensions();
 }
 
 pub const JoystickDeviceIterator = struct {
@@ -408,7 +408,9 @@ pub const Event = union(enum) {
 
     /// Sent before `size`.
     mode: WindowMode,
+    /// Window size as used by mouse and touch events.
     size_logical: Size,
+    /// Window size in pixels.
     size_physical: Size,
     scale: f32,
 
