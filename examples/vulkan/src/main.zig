@@ -2,6 +2,10 @@ const std = @import("std");
 const wio = @import("wio");
 const vk = @import("vulkan");
 
+pub const std_options: std.Options = .{
+    .logFn = wio.logFn,
+};
+
 var debug_allocator = std.heap.DebugAllocator(.{}).init;
 const allocator = debug_allocator.allocator();
 
@@ -9,7 +13,6 @@ var threaded: std.Io.Threaded = undefined;
 
 var window: wio.Window = undefined;
 var size = wio.Size{ .width = 640, .height = 480 };
-var visible = true;
 
 var vkb: vk.BaseWrapper = undefined;
 
@@ -21,14 +24,6 @@ pub fn main() !void {
 
     vkb = .load(@as(*const fn (vk.Instance, [*:0]const u8) ?*const fn () void, @ptrCast(&wio.vkGetInstanceProcAddr)));
     try createInstance();
-    try createSurface();
-    try pickPhysicalDevice();
-    try createLogicalDevice();
-    try chooseSurfaceFormat();
-    try createRenderPass();
-    try createGraphicsPipeline();
-    try createCommandBuffer();
-    try createSyncObjects();
 
     return wio.run(loop);
 }
@@ -81,7 +76,7 @@ fn createInstance() !void {
     instance = .init(handle, &vki);
 }
 
-var surface: vk.SurfaceKHR = undefined;
+var surface: vk.SurfaceKHR = .null_handle;
 
 fn createSurface() !void {
     const result: vk.Result = @enumFromInt(window.vkCreateSurface(@intFromEnum(instance.handle), null, @ptrCast(&surface)));
@@ -335,16 +330,13 @@ fn createSyncObjects() !void {
     in_flight_fence = try device.createFence(&.{ .flags = .{ .signaled_bit = true } }, null);
 }
 
-var swapchain: vk.SwapchainKHR = .null_handle;
-var images: []vk.Image = &.{};
-var image_views: []vk.ImageView = &.{};
-var framebuffers: []vk.Framebuffer = &.{};
-var render_finished_semaphores: []vk.Semaphore = &.{};
+var swapchain: vk.SwapchainKHR = undefined;
+var images: []vk.Image = undefined;
+var image_views: []vk.ImageView = undefined;
+var framebuffers: []vk.Framebuffer = undefined;
+var render_finished_semaphores: []vk.Semaphore = undefined;
 
-fn recreateSwapchain() !void {
-    try device.deviceWaitIdle();
-    destroySwapchain();
-
+fn createSwapchain() !void {
     const capabilities = try instance.getPhysicalDeviceSurfaceCapabilitiesKHR(physical_device, surface);
 
     size.width = @truncate(std.math.clamp(size.width, capabilities.min_image_extent.width, capabilities.max_image_extent.width));
@@ -420,6 +412,37 @@ fn destroySwapchain() void {
     device.destroySwapchainKHR(swapchain, null);
 }
 
+fn createSurfaceAndSwapchain() !void {
+    try createSurface();
+    try pickPhysicalDevice();
+    try createLogicalDevice();
+    try chooseSurfaceFormat();
+    try createRenderPass();
+    try createGraphicsPipeline();
+    try createCommandBuffer();
+    try createSyncObjects();
+    try createSwapchain();
+}
+
+fn destroySurfaceAndSwapchain() void {
+    destroySwapchain();
+    device.destroyFence(in_flight_fence, null);
+    device.destroySemaphore(image_available_semaphore, null);
+    device.destroyCommandPool(command_pool, null);
+    device.destroyPipeline(pipeline, null);
+    device.destroyPipelineLayout(pipeline_layout, null);
+    device.destroyRenderPass(render_pass, null);
+    device.destroyDevice(null);
+    instance.destroySurfaceKHR(surface, null);
+    surface = .null_handle;
+}
+
+fn recreateSwapchain() !void {
+    try device.deviceWaitIdle();
+    destroySwapchain();
+    try createSwapchain();
+}
+
 fn recordCommandBuffer(image_index: u32) !void {
     const extent = vk.Extent2D{ .width = size.width, .height = size.height };
 
@@ -487,20 +510,16 @@ fn drawFrame() !void {
     });
 }
 
+var visible = false;
+
 fn loop() !bool {
     while (window.getEvent()) |event| {
         switch (event) {
             .close => {
-                try device.deviceWaitIdle();
-                destroySwapchain();
-                device.destroyFence(in_flight_fence, null);
-                device.destroySemaphore(image_available_semaphore, null);
-                device.destroyCommandPool(command_pool, null);
-                device.destroyPipeline(pipeline, null);
-                device.destroyPipelineLayout(pipeline_layout, null);
-                device.destroyRenderPass(render_pass, null);
-                device.destroyDevice(null);
-                instance.destroySurfaceKHR(surface, null);
+                if (surface != .null_handle) {
+                    try device.deviceWaitIdle();
+                    destroySurfaceAndSwapchain();
+                }
                 instance.destroyInstance(null);
                 window.destroy();
                 wio.deinit();
@@ -508,18 +527,31 @@ fn loop() !bool {
                 return false;
             },
             .size_physical => |new_size| {
-                size = new_size;
-                try recreateSwapchain();
+                if (new_size.width != size.width or new_size.height != size.height) {
+                    size = new_size;
+                    if (surface != .null_handle) {
+                        try recreateSwapchain();
+                    }
+                }
             },
-            .visible => visible = true,
+            .visible => {
+                visible = true;
+                if (surface == .null_handle) {
+                    try createSurfaceAndSwapchain();
+                }
+            },
             .hidden => visible = false,
             else => {},
         }
     }
 
-    if (visible) {
+    if (visible and surface != .null_handle) {
         drawFrame() catch |err| switch (err) {
             error.OutOfDateKHR => try recreateSwapchain(),
+            error.SurfaceLostKHR => {
+                try device.deviceWaitIdle();
+                destroySurfaceAndSwapchain();
+            },
             else => return err,
         };
     }
