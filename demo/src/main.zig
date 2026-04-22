@@ -104,6 +104,7 @@ fn loop() !bool {
                 }
             },
             .drop_file => |path| allocator.free(path),
+            .drop_text => |text| allocator.free(text),
             else => try actionEvent(event),
         }
     }
@@ -157,7 +158,9 @@ fn logEvent(event: wio.Event) void {
         .scroll_vertical, .scroll_horizontal => |value| std.log.info("{s} {d}", .{ @tagName(event), value }),
         .touch => |touch| std.log.info("touch {}: ({},{})", .{ touch.id, touch.x, touch.y }),
         .touch_end => |touch| std.log.info("touch {}: {s}", .{ touch.id, if (touch.ignore) "ignore" else "end" }),
+        .drop_position => |pos| std.log.info("drop_position ({},{})", .{ pos.x, pos.y }),
         .drop_file => |path| std.log.info("drop_file: {s}", .{path}),
+        .drop_text => |text| std.log.info("drop_text: {s}", .{text}),
         else => std.log.info("{s}", .{@tagName(event)}),
     }
 }

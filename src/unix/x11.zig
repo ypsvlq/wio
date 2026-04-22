@@ -101,6 +101,7 @@ var atoms: extern struct {
 } = undefined;
 
 var atom_text_uri_list: h.Atom = undefined;
+var atom_text_plain_utf8: h.Atom = undefined;
 
 var libX11: DynLib = undefined;
 var libXcursor: DynLib = undefined;
@@ -138,6 +139,7 @@ pub fn init() !bool {
     };
     _ = c.XInternAtoms(display, @ptrCast(&atom_names), atom_names.len, h.False, @ptrCast(&atoms));
     atom_text_uri_list = c.XInternAtom(display, "text/uri-list", h.False);
+    atom_text_plain_utf8 = c.XInternAtom(display, "text/plain;charset=utf-8", h.False);
 
     windows = .empty;
     errdefer windows.deinit(internal.allocator);
@@ -377,6 +379,7 @@ pub const Window = struct {
     xdnd_source: h.Window = 0,
     xdnd_req: h.Atom = h.None,
     xdnd_version: c_int = 0,
+    xdnd_is_text: bool = false,
     opengl: if (build_options.opengl) struct {
         colormap: h.Colormap,
         context: h.GLXContext,
@@ -747,6 +750,7 @@ fn handle(event: *h.XEvent) void {
                 window.xdnd_version = @intCast(event.xclient.data.l[1] >> 24);
                 const use_list = event.xclient.data.l[1] & 1 != 0;
                 window.xdnd_req = h.None;
+                window.xdnd_is_text = false;
                 if (use_list) {
                     var actual_type: h.Atom = undefined;
                     var actual_format: c_int = undefined;
@@ -758,17 +762,27 @@ fn handle(event: *h.XEvent) void {
                     for (@as([*]h.Atom, @ptrCast(@alignCast(data)))[0..nitems]) |atom| {
                         if (atom == atom_text_uri_list) {
                             window.xdnd_req = atom;
+                            window.xdnd_is_text = false;
                             break;
+                        } else if ((atom == atom_text_plain_utf8 or atom == atoms.UTF8_STRING) and window.xdnd_req == h.None) {
+                            window.xdnd_req = atom;
+                            window.xdnd_is_text = true;
                         }
                     }
                 } else {
                     for (1..4) |i| {
-                        if (@as(h.Atom, @bitCast(event.xclient.data.l[i])) == atom_text_uri_list) {
-                            window.xdnd_req = atom_text_uri_list;
+                        const atom: h.Atom = @bitCast(event.xclient.data.l[i]);
+                        if (atom == atom_text_uri_list) {
+                            window.xdnd_req = atom;
+                            window.xdnd_is_text = false;
                             break;
+                        } else if ((atom == atom_text_plain_utf8 or atom == atoms.UTF8_STRING) and window.xdnd_req == h.None) {
+                            window.xdnd_req = atom;
+                            window.xdnd_is_text = true;
                         }
                     }
                 }
+                window.events.push(.drop_begin);
             } else if (event.xclient.message_type == atoms.XdndPosition) {
                 const root_x: c_int = @intCast(event.xclient.data.l[2] >> 16);
                 const root_y: c_int = @intCast(event.xclient.data.l[2] & 0xffff);
@@ -776,6 +790,11 @@ fn handle(event: *h.XEvent) void {
                 var win_y: c_int = undefined;
                 var child: h.Window = undefined;
                 _ = c.XTranslateCoordinates(display, h.DefaultRootWindow(display), window.window, root_x, root_y, &win_x, &win_y, &child);
+                if (std.math.cast(u16, win_x)) |x| {
+                    if (std.math.cast(u16, win_y)) |y| {
+                        window.events.push(.{ .drop_position = .{ .x = x, .y = y } });
+                    }
+                }
 
                 var reply = h.XEvent{ .xclient = std.mem.zeroInit(h.XClientMessageEvent, .{
                     .type = h.ClientMessage,
@@ -790,6 +809,7 @@ fn handle(event: *h.XEvent) void {
                 _ = c.XSendEvent(display, window.xdnd_source, h.False, h.NoEventMask, &reply);
                 _ = c.XFlush(display);
             } else if (event.xclient.message_type == atoms.XdndLeave) {
+                window.events.push(.drop_complete);
                 window.xdnd_source = 0;
                 window.xdnd_req = h.None;
             } else if (event.xclient.message_type == atoms.XdndDrop) {
@@ -923,8 +943,14 @@ fn handle(event: *h.XEvent) void {
                     var iter = std.mem.splitAny(u8, data[0..nitems], "\r\n");
                     while (iter.next()) |line| {
                         if (line.len == 0 or line[0] == '#') continue;
-                        if (uriToPath(line)) |path| {
-                            window.events.push(.{ .drop_file = path });
+                        if (window.xdnd_is_text) {
+                            if (internal.allocator.dupe(u8, line)) |copy| {
+                                window.events.push(.{ .drop_text = copy });
+                            } else |_| {}
+                        } else {
+                            if (uriToPath(line)) |path| {
+                                window.events.push(.{ .drop_file = path });
+                            }
                         }
                     }
                 }

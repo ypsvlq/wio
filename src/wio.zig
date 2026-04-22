@@ -432,8 +432,12 @@ pub const Event = union(enum) {
     touch: struct { id: u8, x: u16, y: u16 },
     touch_end: struct { id: u8, ignore: bool },
 
+    drop_begin: void,
+    drop_position: Position,
     /// Allocated with the allocator passed to `init()`. Caller must free.
     drop_file: []const u8,
+    /// Allocated with the allocator passed to `init()`. Caller must free.
+    drop_text: []const u8,
     drop_complete: void,
 };
 
