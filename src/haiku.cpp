@@ -3,6 +3,7 @@
 #include <OpenGLKit.h>
 #include <DeviceKit.h>
 #include <MediaKit.h>
+#include <StorageKit.h>
 
 extern "C" {
     void wioClose(void *);
@@ -17,14 +18,20 @@ extern "C" {
     void wioMouse(void *, uint16, uint16);
     void wioScroll(void *, float, float);
     void wioAudioOutputWrite(void *, void *, size_t);
+    void wioDropBegin(void *);
+    void wioDropPosition(void *, uint16, uint16);
+    void wioDropFile(void *, const char *, size_t);
+    void wioDropText(void *, const char *, size_t);
+    void wioDropComplete(void *);
 }
 
 class WioWindow : public BWindow {
 private:
     void *zig;
+    bool dropping;
 
 public:
-    WioWindow(void *zig, BRect frame, const char *title) : BWindow(frame, title, B_TITLED_WINDOW, 0) {
+    WioWindow(void *zig, BRect frame, const char *title) : BWindow(frame, title, B_TITLED_WINDOW, 0), dropping(false) {
         this->zig = zig;
 #ifdef WIO_FRAMEBUFFER
         AddChild(new BView(Bounds(), "wio", B_FOLLOW_ALL_SIDES, 0));
@@ -94,6 +101,18 @@ public:
                         wioMouse(zig, where.x, where.y);
                     }
                 }
+                {
+                    BMessage drag_msg;
+                    if (message->FindMessage("be:drag_message", &drag_msg) == B_OK) {
+                        if (!dropping) {
+                            dropping = true;
+                            wioDropBegin(zig);
+                        }
+                        wioDropPosition(zig, (uint16)where.x, (uint16)where.y);
+                    } else if (dropping) {
+                        dropping = false;
+                    }
+                }
                 break;
             }
             case B_MOUSE_WHEEL_CHANGED: {
@@ -103,6 +122,22 @@ public:
                 wioScroll(zig, y, x);
                 break;
             }
+        }
+
+        if (message->WasDropped()) {
+            if (!dropping) wioDropBegin(zig);
+            dropping = false;
+            entry_ref ref;
+            for (int32 i = 0; message->FindRef("refs", i, &ref) == B_OK; i++) {
+                BPath path(&ref);
+                if (path.Path() != NULL) wioDropFile(zig, path.Path(), strlen(path.Path()));
+            }
+            const void *text;
+            ssize_t len;
+            if (message->FindData("text/plain", B_MIME_TYPE, &text, &len) == B_OK) {
+                wioDropText(zig, (const char *)text, (size_t)len);
+            }
+            wioDropComplete(zig);
         }
 
         if (dispatch_parent) {
