@@ -431,6 +431,10 @@ pub const Event = union(enum) {
 
     touch: struct { id: u8, x: u16, y: u16 },
     touch_end: struct { id: u8, ignore: bool },
+
+    /// Allocated with the allocator passed to `init()`. Caller must free.
+    drop_file: []const u8,
+    drop_complete: void,
 };
 
 pub const EventType = @typeInfo(Event).@"union".tag_type.?;

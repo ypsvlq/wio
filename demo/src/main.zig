@@ -103,6 +103,7 @@ fn loop() !bool {
                     gl.viewport(0, 0, size.width, size.height);
                 }
             },
+            .drop_file => |path| allocator.free(path),
             else => try actionEvent(event),
         }
     }
@@ -156,6 +157,7 @@ fn logEvent(event: wio.Event) void {
         .scroll_vertical, .scroll_horizontal => |value| std.log.info("{s} {d}", .{ @tagName(event), value }),
         .touch => |touch| std.log.info("touch {}: ({},{})", .{ touch.id, touch.x, touch.y }),
         .touch_end => |touch| std.log.info("touch {}: {s}", .{ touch.id, if (touch.ignore) "ignore" else "end" }),
+        .drop_file => |path| std.log.info("drop_file: {s}", .{path}),
         else => std.log.info("{s}", .{@tagName(event)}),
     }
 }
