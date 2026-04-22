@@ -103,8 +103,11 @@ fn loop() !bool {
                     gl.viewport(0, 0, size.width, size.height);
                 }
             },
-            .drop_file => |path| allocator.free(path),
-            .drop_text => |text| allocator.free(text),
+            .drop_complete => {
+                const data = window.getDropData();
+                for (data.files) |path| std.log.info("drop_file: {s}", .{path});
+                if (data.text) |text| std.log.info("drop_text: {s}", .{text});
+            },
             else => try actionEvent(event),
         }
     }
@@ -159,8 +162,6 @@ fn logEvent(event: wio.Event) void {
         .touch => |touch| std.log.info("touch {}: ({},{})", .{ touch.id, touch.x, touch.y }),
         .touch_end => |touch| std.log.info("touch {}: {s}", .{ touch.id, if (touch.ignore) "ignore" else "end" }),
         .drop_position => |pos| std.log.info("drop_position ({},{})", .{ pos.x, pos.y }),
-        .drop_file => |path| std.log.info("drop_file: {s}", .{path}),
-        .drop_text => |text| std.log.info("drop_text: {s}", .{text}),
         else => std.log.info("{s}", .{@tagName(event)}),
     }
 }

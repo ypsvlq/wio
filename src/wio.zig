@@ -80,6 +80,11 @@ pub fn getModifiers() Modifiers {
     return backend.getModifiers();
 }
 
+pub const DropData = struct {
+    files: []const []const u8,
+    text: ?[]const u8,
+};
+
 pub const Modifiers = struct {
     control: bool = false,
     shift: bool = false,
@@ -184,6 +189,10 @@ pub const Window = struct {
 
     pub fn setClipboardText(self: *Window, text: []const u8) void {
         self.backend.setClipboardText(text);
+    }
+
+    pub fn getDropData(self: *Window) DropData {
+        return self.backend.getDropData();
     }
 
     pub fn getClipboardText(self: *Window, allocator: std.mem.Allocator) ?[]u8 {
@@ -434,10 +443,6 @@ pub const Event = union(enum) {
 
     drop_begin: void,
     drop_position: Position,
-    /// Allocated with the allocator passed to `init()`. Caller must free.
-    drop_file: []const u8,
-    /// Allocated with the allocator passed to `init()`. Caller must free.
-    drop_text: []const u8,
     drop_complete: void,
 };
 

@@ -370,9 +370,14 @@ pub const Window = struct {
     text: bool = false,
     opengl: if (build_options.opengl) struct { dc: w.HDC = null, rc: w.HGLRC = null } else struct {} = .{},
     drop_target: DropTarget = undefined,
+    drop_files: std.ArrayListUnmanaged([]const u8) = .empty,
+    drop_text: ?[]const u8 = null,
 
     pub fn destroy(self: *Window) void {
         _ = w.RevokeDragDrop(self.window);
+        for (self.drop_files.items) |f| internal.allocator.free(f);
+        self.drop_files.deinit(internal.allocator);
+        if (self.drop_text) |t| internal.allocator.free(t);
         if (build_options.opengl) {
             _ = w.wglDeleteContext(self.opengl.rc);
             _ = w.ReleaseDC(self.window, self.opengl.dc);
@@ -386,6 +391,10 @@ pub const Window = struct {
 
     pub fn getEvent(self: *Window) ?wio.Event {
         return self.events.pop();
+    }
+
+    pub fn getDropData(self: *Window) wio.DropData {
+        return .{ .files = self.drop_files.items, .text = self.drop_text };
     }
 
     pub fn enableTextInput(self: *Window, _: wio.TextInputOptions) void {
@@ -1257,6 +1266,10 @@ const DropTarget = struct {
         dt.has_text = data_obj.QueryGetData(&fmt) == w.S_OK;
         if (dt.has_files or dt.has_text) {
             effect.* = w.DROPEFFECT_COPY;
+            for (dt.window.drop_files.items) |f| internal.allocator.free(f);
+            dt.window.drop_files.clearRetainingCapacity();
+            if (dt.window.drop_text) |t| internal.allocator.free(t);
+            dt.window.drop_text = null;
             dt.window.events.push(.drop_begin);
             pushPosition(dt.window, pt);
         } else {
@@ -1308,7 +1321,7 @@ const DropTarget = struct {
             defer internal.allocator.free(buf);
             _ = w.DragQueryFileW(hdrop, @intCast(i), buf.ptr, len + 1);
             const path = std.unicode.utf16LeToUtf8Alloc(internal.allocator, buf[0..len]) catch continue;
-            window.events.push(.{ .drop_file = path });
+            window.drop_files.append(internal.allocator, path) catch {};
         }
     }
 
@@ -1321,7 +1334,7 @@ const DropTarget = struct {
         defer _ = w.GlobalUnlock(medium.u.hGlobal);
         const wstr = std.mem.sliceTo(ptr, 0);
         if (std.unicode.utf16LeToUtf8Alloc(internal.allocator, wstr)) |text| {
-            window.events.push(.{ .drop_text = text });
+            window.drop_text = text;
         } else |_| {}
     }
 };

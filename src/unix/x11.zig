@@ -52,7 +52,6 @@ var imports: extern struct {
     XSetClassHint: *const fn (?*h.Display, h.Window, [*c]h.XClassHint) callconv(.c) c_int,
     XSetSelectionOwner: *const fn (?*h.Display, h.Atom, h.Window, h.Time) callconv(.c) c_int,
     XConvertSelection: *const fn (?*h.Display, h.Atom, h.Atom, h.Atom, h.Window, h.Time) callconv(.c) c_int,
-    XInternAtom: *const fn (?*h.Display, [*c]const u8, c_int) callconv(.c) h.Atom,
     XTranslateCoordinates: *const fn (?*h.Display, h.Window, h.Window, c_int, c_int, [*c]c_int, [*c]c_int, [*c]h.Window) callconv(.c) c_int,
     XCheckTypedWindowEvent: *const fn (?*h.Display, h.Window, c_int, [*c]h.XEvent) callconv(.c) c_int,
     XCreateColormap: *const fn (?*h.Display, h.Window, [*c]h.Visual, c_int) callconv(.c) h.Colormap,
@@ -98,10 +97,9 @@ var atoms: extern struct {
     XdndTypeList: h.Atom,
     XdndSelection: h.Atom,
     XdndActionCopy: h.Atom,
+    @"text/uri-list": h.Atom,
+    @"text/plain;charset=utf-8": h.Atom,
 } = undefined;
-
-var atom_text_uri_list: h.Atom = undefined;
-var atom_text_plain_utf8: h.Atom = undefined;
 
 var libX11: DynLib = undefined;
 var libXcursor: DynLib = undefined;
@@ -138,8 +136,6 @@ pub fn init() !bool {
         break :blk atom_names;
     };
     _ = c.XInternAtoms(display, @ptrCast(&atom_names), atom_names.len, h.False, @ptrCast(&atoms));
-    atom_text_uri_list = c.XInternAtom(display, "text/uri-list", h.False);
-    atom_text_plain_utf8 = c.XInternAtom(display, "text/plain;charset=utf-8", h.False);
 
     windows = .empty;
     errdefer windows.deinit(internal.allocator);
@@ -380,6 +376,8 @@ pub const Window = struct {
     xdnd_req: h.Atom = h.None,
     xdnd_version: c_int = 0,
     xdnd_is_text: bool = false,
+    drop_files: std.ArrayListUnmanaged([]const u8) = .empty,
+    drop_text: ?[]const u8 = null,
     opengl: if (build_options.opengl) struct {
         colormap: h.Colormap,
         context: h.GLXContext,
@@ -398,11 +396,18 @@ pub const Window = struct {
 
         self.preedit_string.deinit(internal.allocator);
         self.events.deinit();
+        for (self.drop_files.items) |f| internal.allocator.free(f);
+        self.drop_files.deinit(internal.allocator);
+        if (self.drop_text) |t| internal.allocator.free(t);
         internal.allocator.destroy(self);
     }
 
     pub fn getEvent(self: *Window) ?wio.Event {
         return self.events.pop();
+    }
+
+    pub fn getDropData(self: *Window) wio.DropData {
+        return .{ .files = self.drop_files.items, .text = self.drop_text };
     }
 
     pub fn enableTextInput(self: *Window, options: wio.TextInputOptions) void {
@@ -760,11 +765,11 @@ fn handle(event: *h.XEvent) void {
                     _ = c.XGetWindowProperty(display, window.xdnd_source, atoms.XdndTypeList, 0, std.math.maxInt(c_long), h.False, h.XA_ATOM, &actual_type, &actual_format, &nitems, &bytes_after, @ptrCast(&data));
                     defer _ = c.XFree(data);
                     for (@as([*]h.Atom, @ptrCast(@alignCast(data)))[0..nitems]) |atom| {
-                        if (atom == atom_text_uri_list) {
+                        if (atom == atoms.@"text/uri-list") {
                             window.xdnd_req = atom;
                             window.xdnd_is_text = false;
                             break;
-                        } else if ((atom == atom_text_plain_utf8 or atom == atoms.UTF8_STRING) and window.xdnd_req == h.None) {
+                        } else if ((atom == atoms.@"text/plain;charset=utf-8" or atom == atoms.UTF8_STRING) and window.xdnd_req == h.None) {
                             window.xdnd_req = atom;
                             window.xdnd_is_text = true;
                         }
@@ -772,16 +777,20 @@ fn handle(event: *h.XEvent) void {
                 } else {
                     for (1..4) |i| {
                         const atom: h.Atom = @bitCast(event.xclient.data.l[i]);
-                        if (atom == atom_text_uri_list) {
+                        if (atom == atoms.@"text/uri-list") {
                             window.xdnd_req = atom;
                             window.xdnd_is_text = false;
                             break;
-                        } else if ((atom == atom_text_plain_utf8 or atom == atoms.UTF8_STRING) and window.xdnd_req == h.None) {
+                        } else if ((atom == atoms.@"text/plain;charset=utf-8" or atom == atoms.UTF8_STRING) and window.xdnd_req == h.None) {
                             window.xdnd_req = atom;
                             window.xdnd_is_text = true;
                         }
                     }
                 }
+                for (window.drop_files.items) |f| internal.allocator.free(f);
+                window.drop_files.clearRetainingCapacity();
+                if (window.drop_text) |t| internal.allocator.free(t);
+                window.drop_text = null;
                 window.events.push(.drop_begin);
             } else if (event.xclient.message_type == atoms.XdndPosition) {
                 const root_x: c_int = @intCast(event.xclient.data.l[2] >> 16);
@@ -942,14 +951,14 @@ fn handle(event: *h.XEvent) void {
                 if (actual_format == 8) {
                     if (window.xdnd_is_text) {
                         if (internal.allocator.dupe(u8, data[0..nitems])) |copy| {
-                            window.events.push(.{ .drop_text = copy });
+                            window.drop_text = copy;
                         } else |_| {}
                     } else {
                         var iter = std.mem.splitAny(u8, data[0..nitems], "\r\n");
                         while (iter.next()) |line| {
                             if (line.len == 0 or line[0] == '#') continue;
                             if (uriToPath(line)) |path| {
-                                window.events.push(.{ .drop_file = path });
+                                window.drop_files.append(internal.allocator, path) catch {};
                             }
                         }
                     }

@@ -401,6 +401,8 @@ pub const Window = struct {
         surface: h.EGLSurface = null,
         context: h.EGLContext = null,
     } else struct {} = .{},
+    drop_files: std.ArrayListUnmanaged([]const u8) = .empty,
+    drop_text: ?[]const u8 = null,
 
     pub fn destroy(self: *Window) void {
         if (pointer_focus == self) pointer_focus = null;
@@ -430,7 +432,14 @@ pub const Window = struct {
         _ = c.wl_display_roundtrip(display);
 
         self.events.deinit();
+        for (self.drop_files.items) |f| internal.allocator.free(f);
+        self.drop_files.deinit(internal.allocator);
+        if (self.drop_text) |t| internal.allocator.free(t);
         internal.allocator.destroy(self);
+    }
+
+    pub fn getDropData(self: *Window) wio.DropData {
+        return .{ .files = self.drop_files.items, .text = self.drop_text };
     }
 
     pub fn getEvent(self: *Window) ?wio.Event {
@@ -1179,7 +1188,13 @@ fn dataDeviceEnter(_: ?*anyopaque, _: ?*h.wl_data_device, serial: u32, surface: 
         }
     }
 
-    if (drag_window) |window| window.events.push(.drop_begin);
+    if (drag_window) |window| {
+        for (window.drop_files.items) |f| internal.allocator.free(f);
+        window.drop_files.clearRetainingCapacity();
+        if (window.drop_text) |t| internal.allocator.free(t);
+        window.drop_text = null;
+        window.events.push(.drop_begin);
+    }
 }
 
 fn dataDeviceLeave(_: ?*anyopaque, _: ?*h.wl_data_device) callconv(.c) void {
@@ -1235,11 +1250,11 @@ fn dataDeviceDrop(_: ?*anyopaque, _: ?*h.wl_data_device) callconv(.c) void {
             const prefix = "file://";
             if (!std.mem.startsWith(u8, line, prefix)) continue;
             const path = uriDecodePath(line[prefix.len..]) orelse continue;
-            window.events.push(.{ .drop_file = path });
+            window.drop_files.append(internal.allocator, path) catch {};
         }
     } else {
         if (internal.allocator.dupe(u8, buf[0..total])) |copy| {
-            window.events.push(.{ .drop_text = copy });
+            window.drop_text = copy;
         } else |_| {}
     }
     window.events.push(.drop_complete);
