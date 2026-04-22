@@ -36,6 +36,11 @@ const js = struct {
     extern "wio" fn setSize(u32, u16, u16) void;
     extern "wio" fn setClipboardText([*]const u8, usize) void;
     extern "wio" fn presentFramebuffer(u32, [*]const u32, u16, u16) void;
+    extern "wio" fn getDropFileCount(u32) u32;
+    extern "wio" fn getDropFileLen(u32, u32) u32;
+    extern "wio" fn getDropFile(u32, u32, [*]u8) void;
+    extern "wio" fn getDropTextLen(u32) u32;
+    extern "wio" fn getDropText(u32, [*]u8) void;
     extern "wio" fn getJoystickCount() u32;
     extern "wio" fn getJoystickIdLen(u32) u32;
     extern "wio" fn getJoystickId(u32, [*]u8) void;
@@ -92,8 +97,14 @@ pub fn createWindow(options: wio.CreateWindowOptions) !Window {
 
 pub const Window = struct {
     id: u32,
+    drop_files: std.ArrayListUnmanaged([]const u8) = .empty,
+    drop_text: ?[]const u8 = null,
 
-    pub fn destroy(_: *Window) void {}
+    pub fn destroy(self: *Window) void {
+        for (self.drop_files.items) |f| internal.allocator.free(f);
+        self.drop_files.deinit(internal.allocator);
+        if (self.drop_text) |t| internal.allocator.free(t);
+    }
 
     pub fn getEvent(self: *Window) ?wio.Event {
         const event: wio.EventType = @enumFromInt(js.shift(self.id));
@@ -118,6 +129,9 @@ pub const Window = struct {
             .mouse_leave => .mouse_leave,
             .scroll_vertical => .{ .scroll_vertical = js.shiftFloat(self.id) },
             .scroll_horizontal => .{ .scroll_horizontal = js.shiftFloat(self.id) },
+            .drop_begin => .drop_begin,
+            .drop_position => .{ .drop_position = .{ .x = @intCast(js.shift(self.id)), .y = @intCast(js.shift(self.id)) } },
+            .drop_complete => .drop_complete,
             else => unreachable,
         };
     }
@@ -159,6 +173,32 @@ pub const Window = struct {
 
     pub fn getClipboardText(_: *Window, _: std.mem.Allocator) ?[]u8 {
         return null;
+    }
+
+    pub fn getDropData(self: *Window) wio.DropData {
+        for (self.drop_files.items) |f| internal.allocator.free(f);
+        self.drop_files.clearRetainingCapacity();
+        if (self.drop_text) |t| internal.allocator.free(t);
+        self.drop_text = null;
+
+        const file_count = js.getDropFileCount(self.id);
+        for (0..file_count) |i| {
+            const len = js.getDropFileLen(self.id, @intCast(i));
+            const buf = internal.allocator.alloc(u8, len) catch continue;
+            js.getDropFile(self.id, @intCast(i), buf.ptr);
+            self.drop_files.append(internal.allocator, buf) catch {
+                internal.allocator.free(buf);
+            };
+        }
+        const text_len = js.getDropTextLen(self.id);
+        if (text_len > 0) {
+            if (internal.allocator.alloc(u8, text_len)) |buf| {
+                js.getDropText(self.id, buf.ptr);
+                self.drop_text = buf;
+            } else |_| {}
+        }
+
+        return .{ .files = self.drop_files.items, .text = self.drop_text };
     }
 
     pub fn createFramebuffer(_: *Window, size: wio.Size) !Framebuffer {
