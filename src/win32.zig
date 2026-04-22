@@ -114,8 +114,9 @@ pub fn init() !void {
         if (w.RegisterRawInputDevices(&devices, devices.len, @sizeOf(w.RAWINPUTDEVICE)) == w.FALSE) return logLastError("RegisterRawInputDevices");
     }
 
+    try SUCCEED(w.OleInitialize(null), "OleInitialize");
+
     if (build_options.audio) {
-        try SUCCEED(w.CoInitializeEx(null, w.COINIT_MULTITHREADED | w.COINIT_DISABLE_OLE1DDE), "CoInitializeEx");
         try SUCCEED(w.CoCreateInstance(&w.CLSID_MMDeviceEnumerator, null, w.CLSCTX_ALL, &w.IID_IMMDeviceEnumerator, @ptrCast(&mm_device_enumerator)), "CoCreateInstance");
 
         var device: *w.IMMDevice = undefined;
@@ -151,10 +152,10 @@ pub fn deinit() void {
 
     if (build_options.audio) {
         _ = mm_device_enumerator.Release();
-        w.CoUninitialize();
     }
 
     _ = w.DestroyWindow(helper_window);
+    w.OleUninitialize();
 }
 
 pub fn run(func: fn () anyerror!bool) !void {
@@ -338,6 +339,9 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
         }
     }
 
+    self.drop_target = .{ .window = self };
+    _ = w.RegisterDragDrop(window, &self.drop_target.interface);
+
     return self;
 }
 
@@ -365,8 +369,10 @@ pub const Window = struct {
     touch_ids: std.AutoHashMapUnmanaged(u16, u8) = .empty,
     text: bool = false,
     opengl: if (build_options.opengl) struct { dc: w.HDC = null, rc: w.HGLRC = null } else struct {} = .{},
+    drop_target: DropTarget = undefined,
 
     pub fn destroy(self: *Window) void {
+        _ = w.RevokeDragDrop(self.window);
         if (build_options.opengl) {
             _ = w.wglDeleteContext(self.opengl.rc);
             _ = w.ReleaseDC(self.window, self.opengl.dc);
@@ -1183,6 +1189,142 @@ fn enableRawMouse() void {
         }
     }
 }
+
+const DropTarget = struct {
+    interface: w.IDropTarget = .{ .lpVtbl = &vtable },
+    window: *Window = undefined,
+    has_files: bool = false,
+    has_text: bool = false,
+
+    const vtable: w.IDropTarget.Vtbl = .{
+        .QueryInterface = queryInterface,
+        .AddRef = addRef,
+        .Release = release,
+        .DragEnter = dragEnter,
+        .DragOver = dragOver,
+        .DragLeave = dragLeave,
+        .Drop = drop,
+    };
+
+    fn cast(iface: *w.IDropTarget) *DropTarget {
+        return @fieldParentPtr("interface", iface);
+    }
+
+    fn queryInterface(iface: *w.IDropTarget, riid: [*c]const w.GUID, obj: [*c]?*anyopaque) callconv(.winapi) w.HRESULT {
+        const guid: *const w.GUID = @ptrCast(riid);
+        if (std.mem.eql(u8, std.mem.asBytes(guid), std.mem.asBytes(&w.IID_IDropTarget)) or
+            std.mem.eql(u8, std.mem.asBytes(guid), std.mem.asBytes(&w.IID_IUnknown)))
+        {
+            obj.* = iface;
+            return w.S_OK;
+        }
+        obj.* = null;
+        return w.E_NOINTERFACE;
+    }
+
+    fn addRef(_: *w.IDropTarget) callconv(.winapi) u32 {
+        return 1;
+    }
+
+    fn release(_: *w.IDropTarget) callconv(.winapi) u32 {
+        return 1;
+    }
+
+    fn makeFormatEtc(cf: u16) w.FORMATETC {
+        return .{
+            .cfFormat = cf,
+            .ptd = null,
+            .dwAspect = w.DVASPECT_CONTENT,
+            .lindex = -1,
+            .tymed = @intCast(w.TYMED_HGLOBAL),
+        };
+    }
+
+    fn pushPosition(window: *Window, pt: w.POINTL) void {
+        var point = w.POINT{ .x = pt.x, .y = pt.y };
+        _ = w.ScreenToClient(window.window, &point);
+        const x = std.math.cast(u16, point.x) orelse return;
+        const y = std.math.cast(u16, point.y) orelse return;
+        window.events.push(.{ .drop_position = .{ .x = x, .y = y } });
+    }
+
+    fn dragEnter(iface: *w.IDropTarget, data: [*c]w.IDataObject, _: u32, pt: w.POINTL, effect: [*c]u32) callconv(.winapi) w.HRESULT {
+        const dt = cast(iface);
+        const data_obj: *w.IDataObject = @ptrCast(data);
+        var fmt = makeFormatEtc(w.CF_HDROP);
+        dt.has_files = data_obj.QueryGetData(&fmt) == w.S_OK;
+        fmt.cfFormat = w.CF_UNICODETEXT;
+        dt.has_text = data_obj.QueryGetData(&fmt) == w.S_OK;
+        if (dt.has_files or dt.has_text) {
+            effect.* = w.DROPEFFECT_COPY;
+            dt.window.events.push(.drop_begin);
+            pushPosition(dt.window, pt);
+        } else {
+            effect.* = w.DROPEFFECT_NONE;
+        }
+        return w.S_OK;
+    }
+
+    fn dragOver(iface: *w.IDropTarget, _: u32, pt: w.POINTL, effect: [*c]u32) callconv(.winapi) w.HRESULT {
+        const dt = cast(iface);
+        if (dt.has_files or dt.has_text) {
+            effect.* = w.DROPEFFECT_COPY;
+            pushPosition(dt.window, pt);
+        } else {
+            effect.* = w.DROPEFFECT_NONE;
+        }
+        return w.S_OK;
+    }
+
+    fn dragLeave(_: *w.IDropTarget) callconv(.winapi) w.HRESULT {
+        return w.S_OK;
+    }
+
+    fn drop(iface: *w.IDropTarget, data: [*c]w.IDataObject, _: u32, pt: w.POINTL, effect: [*c]u32) callconv(.winapi) w.HRESULT {
+        const dt = cast(iface);
+        const data_obj: *w.IDataObject = @ptrCast(data);
+        if (!dt.has_files and !dt.has_text) {
+            effect.* = w.DROPEFFECT_NONE;
+            return w.S_OK;
+        }
+        effect.* = w.DROPEFFECT_COPY;
+        pushPosition(dt.window, pt);
+        if (dt.has_files) extractFiles(dt.window, data_obj);
+        if (dt.has_text) extractText(dt.window, data_obj);
+        dt.window.events.push(.drop_complete);
+        return w.S_OK;
+    }
+
+    fn extractFiles(window: *Window, data: *w.IDataObject) void {
+        var fmt = makeFormatEtc(w.CF_HDROP);
+        var medium: w.STGMEDIUM = undefined;
+        if (data.GetData(&fmt, &medium) != w.S_OK) return;
+        defer w.ReleaseStgMedium(&medium);
+        const hdrop: w.HDROP = medium.u.hGlobal;
+        const count = w.DragQueryFileW(hdrop, 0xFFFFFFFF, null, 0);
+        for (0..count) |i| {
+            const len = w.DragQueryFileW(hdrop, @intCast(i), null, 0);
+            const buf = internal.allocator.alloc(u16, len + 1) catch continue;
+            defer internal.allocator.free(buf);
+            _ = w.DragQueryFileW(hdrop, @intCast(i), buf.ptr, len + 1);
+            const path = std.unicode.utf16LeToUtf8Alloc(internal.allocator, buf[0..len]) catch continue;
+            window.events.push(.{ .drop_file = path });
+        }
+    }
+
+    fn extractText(window: *Window, data: *w.IDataObject) void {
+        var fmt = makeFormatEtc(w.CF_UNICODETEXT);
+        var medium: w.STGMEDIUM = undefined;
+        if (data.GetData(&fmt, &medium) != w.S_OK) return;
+        defer w.ReleaseStgMedium(&medium);
+        const ptr: [*:0]u16 = @ptrCast(@alignCast(w.GlobalLock(medium.u.hGlobal) orelse return));
+        defer _ = w.GlobalUnlock(medium.u.hGlobal);
+        const wstr = std.mem.sliceTo(ptr, 0);
+        if (std.unicode.utf16LeToUtf8Alloc(internal.allocator, wstr)) |text| {
+            window.events.push(.{ .drop_text = text });
+        } else |_| {}
+    }
+};
 
 fn logLastError(name: []const u8) error{Unexpected} {
     log.err("{s} failed, error {}", .{ name, w.GetLastError() });
