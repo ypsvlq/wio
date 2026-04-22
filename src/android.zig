@@ -168,6 +168,10 @@ pub const Window = struct {
         java.env.*.*.CallVoidMethod.?(java.env, java.activity, java.setClipboardText, text_j);
     }
 
+    pub fn getDropData(_: *Window) wio.DropData {
+        return .{ .files = &.{}, .text = null };
+    }
+
     pub fn getClipboardText(_: *Window, allocator: std.mem.Allocator) ?[]u8 {
         const text_j = java.env.*.*.CallObjectMethod.?(java.env, java.activity, java.getClipboardText) orelse return null;
         defer java.env.*.*.DeleteLocalRef.?(java.env, text_j);
