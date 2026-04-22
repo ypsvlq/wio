@@ -317,6 +317,13 @@ pub const Window = union {
         }
     }
 
+    pub fn getDropData(self: *Window) wio.DropData {
+        switch (active) {
+            .x11 => return self.x11.getDropData(),
+            .wayland => return self.wayland.getDropData(),
+        }
+    }
+
     pub fn createFramebuffer(self: *Window, size: wio.Size) !Framebuffer {
         switch (active) {
             .x11 => return .{ .x11 = try self.x11.createFramebuffer(size) },
