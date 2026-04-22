@@ -1228,19 +1228,19 @@ fn dataDeviceDrop(_: ?*anyopaque, _: ?*h.wl_data_device) callconv(.c) void {
         total += @intCast(n);
     }
 
-    var iter = std.mem.splitAny(u8, buf[0..total], "\r\n");
-    while (iter.next()) |line| {
-        if (line.len == 0 or line[0] == '#') continue;
-        if (drag_has_uri) {
+    if (drag_has_uri) {
+        var iter = std.mem.splitAny(u8, buf[0..total], "\r\n");
+        while (iter.next()) |line| {
+            if (line.len == 0 or line[0] == '#') continue;
             const prefix = "file://";
             if (!std.mem.startsWith(u8, line, prefix)) continue;
             const path = uriDecodePath(line[prefix.len..]) orelse continue;
             window.events.push(.{ .drop_file = path });
-        } else {
-            if (internal.allocator.dupe(u8, line)) |copy| {
-                window.events.push(.{ .drop_text = copy });
-            } else |_| {}
         }
+    } else {
+        if (internal.allocator.dupe(u8, buf[0..total])) |copy| {
+            window.events.push(.{ .drop_text = copy });
+        } else |_| {}
     }
     window.events.push(.drop_complete);
 }

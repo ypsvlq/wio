@@ -940,14 +940,14 @@ fn handle(event: *h.XEvent) void {
                 defer _ = c.XFree(data);
 
                 if (actual_format == 8) {
-                    var iter = std.mem.splitAny(u8, data[0..nitems], "\r\n");
-                    while (iter.next()) |line| {
-                        if (line.len == 0 or line[0] == '#') continue;
-                        if (window.xdnd_is_text) {
-                            if (internal.allocator.dupe(u8, line)) |copy| {
-                                window.events.push(.{ .drop_text = copy });
-                            } else |_| {}
-                        } else {
+                    if (window.xdnd_is_text) {
+                        if (internal.allocator.dupe(u8, data[0..nitems])) |copy| {
+                            window.events.push(.{ .drop_text = copy });
+                        } else |_| {}
+                    } else {
+                        var iter = std.mem.splitAny(u8, data[0..nitems], "\r\n");
+                        while (iter.next()) |line| {
+                            if (line.len == 0 or line[0] == '#') continue;
                             if (uriToPath(line)) |path| {
                                 window.events.push(.{ .drop_file = path });
                             }
