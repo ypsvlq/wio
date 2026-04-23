@@ -142,7 +142,10 @@ pub fn init() !bool {
 
     _ = std.c.setlocale(.CTYPE, "");
     _ = c.XSetLocaleModifiers("");
-    im = c.XOpenIM(display, null, null, null) orelse return error.Unexpected;
+    im = c.XOpenIM(display, null, null, null) orelse blk: {
+        _ = c.XSetLocaleModifiers("@im=");
+        break :blk c.XOpenIM(display, null, null, null) orelse return error.Unexpected;
+    };
     errdefer _ = c.XCloseIM(im);
 
     var im_styles: *h.XIMStyles = undefined;

@@ -40,6 +40,7 @@ var imports: extern struct {
     libdecor_unref: *const fn (context: ?*h.struct_libdecor) callconv(.c) void,
     libdecor_decorate: *const fn (context: ?*h.struct_libdecor, surface: ?*h.struct_wl_surface, iface: [*c]h.struct_libdecor_frame_interface, user_data: ?*anyopaque) callconv(.c) ?*h.struct_libdecor_frame,
     libdecor_frame_unref: *const fn (frame: ?*h.struct_libdecor_frame) callconv(.c) void,
+    libdecor_frame_map: *const fn (frame: ?*h.struct_libdecor_frame) callconv(.c) void,
     libdecor_configuration_get_window_state: *const fn (configuration: ?*h.struct_libdecor_configuration, window_state: [*c]h.enum_libdecor_window_state) callconv(.c) bool,
     libdecor_configuration_get_content_size: *const fn (configuration: ?*h.struct_libdecor_configuration, frame: ?*h.struct_libdecor_frame, width: [*c]c_int, height: [*c]c_int) callconv(.c) bool,
     libdecor_state_new: *const fn (width: c_int, height: c_int) callconv(.c) ?*h.struct_libdecor_state,
@@ -307,6 +308,12 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
     }
     errdefer if (self.fractional_scale) |_| h.wp_fractional_scale_v1_destroy(self.fractional_scale);
 
+    h.wl_surface_commit(surface);
+    c.libdecor_frame_map(frame);
+    while (!self.configured) {
+        if (c.wl_display_dispatch(display) == -1) return error.Unexpected;
+    }
+
     self.events.push(.visible);
     if (self.fractional_scale == null) self.events.push(.{ .scale = 1 });
 
@@ -317,11 +324,6 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
         const id = try internal.allocator.dupeZ(u8, options.app_id orelse options.title);
         defer internal.allocator.free(id);
         c.libdecor_frame_set_app_id(self.frame, id.ptr);
-    }
-
-    h.wl_surface_commit(surface);
-    while (!self.configured) {
-        if (c.wl_display_dispatch(display) == -1) return error.Unexpected;
     }
 
     if (build_options.opengl) {
