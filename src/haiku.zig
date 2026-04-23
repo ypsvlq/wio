@@ -143,8 +143,13 @@ pub const Window = struct {
     buttons: std.StaticBitSet(5) = .initEmpty(),
     text: bool = false,
     opengl: if (build_options.opengl) struct { context: ?*BGLView = null, vsync: bool = false } else struct {} = .{},
+    drop_files: std.ArrayListUnmanaged([]const u8) = .empty,
+    drop_text: ?[]const u8 = null,
 
     pub fn destroy(self: *Window) void {
+        for (self.drop_files.items) |f| internal.allocator.free(f);
+        self.drop_files.deinit(internal.allocator);
+        if (self.drop_text) |t| internal.allocator.free(t);
         wioDestroyWindow(self.window);
         self.events.deinit();
         internal.allocator.destroy(self);
@@ -195,6 +200,10 @@ pub const Window = struct {
 
     pub fn setClipboardText(_: *Window, text: []const u8) void {
         wioSetClipboardText(text.ptr, text.len);
+    }
+
+    pub fn getDropData(self: *Window, allocator: std.mem.Allocator) wio.DropData {
+        return wio.DropData.dupe(allocator, self.drop_files.items, self.drop_text) catch .{ .files = &.{}, .text = null };
     }
 
     pub fn getClipboardText(_: *Window, allocator: std.mem.Allocator) ?[]u8 {
@@ -476,6 +485,34 @@ export fn wioMouse(self: *Window, x: u16, y: u16) void {
 export fn wioScroll(self: *Window, vertical: f32, horizontal: f32) void {
     if (vertical != 0) self.pushEvent(.{ .scroll_vertical = vertical });
     if (horizontal != 0) self.pushEvent(.{ .scroll_horizontal = horizontal });
+}
+
+export fn wioDropBegin(self: *Window) void {
+    for (self.drop_files.items) |f| internal.allocator.free(f);
+    self.drop_files.clearRetainingCapacity();
+    if (self.drop_text) |t| internal.allocator.free(t);
+    self.drop_text = null;
+    self.pushEvent(.drop_begin);
+}
+
+export fn wioDropPosition(self: *Window, x: u16, y: u16) void {
+    self.pushEvent(.{ .drop_position = .{ .x = x, .y = y } });
+}
+
+export fn wioDropFile(self: *Window, ptr: [*]const u8, len: usize) void {
+    const path = internal.allocator.dupe(u8, ptr[0..len]) catch return;
+    self.drop_files.append(internal.allocator, path) catch {
+        internal.allocator.free(path);
+    };
+}
+
+export fn wioDropText(self: *Window, ptr: [*]const u8, len: usize) void {
+    if (self.drop_text) |t| internal.allocator.free(t);
+    self.drop_text = internal.allocator.dupe(u8, ptr[0..len]) catch null;
+}
+
+export fn wioDropComplete(self: *Window) void {
+    self.pushEvent(.drop_complete);
 }
 
 fn wioAudioOutputWrite(data: *const anyopaque, buffer: [*]f32, size: usize) callconv(.c) void {

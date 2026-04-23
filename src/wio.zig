@@ -80,6 +80,31 @@ pub fn getModifiers() Modifiers {
     return backend.getModifiers();
 }
 
+pub const DropData = struct {
+    files: []const []const u8,
+    text: ?[]const u8,
+
+    pub fn dupe(allocator: std.mem.Allocator, files: []const []const u8, text: ?[]const u8) !DropData {
+        const out = try allocator.alloc([]const u8, files.len);
+        var n: usize = 0;
+        errdefer {
+            for (out[0..n]) |f| allocator.free(f);
+            allocator.free(out);
+        }
+        for (files) |f| {
+            out[n] = try allocator.dupe(u8, f);
+            n += 1;
+        }
+        return .{ .files = out, .text = if (text) |t| try allocator.dupe(u8, t) else null };
+    }
+
+    pub fn free(self: DropData, allocator: std.mem.Allocator) void {
+        for (self.files) |f| allocator.free(f);
+        allocator.free(self.files);
+        if (self.text) |t| allocator.free(t);
+    }
+};
+
 pub const Modifiers = struct {
     control: bool = false,
     shift: bool = false,
@@ -184,6 +209,10 @@ pub const Window = struct {
 
     pub fn setClipboardText(self: *Window, text: []const u8) void {
         self.backend.setClipboardText(text);
+    }
+
+    pub fn getDropData(self: *Window, allocator: std.mem.Allocator) DropData {
+        return self.backend.getDropData(allocator);
     }
 
     pub fn getClipboardText(self: *Window, allocator: std.mem.Allocator) ?[]u8 {
@@ -431,6 +460,10 @@ pub const Event = union(enum) {
 
     touch: struct { id: u8, x: u16, y: u16 },
     touch_end: struct { id: u8, ignore: bool },
+
+    drop_begin: void,
+    drop_position: Position,
+    drop_complete: void,
 };
 
 pub const EventType = @typeInfo(Event).@"union".tag_type.?;

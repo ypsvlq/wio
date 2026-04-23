@@ -93,6 +93,10 @@ pub const Window = struct {
         _ = text;
     }
 
+    pub fn getDropData(_: *Window, _: std.mem.Allocator) wio.DropData {
+        return .{ .files = &.{}, .text = null };
+    }
+
     pub fn getClipboardText(self: *Window, allocator: std.mem.Allocator) ?[]u8 {
         _ = self;
         _ = allocator;

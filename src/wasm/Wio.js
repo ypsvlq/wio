@@ -115,6 +115,8 @@ class Wio {
                 text: false,
                 cursor: "default",
                 cursor_mode: 0,
+                drop_files: [],
+                drop_text: null,
             };
 
             new ResizeObserver(() => {
@@ -178,6 +180,25 @@ class Wio {
             canvas.addEventListener("wheel", (event) => {
                 if (event.deltaY !== 0) events.push(20, event.deltaY);
                 if (event.deltaX !== 0) events.push(21, event.deltaX);
+            });
+            canvas.addEventListener("dragenter", (event) => {
+                event.preventDefault();
+                window.drop_files = [];
+                window.drop_text = null;
+                events.push(24);
+            });
+            canvas.addEventListener("dragover", (event) => {
+                event.preventDefault();
+                events.push(25, event.offsetX, event.offsetY);
+            });
+            canvas.addEventListener("drop", (event) => {
+                event.preventDefault();
+                for (const file of event.dataTransfer.files) {
+                    window.drop_files.push(file.name);
+                }
+                const text = event.dataTransfer.getData("text/plain");
+                window.drop_text = text.length > 0 ? text : null;
+                events.push(26);
             });
 
             this.windows.push(window);
@@ -261,6 +282,23 @@ class Wio {
             const framebuffer = new Uint8ClampedArray(this.instance.exports.memory.buffer, ptr, width * height * 4);
             const image = new ImageData(framebuffer, width, height);
             this.windows[id].canvas.getContext("2d").putImageData(image, 0, 0);
+        },
+
+        getDropFileCount: (id) => this.windows[id].drop_files.length,
+
+        getDropFileLen: (id, index) => new TextEncoder().encode(this.windows[id].drop_files[index]).length,
+
+        getDropFile: (id, index, ptr) => {
+            new TextEncoder().encodeInto(this.windows[id].drop_files[index], new Uint8Array(this.instance.exports.memory.buffer, ptr));
+        },
+
+        getDropTextLen: (id) => {
+            const text = this.windows[id].drop_text;
+            return text !== null ? new TextEncoder().encode(text).length : 0;
+        },
+
+        getDropText: (id, ptr) => {
+            new TextEncoder().encodeInto(this.windows[id].drop_text, new Uint8Array(this.instance.exports.memory.buffer, ptr));
         },
 
         getJoystickCount: () => this.gamepads.length,

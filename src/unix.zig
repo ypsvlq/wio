@@ -317,6 +317,13 @@ pub const Window = union {
         }
     }
 
+    pub fn getDropData(self: *Window, allocator: std.mem.Allocator) wio.DropData {
+        switch (active) {
+            .x11 => return self.x11.getDropData(allocator),
+            .wayland => return self.wayland.getDropData(allocator),
+        }
+    }
+
     pub fn createFramebuffer(self: *Window, size: wio.Size) !Framebuffer {
         switch (active) {
             .x11 => return .{ .x11 = try self.x11.createFramebuffer(size) },

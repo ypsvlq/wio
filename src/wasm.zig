@@ -36,6 +36,11 @@ const js = struct {
     extern "wio" fn setSize(u32, u16, u16) void;
     extern "wio" fn setClipboardText([*]const u8, usize) void;
     extern "wio" fn presentFramebuffer(u32, [*]const u32, u16, u16) void;
+    extern "wio" fn getDropFileCount(u32) u32;
+    extern "wio" fn getDropFileLen(u32, u32) u32;
+    extern "wio" fn getDropFile(u32, u32, [*]u8) void;
+    extern "wio" fn getDropTextLen(u32) u32;
+    extern "wio" fn getDropText(u32, [*]u8) void;
     extern "wio" fn getJoystickCount() u32;
     extern "wio" fn getJoystickIdLen(u32) u32;
     extern "wio" fn getJoystickId(u32, [*]u8) void;
@@ -118,6 +123,9 @@ pub const Window = struct {
             .mouse_leave => .mouse_leave,
             .scroll_vertical => .{ .scroll_vertical = js.shiftFloat(self.id) },
             .scroll_horizontal => .{ .scroll_horizontal = js.shiftFloat(self.id) },
+            .drop_begin => .drop_begin,
+            .drop_position => .{ .drop_position = .{ .x = @intCast(js.shift(self.id)), .y = @intCast(js.shift(self.id)) } },
+            .drop_complete => .drop_complete,
             else => unreachable,
         };
     }
@@ -159,6 +167,34 @@ pub const Window = struct {
 
     pub fn getClipboardText(_: *Window, _: std.mem.Allocator) ?[]u8 {
         return null;
+    }
+
+    pub fn getDropData(self: *Window, allocator: std.mem.Allocator) wio.DropData {
+        return getDropDataInner(self, allocator) catch .{ .files = &.{}, .text = null };
+    }
+
+    fn getDropDataInner(self: *Window, allocator: std.mem.Allocator) !wio.DropData {
+        const file_count = js.getDropFileCount(self.id);
+        const files = try allocator.alloc([]const u8, file_count);
+        var n: usize = 0;
+        errdefer {
+            for (files[0..n]) |f| allocator.free(f);
+            allocator.free(files);
+        }
+        for (0..file_count) |i| {
+            const len = js.getDropFileLen(self.id, @intCast(i));
+            const buf = try allocator.alloc(u8, len);
+            js.getDropFile(self.id, @intCast(i), buf.ptr);
+            files[n] = buf;
+            n += 1;
+        }
+        const text_len = js.getDropTextLen(self.id);
+        const text: ?[]u8 = if (text_len > 0) blk: {
+            const buf = try allocator.alloc(u8, text_len);
+            js.getDropText(self.id, buf.ptr);
+            break :blk buf;
+        } else null;
+        return .{ .files = files, .text = text };
     }
 
     pub fn createFramebuffer(_: *Window, size: wio.Size) !Framebuffer {
