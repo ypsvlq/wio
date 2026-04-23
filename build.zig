@@ -63,9 +63,7 @@ pub fn build(b: *std.Build) !void {
             }
 
             module.linkSystemLibrary("user32", .{});
-            if (enable_drop) {
-                module.linkSystemLibrary("shell32", .{});
-            }
+            module.linkSystemLibrary("shell32", .{});
             if (enable_drop or enable_audio) {
                 module.linkSystemLibrary("ole32", .{});
             }

@@ -238,7 +238,9 @@ pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []cons
 }
 
 pub fn openUri(uri: []const u8) void {
-    _ = uri;
+    const uri_w = std.unicode.utf8ToUtf16LeAllocZ(internal.allocator, uri) catch return;
+    defer internal.allocator.free(uri_w);
+    _ = w.ShellExecuteW(null, w.L("open"), uri_w, null, null, w.SW_SHOWNORMAL);
 }
 
 pub fn getModifiers() wio.Modifiers {
