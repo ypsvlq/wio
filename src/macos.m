@@ -435,6 +435,10 @@ void wioMessageBox(uint8_t style, const char *ptr, size_t len) {
     [alert runModal];
 }
 
+void wioOpenUri(const char *ptr, size_t len) {
+    [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:string(ptr, len)]];
+}
+
 NSUInteger wioGetModifiers(void) {
     return [NSEvent modifierFlags];
 }

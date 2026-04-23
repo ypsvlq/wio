@@ -12,6 +12,7 @@ extern fn wioUpdate() void;
 extern fn wioWait(f64) void;
 extern fn wioCancelWait() void;
 extern fn wioMessageBox(u8, [*]const u8, usize) void;
+extern fn wioOpenUri([*]const u8, usize) void;
 extern fn wioGetModifiers() c_ulong;
 extern fn wioCreateWindow(*Window, u16, u16) *NSWindow;
 extern fn wioDestroyWindow(*NSWindow) void;
@@ -172,7 +173,7 @@ pub fn messageBox(style: wio.MessageBoxStyle, _: []const u8, message: []const u8
 }
 
 pub fn openUri(uri: []const u8) void {
-    _ = uri;
+    wioOpenUri(uri.ptr, uri.len);
 }
 
 pub fn getModifiers() wio.Modifiers {
