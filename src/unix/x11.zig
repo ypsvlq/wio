@@ -74,31 +74,37 @@ var glx: struct {
     createContextAttribsARB: h.PFNGLXCREATECONTEXTATTRIBSARBPROC = null,
 } = .{};
 
-var atoms: extern struct {
-    WM_PROTOCOLS: h.Atom,
-    WM_DELETE_WINDOW: h.Atom,
-    _NET_WM_STATE: h.Atom,
-    _NET_WM_STATE_MAXIMIZED_VERT: h.Atom,
-    _NET_WM_STATE_MAXIMIZED_HORZ: h.Atom,
-    _NET_WM_STATE_FULLSCREEN: h.Atom,
-    _NET_WM_STATE_DEMANDS_ATTENTION: h.Atom,
-    CLIPBOARD: h.Atom,
-    UTF8_STRING: h.Atom,
-    TARGETS: h.Atom,
-    INCR: h.Atom,
-    SELECTION: h.Atom,
-    XdndAware: h.Atom,
-    XdndEnter: h.Atom,
-    XdndPosition: h.Atom,
-    XdndStatus: h.Atom,
-    XdndLeave: h.Atom,
-    XdndDrop: h.Atom,
-    XdndFinished: h.Atom,
-    XdndTypeList: h.Atom,
-    XdndSelection: h.Atom,
-    XdndActionCopy: h.Atom,
-    @"text/uri-list": h.Atom,
-    @"text/plain;charset=utf-8": h.Atom,
+var atoms: blk: {
+    const names = [_][]const u8{
+        "WM_PROTOCOLS",
+        "WM_DELETE_WINDOW",
+        "_NET_WM_STATE",
+        "_NET_WM_STATE_MAXIMIZED_VERT",
+        "_NET_WM_STATE_MAXIMIZED_HORZ",
+        "_NET_WM_STATE_FULLSCREEN",
+        "_NET_WM_STATE_DEMANDS_ATTENTION",
+        "CLIPBOARD",
+        "UTF8_STRING",
+        "TARGETS",
+        "INCR",
+        "SELECTION",
+    } ++ if (build_options.drop) .{
+        "XdndAware",
+        "XdndEnter",
+        "XdndPosition",
+        "XdndStatus",
+        "XdndLeave",
+        "XdndDrop",
+        "XdndFinished",
+        "XdndTypeList",
+        "XdndSelection",
+        "XdndActionCopy",
+        "text/uri-list",
+        "text/plain;charset=utf-8",
+    } else .{};
+    const types: [names.len]type = @splat(h.Atom);
+    const attrs: [names.len]std.builtin.Type.StructField.Attributes = @splat(.{});
+    break :blk @Struct(.@"extern", null, &names, &types, &attrs);
 } = undefined;
 
 var libX11: DynLib = undefined;
@@ -307,8 +313,10 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
     const protocols = [_]h.Atom{atoms.WM_DELETE_WINDOW};
     _ = c.XChangeProperty(display, window, atoms.WM_PROTOCOLS, h.XA_ATOM, 32, h.PropModeReplace, @ptrCast(&protocols), protocols.len);
 
-    const xdnd_version: c_long = 5;
-    _ = c.XChangeProperty(display, window, atoms.XdndAware, h.XA_ATOM, 32, h.PropModeReplace, @ptrCast(&xdnd_version), 1);
+    if (build_options.drop) {
+        const xdnd_version: c_long = 5;
+        _ = c.XChangeProperty(display, window, atoms.XdndAware, h.XA_ATOM, 32, h.PropModeReplace, @ptrCast(&xdnd_version), 1);
+    }
 
     const self = try internal.allocator.create(Window);
     errdefer internal.allocator.destroy(self);
