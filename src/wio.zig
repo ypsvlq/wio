@@ -83,6 +83,26 @@ pub fn getModifiers() Modifiers {
 pub const DropData = struct {
     files: []const []const u8,
     text: ?[]const u8,
+
+    pub fn dupe(allocator: std.mem.Allocator, files: []const []const u8, text: ?[]const u8) !DropData {
+        const out = try allocator.alloc([]const u8, files.len);
+        var n: usize = 0;
+        errdefer {
+            for (out[0..n]) |f| allocator.free(f);
+            allocator.free(out);
+        }
+        for (files) |f| {
+            out[n] = try allocator.dupe(u8, f);
+            n += 1;
+        }
+        return .{ .files = out, .text = if (text) |t| try allocator.dupe(u8, t) else null };
+    }
+
+    pub fn free(self: DropData, allocator: std.mem.Allocator) void {
+        for (self.files) |f| allocator.free(f);
+        allocator.free(self.files);
+        if (self.text) |t| allocator.free(t);
+    }
 };
 
 pub const Modifiers = struct {
@@ -191,8 +211,8 @@ pub const Window = struct {
         self.backend.setClipboardText(text);
     }
 
-    pub fn getDropData(self: *Window) DropData {
-        return self.backend.getDropData();
+    pub fn getDropData(self: *Window, allocator: std.mem.Allocator) DropData {
+        return self.backend.getDropData(allocator);
     }
 
     pub fn getClipboardText(self: *Window, allocator: std.mem.Allocator) ?[]u8 {

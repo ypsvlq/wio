@@ -409,8 +409,8 @@ pub const Window = struct {
         return self.events.pop();
     }
 
-    pub fn getDropData(self: *Window) wio.DropData {
-        return .{ .files = self.drop_files.items, .text = self.drop_text };
+    pub fn getDropData(self: *Window, allocator: std.mem.Allocator) wio.DropData {
+        return wio.DropData.dupe(allocator, self.drop_files.items, self.drop_text) catch .{ .files = &.{}, .text = null };
     }
 
     pub fn enableTextInput(self: *Window, options: wio.TextInputOptions) void {

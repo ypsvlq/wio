@@ -93,7 +93,7 @@ pub const Window = struct {
         _ = text;
     }
 
-    pub fn getDropData(_: *Window) wio.DropData {
+    pub fn getDropData(_: *Window, _: std.mem.Allocator) wio.DropData {
         return .{ .files = &.{}, .text = null };
     }
 

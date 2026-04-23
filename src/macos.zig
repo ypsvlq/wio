@@ -278,7 +278,7 @@ pub const Window = struct {
         wioSetClipboardText(text.ptr, text.len);
     }
 
-    pub fn getDropData(_: *Window) wio.DropData {
+    pub fn getDropData(_: *Window, _: std.mem.Allocator) wio.DropData {
         return .{ .files = &.{}, .text = null };
     }
 

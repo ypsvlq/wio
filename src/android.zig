@@ -168,7 +168,7 @@ pub const Window = struct {
         java.env.*.*.CallVoidMethod.?(java.env, java.activity, java.setClipboardText, text_j);
     }
 
-    pub fn getDropData(_: *Window) wio.DropData {
+    pub fn getDropData(_: *Window, _: std.mem.Allocator) wio.DropData {
         return .{ .files = &.{}, .text = null };
     }
 

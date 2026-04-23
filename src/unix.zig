@@ -317,10 +317,10 @@ pub const Window = union {
         }
     }
 
-    pub fn getDropData(self: *Window) wio.DropData {
+    pub fn getDropData(self: *Window, allocator: std.mem.Allocator) wio.DropData {
         switch (active) {
-            .x11 => return self.x11.getDropData(),
-            .wayland => return self.wayland.getDropData(),
+            .x11 => return self.x11.getDropData(allocator),
+            .wayland => return self.wayland.getDropData(allocator),
         }
     }
 

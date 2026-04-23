@@ -440,8 +440,8 @@ pub const Window = struct {
         internal.allocator.destroy(self);
     }
 
-    pub fn getDropData(self: *Window) wio.DropData {
-        return .{ .files = self.drop_files.items, .text = self.drop_text };
+    pub fn getDropData(self: *Window, allocator: std.mem.Allocator) wio.DropData {
+        return wio.DropData.dupe(allocator, self.drop_files.items, self.drop_text) catch .{ .files = &.{}, .text = null };
     }
 
     pub fn getEvent(self: *Window) ?wio.Event {

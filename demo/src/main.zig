@@ -104,7 +104,8 @@ fn loop() !bool {
                 }
             },
             .drop_complete => {
-                const data = window.getDropData();
+                const data = window.getDropData(allocator);
+                defer data.free(allocator);
                 for (data.files) |path| std.log.info("drop_file: {s}", .{path});
                 if (data.text) |text| std.log.info("drop_text: {s}", .{text});
             },
