@@ -138,6 +138,7 @@ public:
                 wioDropText(zig, (const char *)text, (size_t)len);
             }
             wioDropComplete(zig);
+            dispatch_parent = false;
         }
 
         if (dispatch_parent) {
