@@ -19,6 +19,7 @@ extern void wioButtonRelease(void *, UInt8);
 extern void wioMouse(void *, UInt16, UInt16);
 extern void wioMouseRelative(void *, SInt16, SInt16);
 extern void wioMouseLeave(void *);
+extern void wioMouseEnter(void *);
 extern void wioScroll(void *, Float32, Float32);
 extern char *wioDupeClipboardText(const void *, const char *, size_t *);
 
@@ -262,7 +263,7 @@ static void warpCursor(NSWindow *window) {
     [self removeTrackingArea:area];
     area = [[NSTrackingArea alloc]
         initWithRect:[self frame]
-        options:NSTrackingActiveInKeyWindow | NSTrackingCursorUpdate | NSTrackingMouseEnteredAndExited
+        options:NSTrackingActiveInKeyWindow | NSTrackingCursorUpdate | NSTrackingMouseEnteredAndExited | NSTrackingEnabledDuringMouseDrag
         owner:self
         userInfo:nil];
     [self addTrackingArea:area];
@@ -343,21 +344,40 @@ static void warpCursor(NSWindow *window) {
     wioMouse(zig, location.x, location.y);
 }
 
+- (void)trackDragBoundary:(NSEvent *)event {
+    NSPoint location = [event locationInWindow];
+    NSRect frame = [self frame];
+    BOOL inside = location.x >= 0 && location.y >= 0 && location.x <= frame.size.width && location.y <= frame.size.height;
+    if (inside && !cursorInside) {
+        if (cursorMode != 0) [NSCursor hide];
+        cursorInside = YES;
+        wioMouseEnter(zig);
+    } else if (!inside && cursorInside) {
+        wioMouseLeave(zig);
+        if (cursorMode != 0) [NSCursor unhide];
+        cursorInside = NO;
+    }
+}
+
 - (void)mouseDragged:(NSEvent *)event {
+    [self trackDragBoundary:event];
     [self mouseMoved:event];
 }
 
 - (void)rightMouseDragged:(NSEvent *)event {
+    [self trackDragBoundary:event];
     [self mouseMoved:event];
 }
 
 - (void)otherMouseDragged:(NSEvent *)event {
+    [self trackDragBoundary:event];
     [self mouseMoved:event];
 }
 
 - (void)mouseEntered:(NSEvent *)event {
     if (!cursorInside && cursorMode != 0) [NSCursor hide];
     cursorInside = YES;
+    wioMouseEnter(zig);
 }
 
 - (void)mouseExited:(NSEvent *)event {

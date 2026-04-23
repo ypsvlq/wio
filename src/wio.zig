@@ -431,6 +431,8 @@ pub const Event = union(enum) {
 
     touch: struct { id: u8, x: u16, y: u16 },
     touch_end: struct { id: u8, ignore: bool },
+
+    mouse_enter: void,
 };
 
 pub const EventType = @typeInfo(Event).@"union".tag_type.?;
