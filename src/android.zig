@@ -168,10 +168,6 @@ pub const Window = struct {
         java.env.*.*.CallVoidMethod.?(java.env, java.activity, java.setClipboardText, text_j);
     }
 
-    pub fn getDropData(_: *Window, _: std.mem.Allocator) wio.DropData {
-        return .{ .files = &.{}, .text = null };
-    }
-
     pub fn getClipboardText(_: *Window, allocator: std.mem.Allocator) ?[]u8 {
         const text_j = java.env.*.*.CallObjectMethod.?(java.env, java.activity, java.getClipboardText) orelse return null;
         defer java.env.*.*.DeleteLocalRef.?(java.env, text_j);
@@ -180,6 +176,10 @@ pub const Window = struct {
         defer java.env.*.*.ReleaseStringUTFChars.?(java.env, text_j, text_z);
 
         return allocator.dupe(u8, std.mem.sliceTo(text_z, 0)) catch null;
+    }
+
+    pub fn getDropData(_: *Window, _: std.mem.Allocator) wio.DropData {
+        return .{ .files = &.{}, .text = null };
     }
 
     pub fn createFramebuffer(_: *Window, size: wio.Size) !Framebuffer {

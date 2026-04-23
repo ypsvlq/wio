@@ -398,13 +398,15 @@ pub const Window = struct {
     scale: f32 = 1,
     cursor: u32 = h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_DEFAULT,
     cursor_mode: wio.CursorMode = .normal,
+    drop: if (build_options.drop) struct {
+        files: std.ArrayList([]const u8) = .empty,
+        text: ?[]const u8 = null,
+    } else struct {} = .{},
     egl: if (build_options.opengl) struct {
         window: ?*h.wl_egl_window = null,
         surface: h.EGLSurface = null,
         context: h.EGLContext = null,
     } else struct {} = .{},
-    drop_files: std.ArrayListUnmanaged([]const u8) = .empty,
-    drop_text: ?[]const u8 = null,
 
     pub fn destroy(self: *Window) void {
         if (pointer_focus == self) pointer_focus = null;
@@ -427,6 +429,13 @@ pub const Window = struct {
             if (self.egl.surface) |_| _ = c.eglDestroySurface(egl_display, self.egl.surface);
             if (self.egl.window) |_| c.wl_egl_window_destroy(self.egl.window);
         }
+
+        if (build_options.drop) {
+            for (self.drop.files.items) |file| internal.allocator.free(file);
+            self.drop.files.deinit(internal.allocator);
+            if (self.drop.text) |text| internal.allocator.free(text);
+        }
+
         if (self.fractional_scale) |_| h.wp_fractional_scale_v1_destroy(self.fractional_scale);
         if (self.viewport) |_| h.wp_viewport_destroy(self.viewport);
         c.libdecor_frame_unref(self.frame);
@@ -434,14 +443,7 @@ pub const Window = struct {
         _ = c.wl_display_roundtrip(display);
 
         self.events.deinit();
-        for (self.drop_files.items) |f| internal.allocator.free(f);
-        self.drop_files.deinit(internal.allocator);
-        if (self.drop_text) |t| internal.allocator.free(t);
         internal.allocator.destroy(self);
-    }
-
-    pub fn getDropData(self: *Window, allocator: std.mem.Allocator) wio.DropData {
-        return wio.DropData.dupe(allocator, self.drop_files.items, self.drop_text) catch .{ .files = &.{}, .text = null };
     }
 
     pub fn getEvent(self: *Window) ?wio.Event {
@@ -569,6 +571,10 @@ pub const Window = struct {
         _ = c.wl_display_roundtrip(display);
         _ = std.c.close(pipe[1]);
         return readClipboardText(allocator, pipe[0]) catch null;
+    }
+
+    pub fn getDropData(self: *Window, allocator: std.mem.Allocator) wio.DropData {
+        return wio.DropData.dupe(allocator, self.drop.files.items, self.drop.text) catch .{ .files = &.{}, .text = null };
     }
 
     fn readClipboardText(allocator: std.mem.Allocator, fd: i32) ![]u8 {
@@ -1167,99 +1173,109 @@ const data_device_listener = h.wl_data_device_listener{
 };
 
 fn dataDeviceDataOffer(_: ?*anyopaque, _: ?*h.wl_data_device, offer: ?*h.wl_data_offer) callconv(.c) void {
-    pending_drag_has_uri = false;
-    pending_drag_has_text = false;
-    if (offer) |_| _ = h.wl_data_offer_add_listener(offer, &data_offer_listener, null);
+    if (build_options.drop) {
+        pending_drag_has_uri = false;
+        pending_drag_has_text = false;
+        if (offer) |_| _ = h.wl_data_offer_add_listener(offer, &data_offer_listener, null);
+    }
 }
 
 fn dataDeviceEnter(_: ?*anyopaque, _: ?*h.wl_data_device, serial: u32, surface: ?*h.wl_surface, _: h.wl_fixed_t, _: h.wl_fixed_t, offer: ?*h.wl_data_offer) callconv(.c) void {
-    drag_serial = serial;
-    drag_window = getWindow(surface);
-    drag_offer = offer;
-    drag_has_uri = pending_drag_has_uri;
-    drag_has_text = pending_drag_has_text and !pending_drag_has_uri;
-    drag_dropped = false;
+    if (build_options.drop) {
+        drag_serial = serial;
+        drag_window = getWindow(surface);
+        drag_offer = offer;
+        drag_has_uri = pending_drag_has_uri;
+        drag_has_text = pending_drag_has_text and !pending_drag_has_uri;
+        drag_dropped = false;
 
-    if (offer) |o| {
-        if (drag_has_uri) {
-            h.wl_data_offer_accept(o, serial, "text/uri-list");
-        } else if (drag_has_text) {
-            h.wl_data_offer_accept(o, serial, "text/plain;charset=utf-8");
-        } else {
-            h.wl_data_offer_accept(o, serial, null);
+        if (offer) |o| {
+            if (drag_has_uri) {
+                h.wl_data_offer_accept(o, serial, "text/uri-list");
+            } else if (drag_has_text) {
+                h.wl_data_offer_accept(o, serial, "text/plain;charset=utf-8");
+            } else {
+                h.wl_data_offer_accept(o, serial, null);
+            }
         }
-    }
 
-    if (drag_window) |window| {
-        for (window.drop_files.items) |f| internal.allocator.free(f);
-        window.drop_files.clearRetainingCapacity();
-        if (window.drop_text) |t| internal.allocator.free(t);
-        window.drop_text = null;
-        window.events.push(.drop_begin);
+        if (drag_window) |window| {
+            for (window.drop.files.items) |f| internal.allocator.free(f);
+            window.drop.files.clearRetainingCapacity();
+            if (window.drop.text) |t| internal.allocator.free(t);
+            window.drop.text = null;
+            window.events.push(.drop_begin);
+        }
     }
 }
 
 fn dataDeviceLeave(_: ?*anyopaque, _: ?*h.wl_data_device) callconv(.c) void {
-    if (!drag_dropped) {
-        if (drag_window) |window| window.events.push(.drop_complete);
+    if (build_options.drop) {
+        if (!drag_dropped) {
+            if (drag_window) |window| window.events.push(.drop_complete);
+        }
+        if (drag_offer) |o| {
+            h.wl_data_offer_destroy(o);
+            drag_offer = null;
+        }
+        drag_window = null;
     }
-    if (drag_offer) |o| {
-        h.wl_data_offer_destroy(o);
-        drag_offer = null;
-    }
-    drag_window = null;
 }
 
 fn dataDeviceMotion(_: ?*anyopaque, _: ?*h.wl_data_device, _: u32, x: h.wl_fixed_t, y: h.wl_fixed_t) callconv(.c) void {
-    if (drag_window) |window| {
-        const wx = std.math.cast(u16, x >> 8) orelse return;
-        const wy = std.math.cast(u16, y >> 8) orelse return;
-        window.events.push(.{ .drop_position = .{ .x = wx, .y = wy } });
+    if (build_options.drop) {
+        if (drag_window) |window| {
+            const wx = std.math.cast(u16, x >> 8) orelse return;
+            const wy = std.math.cast(u16, y >> 8) orelse return;
+            window.events.push(.{ .drop_position = .{ .x = wx, .y = wy } });
+        }
     }
 }
 
 fn dataDeviceDrop(_: ?*anyopaque, _: ?*h.wl_data_device) callconv(.c) void {
-    const window = drag_window orelse return;
-    const offer = drag_offer orelse return;
-    if (!drag_has_uri and !drag_has_text) return;
+    if (build_options.drop) {
+        const window = drag_window orelse return;
+        const offer = drag_offer orelse return;
+        if (!drag_has_uri and !drag_has_text) return;
 
-    const mime = if (drag_has_uri) "text/uri-list" else "text/plain;charset=utf-8";
+        const mime = if (drag_has_uri) "text/uri-list" else "text/plain;charset=utf-8";
 
-    var pipe: [2]i32 = undefined;
-    if (std.c.pipe(&pipe) == -1) {
-        window.events.push(.drop_complete);
-        drag_dropped = true;
-        return;
-    }
-    defer _ = std.c.close(pipe[0]);
-    h.wl_data_offer_receive(offer, mime, pipe[1]);
-    drag_dropped = true; // set before roundtrip so dataDeviceLeave doesn't double-emit
-    _ = c.wl_display_roundtrip(display);
-    _ = std.c.close(pipe[1]);
-
-    var buf: [4096]u8 = undefined;
-    var total: usize = 0;
-    while (total < buf.len) {
-        const n = std.c.read(pipe[0], buf[total..].ptr, buf.len - total);
-        if (std.c.errno(n) != .SUCCESS or n == 0) break;
-        total += @intCast(n);
-    }
-
-    if (drag_has_uri) {
-        var iter = std.mem.splitAny(u8, buf[0..total], "\r\n");
-        while (iter.next()) |line| {
-            if (line.len == 0 or line[0] == '#') continue;
-            const prefix = "file://";
-            if (!std.mem.startsWith(u8, line, prefix)) continue;
-            const path = internal.allocator.dupe(u8, line[prefix.len..]) catch continue;
-            window.drop_files.append(internal.allocator, std.Uri.percentDecodeInPlace(path)) catch {};
+        var pipe: [2]i32 = undefined;
+        if (std.c.pipe(&pipe) == -1) {
+            window.events.push(.drop_complete);
+            drag_dropped = true;
+            return;
         }
-    } else {
-        if (internal.allocator.dupe(u8, buf[0..total])) |copy| {
-            window.drop_text = copy;
-        } else |_| {}
+        defer _ = std.c.close(pipe[0]);
+        h.wl_data_offer_receive(offer, mime, pipe[1]);
+        drag_dropped = true; // set before roundtrip so dataDeviceLeave doesn't double-emit
+        _ = c.wl_display_roundtrip(display);
+        _ = std.c.close(pipe[1]);
+
+        var buf: [4096]u8 = undefined;
+        var total: usize = 0;
+        while (total < buf.len) {
+            const n = std.c.read(pipe[0], buf[total..].ptr, buf.len - total);
+            if (std.c.errno(n) != .SUCCESS or n == 0) break;
+            total += @intCast(n);
+        }
+
+        if (drag_has_uri) {
+            var iter = std.mem.splitAny(u8, buf[0..total], "\r\n");
+            while (iter.next()) |line| {
+                if (line.len == 0 or line[0] == '#') continue;
+                const prefix = "file://";
+                if (!std.mem.startsWith(u8, line, prefix)) continue;
+                const path = internal.allocator.dupe(u8, line[prefix.len..]) catch continue;
+                window.drop.files.append(internal.allocator, std.Uri.percentDecodeInPlace(path)) catch {};
+            }
+        } else {
+            if (internal.allocator.dupe(u8, buf[0..total])) |copy| {
+                window.drop.text = copy;
+            } else |_| {}
+        }
+        window.events.push(.drop_complete);
     }
-    window.events.push(.drop_complete);
 }
 
 fn dataDeviceSelection(_: ?*anyopaque, _: ?*h.wl_data_device, offer: ?*h.wl_data_offer) callconv(.c) void {
@@ -1273,9 +1289,6 @@ const data_offer_listener = h.wl_data_offer_listener{
     .action = dataOfferAction,
 };
 
-fn dataOfferSourceActions(_: ?*anyopaque, _: ?*h.wl_data_offer, _: u32) callconv(.c) void {}
-fn dataOfferAction(_: ?*anyopaque, _: ?*h.wl_data_offer, _: u32) callconv(.c) void {}
-
 fn dataOfferMime(_: ?*anyopaque, _: ?*h.wl_data_offer, mime: [*c]const u8) callconv(.c) void {
     const s = std.mem.sliceTo(mime, 0);
     if (std.mem.eql(u8, s, "text/uri-list")) {
@@ -1284,6 +1297,9 @@ fn dataOfferMime(_: ?*anyopaque, _: ?*h.wl_data_offer, mime: [*c]const u8) callc
         pending_drag_has_text = true;
     }
 }
+
+fn dataOfferAction(_: ?*anyopaque, _: ?*h.wl_data_offer, _: u32) callconv(.c) void {}
+fn dataOfferSourceActions(_: ?*anyopaque, _: ?*h.wl_data_offer, _: u32) callconv(.c) void {}
 
 const data_source_listener = h.wl_data_source_listener{
     .target = dataSourceTarget,

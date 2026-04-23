@@ -284,14 +284,14 @@ pub const Window = struct {
         wioSetClipboardText(text.ptr, text.len);
     }
 
-    pub fn getDropData(_: *Window, _: std.mem.Allocator) wio.DropData {
-        return .{ .files = &.{}, .text = null };
-    }
-
     pub fn getClipboardText(_: *Window, allocator: std.mem.Allocator) ?[]u8 {
         var len: usize = undefined;
         const text = wioGetClipboardText(&allocator, &len) orelse return null;
         return text[0..len];
+    }
+
+    pub fn getDropData(_: *Window, _: std.mem.Allocator) wio.DropData {
+        return .{ .files = &.{}, .text = null };
     }
 
     pub fn createFramebuffer(_: *Window, size: wio.Size) !Framebuffer {

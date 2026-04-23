@@ -17,12 +17,12 @@ extern "C" {
     void wioButtons(void *, uint8);
     void wioMouse(void *, uint16, uint16);
     void wioScroll(void *, float, float);
-    void wioAudioOutputWrite(void *, void *, size_t);
     void wioDropBegin(void *);
     void wioDropPosition(void *, uint16, uint16);
     void wioDropFile(void *, const char *, size_t);
     void wioDropText(void *, const char *, size_t);
     void wioDropComplete(void *);
+    void wioAudioOutputWrite(void *, void *, size_t);
 }
 
 class WioWindow : public BWindow {
@@ -102,6 +102,9 @@ public:
                         wioMouse(zig, where.x, where.y);
                     }
                 }
+
+#ifdef WIO_DROP
+
                 {
                     BMessage drag_msg;
                     if (message->FindMessage("be:drag_message", &drag_msg) == B_OK) {
@@ -117,6 +120,9 @@ public:
                         dropping = false;
                     }
                 }
+
+#endif
+
                 break;
             }
             case B_MOUSE_WHEEL_CHANGED: {
@@ -127,6 +133,8 @@ public:
                 break;
             }
         }
+
+#ifdef WIO_DROP
 
         if (message->WasDropped()) {
             if (!drop_began) wioDropBegin(zig);
@@ -145,6 +153,8 @@ public:
             wioDropComplete(zig);
             dispatch_parent = false;
         }
+
+#endif
 
         if (dispatch_parent) {
             BWindow::DispatchMessage(message, target);

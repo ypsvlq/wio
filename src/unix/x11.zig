@@ -375,12 +375,14 @@ pub const Window = struct {
     cursor_mode: wio.CursorMode = .normal,
     size: wio.Size,
     warped: bool = false,
-    xdnd_source: h.Window = 0,
-    xdnd_req: h.Atom = h.None,
-    xdnd_version: c_int = 0,
-    xdnd_is_text: bool = false,
-    drop_files: std.ArrayListUnmanaged([]const u8) = .empty,
-    drop_text: ?[]const u8 = null,
+    drop: if (build_options.drop) struct {
+        xdnd_source: h.Window = 0,
+        xdnd_req: h.Atom = h.None,
+        xdnd_version: c_int = 0,
+        xdnd_is_text: bool = false,
+        files: std.ArrayList([]const u8) = .empty,
+        text: ?[]const u8 = null,
+    } else struct {} = .{},
     opengl: if (build_options.opengl) struct {
         colormap: h.Colormap,
         context: h.GLXContext,
@@ -393,24 +395,25 @@ pub const Window = struct {
             if (self.opengl.context) |context| c.glXDestroyContext(display, context);
             if (self.opengl.colormap != h.CopyFromParent) _ = c.XFreeColormap(display, self.opengl.colormap);
         }
+
+        if (build_options.drop) {
+            for (self.drop.files.items) |file| internal.allocator.free(file);
+            self.drop.files.deinit(internal.allocator);
+            if (self.drop.text) |text| internal.allocator.free(text);
+        }
+
         _ = c.XDestroyIC(self.ic);
         _ = c.XDestroyWindow(display, self.window);
         _ = c.XFlush(display);
 
         self.preedit_string.deinit(internal.allocator);
         self.events.deinit();
-        for (self.drop_files.items) |f| internal.allocator.free(f);
-        self.drop_files.deinit(internal.allocator);
-        if (self.drop_text) |t| internal.allocator.free(t);
+
         internal.allocator.destroy(self);
     }
 
     pub fn getEvent(self: *Window) ?wio.Event {
         return self.events.pop();
-    }
-
-    pub fn getDropData(self: *Window, allocator: std.mem.Allocator) wio.DropData {
-        return wio.DropData.dupe(allocator, self.drop_files.items, self.drop_text) catch .{ .files = &.{}, .text = null };
     }
 
     pub fn enableTextInput(self: *Window, options: wio.TextInputOptions) void {
@@ -555,6 +558,10 @@ pub const Window = struct {
         } else {
             return allocator.dupe(u8, property[0..nitems]) catch null;
         }
+    }
+
+    pub fn getDropData(self: *Window, allocator: std.mem.Allocator) wio.DropData {
+        return wio.DropData.dupe(allocator, self.drop.files.items, self.drop.text) catch .{ .files = &.{}, .text = null };
     }
 
     pub fn createFramebuffer(self: *Window, size: wio.Size) !Framebuffer {
@@ -753,91 +760,93 @@ fn handle(event: *h.XEvent) void {
                 if (event.xclient.data.l[0] == atoms.WM_DELETE_WINDOW) {
                     window.events.push(.close);
                 }
-            } else if (event.xclient.message_type == atoms.XdndEnter) {
-                window.xdnd_source = @intCast(event.xclient.data.l[0]);
-                window.xdnd_version = @intCast(event.xclient.data.l[1] >> 24);
-                const use_list = event.xclient.data.l[1] & 1 != 0;
-                window.xdnd_req = h.None;
-                window.xdnd_is_text = false;
-                if (use_list) {
-                    var actual_type: h.Atom = undefined;
-                    var actual_format: c_int = undefined;
-                    var nitems: c_ulong = undefined;
-                    var bytes_after: c_ulong = undefined;
-                    var data: [*]u8 = undefined;
-                    _ = c.XGetWindowProperty(display, window.xdnd_source, atoms.XdndTypeList, 0, std.math.maxInt(c_long), h.False, h.XA_ATOM, &actual_type, &actual_format, &nitems, &bytes_after, @ptrCast(&data));
-                    defer _ = c.XFree(data);
-                    for (@as([*]h.Atom, @ptrCast(@alignCast(data)))[0..nitems]) |atom| {
-                        if (atom == atoms.@"text/uri-list") {
-                            window.xdnd_req = atom;
-                            window.xdnd_is_text = false;
-                            break;
-                        } else if ((atom == atoms.@"text/plain;charset=utf-8" or atom == atoms.UTF8_STRING) and window.xdnd_req == h.None) {
-                            window.xdnd_req = atom;
-                            window.xdnd_is_text = true;
+            } else if (build_options.drop) {
+                if (event.xclient.message_type == atoms.XdndEnter) {
+                    window.drop.xdnd_source = @intCast(event.xclient.data.l[0]);
+                    window.drop.xdnd_version = @intCast(event.xclient.data.l[1] >> 24);
+                    const use_list = event.xclient.data.l[1] & 1 != 0;
+                    window.drop.xdnd_req = h.None;
+                    window.drop.xdnd_is_text = false;
+                    if (use_list) {
+                        var actual_type: h.Atom = undefined;
+                        var actual_format: c_int = undefined;
+                        var nitems: c_ulong = undefined;
+                        var bytes_after: c_ulong = undefined;
+                        var data: [*]u8 = undefined;
+                        _ = c.XGetWindowProperty(display, window.drop.xdnd_source, atoms.XdndTypeList, 0, std.math.maxInt(c_long), h.False, h.XA_ATOM, &actual_type, &actual_format, &nitems, &bytes_after, @ptrCast(&data));
+                        defer _ = c.XFree(data);
+                        for (@as([*]h.Atom, @ptrCast(@alignCast(data)))[0..nitems]) |atom| {
+                            if (atom == atoms.@"text/uri-list") {
+                                window.drop.xdnd_req = atom;
+                                window.drop.xdnd_is_text = false;
+                                break;
+                            } else if ((atom == atoms.@"text/plain;charset=utf-8" or atom == atoms.UTF8_STRING) and window.drop.xdnd_req == h.None) {
+                                window.drop.xdnd_req = atom;
+                                window.drop.xdnd_is_text = true;
+                            }
+                        }
+                    } else {
+                        for (1..4) |i| {
+                            const atom: h.Atom = @bitCast(event.xclient.data.l[i]);
+                            if (atom == atoms.@"text/uri-list") {
+                                window.drop.xdnd_req = atom;
+                                window.drop.xdnd_is_text = false;
+                                break;
+                            } else if ((atom == atoms.@"text/plain;charset=utf-8" or atom == atoms.UTF8_STRING) and window.drop.xdnd_req == h.None) {
+                                window.drop.xdnd_req = atom;
+                                window.drop.xdnd_is_text = true;
+                            }
                         }
                     }
-                } else {
-                    for (1..4) |i| {
-                        const atom: h.Atom = @bitCast(event.xclient.data.l[i]);
-                        if (atom == atoms.@"text/uri-list") {
-                            window.xdnd_req = atom;
-                            window.xdnd_is_text = false;
-                            break;
-                        } else if ((atom == atoms.@"text/plain;charset=utf-8" or atom == atoms.UTF8_STRING) and window.xdnd_req == h.None) {
-                            window.xdnd_req = atom;
-                            window.xdnd_is_text = true;
+                    for (window.drop.files.items) |f| internal.allocator.free(f);
+                    window.drop.files.clearRetainingCapacity();
+                    if (window.drop.text) |t| internal.allocator.free(t);
+                    window.drop.text = null;
+                    window.events.push(.drop_begin);
+                } else if (event.xclient.message_type == atoms.XdndPosition) {
+                    const root_x: c_int = @intCast(event.xclient.data.l[2] >> 16);
+                    const root_y: c_int = @intCast(event.xclient.data.l[2] & 0xffff);
+                    var win_x: c_int = undefined;
+                    var win_y: c_int = undefined;
+                    var child: h.Window = undefined;
+                    _ = c.XTranslateCoordinates(display, h.DefaultRootWindow(display), window.window, root_x, root_y, &win_x, &win_y, &child);
+                    if (std.math.cast(u16, win_x)) |x| {
+                        if (std.math.cast(u16, win_y)) |y| {
+                            window.events.push(.{ .drop_position = .{ .x = x, .y = y } });
                         }
                     }
-                }
-                for (window.drop_files.items) |f| internal.allocator.free(f);
-                window.drop_files.clearRetainingCapacity();
-                if (window.drop_text) |t| internal.allocator.free(t);
-                window.drop_text = null;
-                window.events.push(.drop_begin);
-            } else if (event.xclient.message_type == atoms.XdndPosition) {
-                const root_x: c_int = @intCast(event.xclient.data.l[2] >> 16);
-                const root_y: c_int = @intCast(event.xclient.data.l[2] & 0xffff);
-                var win_x: c_int = undefined;
-                var win_y: c_int = undefined;
-                var child: h.Window = undefined;
-                _ = c.XTranslateCoordinates(display, h.DefaultRootWindow(display), window.window, root_x, root_y, &win_x, &win_y, &child);
-                if (std.math.cast(u16, win_x)) |x| {
-                    if (std.math.cast(u16, win_y)) |y| {
-                        window.events.push(.{ .drop_position = .{ .x = x, .y = y } });
-                    }
-                }
 
-                var reply = h.XEvent{ .xclient = std.mem.zeroInit(h.XClientMessageEvent, .{
-                    .type = h.ClientMessage,
-                    .display = display,
-                    .window = window.xdnd_source,
-                    .message_type = atoms.XdndStatus,
-                    .format = 32,
-                }) };
-                reply.xclient.data.l[0] = @bitCast(@as(c_ulong, window.window));
-                reply.xclient.data.l[1] = if (window.xdnd_req != h.None) 1 else 0;
-                reply.xclient.data.l[4] = @bitCast(atoms.XdndActionCopy);
-                _ = c.XSendEvent(display, window.xdnd_source, h.False, h.NoEventMask, &reply);
-                _ = c.XFlush(display);
-            } else if (event.xclient.message_type == atoms.XdndLeave) {
-                window.events.push(.drop_complete);
-                window.xdnd_source = 0;
-                window.xdnd_req = h.None;
-            } else if (event.xclient.message_type == atoms.XdndDrop) {
-                if (window.xdnd_req == h.None) {
                     var reply = h.XEvent{ .xclient = std.mem.zeroInit(h.XClientMessageEvent, .{
                         .type = h.ClientMessage,
                         .display = display,
-                        .window = window.xdnd_source,
-                        .message_type = atoms.XdndFinished,
+                        .window = window.drop.xdnd_source,
+                        .message_type = atoms.XdndStatus,
                         .format = 32,
                     }) };
                     reply.xclient.data.l[0] = @bitCast(@as(c_ulong, window.window));
-                    _ = c.XSendEvent(display, window.xdnd_source, h.False, h.NoEventMask, &reply);
-                } else {
-                    const time: h.Time = if (window.xdnd_version >= 1) @intCast(event.xclient.data.l[2]) else h.CurrentTime;
-                    _ = c.XConvertSelection(display, atoms.XdndSelection, window.xdnd_req, atoms.SELECTION, window.window, time);
+                    reply.xclient.data.l[1] = if (window.drop.xdnd_req != h.None) 1 else 0;
+                    reply.xclient.data.l[4] = @bitCast(atoms.XdndActionCopy);
+                    _ = c.XSendEvent(display, window.drop.xdnd_source, h.False, h.NoEventMask, &reply);
+                    _ = c.XFlush(display);
+                } else if (event.xclient.message_type == atoms.XdndLeave) {
+                    window.events.push(.drop_complete);
+                    window.drop.xdnd_source = 0;
+                    window.drop.xdnd_req = h.None;
+                } else if (event.xclient.message_type == atoms.XdndDrop) {
+                    if (window.drop.xdnd_req == h.None) {
+                        var reply = h.XEvent{ .xclient = std.mem.zeroInit(h.XClientMessageEvent, .{
+                            .type = h.ClientMessage,
+                            .display = display,
+                            .window = window.drop.xdnd_source,
+                            .message_type = atoms.XdndFinished,
+                            .format = 32,
+                        }) };
+                        reply.xclient.data.l[0] = @bitCast(@as(c_ulong, window.window));
+                        _ = c.XSendEvent(display, window.drop.xdnd_source, h.False, h.NoEventMask, &reply);
+                    } else {
+                        const time: h.Time = if (window.drop.xdnd_version >= 1) @intCast(event.xclient.data.l[2]) else h.CurrentTime;
+                        _ = c.XConvertSelection(display, atoms.XdndSelection, window.drop.xdnd_req, atoms.SELECTION, window.window, time);
+                    }
                 }
             }
         },
@@ -942,7 +951,7 @@ fn handle(event: *h.XEvent) void {
             window.events.push(.mouse_leave);
         },
         h.SelectionNotify => {
-            if (window.xdnd_req != h.None and event.xselection.property != h.None and event.xselection.selection == atoms.XdndSelection) {
+            if (build_options.drop and window.drop.xdnd_req != h.None and event.xselection.property != h.None and event.xselection.selection == atoms.XdndSelection) {
                 var actual_type: h.Atom = undefined;
                 var actual_format: c_int = undefined;
                 var nitems: c_ulong = undefined;
@@ -952,9 +961,9 @@ fn handle(event: *h.XEvent) void {
                 defer _ = c.XFree(data);
 
                 if (actual_format == 8) {
-                    if (window.xdnd_is_text) {
+                    if (window.drop.xdnd_is_text) {
                         if (internal.allocator.dupe(u8, data[0..nitems])) |copy| {
-                            window.drop_text = copy;
+                            window.drop.text = copy;
                         } else |_| {}
                     } else {
                         var iter = std.mem.splitAny(u8, data[0..nitems], "\r\n");
@@ -963,7 +972,7 @@ fn handle(event: *h.XEvent) void {
                             const prefix = "file://";
                             if (!std.mem.startsWith(u8, line, prefix)) continue;
                             const path = internal.allocator.dupe(u8, line[prefix.len..]) catch continue;
-                            window.drop_files.append(internal.allocator, std.Uri.percentDecodeInPlace(path)) catch {};
+                            window.drop.files.append(internal.allocator, std.Uri.percentDecodeInPlace(path)) catch {};
                         }
                     }
                 }
@@ -972,18 +981,18 @@ fn handle(event: *h.XEvent) void {
                 var reply = h.XEvent{ .xclient = std.mem.zeroInit(h.XClientMessageEvent, .{
                     .type = h.ClientMessage,
                     .display = display,
-                    .window = window.xdnd_source,
+                    .window = window.drop.xdnd_source,
                     .message_type = atoms.XdndFinished,
                     .format = 32,
                 }) };
                 reply.xclient.data.l[0] = @bitCast(@as(c_ulong, window.window));
                 reply.xclient.data.l[1] = 1;
                 reply.xclient.data.l[2] = @bitCast(atoms.XdndActionCopy);
-                _ = c.XSendEvent(display, window.xdnd_source, h.False, h.NoEventMask, &reply);
+                _ = c.XSendEvent(display, window.drop.xdnd_source, h.False, h.NoEventMask, &reply);
                 _ = c.XFlush(display);
 
-                window.xdnd_source = 0;
-                window.xdnd_req = h.None;
+                window.drop.xdnd_source = 0;
+                window.drop.xdnd_req = h.None;
             } else {
                 // clipboard SelectionNotify is handled in getClipboardText via XCheckTypedWindowEvent
             }

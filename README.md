@@ -23,6 +23,7 @@ The [examples][3] directory contains small programs using other rendering APIs.
 By default, only a subset of the API is available. The following build options
 enable additional features:
 
+- `enable_drop`
 - `enable_framebuffer`
 - `enable_opengl`
 - `enable_vulkan`
@@ -66,8 +67,7 @@ FreeBSD, DragonFlyBSD, or illumos.
 wio embeds an [application manifest][4] by default. To use a custom manifest,
 set the `win32_manifest` build option to `false`.
 
-If audio is enabled, wio initializes COM with options `COINIT_MULTITHREADED`
-and `COINIT_DISABLE_OLE1DDE`.
+If drag-and-drop or audio support is enabled, wio calls `OleInitialize`.
 
 ### macOS
 

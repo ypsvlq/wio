@@ -211,12 +211,13 @@ pub const Window = struct {
         self.backend.setClipboardText(text);
     }
 
-    pub fn getDropData(self: *Window, allocator: std.mem.Allocator) DropData {
-        return self.backend.getDropData(allocator);
-    }
-
     pub fn getClipboardText(self: *Window, allocator: std.mem.Allocator) ?[]u8 {
         return self.backend.getClipboardText(allocator);
+    }
+
+    pub fn getDropData(self: *Window, allocator: std.mem.Allocator) DropData {
+        assertFeature(.drop);
+        return self.backend.getDropData(allocator);
     }
 
     pub fn createFramebuffer(self: *Window, size: Size) !Framebuffer {

@@ -114,7 +114,9 @@ pub fn init() !void {
         if (w.RegisterRawInputDevices(&devices, devices.len, @sizeOf(w.RAWINPUTDEVICE)) == w.FALSE) return logLastError("RegisterRawInputDevices");
     }
 
-    try SUCCEED(w.OleInitialize(null), "OleInitialize");
+    if (build_options.drop or build_options.audio) {
+        try SUCCEED(w.OleInitialize(null), "OleInitialize");
+    }
 
     if (build_options.audio) {
         try SUCCEED(w.CoCreateInstance(&w.CLSID_MMDeviceEnumerator, null, w.CLSCTX_ALL, &w.IID_IMMDeviceEnumerator, @ptrCast(&mm_device_enumerator)), "CoCreateInstance");
@@ -284,6 +286,11 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
 
     self.setMode(options.mode);
 
+    if (build_options.drop) {
+        self.drop.target = .{ .window = self };
+        _ = w.RegisterDragDrop(window, &self.drop.target.interface);
+    }
+
     if (build_options.opengl) {
         if (options.opengl) |opengl| {
             self.opengl.dc = w.GetDC(self.window);
@@ -340,9 +347,6 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
         }
     }
 
-    self.drop_target = .{ .window = self };
-    _ = w.RegisterDragDrop(window, &self.drop_target.interface);
-
     return self;
 }
 
@@ -369,19 +373,26 @@ pub const Window = struct {
     touch_bitmap: std.StaticBitSet(256) = .initEmpty(),
     touch_ids: std.AutoHashMapUnmanaged(u16, u8) = .empty,
     text: bool = false,
-    opengl: if (build_options.opengl) struct { dc: w.HDC = null, rc: w.HGLRC = null } else struct {} = .{},
-    drop_target: DropTarget = undefined,
-    drop_files: std.ArrayListUnmanaged([]const u8) = .empty,
-    drop_text: ?[]const u8 = null,
+    drop: if (build_options.drop) struct {
+        target: DropTarget = undefined,
+        files: std.ArrayList([]const u8) = .empty,
+        text: ?[]const u8 = null,
+    } else struct {} = .{},
+    opengl: if (build_options.opengl) struct {
+        dc: w.HDC = null,
+        rc: w.HGLRC = null,
+    } else struct {} = .{},
 
     pub fn destroy(self: *Window) void {
-        _ = w.RevokeDragDrop(self.window);
-        for (self.drop_files.items) |f| internal.allocator.free(f);
-        self.drop_files.deinit(internal.allocator);
-        if (self.drop_text) |t| internal.allocator.free(t);
         if (build_options.opengl) {
             _ = w.wglDeleteContext(self.opengl.rc);
             _ = w.ReleaseDC(self.window, self.opengl.dc);
+        }
+        if (build_options.drop) {
+            _ = w.RevokeDragDrop(self.window);
+            for (self.drop.files.items) |f| internal.allocator.free(f);
+            self.drop.files.deinit(internal.allocator);
+            if (self.drop.text) |t| internal.allocator.free(t);
         }
         _ = w.DestroyWindow(self.window);
         self.touch_ids.deinit(internal.allocator);
@@ -392,10 +403,6 @@ pub const Window = struct {
 
     pub fn getEvent(self: *Window) ?wio.Event {
         return self.events.pop();
-    }
-
-    pub fn getDropData(self: *Window, allocator: std.mem.Allocator) wio.DropData {
-        return wio.DropData.dupe(allocator, self.drop_files.items, self.drop_text) catch .{ .files = &.{}, .text = null };
     }
 
     pub fn enableTextInput(self: *Window, _: wio.TextInputOptions) void {
@@ -515,6 +522,10 @@ pub const Window = struct {
         const text: [*:0]const u16 = @ptrCast(@alignCast(w.GlobalLock(mem) orelse return null));
         defer _ = w.GlobalUnlock(mem);
         return std.unicode.utf16LeToUtf8Alloc(allocator, std.mem.sliceTo(text, 0)) catch null;
+    }
+
+    pub fn getDropData(self: *Window, allocator: std.mem.Allocator) wio.DropData {
+        return wio.DropData.dupe(allocator, self.drop.files.items, self.drop.text) catch .{ .files = &.{}, .text = null };
     }
 
     pub fn createFramebuffer(_: *Window, size: wio.Size) !Framebuffer {
@@ -1267,10 +1278,10 @@ const DropTarget = struct {
         dt.has_text = data_obj.QueryGetData(&fmt) == w.S_OK;
         if (dt.has_files or dt.has_text) {
             effect.* = w.DROPEFFECT_COPY;
-            for (dt.window.drop_files.items) |f| internal.allocator.free(f);
-            dt.window.drop_files.clearRetainingCapacity();
-            if (dt.window.drop_text) |t| internal.allocator.free(t);
-            dt.window.drop_text = null;
+            for (dt.window.drop.files.items) |f| internal.allocator.free(f);
+            dt.window.drop.files.clearRetainingCapacity();
+            if (dt.window.drop.text) |t| internal.allocator.free(t);
+            dt.window.drop.text = null;
             dt.window.events.push(.drop_begin);
             pushPosition(dt.window, pt);
         } else {
@@ -1322,7 +1333,7 @@ const DropTarget = struct {
             defer internal.allocator.free(buf);
             _ = w.DragQueryFileW(hdrop, @intCast(i), buf.ptr, len + 1);
             const path = std.unicode.utf16LeToUtf8Alloc(internal.allocator, buf[0..len]) catch continue;
-            window.drop_files.append(internal.allocator, path) catch {};
+            window.drop.files.append(internal.allocator, path) catch {};
         }
     }
 
@@ -1335,7 +1346,7 @@ const DropTarget = struct {
         defer _ = w.GlobalUnlock(medium.u.hGlobal);
         const wstr = std.mem.sliceTo(ptr, 0);
         if (std.unicode.utf16LeToUtf8Alloc(internal.allocator, wstr)) |text| {
-            window.drop_text = text;
+            window.drop.text = text;
         } else |_| {}
     }
 };

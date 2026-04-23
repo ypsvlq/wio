@@ -142,14 +142,21 @@ pub const Window = struct {
     events_mutex: std.Io.Mutex = .init,
     buttons: std.StaticBitSet(5) = .initEmpty(),
     text: bool = false,
-    opengl: if (build_options.opengl) struct { context: ?*BGLView = null, vsync: bool = false } else struct {} = .{},
-    drop_files: std.ArrayListUnmanaged([]const u8) = .empty,
-    drop_text: ?[]const u8 = null,
+    drop: if (build_options.drop) struct {
+        files: std.ArrayList([]const u8) = .empty,
+        text: ?[]const u8 = null,
+    } else struct {} = .{},
+    opengl: if (build_options.opengl) struct {
+        context: ?*BGLView = null,
+        vsync: bool = false,
+    } else struct {} = .{},
 
     pub fn destroy(self: *Window) void {
-        for (self.drop_files.items) |f| internal.allocator.free(f);
-        self.drop_files.deinit(internal.allocator);
-        if (self.drop_text) |t| internal.allocator.free(t);
+        if (build_options.drop) {
+            for (self.drop.files.items) |file| internal.allocator.free(file);
+            self.drop.files.deinit(internal.allocator);
+            if (self.drop.text) |text| internal.allocator.free(text);
+        }
         wioDestroyWindow(self.window);
         self.events.deinit();
         internal.allocator.destroy(self);
@@ -202,14 +209,14 @@ pub const Window = struct {
         wioSetClipboardText(text.ptr, text.len);
     }
 
-    pub fn getDropData(self: *Window, allocator: std.mem.Allocator) wio.DropData {
-        return wio.DropData.dupe(allocator, self.drop_files.items, self.drop_text) catch .{ .files = &.{}, .text = null };
-    }
-
     pub fn getClipboardText(_: *Window, allocator: std.mem.Allocator) ?[]u8 {
         var len: usize = undefined;
         const ptr = wioGetClipboardText(&len) orelse return null;
         return allocator.dupe(u8, ptr[0..len]) catch return null;
+    }
+
+    pub fn getDropData(self: *Window, allocator: std.mem.Allocator) wio.DropData {
+        return wio.DropData.dupe(allocator, self.drop.files.items, self.drop.text) catch .{ .files = &.{}, .text = null };
     }
 
     pub fn createFramebuffer(_: *Window, size: wio.Size) !Framebuffer {
@@ -487,31 +494,31 @@ export fn wioScroll(self: *Window, vertical: f32, horizontal: f32) void {
     if (horizontal != 0) self.pushEvent(.{ .scroll_horizontal = horizontal });
 }
 
-export fn wioDropBegin(self: *Window) void {
-    for (self.drop_files.items) |f| internal.allocator.free(f);
-    self.drop_files.clearRetainingCapacity();
-    if (self.drop_text) |t| internal.allocator.free(t);
-    self.drop_text = null;
+fn wioDropBegin(self: *Window) void {
+    for (self.drop.files.items) |f| internal.allocator.free(f);
+    self.drop.files.clearRetainingCapacity();
+    if (self.drop.text) |t| internal.allocator.free(t);
+    self.drop.text = null;
     self.pushEvent(.drop_begin);
 }
 
-export fn wioDropPosition(self: *Window, x: u16, y: u16) void {
+fn wioDropPosition(self: *Window, x: u16, y: u16) void {
     self.pushEvent(.{ .drop_position = .{ .x = x, .y = y } });
 }
 
-export fn wioDropFile(self: *Window, ptr: [*]const u8, len: usize) void {
+fn wioDropFile(self: *Window, ptr: [*]const u8, len: usize) void {
     const path = internal.allocator.dupe(u8, ptr[0..len]) catch return;
-    self.drop_files.append(internal.allocator, path) catch {
+    self.drop.files.append(internal.allocator, path) catch {
         internal.allocator.free(path);
     };
 }
 
-export fn wioDropText(self: *Window, ptr: [*]const u8, len: usize) void {
-    if (self.drop_text) |t| internal.allocator.free(t);
-    self.drop_text = internal.allocator.dupe(u8, ptr[0..len]) catch null;
+fn wioDropText(self: *Window, ptr: [*]const u8, len: usize) void {
+    if (self.drop.text) |t| internal.allocator.free(t);
+    self.drop.text = internal.allocator.dupe(u8, ptr[0..len]) catch null;
 }
 
-export fn wioDropComplete(self: *Window) void {
+fn wioDropComplete(self: *Window) void {
     self.pushEvent(.drop_complete);
 }
 
@@ -521,6 +528,13 @@ fn wioAudioOutputWrite(data: *const anyopaque, buffer: [*]f32, size: usize) call
 }
 
 comptime {
+    if (build_options.drop) {
+        @export(&wioDropBegin, .{ .name = "wioDropBegin" });
+        @export(&wioDropPosition, .{ .name = "wioDropPosition" });
+        @export(&wioDropFile, .{ .name = "wioDropFile" });
+        @export(&wioDropText, .{ .name = "wioDropText" });
+        @export(&wioDropComplete, .{ .name = "wioDropComplete" });
+    }
     if (build_options.audio) {
         @export(&wioAudioOutputWrite, .{ .name = "wioAudioOutputWrite" });
     }

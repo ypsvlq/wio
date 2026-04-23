@@ -65,6 +65,7 @@ fn createModule(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.b
     const wio = b.dependency("wio", .{
         .target = target,
         .optimize = optimize,
+        .enable_drop = true,
         .enable_opengl = true,
         .enable_joystick = true,
         .enable_audio = true,

@@ -10,6 +10,7 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
     });
 
+    const enable_drop = b.option(bool, "enable_drop", "Enable drag-and-drop support (default: false)") orelse false;
     const enable_framebuffer = b.option(bool, "enable_framebuffer", "Enable software framebuffer support (default: false)") orelse false;
     const enable_opengl = b.option(bool, "enable_opengl", "Enable OpenGL support (default: false)") orelse false;
     const enable_vulkan = b.option(bool, "enable_vulkan", "Enable Vulkan support (default: false)") orelse false;
@@ -33,6 +34,7 @@ pub fn build(b: *std.Build) !void {
 
     const system_integration = b.systemIntegrationOption("wio", .{});
     const options = b.addOptions();
+    options.addOption(bool, "drop", enable_drop);
     options.addOption(bool, "framebuffer", enable_framebuffer);
     options.addOption(bool, "opengl", enable_opengl);
     options.addOption(bool, "vulkan", enable_vulkan);
@@ -43,6 +45,7 @@ pub fn build(b: *std.Build) !void {
     options.addOption(bool, "system_integration", system_integration);
     module.addOptions("build_options", options);
 
+    if (enable_drop) module.addCMacro("WIO_DROP", "");
     if (enable_framebuffer) module.addCMacro("WIO_FRAMEBUFFER", "");
     if (enable_opengl) module.addCMacro("WIO_OPENGL", "");
     if (enable_vulkan) module.addCMacro("WIO_VULKAN", "");
@@ -60,8 +63,12 @@ pub fn build(b: *std.Build) !void {
             }
 
             module.linkSystemLibrary("user32", .{});
-            module.linkSystemLibrary("ole32", .{});
-            module.linkSystemLibrary("shell32", .{});
+            if (enable_drop) {
+                module.linkSystemLibrary("shell32", .{});
+            }
+            if (enable_drop or enable_audio) {
+                module.linkSystemLibrary("ole32", .{});
+            }
             if (enable_framebuffer or enable_opengl) {
                 module.linkSystemLibrary("gdi32", .{});
             }
