@@ -29,9 +29,10 @@ class WioWindow : public BWindow {
 private:
     void *zig;
     bool dropping;
+    bool drop_began;
 
 public:
-    WioWindow(void *zig, BRect frame, const char *title) : BWindow(frame, title, B_TITLED_WINDOW, 0), dropping(false) {
+    WioWindow(void *zig, BRect frame, const char *title) : BWindow(frame, title, B_TITLED_WINDOW, 0), dropping(false), drop_began(false) {
         this->zig = zig;
 #ifdef WIO_FRAMEBUFFER
         AddChild(new BView(Bounds(), "wio", B_FOLLOW_ALL_SIDES, 0));
@@ -106,7 +107,10 @@ public:
                     if (message->FindMessage("be:drag_message", &drag_msg) == B_OK) {
                         if (!dropping) {
                             dropping = true;
-                            wioDropBegin(zig);
+                            if (!drop_began) {
+                                drop_began = true;
+                                wioDropBegin(zig);
+                            }
                         }
                         wioDropPosition(zig, (uint16)where.x, (uint16)where.y);
                     } else if (dropping) {
@@ -125,8 +129,9 @@ public:
         }
 
         if (message->WasDropped()) {
-            if (!dropping) wioDropBegin(zig);
+            if (!drop_began) wioDropBegin(zig);
             dropping = false;
+            drop_began = false;
             entry_ref ref;
             for (int32 i = 0; message->FindRef("refs", i, &ref) == B_OK; i++) {
                 BPath path(&ref);
