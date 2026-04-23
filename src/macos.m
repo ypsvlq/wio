@@ -1,4 +1,5 @@
 #import <Cocoa/Cocoa.h>
+#include <objc/NSObjCRuntime.h>
 #import <QuartzCore/QuartzCore.h>
 #include <IOKit/hid/IOHIDKeys.h>
 
@@ -433,6 +434,10 @@ void wioMessageBox(uint8_t style, const char *ptr, size_t len) {
     [alert setMessageText:string(ptr, len)];
     [alert setAlertStyle:styles[style]];
     [alert runModal];
+}
+
+NSUInteger wioGetModifiers(void) {
+    return [NSEvent modifierFlags];
 }
 
 void *wioCreateWindow(void *zig, uint16_t width, uint16_t height) {

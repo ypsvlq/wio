@@ -12,6 +12,7 @@ extern fn wioUpdate() void;
 extern fn wioWait(f64) void;
 extern fn wioCancelWait() void;
 extern fn wioMessageBox(u8, [*]const u8, usize) void;
+extern fn wioGetModifiers() c_ulong;
 extern fn wioCreateWindow(*Window, u16, u16) *NSWindow;
 extern fn wioDestroyWindow(*NSWindow) void;
 extern fn wioEnableTextInput(*NSWindow, u16, u16) void;
@@ -171,8 +172,13 @@ pub fn messageBox(style: wio.MessageBoxStyle, _: []const u8, message: []const u8
 }
 
 pub fn getModifiers() wio.Modifiers {
-    log.warn("getModifiers() is not implemented for macos", .{});
-    return .{ .control = false, .shift = false, .alt = false };
+    const modifiers = wioGetModifiers();
+    return .{
+        .control = (modifiers & (1 << 18) != 0),
+        .shift = (modifiers & (1 << 17) != 0),
+        .alt = (modifiers & (1 << 19) != 0),
+        .gui = (modifiers & (1 << 20) != 0),
+    };
 }
 
 pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
