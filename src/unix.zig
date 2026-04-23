@@ -208,6 +208,14 @@ fn spawnAndPoll(args: []const []const u8) bool {
     return true;
 }
 
+pub fn openUri(uri: []const u8) void {
+    var child = std.process.spawn(internal.io, .{ .argv = &.{ "xdg-open", uri } }) catch |err| {
+        log.err("could not spawn xdg-open: {s}", .{@errorName(err)});
+        return;
+    };
+    _ = child.wait(internal.io) catch {};
+}
+
 pub fn getModifiers() wio.Modifiers {
     return switch (active) {
         .x11 => x11.getModifiers(),

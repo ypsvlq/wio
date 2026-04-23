@@ -76,34 +76,13 @@ pub fn messageBox(style: MessageBoxStyle, title: []const u8, message: []const u8
     backend.messageBox(style, title, message);
 }
 
+pub fn openUri(uri: []const u8) void {
+    backend.openUri(uri);
+}
+
 pub fn getModifiers() Modifiers {
     return backend.getModifiers();
 }
-
-pub const DropData = struct {
-    files: []const []const u8,
-    text: ?[]const u8,
-
-    pub fn dupe(allocator: std.mem.Allocator, files: []const []const u8, text: ?[]const u8) !DropData {
-        const out = try allocator.alloc([]const u8, files.len);
-        var n: usize = 0;
-        errdefer {
-            for (out[0..n]) |f| allocator.free(f);
-            allocator.free(out);
-        }
-        for (files) |f| {
-            out[n] = try allocator.dupe(u8, f);
-            n += 1;
-        }
-        return .{ .files = out, .text = if (text) |t| try allocator.dupe(u8, t) else null };
-    }
-
-    pub fn free(self: DropData, allocator: std.mem.Allocator) void {
-        for (self.files) |f| allocator.free(f);
-        allocator.free(self.files);
-        if (self.text) |t| allocator.free(t);
-    }
-};
 
 pub const Modifiers = struct {
     control: bool = false,
@@ -254,6 +233,31 @@ pub const Window = struct {
     pub fn vkCreateSurface(self: *Window, instance: usize, allocation_callbacks: ?*const anyopaque, surface: *u64) i32 {
         assertFeature(.vulkan);
         return self.backend.vkCreateSurface(instance, allocation_callbacks, surface);
+    }
+};
+
+pub const DropData = struct {
+    files: []const []const u8,
+    text: ?[]const u8,
+
+    pub fn dupe(allocator: std.mem.Allocator, files: []const []const u8, text: ?[]const u8) !DropData {
+        const out = try allocator.alloc([]const u8, files.len);
+        var n: usize = 0;
+        errdefer {
+            for (out[0..n]) |f| allocator.free(f);
+            allocator.free(out);
+        }
+        for (files) |f| {
+            out[n] = try allocator.dupe(u8, f);
+            n += 1;
+        }
+        return .{ .files = out, .text = if (text) |t| try allocator.dupe(u8, t) else null };
+    }
+
+    pub fn free(self: DropData, allocator: std.mem.Allocator) void {
+        for (self.files) |f| allocator.free(f);
+        allocator.free(self.files);
+        if (self.text) |t| allocator.free(t);
     }
 };
 

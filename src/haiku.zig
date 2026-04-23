@@ -99,6 +99,10 @@ pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []cons
     wioMessageBox(@intFromEnum(style), title_z, message_z);
 }
 
+pub fn openUri(uri: []const u8) void {
+    _ = uri;
+}
+
 pub fn getModifiers() wio.Modifiers {
     const modifiers = wioGetModifiers();
     return .{

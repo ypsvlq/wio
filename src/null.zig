@@ -25,6 +25,10 @@ pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []cons
     _ = message;
 }
 
+pub fn openUri(uri: []const u8) void {
+    _ = uri;
+}
+
 pub fn getModifiers() wio.Modifiers {
     return .{};
 }

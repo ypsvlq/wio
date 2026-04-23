@@ -245,6 +245,7 @@ fn action(button: wio.Button) !void {
             wio.messageBox(.warn, "wio", "warning");
             wio.messageBox(.err, "wio", "error");
         },
+        .u => wio.openUri("https://tiredsleepy.net"),
         .equals, .kp_plus => window.setSize(.{ .width = 640, .height = 480 }),
         .minus, .kp_minus => window.setSize(.{ .width = 320, .height = 240 }),
         .c => window.setClipboardText("wio example"),

@@ -237,6 +237,10 @@ pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []cons
     _ = w.MessageBoxW(null, message_w, title_w, flags);
 }
 
+pub fn openUri(uri: []const u8) void {
+    _ = uri;
+}
+
 pub fn getModifiers() wio.Modifiers {
     return .{
         .control = (w.GetAsyncKeyState(w.VK_CONTROL) < 0),
