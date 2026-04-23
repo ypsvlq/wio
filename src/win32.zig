@@ -240,6 +240,7 @@ pub fn getModifiers() wio.Modifiers {
         .control = (w.GetAsyncKeyState(w.VK_CONTROL) < 0),
         .shift = (w.GetAsyncKeyState(w.VK_SHIFT) < 0),
         .alt = (w.GetAsyncKeyState(w.VK_MENU) < 0),
+        .gui = (w.GetAsyncKeyState(w.VK_LWIN) < 0 or w.GetAsyncKeyState(w.VK_RWIN) < 0),
     };
 }
 
