@@ -374,7 +374,12 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
 
             self.egl.window = c.wl_egl_window_create(self.surface, options.size.width, options.size.height);
             self.egl.surface = c.eglCreateWindowSurface(egl_display, config, self.egl.window, null) orelse return logEglError("eglCreateWindowSurface");
-            self.egl.context = c.eglCreateContext(egl_display, config, h.EGL_NO_CONTEXT, context_attribs) orelse return logEglError("eglCreateContext");
+            self.egl.context = c.eglCreateContext(
+                egl_display,
+                config,
+                if (opengl.share_window) |share| share.backend.wayland.egl.context else h.EGL_NO_CONTEXT,
+                context_attribs,
+            ) orelse return logEglError("eglCreateContext");
         }
     }
 

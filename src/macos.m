@@ -546,11 +546,11 @@ void wioPresentFramebuffer(NSWindow *window, CGContextRef bitmap) {
 
 #ifdef WIO_OPENGL
 
-void *wioCreateContext(NSWindow *window, const NSOpenGLPixelFormatAttribute *attributes) {
+void *wioCreateContext(NSWindow *window, const NSOpenGLPixelFormatAttribute *attributes, NSOpenGLContext *share) {
     NSView *view = [window contentView];
     [view setWantsBestResolutionOpenGLSurface:YES];
     NSOpenGLPixelFormat *format = [[NSOpenGLPixelFormat alloc] initWithAttributes:attributes];
-    NSOpenGLContext *context = [[NSOpenGLContext alloc] initWithFormat:format shareContext:nil];
+    NSOpenGLContext *context = [[NSOpenGLContext alloc] initWithFormat:format shareContext:share];
     [context setView:view];
     WioWindowDelegate *delegate = [window delegate];
     [delegate setContext:context];

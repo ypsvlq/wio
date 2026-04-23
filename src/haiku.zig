@@ -111,6 +111,7 @@ pub fn getModifiers() wio.Modifiers {
 
 pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
     const self = try internal.allocator.create(Window);
+    errdefer internal.allocator.destroy(self);
     self.* = .{
         .window = undefined,
         .events = .init(),
@@ -129,7 +130,11 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
 
     if (build_options.opengl) {
         if (options.opengl) |opengl| {
-            self.opengl.context = wioCreateContext(self.window, opengl.doublebuffer, (opengl.alpha_bits > 0), (opengl.depth_bits > 0), (opengl.stencil_bits > 0));
+            if (opengl.share_window == null) {
+                self.opengl.context = wioCreateContext(self.window, opengl.doublebuffer, (opengl.alpha_bits > 0), (opengl.depth_bits > 0), (opengl.stencil_bits > 0));
+            } else {
+                return error.UnsupportedContextOptions;
+            }
         }
     }
 

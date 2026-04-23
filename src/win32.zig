@@ -335,15 +335,21 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
             _ = w.SetPixelFormat(self.opengl.dc, format, &pfd);
 
             self.opengl.rc = if (wgl.createContextAttribsARB) |createContextAttribsARB|
-                createContextAttribsARB(self.opengl.dc, null, &[_]i32{
-                    0x2091, opengl.major_version,
-                    0x2092, opengl.minor_version,
-                    0x2094, @as(i32, if (opengl.debug) 1 else 0) | @as(i32, if (opengl.forward_compatible) 2 else 0),
-                    0x9126, if (opengl.profile == .core) 1 else 2,
-                    0,
-                }) orelse return logLastError("wglCreateContextAttribsARB")
+                createContextAttribsARB(
+                    self.opengl.dc,
+                    if (opengl.share_window) |share| share.backend.opengl.rc else null,
+                    &[_]i32{
+                        0x2091, opengl.major_version,
+                        0x2092, opengl.minor_version,
+                        0x2094, @as(i32, if (opengl.debug) 1 else 0) | @as(i32, if (opengl.forward_compatible) 2 else 0),
+                        0x9126, if (opengl.profile == .core) 1 else 2,
+                        0,
+                    },
+                ) orelse return logLastError("wglCreateContextAttribsARB")
+            else if (opengl.share_window == null)
+                w.wglCreateContext(self.opengl.dc) orelse return logLastError("wglCreateContext")
             else
-                w.wglCreateContext(self.opengl.dc) orelse return logLastError("wglCreateContext");
+                return error.UnsupportedContextOptions;
         }
     }
 

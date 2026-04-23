@@ -274,15 +274,27 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
             errdefer _ = c.XFreeColormap(display, attributes.colormap);
 
             context = if (glx.createContextAttribsARB) |createContextAttribsARB|
-                createContextAttribsARB(display, config, null, h.True, &[_]c_int{
-                    h.GLX_CONTEXT_MAJOR_VERSION_ARB, opengl.major_version,
-                    h.GLX_CONTEXT_MINOR_VERSION_ARB, opengl.minor_version,
-                    h.GLX_CONTEXT_FLAGS_ARB,         (if (opengl.forward_compatible) h.GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB else 0) | (if (opengl.debug) h.GLX_CONTEXT_DEBUG_BIT_ARB else 0),
-                    h.GLX_CONTEXT_PROFILE_MASK_ARB,  if (opengl.profile == .core) h.GLX_CONTEXT_CORE_PROFILE_BIT_ARB else h.GLX_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
-                    h.None,
-                }) orelse return internal.logUnexpected("glXCreateContextAttribsARB")
+                createContextAttribsARB(
+                    display,
+                    config,
+                    if (opengl.share_window) |share| share.backend.x11.opengl.context else null,
+                    h.True,
+                    &[_]c_int{
+                        h.GLX_CONTEXT_MAJOR_VERSION_ARB, opengl.major_version,
+                        h.GLX_CONTEXT_MINOR_VERSION_ARB, opengl.minor_version,
+                        h.GLX_CONTEXT_FLAGS_ARB,         (if (opengl.forward_compatible) h.GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB else 0) | (if (opengl.debug) h.GLX_CONTEXT_DEBUG_BIT_ARB else 0),
+                        h.GLX_CONTEXT_PROFILE_MASK_ARB,  if (opengl.profile == .core) h.GLX_CONTEXT_CORE_PROFILE_BIT_ARB else h.GLX_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
+                        h.None,
+                    },
+                ) orelse return internal.logUnexpected("glXCreateContextAttribsARB")
             else
-                c.glXCreateNewContext(display, config, h.GLX_RGBA_TYPE, null, h.True) orelse return internal.logUnexpected("glXCreateNewContext");
+                c.glXCreateNewContext(
+                    display,
+                    config,
+                    h.GLX_RGBA_TYPE,
+                    if (opengl.share_window) |window| window.backend.x11.opengl.context else null,
+                    h.True,
+                ) orelse return internal.logUnexpected("glXCreateNewContext");
         }
     }
     errdefer if (build_options.opengl) {

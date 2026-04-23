@@ -501,6 +501,8 @@ pub const CursorMode = enum {
 };
 
 pub const CreateContextOptions = struct {
+    share_window: ?*Window = null,
+
     api: enum { gl, gles1, gles2 } = .gl,
 
     major_version: u8 = 1,

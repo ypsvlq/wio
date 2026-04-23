@@ -26,7 +26,7 @@ extern fn wioRequestAttention() void;
 extern fn wioSetClipboardText([*]const u8, usize) void;
 extern fn wioGetClipboardText(*const std.mem.Allocator, *usize) ?[*]u8;
 extern fn wioPresentFramebuffer(*NSWindow, c.CGContextRef) void;
-extern fn wioCreateContext(*NSWindow, [*]const c.CGLPixelFormatAttribute) ?*NSOpenGLContext;
+extern fn wioCreateContext(*NSWindow, [*]const c.CGLPixelFormatAttribute, ?*NSOpenGLContext) ?*NSOpenGLContext;
 extern fn wioDestroyContext(?*NSOpenGLContext) void;
 extern fn wioMakeContextCurrent(?*NSOpenGLContext) void;
 extern fn wioSwapBuffers(*NSWindow, ?*NSOpenGLContext) void;
@@ -201,22 +201,26 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
             else if (opengl.major_version == 4 and opengl.minor_version <= 1 and opengl.profile == .core)
                 c.kCGLOGLPVersion_GL4_Core
             else
-                return error.UnsupportedOpenGLVersion;
+                return error.UnsupportedContextOptions;
 
-            self.opengl.context = wioCreateContext(self.window, &.{
-                c.kCGLPFAOpenGLProfile, profile,
-                c.kCGLPFAColorSize,     opengl.red_bits + opengl.green_bits + opengl.blue_bits,
-                c.kCGLPFAAlphaSize,     opengl.alpha_bits,
-                c.kCGLPFADepthSize,     opengl.depth_bits,
-                c.kCGLPFAStencilSize,   opengl.stencil_bits,
-                c.kCGLPFASampleBuffers, if (opengl.samples == 0) 0 else 1,
-                c.kCGLPFASamples,       opengl.samples,
-                if (opengl.doublebuffer)
-                    c.kCGLPFADoubleBuffer
-                else
+            self.opengl.context = wioCreateContext(
+                self.window,
+                &.{
+                    c.kCGLPFAOpenGLProfile, profile,
+                    c.kCGLPFAColorSize,     opengl.red_bits + opengl.green_bits + opengl.blue_bits,
+                    c.kCGLPFAAlphaSize,     opengl.alpha_bits,
+                    c.kCGLPFADepthSize,     opengl.depth_bits,
+                    c.kCGLPFAStencilSize,   opengl.stencil_bits,
+                    c.kCGLPFASampleBuffers, if (opengl.samples == 0) 0 else 1,
+                    c.kCGLPFASamples,       opengl.samples,
+                    if (opengl.doublebuffer)
+                        c.kCGLPFADoubleBuffer
+                    else
+                        0,
                     0,
-                0,
-            });
+                },
+                if (opengl.share_window) |share| share.backend.opengl.context else null,
+            );
         }
     }
 
