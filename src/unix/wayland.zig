@@ -1251,8 +1251,8 @@ fn dataDeviceDrop(_: ?*anyopaque, _: ?*h.wl_data_device) callconv(.c) void {
             if (line.len == 0 or line[0] == '#') continue;
             const prefix = "file://";
             if (!std.mem.startsWith(u8, line, prefix)) continue;
-            const path = uriDecodePath(line[prefix.len..]) orelse continue;
-            window.drop_files.append(internal.allocator, path) catch {};
+            const path = internal.allocator.dupe(u8, line[prefix.len..]) catch continue;
+            window.drop_files.append(internal.allocator, std.Uri.percentDecodeInPlace(path)) catch {};
         }
     } else {
         if (internal.allocator.dupe(u8, buf[0..total])) |copy| {
@@ -1283,11 +1283,6 @@ fn dataOfferMime(_: ?*anyopaque, _: ?*h.wl_data_offer, mime: [*c]const u8) callc
     } else if (std.mem.eql(u8, s, "text/plain;charset=utf-8")) {
         pending_drag_has_text = true;
     }
-}
-
-fn uriDecodePath(encoded: []const u8) ?[]u8 {
-    const buf = internal.allocator.dupe(u8, encoded) catch return null;
-    return std.Uri.percentDecodeInPlace(buf);
 }
 
 const data_source_listener = h.wl_data_source_listener{

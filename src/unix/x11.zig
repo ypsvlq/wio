@@ -960,9 +960,10 @@ fn handle(event: *h.XEvent) void {
                         var iter = std.mem.splitAny(u8, data[0..nitems], "\r\n");
                         while (iter.next()) |line| {
                             if (line.len == 0 or line[0] == '#') continue;
-                            if (uriToPath(line)) |path| {
-                                window.drop_files.append(internal.allocator, path) catch {};
-                            }
+                            const prefix = "file://";
+                            if (!std.mem.startsWith(u8, line, prefix)) continue;
+                            const path = internal.allocator.dupe(u8, line[prefix.len..]) catch continue;
+                            window.drop_files.append(internal.allocator, std.Uri.percentDecodeInPlace(path)) catch {};
                         }
                     }
                 }
@@ -989,13 +990,6 @@ fn handle(event: *h.XEvent) void {
         },
         else => {},
     }
-}
-
-fn uriToPath(uri: []const u8) ?[]u8 {
-    const prefix = "file://";
-    if (!std.mem.startsWith(u8, uri, prefix)) return null;
-    const buf = internal.allocator.dupe(u8, uri[prefix.len..]) catch return null;
-    return std.Uri.percentDecodeInPlace(buf);
 }
 
 fn handleKeyPress(window: *Window, event: *h.XEvent, repeat: bool) void {
