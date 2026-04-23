@@ -277,7 +277,7 @@ static void warpCursor(NSWindow *window) {
     [self removeTrackingArea:area];
     area = [[NSTrackingArea alloc]
         initWithRect:[self frame]
-        options:NSTrackingActiveInKeyWindow | NSTrackingCursorUpdate | NSTrackingMouseEnteredAndExited
+        options:NSTrackingActiveInKeyWindow | NSTrackingCursorUpdate | NSTrackingMouseEnteredAndExited | NSTrackingEnabledDuringMouseDrag
         owner:self
         userInfo:nil];
     [self addTrackingArea:area];
