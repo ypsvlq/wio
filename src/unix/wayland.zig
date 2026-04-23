@@ -1286,36 +1286,8 @@ fn dataOfferMime(_: ?*anyopaque, _: ?*h.wl_data_offer, mime: [*c]const u8) callc
 }
 
 fn uriDecodePath(encoded: []const u8) ?[]u8 {
-    var path = internal.allocator.alloc(u8, encoded.len) catch return null;
-    var out: usize = 0;
-    var i: usize = 0;
-    while (i < encoded.len) {
-        if (encoded[i] == '%' and i + 2 < encoded.len) {
-            const hi = std.fmt.charToDigit(encoded[i + 1], 16) catch {
-                path[out] = encoded[i];
-                out += 1;
-                i += 1;
-                continue;
-            };
-            const lo = std.fmt.charToDigit(encoded[i + 2], 16) catch {
-                path[out] = encoded[i];
-                out += 1;
-                i += 1;
-                continue;
-            };
-            path[out] = (hi << 4) | lo;
-            out += 1;
-            i += 3;
-        } else {
-            path[out] = encoded[i];
-            out += 1;
-            i += 1;
-        }
-    }
-    return internal.allocator.realloc(path, out) catch {
-        internal.allocator.free(path);
-        return null;
-    };
+    const buf = internal.allocator.dupe(u8, encoded) catch return null;
+    return std.Uri.percentDecodeInPlace(buf);
 }
 
 const data_source_listener = h.wl_data_source_listener{

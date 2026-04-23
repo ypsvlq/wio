@@ -994,38 +994,8 @@ fn handle(event: *h.XEvent) void {
 fn uriToPath(uri: []const u8) ?[]u8 {
     const prefix = "file://";
     if (!std.mem.startsWith(u8, uri, prefix)) return null;
-    const encoded = uri[prefix.len..];
-
-    var path = internal.allocator.alloc(u8, encoded.len) catch return null;
-    var out: usize = 0;
-    var i: usize = 0;
-    while (i < encoded.len) {
-        if (encoded[i] == '%' and i + 2 < encoded.len) {
-            const hi = std.fmt.charToDigit(encoded[i + 1], 16) catch {
-                path[out] = encoded[i];
-                out += 1;
-                i += 1;
-                continue;
-            };
-            const lo = std.fmt.charToDigit(encoded[i + 2], 16) catch {
-                path[out] = encoded[i];
-                out += 1;
-                i += 1;
-                continue;
-            };
-            path[out] = hi << 4 | lo;
-            out += 1;
-            i += 3;
-        } else {
-            path[out] = encoded[i];
-            out += 1;
-            i += 1;
-        }
-    }
-    return internal.allocator.realloc(path, out) catch {
-        internal.allocator.free(path);
-        return null;
-    };
+    const buf = internal.allocator.dupe(u8, uri[prefix.len..]) catch return null;
+    return std.Uri.percentDecodeInPlace(buf);
 }
 
 fn handleKeyPress(window: *Window, event: *h.XEvent, repeat: bool) void {
