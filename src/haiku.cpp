@@ -1,5 +1,6 @@
 #include <AppKit.h>
 #include <InterfaceKit.h>
+#include <NetworkKit.h>
 #include <OpenGLKit.h>
 #include <DeviceKit.h>
 #include <MediaKit.h>
@@ -171,6 +172,10 @@ extern "C" {
         alert_type types[] = { B_INFO_ALERT, B_WARNING_ALERT, B_STOP_ALERT };
         BAlert *alert = new BAlert(title, message, "OK", NULL, NULL, B_WIDTH_AS_USUAL, types[type]);
         alert->Go();
+    }
+
+    void wioOpenUri(const char *uri) {
+        BUrl(uri, false).OpenWithPreferredApplication();
     }
 
     uint32 wioGetModifiers(void) {

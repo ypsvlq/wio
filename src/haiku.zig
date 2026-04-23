@@ -13,6 +13,7 @@ const BJoystick = opaque {};
 const BSoundPlayer = opaque {};
 extern fn wioInit() void;
 extern fn wioMessageBox(u8, [*:0]const u8, [*:0]const u8) void;
+extern fn wioOpenUri([*:0]const u8) void;
 extern fn wioGetModifiers() u32;
 extern fn wioCreateWindow(*Window, [*:0]const u8, u16, u16) *BWindow;
 extern fn wioDestroyWindow(*BWindow) void;
@@ -100,7 +101,9 @@ pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []cons
 }
 
 pub fn openUri(uri: []const u8) void {
-    _ = uri;
+    const uri_z = internal.allocator.dupeZ(u8, uri) catch return;
+    defer internal.allocator.free(uri_z);
+    wioOpenUri(uri_z);
 }
 
 pub fn getModifiers() wio.Modifiers {
