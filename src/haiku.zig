@@ -494,7 +494,7 @@ export fn wioScroll(self: *Window, vertical: f32, horizontal: f32) void {
     if (horizontal != 0) self.pushEvent(.{ .scroll_horizontal = horizontal });
 }
 
-fn wioDropBegin(self: *Window) void {
+fn wioDropBegin(self: *Window) callconv(.c) void {
     for (self.drop.files.items) |f| internal.allocator.free(f);
     self.drop.files.clearRetainingCapacity();
     if (self.drop.text) |t| internal.allocator.free(t);
@@ -502,23 +502,23 @@ fn wioDropBegin(self: *Window) void {
     self.pushEvent(.drop_begin);
 }
 
-fn wioDropPosition(self: *Window, x: u16, y: u16) void {
+fn wioDropPosition(self: *Window, x: u16, y: u16) callconv(.c) void {
     self.pushEvent(.{ .drop_position = .{ .x = x, .y = y } });
 }
 
-fn wioDropFile(self: *Window, ptr: [*]const u8, len: usize) void {
+fn wioDropFile(self: *Window, ptr: [*]const u8, len: usize) callconv(.c) void {
     const path = internal.allocator.dupe(u8, ptr[0..len]) catch return;
     self.drop.files.append(internal.allocator, path) catch {
         internal.allocator.free(path);
     };
 }
 
-fn wioDropText(self: *Window, ptr: [*]const u8, len: usize) void {
+fn wioDropText(self: *Window, ptr: [*]const u8, len: usize) callconv(.c) void {
     if (self.drop.text) |t| internal.allocator.free(t);
     self.drop.text = internal.allocator.dupe(u8, ptr[0..len]) catch null;
 }
 
-fn wioDropComplete(self: *Window) void {
+fn wioDropComplete(self: *Window) callconv(.c) void {
     self.pushEvent(.drop_complete);
 }
 
