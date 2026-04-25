@@ -15,6 +15,8 @@ const c = @cImport({
 
 pub const logFn = android.logFn;
 
+const egl = internal.egl(c, c);
+
 var events: internal.EventQueue = .{};
 var events_mutex: std.Io.Mutex = .init;
 var wait_event: std.Io.Event = .unset;
@@ -25,21 +27,19 @@ var modifiers: wio.Modifiers = .{};
 var cursor: c.jint = @intFromEnum(wio.Cursor.arrow);
 var cursor_mode: wio.CursorMode = .normal;
 
-var egl_display: c.EGLDisplay = undefined;
 var egl_config: c.EGLConfig = null;
 var egl_surface: c.EGLSurface = null;
 var egl_surface_mutex: std.Io.Mutex = .init;
 
 pub fn init() !void {
     if (build_options.opengl) {
-        egl_display = c.eglGetDisplay(c.EGL_DEFAULT_DISPLAY) orelse return logUnexpectedEgl("eglGetDisplay");
-        if (c.eglInitialize(egl_display, null, null) == c.EGL_FALSE) return logUnexpectedEgl("eglInitialize");
+        try egl.init(c.EGL_DEFAULT_DISPLAY);
     }
 }
 
 pub fn deinit() void {
     if (build_options.opengl) {
-        _ = c.eglTerminate(egl_display);
+        _ = c.eglTerminate(egl.display);
     }
 }
 
@@ -86,18 +86,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !Window {
 
     if (build_options.opengl) {
         if (options.gl_options) |gl| {
-            var count: i32 = undefined;
-            if (c.eglChooseConfig(egl_display, &[_]i32{
-                c.EGL_RED_SIZE,       gl.red_bits,
-                c.EGL_GREEN_SIZE,     gl.green_bits,
-                c.EGL_BLUE_SIZE,      gl.blue_bits,
-                c.EGL_ALPHA_SIZE,     gl.alpha_bits,
-                c.EGL_DEPTH_SIZE,     gl.depth_bits,
-                c.EGL_STENCIL_SIZE,   gl.stencil_bits,
-                c.EGL_SAMPLE_BUFFERS, if (gl.samples != 0) 1 else 0,
-                c.EGL_SAMPLES,        gl.samples,
-                c.EGL_NONE,
-            }, &egl_config, 1, &count) == c.EGL_FALSE) return logUnexpectedEgl("eglChooseConfig");
+            egl_config = try egl.chooseConfig(gl);
         }
     }
 
@@ -202,28 +191,28 @@ pub const Window = struct {
 
     pub fn glCreateContext(_: *Window, options: wio.GlCreateContextOptions) !GlContext {
         return .{
-            .context = c.eglCreateContext(egl_display, egl_config, c.EGL_NO_CONTEXT, &[_]i32{
-                c.EGL_CONTEXT_MAJOR_VERSION, options.options.major_version,
-                c.EGL_CONTEXT_MINOR_VERSION, options.options.minor_version,
-                c.EGL_NONE,
-            }) orelse return logUnexpectedEgl("eglCreateContext"),
+            .context = try egl.createContext(
+                egl_config,
+                options.options,
+                if (options.share) |share| share.backend.context else c.EGL_NO_CONTEXT,
+            ),
         };
     }
 
     pub fn glMakeContextCurrent(_: *Window, context: *GlContext) void {
         egl_surface_mutex.lockUncancelable(internal.io);
         defer egl_surface_mutex.unlock(internal.io);
-        _ = c.eglMakeCurrent(egl_display, egl_surface, egl_surface, context.context);
+        _ = c.eglMakeCurrent(egl.display, egl_surface, egl_surface, context.context);
     }
 
     pub fn glSwapBuffers(_: *Window) void {
         egl_surface_mutex.lockUncancelable(internal.io);
         defer egl_surface_mutex.unlock(internal.io);
-        _ = c.eglSwapBuffers(egl_display, egl_surface);
+        _ = c.eglSwapBuffers(egl.display, egl_surface);
     }
 
     pub fn glSwapInterval(_: *Window, interval: i32) void {
-        _ = c.eglSwapInterval(egl_display, interval);
+        _ = c.eglSwapInterval(egl.display, interval);
     }
 
     pub fn vkCreateSurface(_: *Window, instance: usize, allocation_callbacks: ?*const anyopaque, surface: *u64) i32 {
@@ -258,7 +247,7 @@ pub const GlContext = struct {
     context: c.EGLContext,
 
     pub fn destroy(self: *GlContext) void {
-        _ = c.eglDestroyContext(egl_display, self.context);
+        _ = c.eglDestroyContext(egl.display, self.context);
     }
 };
 
@@ -555,7 +544,7 @@ const native = struct {
             if (egl_config != null) {
                 egl_surface_mutex.lockUncancelable(internal.io);
                 defer egl_surface_mutex.unlock(internal.io);
-                egl_surface = c.eglCreateWindowSurface(egl_display, egl_config, window, null) orelse {
+                egl_surface = c.eglCreateWindowSurface(egl.display, egl_config, window, null) orelse {
                     logEglError("eglCreateWindowSurface");
                     return;
                 };
@@ -579,7 +568,7 @@ const native = struct {
             if (egl_surface) |_| {
                 egl_surface_mutex.lockUncancelable(internal.io);
                 defer egl_surface_mutex.unlock(internal.io);
-                _ = c.eglDestroySurface(egl_display, egl_surface);
+                _ = c.eglDestroySurface(egl.display, egl_surface);
                 egl_surface = null;
             }
         }

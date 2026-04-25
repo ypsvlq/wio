@@ -28,6 +28,7 @@ var maybe_window2: ?wio.Window = null;
 var context2: wio.GlContext = undefined;
 
 const gl_options: wio.GlOptions = .{
+    .api = if (builtin.abi.isAndroid()) .gles2 else .gl,
     .major_version = 2,
     .samples = 4,
 };

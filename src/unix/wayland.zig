@@ -72,6 +72,8 @@ var imports: extern struct {
 } = undefined;
 const c = if (build_options.system_integration) h else &imports;
 
+const egl = internal.egl(c, h);
+
 var libwayland_client: DynLib = undefined;
 var libxkbcommon: DynLib = undefined;
 var libdecor: DynLib = undefined;
@@ -133,8 +135,6 @@ var drag_has_text: bool = false;
 var drag_serial: u32 = 0;
 var drag_window: ?*Window = null;
 var drag_dropped: bool = false;
-
-var egl_display: h.EGLDisplay = undefined;
 
 const exports = if (!build_options.system_integration) struct {
     export var wio_wl_proxy_get_version: @TypeOf(imports.wl_proxy_get_version) = undefined;
@@ -211,8 +211,7 @@ pub fn init() !bool {
     }
 
     if (build_options.opengl) {
-        egl_display = c.eglGetDisplay(display) orelse return logEglError("eglGetDisplay");
-        if (c.eglInitialize(egl_display, null, null) == h.EGL_FALSE) return logEglError("eglInitialize");
+        try egl.init(display);
     }
 
     return true;
@@ -220,7 +219,7 @@ pub fn init() !bool {
 
 pub fn deinit() void {
     if (build_options.opengl) {
-        _ = c.eglTerminate(egl_display);
+        _ = c.eglTerminate(egl.display);
         libEGL.close();
         libwayland_egl.close();
     }
@@ -328,33 +327,9 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
 
     if (build_options.opengl) {
         if (options.gl_options) |gl| {
-            if (c.eglBindAPI(switch (gl.api) {
-                .gl => h.EGL_OPENGL_API,
-                .gles1, .gles2 => h.EGL_OPENGL_ES_BIT,
-            }) == h.EGL_FALSE) return logEglError("eglBindAPI");
-
-            const renderable_type = switch (gl.api) {
-                .gl => h.EGL_OPENGL_BIT,
-                .gles1 => h.EGL_OPENGL_ES_BIT,
-                .gles2 => h.EGL_OPENGL_ES2_BIT,
-            };
-
-            var count: i32 = undefined;
-            if (c.eglChooseConfig(egl_display, &[_]i32{
-                h.EGL_RENDERABLE_TYPE, renderable_type,
-                h.EGL_RED_SIZE,        gl.red_bits,
-                h.EGL_GREEN_SIZE,      gl.green_bits,
-                h.EGL_BLUE_SIZE,       gl.blue_bits,
-                h.EGL_ALPHA_SIZE,      gl.alpha_bits,
-                h.EGL_DEPTH_SIZE,      gl.depth_bits,
-                h.EGL_STENCIL_SIZE,    gl.stencil_bits,
-                h.EGL_SAMPLE_BUFFERS,  if (gl.samples != 0) 1 else 0,
-                h.EGL_SAMPLES,         gl.samples,
-                h.EGL_NONE,
-            }, &self.egl.config, 1, &count) == h.EGL_FALSE) return logEglError("eglChooseConfig");
-
+            self.egl.config = try egl.chooseConfig(gl);
             self.egl.window = c.wl_egl_window_create(self.surface, options.size.width, options.size.height);
-            self.egl.surface = c.eglCreateWindowSurface(egl_display, self.egl.config, self.egl.window, null) orelse return logEglError("eglCreateWindowSurface");
+            self.egl.surface = c.eglCreateWindowSurface(egl.display, self.egl.config, self.egl.window, null) orelse return egl.logError("eglCreateWindowSurface");
         }
     }
 
@@ -405,7 +380,7 @@ pub const Window = struct {
         }
 
         if (build_options.opengl) {
-            if (self.egl.surface) |_| _ = c.eglDestroySurface(egl_display, self.egl.surface);
+            if (self.egl.surface) |_| _ = c.eglDestroySurface(egl.display, self.egl.surface);
             if (self.egl.window) |_| c.wl_egl_window_destroy(self.egl.window);
         }
 
@@ -639,39 +614,24 @@ pub const Window = struct {
 
     pub fn glCreateContext(self: *Window, options: wio.GlCreateContextOptions) !GlContext {
         return .{
-            .context = c.eglCreateContext(
-                egl_display,
+            .context = try egl.createContext(
                 self.egl.config,
-                if (options.share) |share| share.backend.wayland.context else h.EGL_NO_CONTEXT,
-                switch (options.options.api) {
-                    .gl => &[_]i32{
-                        h.EGL_CONTEXT_MAJOR_VERSION,             options.options.major_version,
-                        h.EGL_CONTEXT_MINOR_VERSION,             options.options.minor_version,
-                        h.EGL_CONTEXT_OPENGL_PROFILE_MASK,       if (options.options.profile == .core) h.EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT else h.EGL_CONTEXT_OPENGL_COMPATIBILITY_PROFILE_BIT,
-                        h.EGL_CONTEXT_OPENGL_FORWARD_COMPATIBLE, if (options.options.forward_compatible) h.EGL_TRUE else h.EGL_FALSE,
-                        h.EGL_CONTEXT_OPENGL_DEBUG,              if (options.options.debug) h.EGL_TRUE else h.EGL_FALSE,
-                        h.EGL_NONE,
-                    },
-                    .gles1, .gles2 => &[_]i32{
-                        h.EGL_CONTEXT_MAJOR_VERSION, options.options.major_version,
-                        h.EGL_CONTEXT_MINOR_VERSION, options.options.minor_version,
-                        h.EGL_NONE,
-                    },
-                },
-            ) orelse return logEglError("eglCreateContext"),
+                options.options,
+                if (options.share) |share| share.backend.wayland.context else null,
+            ),
         };
     }
 
     pub fn glMakeContextCurrent(self: *Window, context: *GlContext) void {
-        _ = c.eglMakeCurrent(egl_display, self.egl.surface, self.egl.surface, context.context);
+        _ = c.eglMakeCurrent(egl.display, self.egl.surface, self.egl.surface, context.context);
     }
 
     pub fn glSwapBuffers(self: *Window) void {
-        _ = c.eglSwapBuffers(egl_display, self.egl.surface);
+        _ = c.eglSwapBuffers(egl.display, self.egl.surface);
     }
 
     pub fn glSwapInterval(_: *Window, interval: i32) void {
-        _ = c.eglSwapInterval(egl_display, interval);
+        _ = c.eglSwapInterval(egl.display, interval);
     }
 
     pub fn vkCreateSurface(self: Window, instance: usize, allocation_callbacks: ?*const anyopaque, surface: *u64) i32 {
@@ -779,7 +739,7 @@ pub const GlContext = struct {
     context: h.EGLContext,
 
     pub fn destroy(self: *GlContext) void {
-        _ = c.eglDestroyContext(egl_display, self.context);
+        _ = c.eglDestroyContext(egl.display, self.context);
     }
 };
 
@@ -789,11 +749,6 @@ pub fn glGetProcAddress(name: [*:0]const u8) ?*const anyopaque {
 
 pub fn getRequiredVulkanInstanceExtensions() []const [*:0]const u8 {
     return &.{ "VK_KHR_surface", "VK_KHR_wayland_surface" };
-}
-
-fn logEglError(name: []const u8) error{Unexpected} {
-    log.err("{s} failed, error 0x{X}", .{ name, c.eglGetError() });
-    return error.Unexpected;
 }
 
 fn getWindow(surface: ?*h.wl_surface) ?*Window {
