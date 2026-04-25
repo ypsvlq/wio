@@ -35,6 +35,7 @@ pub fn build(b: *std.Build) void {
             .target = spirv_target,
             .optimize = optimize,
         }),
+        .use_llvm = false,
     });
     exe_mod.addAnonymousImport("vertex", .{ .root_source_file = vertex.getEmittedBin() });
 
@@ -45,6 +46,7 @@ pub fn build(b: *std.Build) void {
             .target = spirv_target,
             .optimize = optimize,
         }),
+        .use_llvm = false,
     });
     exe_mod.addAnonymousImport("fragment", .{ .root_source_file = fragment.getEmittedBin() });
 
