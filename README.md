@@ -93,6 +93,7 @@ The following libraries are loaded for the X11 backend:
 - `libX11.so.6`
 - `libXcursor.so.1`
 - `libGL.so.1` (if OpenGL is enabled)
+- `libXext.so.6` (if Vulkan is enabled, as a workaround for [this issue][6])
 
 The following libraries are loaded for the Wayland backend:
 
@@ -110,7 +111,7 @@ The following libraries are loaded under Linux:
 ### WebAssembly
 
 If OpenGL is enabled, wio imports `createContext` and `makeContextCurrent`
-from the `gl` module. WebGL 1 bindings are provided in [demo/wasm.js][6].
+from the `gl` module. WebGL 1 bindings are provided in [demo/wasm.js][7].
 
 `glGetProcAddress` always returns null.
 
@@ -151,4 +152,5 @@ for a given platform:
 [3]: https://github.com/ypsvlq/wio/tree/master/examples
 [4]: https://learn.microsoft.com/en-us/windows/win32/sbscs/application-manifests
 [5]: https://github.com/ypsvlq/wio/tree/master/demo/wio.app
-[6]: https://github.com/ypsvlq/wio/blob/master/demo/wasm.js
+[6]: https://gitlab.freedesktop.org/xorg/lib/libxext/-/work_items/3
+[7]: https://github.com/ypsvlq/wio/blob/master/demo/wasm.js

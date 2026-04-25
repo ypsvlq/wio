@@ -196,6 +196,9 @@ pub fn build(b: *std.Build) !void {
                         if (enable_opengl) {
                             module.linkSystemLibrary("gl", .{});
                         }
+                        if (enable_vulkan) {
+                            module.linkSystemLibrary("xext", .{});
+                        }
                     }
                     if (enable_wayland) {
                         module.linkSystemLibrary("wayland-client", .{});

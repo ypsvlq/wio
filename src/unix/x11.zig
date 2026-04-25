@@ -110,6 +110,7 @@ var atoms: blk: {
 var libX11: DynLib = undefined;
 var libXcursor: DynLib = undefined;
 var libGL: DynLib = undefined;
+var libXext: DynLib = undefined;
 var windows: std.AutoHashMapUnmanaged(h.Window, *Window) = undefined;
 pub var display: *h.Display = undefined;
 var im: h.XIM = undefined;
@@ -130,6 +131,12 @@ pub fn init() !bool {
         DynLib.load(&imports, &.{.{ .handle = &libGL, .name = "libGL.so.1", .prefix = "glX" }}) catch return false;
     }
     errdefer if (build_options.opengl) libGL.close();
+
+    if (build_options.vulkan) {
+        // https://gitlab.freedesktop.org/xorg/lib/libxext/-/work_items/3
+        libXext = DynLib.open("libXext.so.6") catch return false;
+    }
+    errdefer if (build_options.vulkan) libXext.close();
 
     display = c.XkbOpenDisplay(null, null, null, null, null, null) orelse return false;
     errdefer _ = c.XCloseDisplay(display);
@@ -213,6 +220,7 @@ pub fn deinit() void {
     internal.allocator.free(clipboard_text);
     _ = c.XCloseIM(im);
     _ = c.XCloseDisplay(display);
+    if (build_options.vulkan) libXext.close();
     if (build_options.opengl) libGL.close();
     libXcursor.close();
     libX11.close();

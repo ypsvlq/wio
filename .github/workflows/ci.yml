@@ -30,7 +30,7 @@ jobs:
       name: Install packages
       uses: awalsh128/cache-apt-pkgs-action@v1
       with:
-        packages: xwayland-run libx11-dev libxcursor-dev libglvnd-dev libwayland-dev libxkbcommon-dev libdecor-0-dev libvulkan-dev libudev-dev libpulse-dev
+        packages: xwayland-run libx11-dev libxcursor-dev libglvnd-dev libwayland-dev libxkbcommon-dev libdecor-0-dev libvulkan-dev libxext-dev libudev-dev libpulse-dev
     - name: Build demo
       working-directory: demo
       run: ${{ env.build }}
