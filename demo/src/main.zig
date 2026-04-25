@@ -23,7 +23,14 @@ var threaded: std.Io.Threaded = undefined;
 var io: std.Io = undefined;
 
 var window: wio.Window = undefined;
+var context: wio.GlContext = undefined;
 var maybe_window2: ?wio.Window = null;
+var context2: wio.GlContext = undefined;
+
+const gl_options: wio.GlOptions = .{
+    .major_version = 2,
+    .samples = 4,
+};
 
 pub fn main() !void {
     if (builtin.cpu.arch.isWasm()) {
@@ -43,14 +50,12 @@ pub fn main() !void {
     window = try wio.createWindow(.{
         .title = "wio example",
         .scale = 1,
-        .opengl = .{
-            .major_version = 2,
-            .samples = 4,
-        },
+        .opengl = gl_options,
     });
 
     if (wio.build_options.opengl) {
-        window.glMakeContextCurrent();
+        context = try window.glCreateContext(.{ .options = gl_options });
+        window.glMakeContextCurrent(&context);
         window.glSwapInterval(1);
         if (!builtin.cpu.arch.isWasm()) {
             try gl.load(wio.glGetProcAddress);
@@ -92,14 +97,14 @@ fn loop() !bool {
             },
             .draw => {
                 if (wio.build_options.opengl) {
-                    window.glMakeContextCurrent();
+                    window.glMakeContextCurrent(&context);
                     triangle.draw();
                     window.glSwapBuffers();
                 }
             },
             .size_physical => |size| {
                 if (wio.build_options.opengl) {
-                    window.glMakeContextCurrent();
+                    window.glMakeContextCurrent(&context);
                     gl.viewport(0, 0, size.width, size.height);
                 }
             },
@@ -124,7 +129,7 @@ fn loop() !bool {
                 },
                 .draw => {
                     if (wio.build_options.opengl) {
-                        window2.glMakeContextCurrent();
+                        window2.glMakeContextCurrent(&context2);
                         gl.clearColor(0.5, 0.5, 0.5, 1);
                         gl.clear(gl.COLOR_BUFFER_BIT);
                         window2.glSwapBuffers();
@@ -132,7 +137,7 @@ fn loop() !bool {
                 },
                 .size_physical => |size| {
                     if (wio.build_options.opengl) {
-                        window2.glMakeContextCurrent();
+                        window2.glMakeContextCurrent(&context2);
                         gl.viewport(0, 0, size.width, size.height);
                     }
                 },
@@ -208,11 +213,8 @@ fn action(button: wio.Button) !void {
     switch (button) {
         .enter => {
             if (maybe_window2 == null) {
-                maybe_window2 = try wio.createWindow(.{
-                    .size = .{ .width = 320, .height = 240 },
-                    .scale = 1,
-                    .opengl = .{},
-                });
+                maybe_window2 = try wio.createWindow(.{ .size = .{ .width = 320, .height = 240 }, .scale = 1, .opengl = gl_options });
+                context2 = try maybe_window2.?.glCreateContext(.{ .options = gl_options });
             }
         },
         .@"1" => {
@@ -225,7 +227,12 @@ fn action(button: wio.Button) !void {
         },
         .l => {
             const modifiers = wio.getModifiers();
-            std.log.scoped(.modifiers).info("{s}{s}{s}{s}", .{ if (modifiers.control) "control " else "", if (modifiers.shift) "shift " else "", if (modifiers.alt) "alt " else "", if (modifiers.gui) "gui " else "" });
+            std.log.scoped(.modifiers).info("{s}{s}{s}{s}", .{
+                if (modifiers.control) "control " else "",
+                if (modifiers.shift) "shift " else "",
+                if (modifiers.alt) "alt " else "",
+                if (modifiers.gui) "gui " else "",
+            });
         },
         .t => window.setTitle("retitled wio example"),
         .w => window.setMode(.normal),

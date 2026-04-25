@@ -339,23 +339,6 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
                 if (format == 0) return logLastError("ChoosePixelFormat");
             }
             _ = w.SetPixelFormat(self.opengl.dc, format, &pfd);
-
-            self.opengl.rc = if (wgl.createContextAttribsARB) |createContextAttribsARB|
-                createContextAttribsARB(
-                    self.opengl.dc,
-                    if (opengl.share_window) |share| share.backend.opengl.rc else null,
-                    &[_]i32{
-                        0x2091, opengl.major_version,
-                        0x2092, opengl.minor_version,
-                        0x2094, @as(i32, if (opengl.debug) 1 else 0) | @as(i32, if (opengl.forward_compatible) 2 else 0),
-                        0x9126, if (opengl.profile == .core) 1 else 2,
-                        0,
-                    },
-                ) orelse return logLastError("wglCreateContextAttribsARB")
-            else if (opengl.share_window == null)
-                w.wglCreateContext(self.opengl.dc) orelse return logLastError("wglCreateContext")
-            else
-                return error.UnsupportedContextOptions;
         }
     }
 
@@ -392,12 +375,10 @@ pub const Window = struct {
     } else struct {} = .{},
     opengl: if (build_options.opengl) struct {
         dc: w.HDC = null,
-        rc: w.HGLRC = null,
     } else struct {} = .{},
 
     pub fn destroy(self: *Window) void {
         if (build_options.opengl) {
-            _ = w.wglDeleteContext(self.opengl.rc);
             _ = w.ReleaseDC(self.window, self.opengl.dc);
         }
         if (build_options.drop) {
@@ -576,8 +557,29 @@ pub const Window = struct {
         _ = w.BitBlt(dc, 0, 0, framebuffer.size.width, framebuffer.size.height, framebuffer.dc, 0, 0, w.SRCCOPY);
     }
 
-    pub fn glMakeContextCurrent(self: *Window) void {
-        _ = w.wglMakeCurrent(self.opengl.dc, self.opengl.rc);
+    pub fn glCreateContext(self: *Window, options: wio.GlCreateContextOptions) !GlContext {
+        return .{
+            .rc = if (wgl.createContextAttribsARB) |createContextAttribsARB|
+                createContextAttribsARB(
+                    self.opengl.dc,
+                    if (options.share) |share| share.backend.rc else null,
+                    &[_]i32{
+                        0x2091, options.options.major_version,
+                        0x2092, options.options.minor_version,
+                        0x2094, @as(i32, if (options.options.debug) 1 else 0) | @as(i32, if (options.options.forward_compatible) 2 else 0),
+                        0x9126, if (options.options.profile == .core) 1 else 2,
+                        0,
+                    },
+                ) orelse return logLastError("wglCreateContextAttribsARB")
+            else if (options.share == null)
+                w.wglCreateContext(self.opengl.dc) orelse return logLastError("wglCreateContext")
+            else
+                return error.UnsupportedContextOptions,
+        };
+    }
+
+    pub fn glMakeContextCurrent(self: *Window, context: *GlContext) void {
+        _ = w.wglMakeCurrent(self.opengl.dc, context.rc);
     }
 
     pub fn glSwapBuffers(self: *Window) void {
@@ -638,6 +640,14 @@ pub const Framebuffer = struct {
 
     pub fn setPixel(self: *Framebuffer, x: usize, y: usize, rgb: u32) void {
         std.mem.writeInt(u32, std.mem.asBytes(&self.pixels[y * self.size.width + x]), rgb, .little);
+    }
+};
+
+pub const GlContext = struct {
+    rc: w.HGLRC,
+
+    pub fn destroy(self: *GlContext) void {
+        w.wglDeleteContext(self.rc);
     }
 };
 

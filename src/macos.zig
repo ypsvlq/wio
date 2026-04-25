@@ -5,6 +5,7 @@ const internal = @import("wio.internal.zig");
 const log = std.log.scoped(.wio);
 
 const NSWindow = opaque {};
+const NSOpenGLPixelFormat = opaque {};
 const NSOpenGLContext = opaque {};
 const CAMetalLayer = opaque {};
 extern fn wioInit() void;
@@ -27,11 +28,12 @@ extern fn wioRequestAttention() void;
 extern fn wioSetClipboardText([*]const u8, usize) void;
 extern fn wioGetClipboardText(*const std.mem.Allocator, *usize) ?[*]u8;
 extern fn wioPresentFramebuffer(*NSWindow, c.CGContextRef) void;
-extern fn wioCreateContext(*NSWindow, [*]const c.CGLPixelFormatAttribute, ?*NSOpenGLContext) ?*NSOpenGLContext;
-extern fn wioDestroyContext(?*NSOpenGLContext) void;
-extern fn wioMakeContextCurrent(?*NSOpenGLContext) void;
-extern fn wioSwapBuffers(*NSWindow, ?*NSOpenGLContext) void;
-extern fn wioSwapInterval(?*NSOpenGLContext, i32) void;
+extern fn wioRelease(?*const anyopaque) void;
+extern fn wioGlChoosePixelFormat([*]const c.CGLPixelFormatAttribute) ?*NSOpenGLPixelFormat;
+extern fn wioGlCreateContext(?*NSOpenGLPixelFormat, ?*NSOpenGLContext) ?*NSOpenGLContext;
+extern fn wioGlMakeContextCurrent(*NSWindow, ?*NSOpenGLContext) void;
+extern fn wioGlSwapBuffers() void;
+extern fn wioGlSwapInterval(i32) void;
 extern fn wioCreateMetalLayer(*NSWindow) ?*CAMetalLayer;
 extern const wioHIDDeviceUsagePageKey: c.CFStringRef;
 extern const wioHIDDeviceUsageKey: c.CFStringRef;
@@ -208,24 +210,20 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
             else
                 return error.UnsupportedContextOptions;
 
-            self.opengl.context = wioCreateContext(
-                self.window,
-                &.{
-                    c.kCGLPFAOpenGLProfile, profile,
-                    c.kCGLPFAColorSize,     opengl.red_bits + opengl.green_bits + opengl.blue_bits,
-                    c.kCGLPFAAlphaSize,     opengl.alpha_bits,
-                    c.kCGLPFADepthSize,     opengl.depth_bits,
-                    c.kCGLPFAStencilSize,   opengl.stencil_bits,
-                    c.kCGLPFASampleBuffers, if (opengl.samples == 0) 0 else 1,
-                    c.kCGLPFASamples,       opengl.samples,
-                    if (opengl.doublebuffer)
-                        c.kCGLPFADoubleBuffer
-                    else
-                        0,
+            self.opengl.format = wioGlChoosePixelFormat(&.{
+                c.kCGLPFAOpenGLProfile, profile,
+                c.kCGLPFAColorSize,     opengl.red_bits + opengl.green_bits + opengl.blue_bits,
+                c.kCGLPFAAlphaSize,     opengl.alpha_bits,
+                c.kCGLPFADepthSize,     opengl.depth_bits,
+                c.kCGLPFAStencilSize,   opengl.stencil_bits,
+                c.kCGLPFASampleBuffers, if (opengl.samples == 0) 0 else 1,
+                c.kCGLPFASamples,       opengl.samples,
+                if (opengl.doublebuffer)
+                    c.kCGLPFADoubleBuffer
+                else
                     0,
-                },
-                if (opengl.share_window) |share| share.backend.opengl.context else null,
-            );
+                0,
+            });
         }
     }
 
@@ -235,10 +233,12 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
 pub const Window = struct {
     events: internal.EventQueue,
     window: *NSWindow,
-    opengl: if (build_options.opengl) struct { context: ?*NSOpenGLContext = null } else struct {} = .{},
+    opengl: if (build_options.opengl) struct {
+        format: ?*NSOpenGLPixelFormat = null,
+    } else struct {} = .{},
 
     pub fn destroy(self: *Window) void {
-        if (build_options.opengl) wioDestroyContext(self.opengl.context);
+        if (build_options.opengl) wioRelease(self.opengl.format);
         wioDestroyWindow(self.window);
         self.events.deinit();
         internal.allocator.destroy(self);
@@ -331,16 +331,25 @@ pub const Window = struct {
         wioPresentFramebuffer(self.window, framebuffer.bitmap);
     }
 
-    pub fn glMakeContextCurrent(self: *Window) void {
-        wioMakeContextCurrent(self.opengl.context);
+    pub fn glCreateContext(self: *Window, options: wio.GlCreateContextOptions) !GlContext {
+        return .{
+            .context = wioGlCreateContext(
+                self.opengl.format,
+                if (options.share) |share| share.backend.context else null,
+            ),
+        };
     }
 
-    pub fn glSwapBuffers(self: *Window) void {
-        wioSwapBuffers(self.window, self.opengl.context);
+    pub fn glMakeContextCurrent(self: *Window, context: *GlContext) void {
+        wioGlMakeContextCurrent(self.window, context.context);
     }
 
-    pub fn glSwapInterval(self: *Window, interval: i32) void {
-        wioSwapInterval(self.opengl.context, interval);
+    pub fn glSwapBuffers(_: *Window) void {
+        wioGlSwapBuffers();
+    }
+
+    pub fn glSwapInterval(_: *Window, interval: i32) void {
+        wioGlSwapInterval(interval);
     }
 
     pub fn vkCreateSurface(self: Window, instance: usize, allocation_callbacks: ?*const anyopaque, surface: *u64) i32 {
@@ -375,6 +384,14 @@ pub const Framebuffer = struct {
 
     pub fn setPixel(self: *Framebuffer, x: usize, y: usize, rgb: u32) void {
         std.mem.writeInt(u32, std.mem.asBytes(&self.pixels[y * self.width + x]), rgb, .little);
+    }
+};
+
+pub const GlContext = struct {
+    context: ?*NSOpenGLContext,
+
+    pub fn destroy(self: *GlContext) void {
+        wioRelease(self.context);
     }
 };
 

@@ -120,8 +120,15 @@ pub const Window = struct {
         _ = framebuffer;
     }
 
-    pub fn glMakeContextCurrent(self: *Window) void {
+    pub fn glCreateContext(self: *Window, options: wio.GlCreateContextOptions) !GlContext {
         _ = self;
+        _ = options;
+        return error.Unexpected;
+    }
+
+    pub fn glMakeContextCurrent(self: *Window, context: *GlContext) void {
+        _ = self;
+        _ = context;
     }
 
     pub fn glSwapBuffers(self: *Window) void {
@@ -152,6 +159,12 @@ pub const Framebuffer = struct {
         _ = x;
         _ = y;
         _ = rgb;
+    }
+};
+
+pub const GlContext = struct {
+    pub fn destroy(self: *GlContext) void {
+        _ = self;
     }
 };
 

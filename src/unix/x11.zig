@@ -245,7 +245,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
 
     var depth: c_int = h.CopyFromParent;
     var visual: ?*h.Visual = null;
-    var context: h.GLXContext = null;
+    var config: h.GLXFBConfig = null;
     if (build_options.opengl) {
         if (options.opengl) |opengl| {
             var count: c_int = undefined;
@@ -263,7 +263,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
             }, &count) orelse return internal.logUnexpected("glXChooseFBConfig");
             defer _ = c.XFree(@ptrCast(configs));
 
-            const config = configs[0];
+            config = configs[0];
 
             const info: *h.XVisualInfo = c.glXGetVisualFromFBConfig(display, config) orelse return internal.logUnexpected("glXGetVisualFromFBConfig");
             defer _ = c.XFree(info);
@@ -272,34 +272,10 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
 
             attributes.colormap = c.XCreateColormap(display, h.DefaultRootWindow(display), visual, h.AllocNone);
             errdefer _ = c.XFreeColormap(display, attributes.colormap);
-
-            context = if (glx.createContextAttribsARB) |createContextAttribsARB|
-                createContextAttribsARB(
-                    display,
-                    config,
-                    if (opengl.share_window) |share| share.backend.x11.opengl.context else null,
-                    h.True,
-                    &[_]c_int{
-                        h.GLX_CONTEXT_MAJOR_VERSION_ARB, opengl.major_version,
-                        h.GLX_CONTEXT_MINOR_VERSION_ARB, opengl.minor_version,
-                        h.GLX_CONTEXT_FLAGS_ARB,         (if (opengl.forward_compatible) h.GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB else 0) | (if (opengl.debug) h.GLX_CONTEXT_DEBUG_BIT_ARB else 0),
-                        h.GLX_CONTEXT_PROFILE_MASK_ARB,  if (opengl.profile == .core) h.GLX_CONTEXT_CORE_PROFILE_BIT_ARB else h.GLX_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
-                        h.None,
-                    },
-                ) orelse return internal.logUnexpected("glXCreateContextAttribsARB")
-            else
-                c.glXCreateNewContext(
-                    display,
-                    config,
-                    h.GLX_RGBA_TYPE,
-                    if (opengl.share_window) |window| window.backend.x11.opengl.context else null,
-                    h.True,
-                ) orelse return internal.logUnexpected("glXCreateNewContext");
         }
     }
     errdefer if (build_options.opengl) {
         if (options.opengl != null) {
-            c.glXDestroyContext(display, context);
             _ = c.XFreeColormap(display, attributes.colormap);
         }
     };
@@ -362,7 +338,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
         .window = window,
         .ic = ic,
         .size = options.size,
-        .opengl = if (build_options.opengl) .{ .colormap = attributes.colormap, .context = context } else .{},
+        .opengl = if (build_options.opengl) .{ .config = config, .colormap = attributes.colormap } else .{},
     };
 
     self.setTitle(options.title);
@@ -404,15 +380,14 @@ pub const Window = struct {
         text: ?[]const u8 = null,
     } else struct {} = .{},
     opengl: if (build_options.opengl) struct {
+        config: h.GLXFBConfig,
         colormap: h.Colormap,
-        context: h.GLXContext,
     } else struct {},
 
     pub fn destroy(self: *Window) void {
         _ = windows.remove(self.window);
 
         if (build_options.opengl) {
-            if (self.opengl.context) |context| c.glXDestroyContext(display, context);
             if (self.opengl.colormap != h.CopyFromParent) _ = c.XFreeColormap(display, self.opengl.colormap);
         }
 
@@ -616,8 +591,35 @@ pub const Window = struct {
         _ = c.XFlush(display);
     }
 
-    pub fn glMakeContextCurrent(self: *Window) void {
-        _ = c.glXMakeCurrent(display, self.window, self.opengl.context);
+    pub fn glCreateContext(self: *Window, options: wio.GlCreateContextOptions) !GlContext {
+        return .{
+            .context = if (glx.createContextAttribsARB) |createContextAttribsARB|
+                createContextAttribsARB(
+                    display,
+                    self.opengl.config,
+                    if (options.share) |share| share.backend.x11.context else null,
+                    h.True,
+                    &[_]c_int{
+                        h.GLX_CONTEXT_MAJOR_VERSION_ARB, options.options.major_version,
+                        h.GLX_CONTEXT_MINOR_VERSION_ARB, options.options.minor_version,
+                        h.GLX_CONTEXT_FLAGS_ARB,         (if (options.options.forward_compatible) h.GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB else 0) | (if (options.options.debug) h.GLX_CONTEXT_DEBUG_BIT_ARB else 0),
+                        h.GLX_CONTEXT_PROFILE_MASK_ARB,  if (options.options.profile == .core) h.GLX_CONTEXT_CORE_PROFILE_BIT_ARB else h.GLX_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
+                        h.None,
+                    },
+                ) orelse return internal.logUnexpected("glXCreateContextAttribsARB")
+            else
+                c.glXCreateNewContext(
+                    display,
+                    self.opengl.config,
+                    h.GLX_RGBA_TYPE,
+                    if (options.share) |share| share.backend.x11.context else null,
+                    h.True,
+                ) orelse return internal.logUnexpected("glXCreateNewContext"),
+        };
+    }
+
+    pub fn glMakeContextCurrent(self: *Window, context: *GlContext) void {
+        _ = c.glXMakeCurrent(display, self.window, context.context);
     }
 
     pub fn glSwapBuffers(self: *Window) void {
@@ -669,6 +671,14 @@ pub const Framebuffer = struct {
 
     pub fn setPixel(self: *Framebuffer, x: usize, y: usize, rgb: u32) void {
         std.mem.writeInt(u32, std.mem.asBytes(&self.pixels[y * self.size.width + x]), rgb, .little);
+    }
+};
+
+pub const GlContext = struct {
+    context: h.GLXContext,
+
+    pub fn destroy(self: *GlContext) void {
+        c.glXDestroyContext(display, self.context);
     }
 };
 

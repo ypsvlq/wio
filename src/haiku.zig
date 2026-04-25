@@ -24,9 +24,9 @@ extern fn wioGetClipboardText(*usize) ?[*]const u8;
 extern fn wioCreateFramebuffer(u16, u16) Framebuffer;
 extern fn wioFramebufferDestroy(*BBitmap) void;
 extern fn wioPresentFramebuffer(*BWindow, *BBitmap) void;
-extern fn wioCreateContext(*BWindow, bool, bool, bool, bool) *BGLView;
-extern fn wioMakeContextCurrent(*BGLView) void;
-extern fn wioSwapBuffers(bool) void;
+extern fn wioGlCreateContext(*BWindow, bool, bool, bool, bool) *BGLView;
+extern fn wioGlMakeContextCurrent(*BGLView) void;
+extern fn wioGlSwapBuffers(bool) void;
 extern fn wioJoystickIteratorInit(*i32) *BJoystick;
 extern fn wioJoystickIteratorDeinit(*BJoystick) void;
 extern fn wioJoystickIteratorNext(*BJoystick, i32, [*]u8) void;
@@ -135,16 +135,6 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
     defer internal.allocator.free(title);
     self.window = wioCreateWindow(self, title, options.size.width, options.size.height);
 
-    if (build_options.opengl) {
-        if (options.opengl) |opengl| {
-            if (opengl.share_window == null) {
-                self.opengl.context = wioCreateContext(self.window, opengl.doublebuffer, (opengl.alpha_bits > 0), (opengl.depth_bits > 0), (opengl.stencil_bits > 0));
-            } else {
-                return error.UnsupportedContextOptions;
-            }
-        }
-    }
-
     return self;
 }
 
@@ -159,7 +149,6 @@ pub const Window = struct {
         text: ?[]const u8 = null,
     } else struct {} = .{},
     opengl: if (build_options.opengl) struct {
-        context: ?*BGLView = null,
         vsync: bool = false,
     } else struct {} = .{},
 
@@ -239,12 +228,21 @@ pub const Window = struct {
         wioPresentFramebuffer(self.window, framebuffer.bitmap);
     }
 
-    pub fn glMakeContextCurrent(self: *Window) void {
-        wioMakeContextCurrent(self.opengl.context.?);
+    pub fn glCreateContext(self: *Window, options: wio.GlCreateContextOptions) !GlContext {
+        return .{
+            .view = if (options.share == null)
+                wioGlCreateContext(self.window, options.doublebuffer, (options.alpha_bits > 0), (options.depth_bits > 0), (options.stencil_bits > 0))
+            else
+                return error.UnsupportedContextOptions,
+        };
+    }
+
+    pub fn glMakeContextCurrent(_: *Window, context: *GlContext) void {
+        wioGlMakeContextCurrent(context.view);
     }
 
     pub fn glSwapBuffers(self: *Window) void {
-        wioSwapBuffers(self.opengl.vsync);
+        wioGlSwapBuffers(self.opengl.vsync);
     }
 
     pub fn glSwapInterval(self: *Window, interval: i32) void {
@@ -272,6 +270,12 @@ pub const Framebuffer = extern struct {
         const index = (y * self.bytes_per_row) + (x * @sizeOf(u32));
         std.mem.writeInt(u32, self.bits[index..][0..4], rgb, .little);
     }
+};
+
+pub const GlContext = struct {
+    view: *BGLView,
+
+    pub fn destroy(_: *GlContext) void {}
 };
 
 pub fn glGetProcAddress(name: [*:0]const u8) ?*const anyopaque {

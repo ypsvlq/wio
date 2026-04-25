@@ -252,7 +252,7 @@ extern "C" {
 
 #ifdef WIO_OPENGL
 
-    BGLView *wioCreateContext(WioWindow *window, bool doublebuffer, bool alpha, bool depth, bool stencil) {
+    BGLView *wioGlCreateContext(WioWindow *window, bool doublebuffer, bool alpha, bool depth, bool stencil) {
         BGLView *view = new BGLView(window->Bounds(), "OpenGL", B_FOLLOW_ALL_SIDES, 0, (doublebuffer ? BGL_DOUBLE : 0) | (alpha ? BGL_ALPHA : 0) | (depth ? BGL_DEPTH : 0) | (stencil ? BGL_STENCIL : 0));
         window->AddChild(view);
         return view;
@@ -260,13 +260,13 @@ extern "C" {
 
     static BGLView *current;
 
-    void wioMakeContextCurrent(BGLView *view) {
+    void wioGlMakeContextCurrent(BGLView *view) {
         if (current != NULL) current->UnlockGL();
         view->LockGL();
         current = view;
     }
 
-    void wioSwapBuffers(bool vsync) {
+    void wioGlSwapBuffers(bool vsync) {
         current->SwapBuffers(vsync);
     }
 

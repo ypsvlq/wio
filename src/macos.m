@@ -550,31 +550,35 @@ void wioPresentFramebuffer(NSWindow *window, CGContextRef bitmap) {
 
 #ifdef WIO_OPENGL
 
-void *wioCreateContext(NSWindow *window, const NSOpenGLPixelFormatAttribute *attributes, NSOpenGLContext *share) {
-    NSView *view = [window contentView];
-    [view setWantsBestResolutionOpenGLSurface:YES];
+void wioRelease(void *object) {
+    CFBridgingRelease(object);
+}
+
+void *wioGlChoosePixelFormat(const NSOpenGLPixelFormatAttribute *attributes) {
     NSOpenGLPixelFormat *format = [[NSOpenGLPixelFormat alloc] initWithAttributes:attributes];
+    return (void *)CFBridgingRetain(format);
+}
+
+void *wioGlCreateContext(NSOpenGLPixelFormat *format, NSOpenGLContext *share) {
     NSOpenGLContext *context = [[NSOpenGLContext alloc] initWithFormat:format shareContext:share];
-    [context setView:view];
-    WioWindowDelegate *delegate = [window delegate];
-    [delegate setContext:context];
     return (void *)CFBridgingRetain(context);
 }
 
-void wioDestroyContext(void *context) {
-    CFBridgingRelease(context);
-}
-
-void wioMakeContextCurrent(NSOpenGLContext *context) {
+void wioGlMakeContextCurrent(NSWindow *window, NSOpenGLContext *context) {
+    NSView *view = [window contentView];
+    [view setWantsBestResolutionOpenGLSurface:YES];
+    [context setView:view];
+    WioWindowDelegate *delegate = [window delegate];
+    [delegate setContext:context];
     [context makeCurrentContext];
 }
 
-void wioSwapBuffers(NSWindow *window, NSOpenGLContext *context) {
-    [context flushBuffer];
+void wioGlSwapBuffers(void) {
+    [[NSOpenGLContext currentContext] flushBuffer];
 }
 
-void wioSwapInterval(NSOpenGLContext *context, int32_t interval) {
-    [context setValues:&interval forParameter:NSOpenGLCPSwapInterval];
+void wioGlSwapInterval(int32_t interval) {
+    [[NSOpenGLContext currentContext] setValues:&interval forParameter:NSOpenGLCPSwapInterval];
 }
 
 #endif

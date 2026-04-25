@@ -95,7 +95,6 @@ pub fn getModifiers() wio.Modifiers {
 pub fn createWindow(options: wio.CreateWindowOptions) !Window {
     const id = js.createWindow();
     if (options.mode == .fullscreen) js.setFullscreen(id, true);
-    if (build_options.opengl and options.opengl != null) gl.createContext(id);
     return .{ .id = id };
 }
 
@@ -210,7 +209,12 @@ pub const Window = struct {
         js.presentFramebuffer(self.id, framebuffer.pixels.ptr, framebuffer.size.width, framebuffer.size.height);
     }
 
-    pub fn glMakeContextCurrent(self: *Window) void {
+    pub fn glCreateContext(self: *Window, _: wio.GlCreateContextOptions) !GlContext {
+        gl.createContext(self.id);
+        return .{};
+    }
+
+    pub fn glMakeContextCurrent(self: *Window, _: *GlContext) void {
         gl.makeContextCurrent(self.id);
     }
 
@@ -230,6 +234,10 @@ pub const Framebuffer = struct {
     pub fn setPixel(self: *Framebuffer, x: usize, y: usize, rgb: u32) void {
         self.pixels[y * self.size.width + x] = 0xFF000000 | ((rgb & 0xFF0000) >> 16) | (rgb & 0xFF00) | ((rgb & 0xFF) << 16);
     }
+};
+
+pub const GlContext = struct {
+    pub fn destroy(_: *GlContext) void {}
 };
 
 pub fn glGetProcAddress(_: [*:0]const u8) ?*const anyopaque {

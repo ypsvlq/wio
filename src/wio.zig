@@ -126,7 +126,7 @@ pub const CreateWindowOptions = struct {
     /// Only functional on Windows and X11.
     parent: usize = 0,
 
-    opengl: ?CreateContextOptions = null,
+    opengl: ?GlOptions = null,
 };
 
 pub fn createWindow(options: CreateWindowOptions) !Window {
@@ -209,10 +209,16 @@ pub const Window = struct {
         self.backend.presentFramebuffer(&framebuffer.backend);
     }
 
-    /// May be called on any thread.
-    pub fn glMakeContextCurrent(self: *Window) void {
+    /// Must be destroyed before the window.
+    pub fn glCreateContext(self: *Window, options: GlCreateContextOptions) !GlContext {
         assertFeature(.opengl);
-        self.backend.glMakeContextCurrent();
+        return .{ .backend = try self.backend.glCreateContext(options) };
+    }
+
+    /// May be called on any thread.
+    pub fn glMakeContextCurrent(self: *Window, context: *GlContext) void {
+        assertFeature(.opengl);
+        self.backend.glMakeContextCurrent(&context.backend);
     }
 
     /// Must be called on the thread where the context is current.
@@ -271,6 +277,39 @@ pub const Framebuffer = struct {
     /// `rgb` is encoded as 0xRRGGBB.
     pub fn setPixel(self: *Framebuffer, x: usize, y: usize, rgb: u32) void {
         self.backend.setPixel(x, y, rgb);
+    }
+};
+
+pub const GlApi = enum { gl, gles1, gles2 };
+
+pub const GlOptions = struct {
+    api: GlApi = .gl,
+    major_version: u8 = 1,
+    minor_version: u8 = 0,
+    profile: enum { core, compatibility } = .core,
+    forward_compatible: bool = false,
+    debug: bool = false,
+
+    doublebuffer: bool = true,
+    red_bits: u8 = 8,
+    green_bits: u8 = 8,
+    blue_bits: u8 = 8,
+    alpha_bits: u8 = 8,
+    depth_bits: u8 = 24,
+    stencil_bits: u8 = 8,
+    samples: u8 = 0,
+};
+
+pub const GlCreateContextOptions = struct {
+    options: GlOptions,
+    share: ?*GlContext = null,
+};
+
+pub const GlContext = struct {
+    backend: backend.GlContext,
+
+    pub fn destroy(self: *GlContext) void {
+        self.backend.destroy();
     }
 };
 
@@ -502,27 +541,6 @@ pub const CursorMode = enum {
     normal,
     hidden,
     relative,
-};
-
-pub const CreateContextOptions = struct {
-    share_window: ?*Window = null,
-
-    api: enum { gl, gles1, gles2 } = .gl,
-
-    major_version: u8 = 1,
-    minor_version: u8 = 0,
-    profile: enum { core, compatibility } = .core,
-    forward_compatible: bool = false,
-    debug: bool = false,
-
-    doublebuffer: bool = true,
-    red_bits: u8 = 8,
-    green_bits: u8 = 8,
-    blue_bits: u8 = 8,
-    alpha_bits: u8 = 8,
-    depth_bits: u8 = 24,
-    stencil_bits: u8 = 8,
-    samples: u8 = 0,
 };
 
 pub const Button = enum {

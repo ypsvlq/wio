@@ -346,10 +346,17 @@ pub const Window = union {
         }
     }
 
-    pub fn glMakeContextCurrent(self: *Window) void {
+    pub fn glCreateContext(self: *Window, options: wio.GlCreateContextOptions) !GlContext {
+        return switch (active) {
+            .x11 => .{ .x11 = try self.x11.glCreateContext(options) },
+            .wayland => .{ .wayland = try self.wayland.glCreateContext(options) },
+        };
+    }
+
+    pub fn glMakeContextCurrent(self: *Window, context: *GlContext) void {
         switch (active) {
-            .x11 => self.x11.glMakeContextCurrent(),
-            .wayland => self.wayland.glMakeContextCurrent(),
+            .x11 => self.x11.glMakeContextCurrent(&context.x11),
+            .wayland => self.wayland.glMakeContextCurrent(&context.wayland),
         }
     }
 
@@ -390,6 +397,18 @@ pub const Framebuffer = union {
         switch (active) {
             .x11 => self.x11.setPixel(x, y, rgb),
             .wayland => self.wayland.setPixel(x, y, rgb),
+        }
+    }
+};
+
+pub const GlContext = union {
+    x11: x11.GlContext,
+    wayland: wayland.GlContext,
+
+    pub fn destroy(self: *GlContext) void {
+        switch (active) {
+            .x11 => self.x11.destroy(),
+            .wayland => self.wayland.destroy(),
         }
     }
 };

@@ -328,10 +328,10 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
 
     if (build_options.opengl) {
         if (options.opengl) |opengl| {
-            const api: c_uint = switch (opengl.api) {
+            if (c.eglBindAPI(switch (opengl.api) {
                 .gl => h.EGL_OPENGL_API,
-                .gles1, .gles2 => h.EGL_OPENGL_ES_API,
-            };
+                .gles1, .gles2 => h.EGL_OPENGL_ES_BIT,
+            }) == h.EGL_FALSE) return logEglError("eglBindAPI");
 
             const renderable_type = switch (opengl.api) {
                 .gl => h.EGL_OPENGL_BIT,
@@ -339,25 +339,6 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
                 .gles2 => h.EGL_OPENGL_ES2_BIT,
             };
 
-            const context_attribs: [*]const i32 = switch (opengl.api) {
-                .gl => &[_]i32{
-                    h.EGL_CONTEXT_MAJOR_VERSION,             opengl.major_version,
-                    h.EGL_CONTEXT_MINOR_VERSION,             opengl.minor_version,
-                    h.EGL_CONTEXT_OPENGL_PROFILE_MASK,       if (opengl.profile == .core) h.EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT else h.EGL_CONTEXT_OPENGL_COMPATIBILITY_PROFILE_BIT,
-                    h.EGL_CONTEXT_OPENGL_FORWARD_COMPATIBLE, if (opengl.forward_compatible) h.EGL_TRUE else h.EGL_FALSE,
-                    h.EGL_CONTEXT_OPENGL_DEBUG,              if (opengl.debug) h.EGL_TRUE else h.EGL_FALSE,
-                    h.EGL_NONE,
-                },
-                .gles1, .gles2 => &[_]i32{
-                    h.EGL_CONTEXT_MAJOR_VERSION, opengl.major_version,
-                    h.EGL_CONTEXT_MINOR_VERSION, opengl.minor_version,
-                    h.EGL_NONE,
-                },
-            };
-
-            if (c.eglBindAPI(api) == h.EGL_FALSE) return logEglError("eglBindAPI");
-
-            var config: h.EGLConfig = undefined;
             var count: i32 = undefined;
             if (c.eglChooseConfig(egl_display, &[_]i32{
                 h.EGL_RENDERABLE_TYPE, renderable_type,
@@ -370,16 +351,10 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
                 h.EGL_SAMPLE_BUFFERS,  if (opengl.samples != 0) 1 else 0,
                 h.EGL_SAMPLES,         opengl.samples,
                 h.EGL_NONE,
-            }, &config, 1, &count) == h.EGL_FALSE) return logEglError("eglChooseConfig");
+            }, &self.egl.config, 1, &count) == h.EGL_FALSE) return logEglError("eglChooseConfig");
 
             self.egl.window = c.wl_egl_window_create(self.surface, options.size.width, options.size.height);
-            self.egl.surface = c.eglCreateWindowSurface(egl_display, config, self.egl.window, null) orelse return logEglError("eglCreateWindowSurface");
-            self.egl.context = c.eglCreateContext(
-                egl_display,
-                config,
-                if (opengl.share_window) |share| share.backend.wayland.egl.context else h.EGL_NO_CONTEXT,
-                context_attribs,
-            ) orelse return logEglError("eglCreateContext");
+            self.egl.surface = c.eglCreateWindowSurface(egl_display, self.egl.config, self.egl.window, null) orelse return logEglError("eglCreateWindowSurface");
         }
     }
 
@@ -408,9 +383,9 @@ pub const Window = struct {
         text: ?[]const u8 = null,
     } else struct {} = .{},
     egl: if (build_options.opengl) struct {
+        config: h.EGLConfig = null,
         window: ?*h.wl_egl_window = null,
         surface: h.EGLSurface = null,
-        context: h.EGLContext = null,
     } else struct {} = .{},
 
     pub fn destroy(self: *Window) void {
@@ -430,7 +405,6 @@ pub const Window = struct {
         }
 
         if (build_options.opengl) {
-            if (self.egl.context) |_| _ = c.eglDestroyContext(egl_display, self.egl.context);
             if (self.egl.surface) |_| _ = c.eglDestroySurface(egl_display, self.egl.surface);
             if (self.egl.window) |_| c.wl_egl_window_destroy(self.egl.window);
         }
@@ -663,8 +637,33 @@ pub const Window = struct {
         _ = c.wl_display_roundtrip(display);
     }
 
-    pub fn glMakeContextCurrent(self: *Window) void {
-        _ = c.eglMakeCurrent(egl_display, self.egl.surface, self.egl.surface, self.egl.context);
+    pub fn glCreateContext(self: *Window, options: wio.GlCreateContextOptions) !GlContext {
+        return .{
+            .context = c.eglCreateContext(
+                egl_display,
+                self.egl.config,
+                if (options.share) |share| share.backend.wayland.context else h.EGL_NO_CONTEXT,
+                switch (options.options.api) {
+                    .gl => &[_]i32{
+                        h.EGL_CONTEXT_MAJOR_VERSION,             options.options.major_version,
+                        h.EGL_CONTEXT_MINOR_VERSION,             options.options.minor_version,
+                        h.EGL_CONTEXT_OPENGL_PROFILE_MASK,       if (options.options.profile == .core) h.EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT else h.EGL_CONTEXT_OPENGL_COMPATIBILITY_PROFILE_BIT,
+                        h.EGL_CONTEXT_OPENGL_FORWARD_COMPATIBLE, if (options.options.forward_compatible) h.EGL_TRUE else h.EGL_FALSE,
+                        h.EGL_CONTEXT_OPENGL_DEBUG,              if (options.options.debug) h.EGL_TRUE else h.EGL_FALSE,
+                        h.EGL_NONE,
+                    },
+                    .gles1, .gles2 => &[_]i32{
+                        h.EGL_CONTEXT_MAJOR_VERSION, options.options.major_version,
+                        h.EGL_CONTEXT_MINOR_VERSION, options.options.minor_version,
+                        h.EGL_NONE,
+                    },
+                },
+            ) orelse return logEglError("eglCreateContext"),
+        };
+    }
+
+    pub fn glMakeContextCurrent(self: *Window, context: *GlContext) void {
+        _ = c.eglMakeCurrent(egl_display, self.egl.surface, self.egl.surface, context.context);
     }
 
     pub fn glSwapBuffers(self: *Window) void {
@@ -773,6 +772,14 @@ pub const Framebuffer = struct {
 
     pub fn setPixel(self: *Framebuffer, x: usize, y: usize, rgb: u32) void {
         std.mem.writeInt(u32, std.mem.asBytes(&std.mem.bytesAsSlice(u32, self.mapped)[y * self.width + x]), rgb, .little);
+    }
+};
+
+pub const GlContext = struct {
+    context: h.EGLContext,
+
+    pub fn destroy(self: *GlContext) void {
+        _ = c.eglDestroyContext(egl_display, self.context);
     }
 };
 
