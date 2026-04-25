@@ -247,18 +247,18 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
     var visual: ?*h.Visual = null;
     var config: h.GLXFBConfig = null;
     if (build_options.opengl) {
-        if (options.opengl) |opengl| {
+        if (options.gl_options) |gl| {
             var count: c_int = undefined;
             const configs = c.glXChooseFBConfig(display, h.DefaultScreen(display), &[_]c_int{
-                h.GLX_DOUBLEBUFFER,   if (opengl.doublebuffer) h.True else h.False,
-                h.GLX_RED_SIZE,       opengl.red_bits,
-                h.GLX_GREEN_SIZE,     opengl.green_bits,
-                h.GLX_BLUE_SIZE,      opengl.blue_bits,
-                h.GLX_ALPHA_SIZE,     opengl.alpha_bits,
-                h.GLX_DEPTH_SIZE,     opengl.depth_bits,
-                h.GLX_STENCIL_SIZE,   opengl.stencil_bits,
-                h.GLX_SAMPLE_BUFFERS, if (opengl.samples != 0) 1 else 0,
-                h.GLX_SAMPLES,        opengl.samples,
+                h.GLX_DOUBLEBUFFER,   if (gl.doublebuffer) h.True else h.False,
+                h.GLX_RED_SIZE,       gl.red_bits,
+                h.GLX_GREEN_SIZE,     gl.green_bits,
+                h.GLX_BLUE_SIZE,      gl.blue_bits,
+                h.GLX_ALPHA_SIZE,     gl.alpha_bits,
+                h.GLX_DEPTH_SIZE,     gl.depth_bits,
+                h.GLX_STENCIL_SIZE,   gl.stencil_bits,
+                h.GLX_SAMPLE_BUFFERS, if (gl.samples != 0) 1 else 0,
+                h.GLX_SAMPLES,        gl.samples,
                 h.None,
             }, &count) orelse return internal.logUnexpected("glXChooseFBConfig");
             defer _ = c.XFree(@ptrCast(configs));
@@ -275,7 +275,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
         }
     }
     errdefer if (build_options.opengl) {
-        if (options.opengl != null) {
+        if (options.gl_options != null) {
             _ = c.XFreeColormap(display, attributes.colormap);
         }
     };

@@ -50,7 +50,7 @@ pub fn main() !void {
     window = try wio.createWindow(.{
         .title = "wio example",
         .scale = 1,
-        .opengl = gl_options,
+        .gl_options = gl_options,
     });
 
     if (wio.build_options.opengl) {
@@ -213,7 +213,7 @@ fn action(button: wio.Button) !void {
     switch (button) {
         .enter => {
             if (maybe_window2 == null) {
-                maybe_window2 = try wio.createWindow(.{ .size = .{ .width = 320, .height = 240 }, .scale = 1, .opengl = gl_options });
+                maybe_window2 = try wio.createWindow(.{ .size = .{ .width = 320, .height = 240 }, .scale = 1, .gl_options = gl_options });
                 context2 = try maybe_window2.?.glCreateContext(.{ .options = gl_options });
             }
         },

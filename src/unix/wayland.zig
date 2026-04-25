@@ -327,13 +327,13 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
     }
 
     if (build_options.opengl) {
-        if (options.opengl) |opengl| {
-            if (c.eglBindAPI(switch (opengl.api) {
+        if (options.gl_options) |gl| {
+            if (c.eglBindAPI(switch (gl.api) {
                 .gl => h.EGL_OPENGL_API,
                 .gles1, .gles2 => h.EGL_OPENGL_ES_BIT,
             }) == h.EGL_FALSE) return logEglError("eglBindAPI");
 
-            const renderable_type = switch (opengl.api) {
+            const renderable_type = switch (gl.api) {
                 .gl => h.EGL_OPENGL_BIT,
                 .gles1 => h.EGL_OPENGL_ES_BIT,
                 .gles2 => h.EGL_OPENGL_ES2_BIT,
@@ -342,14 +342,14 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
             var count: i32 = undefined;
             if (c.eglChooseConfig(egl_display, &[_]i32{
                 h.EGL_RENDERABLE_TYPE, renderable_type,
-                h.EGL_RED_SIZE,        opengl.red_bits,
-                h.EGL_GREEN_SIZE,      opengl.green_bits,
-                h.EGL_BLUE_SIZE,       opengl.blue_bits,
-                h.EGL_ALPHA_SIZE,      opengl.alpha_bits,
-                h.EGL_DEPTH_SIZE,      opengl.depth_bits,
-                h.EGL_STENCIL_SIZE,    opengl.stencil_bits,
-                h.EGL_SAMPLE_BUFFERS,  if (opengl.samples != 0) 1 else 0,
-                h.EGL_SAMPLES,         opengl.samples,
+                h.EGL_RED_SIZE,        gl.red_bits,
+                h.EGL_GREEN_SIZE,      gl.green_bits,
+                h.EGL_BLUE_SIZE,       gl.blue_bits,
+                h.EGL_ALPHA_SIZE,      gl.alpha_bits,
+                h.EGL_DEPTH_SIZE,      gl.depth_bits,
+                h.EGL_STENCIL_SIZE,    gl.stencil_bits,
+                h.EGL_SAMPLE_BUFFERS,  if (gl.samples != 0) 1 else 0,
+                h.EGL_SAMPLES,         gl.samples,
                 h.EGL_NONE,
             }, &self.egl.config, 1, &count) == h.EGL_FALSE) return logEglError("eglChooseConfig");
 

@@ -85,17 +85,17 @@ pub fn createWindow(options: wio.CreateWindowOptions) !Window {
     created = true;
 
     if (build_options.opengl) {
-        if (options.opengl) |opengl| {
+        if (options.gl_options) |gl| {
             var count: i32 = undefined;
             if (c.eglChooseConfig(egl_display, &[_]i32{
-                c.EGL_RED_SIZE,       opengl.red_bits,
-                c.EGL_GREEN_SIZE,     opengl.green_bits,
-                c.EGL_BLUE_SIZE,      opengl.blue_bits,
-                c.EGL_ALPHA_SIZE,     opengl.alpha_bits,
-                c.EGL_DEPTH_SIZE,     opengl.depth_bits,
-                c.EGL_STENCIL_SIZE,   opengl.stencil_bits,
-                c.EGL_SAMPLE_BUFFERS, if (opengl.samples != 0) 1 else 0,
-                c.EGL_SAMPLES,        opengl.samples,
+                c.EGL_RED_SIZE,       gl.red_bits,
+                c.EGL_GREEN_SIZE,     gl.green_bits,
+                c.EGL_BLUE_SIZE,      gl.blue_bits,
+                c.EGL_ALPHA_SIZE,     gl.alpha_bits,
+                c.EGL_DEPTH_SIZE,     gl.depth_bits,
+                c.EGL_STENCIL_SIZE,   gl.stencil_bits,
+                c.EGL_SAMPLE_BUFFERS, if (gl.samples != 0) 1 else 0,
+                c.EGL_SAMPLES,        gl.samples,
                 c.EGL_NONE,
             }, &egl_config, 1, &count) == c.EGL_FALSE) return logUnexpectedEgl("eglChooseConfig");
         }

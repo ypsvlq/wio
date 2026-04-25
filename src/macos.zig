@@ -200,25 +200,25 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
     self.setMode(options.mode);
 
     if (build_options.opengl) {
-        if (options.opengl) |opengl| {
-            const profile: c.CGLPixelFormatAttribute = if (opengl.major_version <= 2)
+        if (options.gl_options) |gl| {
+            const profile: c.CGLPixelFormatAttribute = if (gl.major_version <= 2)
                 c.kCGLOGLPVersion_Legacy
-            else if (opengl.major_version == 3 and (opengl.minor_version == 2 or opengl.minor_version == 3) and opengl.profile == .core)
+            else if (gl.major_version == 3 and (gl.minor_version == 2 or gl.minor_version == 3) and gl.profile == .core)
                 c.kCGLOGLPVersion_GL3_Core
-            else if (opengl.major_version == 4 and opengl.minor_version <= 1 and opengl.profile == .core)
+            else if (gl.major_version == 4 and gl.minor_version <= 1 and gl.profile == .core)
                 c.kCGLOGLPVersion_GL4_Core
             else
                 return error.UnsupportedContextOptions;
 
             self.opengl.format = wioGlChoosePixelFormat(&.{
                 c.kCGLPFAOpenGLProfile, profile,
-                c.kCGLPFAColorSize,     opengl.red_bits + opengl.green_bits + opengl.blue_bits,
-                c.kCGLPFAAlphaSize,     opengl.alpha_bits,
-                c.kCGLPFADepthSize,     opengl.depth_bits,
-                c.kCGLPFAStencilSize,   opengl.stencil_bits,
-                c.kCGLPFASampleBuffers, if (opengl.samples == 0) 0 else 1,
-                c.kCGLPFASamples,       opengl.samples,
-                if (opengl.doublebuffer)
+                c.kCGLPFAColorSize,     gl.red_bits + gl.green_bits + gl.blue_bits,
+                c.kCGLPFAAlphaSize,     gl.alpha_bits,
+                c.kCGLPFADepthSize,     gl.depth_bits,
+                c.kCGLPFAStencilSize,   gl.stencil_bits,
+                c.kCGLPFASampleBuffers, if (gl.samples == 0) 0 else 1,
+                c.kCGLPFASamples,       gl.samples,
+                if (gl.doublebuffer)
                     c.kCGLPFADoubleBuffer
                 else
                     0,

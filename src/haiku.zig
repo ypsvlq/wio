@@ -231,7 +231,7 @@ pub const Window = struct {
     pub fn glCreateContext(self: *Window, options: wio.GlCreateContextOptions) !GlContext {
         return .{
             .view = if (options.share == null)
-                wioGlCreateContext(self.window, options.doublebuffer, (options.alpha_bits > 0), (options.depth_bits > 0), (options.stencil_bits > 0))
+                wioGlCreateContext(self.window, options.options.doublebuffer, (options.options.alpha_bits > 0), (options.options.depth_bits > 0), (options.options.stencil_bits > 0))
             else
                 return error.UnsupportedContextOptions,
         };

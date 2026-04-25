@@ -298,7 +298,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
     }
 
     if (build_options.opengl) {
-        if (options.opengl) |opengl| {
+        if (options.gl_options) |gl| {
             self.opengl.dc = w.GetDC(self.window);
 
             var format: i32 = undefined;
@@ -307,15 +307,15 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
             if (wgl.choosePixelFormatARB) |choosePixelFormatARB| {
                 var count: u32 = undefined;
                 if (choosePixelFormatARB(self.opengl.dc, &.{
-                    0x2011, if (opengl.doublebuffer) w.TRUE else w.FALSE,
-                    0x2015, opengl.red_bits,
-                    0x2017, opengl.green_bits,
-                    0x2019, opengl.blue_bits,
-                    0x201B, opengl.alpha_bits,
-                    0x2022, opengl.depth_bits,
-                    0x2023, opengl.stencil_bits,
-                    0x2041, if (opengl.samples != 0) 1 else 0,
-                    0x2042, opengl.samples,
+                    0x2011, if (gl.doublebuffer) w.TRUE else w.FALSE,
+                    0x2015, gl.red_bits,
+                    0x2017, gl.green_bits,
+                    0x2019, gl.blue_bits,
+                    0x201B, gl.alpha_bits,
+                    0x2022, gl.depth_bits,
+                    0x2023, gl.stencil_bits,
+                    0x2041, if (gl.samples != 0) 1 else 0,
+                    0x2042, gl.samples,
                     0,
                 }, null, 1, &format, &count) == w.FALSE) return logLastError("wglChoosePixelFormatARB");
                 if (count == 1) {
@@ -328,12 +328,12 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
                 pfd = std.mem.zeroInit(w.PIXELFORMATDESCRIPTOR, .{
                     .nSize = @sizeOf(w.PIXELFORMATDESCRIPTOR),
                     .nVersion = 1,
-                    .dwFlags = w.PFD_DRAW_TO_WINDOW | w.PFD_SUPPORT_OPENGL | if (opengl.doublebuffer) w.PFD_DOUBLEBUFFER else 0,
+                    .dwFlags = w.PFD_DRAW_TO_WINDOW | w.PFD_SUPPORT_OPENGL | if (gl.doublebuffer) w.PFD_DOUBLEBUFFER else 0,
                     .iPixelType = w.PFD_TYPE_RGBA,
-                    .cColorBits = opengl.red_bits + opengl.green_bits + opengl.blue_bits,
-                    .cAlphaBits = opengl.alpha_bits,
-                    .cDepthBits = opengl.depth_bits,
-                    .cStencilBits = opengl.stencil_bits,
+                    .cColorBits = gl.red_bits + gl.green_bits + gl.blue_bits,
+                    .cAlphaBits = gl.alpha_bits,
+                    .cDepthBits = gl.depth_bits,
+                    .cStencilBits = gl.stencil_bits,
                 });
                 format = w.ChoosePixelFormat(self.opengl.dc, &pfd);
                 if (format == 0) return logLastError("ChoosePixelFormat");

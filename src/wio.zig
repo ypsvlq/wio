@@ -126,7 +126,7 @@ pub const CreateWindowOptions = struct {
     /// Only functional on Windows and X11.
     parent: usize = 0,
 
-    opengl: ?GlOptions = null,
+    gl_options: ?GlOptions = null,
 };
 
 pub fn createWindow(options: CreateWindowOptions) !Window {
