@@ -47,7 +47,6 @@ static void warpCursor(NSWindow *window) {
 
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {
     [NSApp activateIgnoringOtherApps:YES];
-    [NSApp stop:nil];
 }
 
 - (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender {
@@ -413,7 +412,7 @@ void wioInit() {
     [[NSBundle mainBundle] loadNibNamed:@"MainMenu" owner:NSApp topLevelObjects:nil];
     [NSApp setDelegate:[[WioApplicationDelegate alloc] init]];
     [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
-    [NSApp run];
+    [NSApp finishLaunching];
 }
 
 void wioUpdate(void) {
@@ -470,8 +469,11 @@ void *wioCreateWindow(void *zig, uint16_t width, uint16_t height) {
     [window setAcceptsMouseMovedEvents:YES];
     [window setCollectionBehavior:NSWindowCollectionBehaviorFullScreenPrimary];
     [window setTabbingMode:NSWindowTabbingModeDisallowed];
-    [window makeKeyAndOrderFront:nil];
     [window center];
+    [window makeKeyAndOrderFront:nil];
+    [window orderFrontRegardless];
+    [window makeKeyWindow];
+    [NSApp activateIgnoringOtherApps:YES];
 
     wioVisible(zig);
     wioScale(zig, [window backingScaleFactor]);
