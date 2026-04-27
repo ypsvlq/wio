@@ -286,7 +286,7 @@ pub const GlOptions = struct {
     api: GlApi = .gl,
     major_version: u8 = 1,
     minor_version: u8 = 0,
-    profile: enum { core, compatibility } = .core,
+    profile: enum { compatibility, core } = .compatibility,
     forward_compatible: bool = false,
     debug: bool = false,
 
