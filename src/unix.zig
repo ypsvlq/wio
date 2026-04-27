@@ -353,10 +353,10 @@ pub const Window = union {
         };
     }
 
-    pub fn glMakeContextCurrent(self: *Window, context: *GlContext) void {
+    pub fn glMakeContextCurrent(self: *Window, context: GlContext) void {
         switch (active) {
-            .x11 => self.x11.glMakeContextCurrent(&context.x11),
-            .wayland => self.wayland.glMakeContextCurrent(&context.wayland),
+            .x11 => self.x11.glMakeContextCurrent(context.x11),
+            .wayland => self.wayland.glMakeContextCurrent(context.wayland),
         }
     }
 
@@ -405,7 +405,7 @@ pub const GlContext = union {
     x11: x11.GlContext,
     wayland: wayland.GlContext,
 
-    pub fn destroy(self: *GlContext) void {
+    pub fn destroy(self: GlContext) void {
         switch (active) {
             .x11 => self.x11.destroy(),
             .wayland => self.wayland.destroy(),

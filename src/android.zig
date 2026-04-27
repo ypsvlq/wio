@@ -199,7 +199,7 @@ pub const Window = struct {
         };
     }
 
-    pub fn glMakeContextCurrent(_: *Window, context: *GlContext) void {
+    pub fn glMakeContextCurrent(_: *Window, context: GlContext) void {
         egl_surface_mutex.lockUncancelable(internal.io);
         defer egl_surface_mutex.unlock(internal.io);
         _ = c.eglMakeCurrent(egl.display, egl_surface, egl_surface, context.context);
@@ -246,7 +246,7 @@ pub const Framebuffer = struct {
 pub const GlContext = struct {
     context: c.EGLContext,
 
-    pub fn destroy(self: *GlContext) void {
+    pub fn destroy(self: GlContext) void {
         _ = c.eglDestroyContext(egl.display, self.context);
     }
 };

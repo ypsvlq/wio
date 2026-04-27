@@ -626,7 +626,7 @@ pub const Window = struct {
         };
     }
 
-    pub fn glMakeContextCurrent(self: *Window, context: *GlContext) void {
+    pub fn glMakeContextCurrent(self: *Window, context: GlContext) void {
         _ = c.glXMakeCurrent(display, self.window, context.context);
     }
 
@@ -685,7 +685,7 @@ pub const Framebuffer = struct {
 pub const GlContext = struct {
     context: h.GLXContext,
 
-    pub fn destroy(self: *GlContext) void {
+    pub fn destroy(self: GlContext) void {
         c.glXDestroyContext(display, self.context);
     }
 };

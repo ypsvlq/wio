@@ -241,7 +241,7 @@ pub const Window = struct {
         };
     }
 
-    pub fn glMakeContextCurrent(_: *Window, context: *GlContext) void {
+    pub fn glMakeContextCurrent(_: *Window, context: GlContext) void {
         wioGlMakeContextCurrent(context.view);
     }
 
@@ -279,7 +279,7 @@ pub const Framebuffer = extern struct {
 pub const GlContext = struct {
     view: *BGLView,
 
-    pub fn destroy(_: *GlContext) void {}
+    pub fn destroy(_: GlContext) void {}
 };
 
 pub fn glGetProcAddress(name: [*:0]const u8) ?*const anyopaque {

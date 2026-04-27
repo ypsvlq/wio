@@ -578,7 +578,7 @@ pub const Window = struct {
         };
     }
 
-    pub fn glMakeContextCurrent(self: *Window, context: *GlContext) void {
+    pub fn glMakeContextCurrent(self: *Window, context: GlContext) void {
         _ = w.wglMakeCurrent(self.opengl.dc, context.rc);
     }
 
@@ -646,7 +646,7 @@ pub const Framebuffer = struct {
 pub const GlContext = struct {
     rc: w.HGLRC,
 
-    pub fn destroy(self: *GlContext) void {
+    pub fn destroy(self: GlContext) void {
         _ = w.wglDeleteContext(self.rc);
     }
 };

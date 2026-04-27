@@ -340,7 +340,7 @@ pub const Window = struct {
         };
     }
 
-    pub fn glMakeContextCurrent(self: *Window, context: *GlContext) void {
+    pub fn glMakeContextCurrent(self: *Window, context: GlContext) void {
         wioGlMakeContextCurrent(self.window, context.context);
     }
 
@@ -390,7 +390,7 @@ pub const Framebuffer = struct {
 pub const GlContext = struct {
     context: ?*NSOpenGLContext,
 
-    pub fn destroy(self: *GlContext) void {
+    pub fn destroy(self: GlContext) void {
         wioRelease(self.context);
     }
 };

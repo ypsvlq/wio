@@ -216,9 +216,9 @@ pub const Window = struct {
     }
 
     /// May be called on any thread.
-    pub fn glMakeContextCurrent(self: *Window, context: *GlContext) void {
+    pub fn glMakeContextCurrent(self: *Window, context: GlContext) void {
         assertFeature(.opengl);
-        self.backend.glMakeContextCurrent(&context.backend);
+        self.backend.glMakeContextCurrent(context.backend);
     }
 
     /// Must be called on the thread where the context is current.
@@ -302,13 +302,13 @@ pub const GlOptions = struct {
 
 pub const GlCreateContextOptions = struct {
     options: GlOptions,
-    share: ?*GlContext = null,
+    share: ?GlContext = null,
 };
 
 pub const GlContext = struct {
     backend: backend.GlContext,
 
-    pub fn destroy(self: *GlContext) void {
+    pub fn destroy(self: GlContext) void {
         self.backend.destroy();
     }
 };

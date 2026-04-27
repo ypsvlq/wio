@@ -126,7 +126,7 @@ pub const Window = struct {
         return error.Unexpected;
     }
 
-    pub fn glMakeContextCurrent(self: *Window, context: *GlContext) void {
+    pub fn glMakeContextCurrent(self: *Window, context: GlContext) void {
         _ = self;
         _ = context;
     }
@@ -163,7 +163,7 @@ pub const Framebuffer = struct {
 };
 
 pub const GlContext = struct {
-    pub fn destroy(self: *GlContext) void {
+    pub fn destroy(self: GlContext) void {
         _ = self;
     }
 };

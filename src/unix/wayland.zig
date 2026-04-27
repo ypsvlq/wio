@@ -622,7 +622,7 @@ pub const Window = struct {
         };
     }
 
-    pub fn glMakeContextCurrent(self: *Window, context: *GlContext) void {
+    pub fn glMakeContextCurrent(self: *Window, context: GlContext) void {
         _ = c.eglMakeCurrent(egl.display, self.egl.surface, self.egl.surface, context.context);
     }
 
@@ -738,7 +738,7 @@ pub const Framebuffer = struct {
 pub const GlContext = struct {
     context: h.EGLContext,
 
-    pub fn destroy(self: *GlContext) void {
+    pub fn destroy(self: GlContext) void {
         _ = c.eglDestroyContext(egl.display, self.context);
     }
 };

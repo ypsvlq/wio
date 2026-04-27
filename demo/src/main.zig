@@ -56,7 +56,7 @@ pub fn main() !void {
 
     if (wio.build_options.opengl) {
         context = try window.glCreateContext(.{ .options = gl_options });
-        window.glMakeContextCurrent(&context);
+        window.glMakeContextCurrent(context);
         window.glSwapInterval(1);
         if (!builtin.cpu.arch.isWasm()) {
             try gl.load(wio.glGetProcAddress);
@@ -102,14 +102,14 @@ fn loop() !bool {
             },
             .draw => {
                 if (wio.build_options.opengl) {
-                    window.glMakeContextCurrent(&context);
+                    window.glMakeContextCurrent(context);
                     triangle.draw();
                     window.glSwapBuffers();
                 }
             },
             .size_physical => |size| {
                 if (wio.build_options.opengl) {
-                    window.glMakeContextCurrent(&context);
+                    window.glMakeContextCurrent(context);
                     gl.viewport(0, 0, size.width, size.height);
                 }
             },
@@ -134,7 +134,7 @@ fn loop() !bool {
                 },
                 .draw => {
                     if (wio.build_options.opengl) {
-                        window2.glMakeContextCurrent(&context2);
+                        window2.glMakeContextCurrent(context2);
                         gl.clearColor(0.5, 0.5, 0.5, 1);
                         gl.clear(gl.COLOR_BUFFER_BIT);
                         window2.glSwapBuffers();
@@ -142,7 +142,7 @@ fn loop() !bool {
                 },
                 .size_physical => |size| {
                     if (wio.build_options.opengl) {
-                        window2.glMakeContextCurrent(&context2);
+                        window2.glMakeContextCurrent(context2);
                         gl.viewport(0, 0, size.width, size.height);
                     }
                 },

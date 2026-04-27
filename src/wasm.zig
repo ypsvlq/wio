@@ -214,7 +214,7 @@ pub const Window = struct {
         return .{};
     }
 
-    pub fn glMakeContextCurrent(self: *Window, _: *GlContext) void {
+    pub fn glMakeContextCurrent(self: *Window, _: GlContext) void {
         gl.makeContextCurrent(self.id);
     }
 
@@ -237,7 +237,7 @@ pub const Framebuffer = struct {
 };
 
 pub const GlContext = struct {
-    pub fn destroy(_: *GlContext) void {}
+    pub fn destroy(_: GlContext) void {}
 };
 
 pub fn glGetProcAddress(_: [*:0]const u8) ?*const anyopaque {
