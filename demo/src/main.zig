@@ -194,7 +194,7 @@ fn actionEvent(event: wio.Event) !void {
         .button_release => |button| {
             if (button == .left_control or button == .right_control) {
                 actions = false;
-            } else if (!builtin.cpu.arch.isWasm() and button == .f12) {
+            } else if (!builtin.single_threaded and button == .f12) {
                 const thread = try std.Thread.spawn(.{}, cancelWait, .{});
                 thread.detach();
                 const start = std.Io.Clock.awake.now(io).toMilliseconds();
