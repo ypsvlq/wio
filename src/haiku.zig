@@ -526,8 +526,8 @@ fn wioDropPosition(self: *Window, x: u16, y: u16) callconv(.c) void {
     self.pushEvent(.{ .drop_position = .{ .x = x, .y = y } });
 }
 
-fn wioDropFile(self: *Window, ptr: [*]const u8, len: usize) callconv(.c) void {
-    const path = internal.allocator.dupe(u8, ptr[0..len]) catch return;
+fn wioDropFile(self: *Window, ptr: [*:0]const u8) callconv(.c) void {
+    const path = internal.allocator.dupe(u8, std.mem.sliceTo(ptr, 0)) catch return;
     self.drop.files.append(internal.allocator, path) catch {
         internal.allocator.free(path);
     };

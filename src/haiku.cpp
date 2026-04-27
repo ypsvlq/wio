@@ -20,7 +20,7 @@ extern "C" {
     void wioScroll(void *, float, float);
     void wioDropBegin(void *);
     void wioDropPosition(void *, uint16, uint16);
-    void wioDropFile(void *, const char *, size_t);
+    void wioDropFile(void *, const char *);
     void wioDropText(void *, const char *, size_t);
     void wioDropComplete(void *);
     void wioAudioOutputWrite(void *, void *, size_t);
@@ -32,11 +32,11 @@ class WioWindow : public BWindow {
 private:
     void *zig;
     bool dropping;
-    bool drop_began;
 
 public:
-    WioWindow(void *zig, BRect frame, const char *title) : BWindow(frame, title, B_TITLED_WINDOW, 0), dropping(false), drop_began(false) {
+    WioWindow(void *zig, BRect frame, const char *title) : BWindow(frame, title, B_TITLED_WINDOW, 0) {
         this->zig = zig;
+        this->dropping = false;
 #ifdef WIO_FRAMEBUFFER
         AddChild(new BView(Bounds(), "wio", B_FOLLOW_ALL_SIDES, 0));
 #endif
@@ -108,19 +108,14 @@ public:
 
 #ifdef WIO_DROP
 
-                {
-                    BMessage drag_msg;
-                    if (message->FindMessage("be:drag_message", &drag_msg) == B_OK) {
-                        if (!dropping) {
-                            dropping = true;
-                            if (!drop_began) {
-                                drop_began = true;
-                                wioDropBegin(zig);
-                            }
-                        }
+                BMessage drag_msg;
+                if (message->FindMessage("be:drag_message", &drag_msg) == B_OK) {
+                    if (!dropping) {
+                        dropping = true;
+                        wioDropBegin(zig);
+                    }
+                    if (where.x > 0 && where.y > 0) {
                         wioDropPosition(zig, (uint16)where.x, (uint16)where.y);
-                    } else if (dropping) {
-                        dropping = false;
                     }
                 }
 
@@ -140,13 +135,10 @@ public:
 #ifdef WIO_DROP
 
         if (message->WasDropped()) {
-            if (!drop_began) wioDropBegin(zig);
             dropping = false;
-            drop_began = false;
             entry_ref ref;
             for (int32 i = 0; message->FindRef("refs", i, &ref) == B_OK; i++) {
-                BPath path(&ref);
-                if (path.Path() != NULL) wioDropFile(zig, path.Path(), strlen(path.Path()));
+                wioDropFile(zig, BPath(&ref).Path());
             }
             const void *text;
             ssize_t len;
