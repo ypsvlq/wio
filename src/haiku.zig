@@ -36,6 +36,8 @@ extern fn wioJoystickPoll(*BJoystick, [*]u16, [*]wio.Hat, *u32) bool;
 extern fn wioAudioOutputOpen(u32, u8, *const anyopaque) ?*BSoundPlayer;
 extern fn wioAudioOutputClose(*BSoundPlayer) void;
 
+export var wio_scale: f32 = undefined;
+
 var libGL: u32 = undefined;
 
 pub fn init() !void {
@@ -124,16 +126,18 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
         .events = .init(),
     };
 
+    const size = if (options.scale) |base| options.size.multiply(wio_scale / base) else options.size;
+
     self.events.push(.visible);
-    self.events.push(.{ .scale = 1 });
+    self.events.push(.{ .scale = wio_scale });
     self.events.push(.{ .mode = .normal });
-    self.events.push(.{ .size_logical = options.size });
-    self.events.push(.{ .size_physical = options.size });
+    self.events.push(.{ .size_logical = size });
+    self.events.push(.{ .size_physical = size });
     self.events.push(.draw);
 
     const title = try internal.allocator.dupeZ(u8, options.title);
     defer internal.allocator.free(title);
-    self.window = wioCreateWindow(self, title, options.size.width, options.size.height);
+    self.window = wioCreateWindow(self, title, size.width, size.height);
 
     return self;
 }

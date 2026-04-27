@@ -24,6 +24,8 @@ extern "C" {
     void wioDropText(void *, const char *, size_t);
     void wioDropComplete(void *);
     void wioAudioOutputWrite(void *, void *, size_t);
+
+    extern float wio_scale;
 }
 
 class WioWindow : public BWindow {
@@ -166,6 +168,7 @@ public:
 extern "C" {
     void wioInit(void) {
         new BApplication("application/x-vnd.wio");
+        wio_scale = be_plain_font->Size() / 12.0f;
     }
 
     void wioMessageBox(uint8 type, const char *title, const char *message) {
