@@ -647,7 +647,7 @@ pub const GlContext = struct {
     rc: w.HGLRC,
 
     pub fn destroy(self: *GlContext) void {
-        w.wglDeleteContext(self.rc);
+        _ = w.wglDeleteContext(self.rc);
     }
 };
 
