@@ -79,7 +79,11 @@ fn loop() !bool {
                 audio.close();
                 joystick.close();
 
-                if (maybe_window2) |*window2| window2.destroy();
+                if (maybe_window2) |*window2| {
+                    context2.destroy();
+                    window2.destroy();
+                }
+                context.destroy();
                 window.destroy();
 
                 wio.deinit();
