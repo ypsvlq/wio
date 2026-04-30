@@ -19,6 +19,7 @@ extern fn wioCreateWindow(*Window, [*:0]const u8, u16, u16) *BWindow;
 extern fn wioDestroyWindow(*BWindow) void;
 extern fn wioSetTitle(*BWindow, [*:0]const u8) void;
 extern fn wioSetSize(*BWindow, f32, f32) void;
+extern fn wioSetCursor(u8) void;
 extern fn wioSetClipboardText([*]const u8, usize) void;
 extern fn wioGetClipboardText(*usize) ?[*]const u8;
 extern fn wioCreateFramebuffer(u16, u16) Framebuffer;
@@ -148,6 +149,7 @@ pub const Window = struct {
     events_mutex: std.Io.Mutex = .init,
     buttons: std.StaticBitSet(5) = .initEmpty(),
     text: bool = false,
+    cursor: wio.Cursor = .arrow,
     drop: if (build_options.drop) struct {
         files: std.ArrayList([]const u8) = .empty,
         text: ?[]const u8 = null,
@@ -199,8 +201,8 @@ pub const Window = struct {
     pub fn setParent(_: *Window, _: usize) void {}
 
     pub fn setCursor(self: *Window, shape: wio.Cursor) void {
-        _ = self;
-        _ = shape;
+        self.cursor = shape;
+        wioSetCursor(@intFromEnum(shape));
     }
 
     pub fn setCursorMode(self: *Window, mode: wio.CursorMode) void {
@@ -447,6 +449,7 @@ export fn wioClose(self: *Window) void {
 
 export fn wioFocused(self: *Window) void {
     self.pushEvent(.focused);
+    wioSetCursor(@intFromEnum(self.cursor));
 }
 
 export fn wioUnfocused(self: *Window) void {

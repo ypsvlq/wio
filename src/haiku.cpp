@@ -5,6 +5,7 @@
 #include <DeviceKit.h>
 #include <MediaKit.h>
 #include <StorageKit.h>
+#include <app/Cursor.h>
 
 extern "C" {
     void wioClose(void *);
@@ -198,6 +199,44 @@ extern "C" {
 
     void wioSetSize(WioWindow *window, float width, float height) {
         window->ResizeTo(width, height);
+    }
+
+    void wioSetCursor(uint8 shape) {
+        BCursorID id;
+        switch (shape) {
+            case 2:
+                id = B_CURSOR_ID_PROGRESS;
+                break;
+            case 3:
+                id = B_CURSOR_ID_I_BEAM;
+                break;
+            case 4:
+                id = B_CURSOR_ID_FOLLOW_LINK;
+                break;
+            case 6:
+                id = B_CURSOR_ID_NOT_ALLOWED;
+                break;
+            case 7:
+                id = B_CURSOR_ID_MOVE;
+                break;
+            case 8:
+                id = B_CURSOR_ID_RESIZE_NORTH_SOUTH;
+                break;
+            case 9:
+                id = B_CURSOR_ID_RESIZE_EAST_WEST;
+                break;
+            case 10:
+                id = B_CURSOR_ID_RESIZE_NORTH_EAST_SOUTH_WEST;
+                break;
+            case 11:
+                id = B_CURSOR_ID_RESIZE_NORTH_WEST_SOUTH_EAST;
+                break;
+            default:
+                id = B_CURSOR_ID_SYSTEM_DEFAULT;
+                break;
+        }
+        BCursor cursor = BCursor(id);
+        be_app->SetCursor(&cursor);
     }
 
     void wioSetClipboardText(const char *text, size_t len) {
