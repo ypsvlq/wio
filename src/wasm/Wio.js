@@ -6,7 +6,7 @@ class Wio {
         /** @type {HTMLCanvasElement[]} */
         this.canvases = canvases;
 
-        /** @type {{canvas: HTMLCanvasElement, events: number[], input: HTMLInputElement, text: boolean, cursor: string, cursor_mode: number}[]} */
+        /** @type {{canvas: HTMLCanvasElement, events: number[], input: HTMLInputElement, text: boolean, relative_mouse: boolean, cursor: string, drop_files: string[], drop_text: string}[]} */
         this.windows = [];
 
         this.modifiers = 0;
@@ -23,9 +23,7 @@ class Wio {
 
         addEventListener("pointerlockchange", () => {
             for (const window of this.windows) {
-                if (window.cursor_mode === 2) {
-                    window.canvas.style.cursor = (window.canvas === document.pointerLockElement) ? "none" : window.cursor;
-                }
+                window.canvas.style.cursor = (window.canvas === document.pointerLockElement) ? "none" : window.cursor;
             }
         });
 
@@ -113,8 +111,8 @@ class Wio {
                 events: events,
                 input: input,
                 text: false,
+                relative_mouse: false,
                 cursor: "default",
-                cursor_mode: 0,
                 drop_files: [],
                 drop_text: null,
             };
@@ -161,7 +159,7 @@ class Wio {
             canvas.addEventListener("mousedown", (event) => {
                 const button = Wio.buttons[event.button];
                 if (button !== undefined) events.push(14, button);
-                if (window.cursor_mode === 2) canvas.requestPointerLock({ unadjustedMovement: true });
+                if (window.relative_mouse) canvas.requestPointerLock({ unadjustedMovement: true });
                 this.updateModifiers(event);
             });
             canvas.addEventListener("mouseup", (event) => {
@@ -169,7 +167,7 @@ class Wio {
                 if (button !== undefined) events.push(16, button);
             });
             canvas.addEventListener("mousemove", (event) => {
-                if (window.cursor_mode !== 2) {
+                if (!window.relative_mouse) {
                     events.push(17, event.offsetX, event.offsetY);
                 } else {
                     events.push(18, event.movementX, event.movementY);
@@ -224,6 +222,16 @@ class Wio {
             }
         },
 
+        enableRelativeMouse: (id) => {
+            this.windows[id].relative_mouse = true;
+            this.windows[id].canvas.requestPointerLock({ unadjustedMovement: true });
+        },
+
+        disableRelativeMouse: (id) => {
+            this.windows[id].relative_mouse = false;
+            document.exitPointerLock();
+        },
+
         setFullscreen: (id, fullscreen) => {
             if (fullscreen) {
                 this.windows[id].canvas.requestFullscreen().catch(() => { });
@@ -240,38 +248,43 @@ class Wio {
         setCursor: (id, cursor) => {
             this.windows[id].cursor = {
                 0: "default",
-                1: "progress",
-                2: "wait",
-                3: "text",
+                1: "none",
+                2: "context-menu",
+                3: "help",
                 4: "pointer",
-                5: "crosshair",
-                6: "not-allowed",
-                7: "move",
-                8: "ns-resize",
-                9: "ew-resize",
-                10: "nesw-resize",
-                11: "nwse-resize",
+                5: "progress",
+                6: "wait",
+                7: "cell",
+                8: "crosshair",
+                9: "text",
+                10: "vertical-text",
+                11: "alias",
+                12: "copy",
+                13: "move",
+                14: "no-drop",
+                15: "not-allowed",
+                16: "grab",
+                17: "grabbing",
+                18: "e-resize",
+                19: "n-resize",
+                20: "ne-resize",
+                21: "nw-resize",
+                22: "s-resize",
+                23: "se-resize",
+                24: "sw-resize",
+                25: "w-resize",
+                26: "ew-resize",
+                27: "ns-resize",
+                28: "nesw-resize",
+                29: "nwse-resize",
+                30: "col-resize",
+                31: "row-resize",
+                32: "all-scroll",
+                33: "zoom-in",
+                34: "zoom-out",
             }[cursor];
 
-            if (this.windows[id].cursor_mode === 0) {
-                this.windows[id].canvas.style.cursor = this.windows[id].cursor;
-            }
-        },
-
-        setCursorMode: (id, mode) => {
-            this.windows[id].cursor_mode = mode;
-
-            if (mode === 0) {
-                this.windows[id].canvas.style.cursor = this.windows[id].cursor;
-            } else {
-                this.windows[id].canvas.style.cursor = "none";
-            }
-
-            if (mode === 2) {
-                this.windows[id].canvas.requestPointerLock({ unadjustedMovement: true });
-            } else {
-                document.exitPointerLock();
-            }
+            this.windows[id].canvas.style.cursor = this.windows[id].cursor;
         },
 
         setClipboardText: (ptr, len) => {

@@ -157,6 +157,14 @@ pub const Window = struct {
         self.backend.disableTextInput();
     }
 
+    pub fn enableRelativeMouse(self: *Window) void {
+        self.backend.enableRelativeMouse();
+    }
+
+    pub fn disableRelativeMouse(self: *Window) void {
+        self.backend.disableRelativeMouse();
+    }
+
     pub fn setTitle(self: *Window, title: []const u8) void {
         self.backend.setTitle(title);
     }
@@ -176,10 +184,6 @@ pub const Window = struct {
 
     pub fn setCursor(self: *Window, cursor: Cursor) void {
         self.backend.setCursor(cursor);
-    }
-
-    pub fn setCursorMode(self: *Window, mode: CursorMode) void {
-        self.backend.setCursorMode(mode);
     }
 
     pub fn requestAttention(self: *Window) void {
@@ -522,25 +526,43 @@ pub const TextInputOptions = struct {
     cursor: ?Position = null,
 };
 
+/// See https://drafts.csswg.org/css-ui-4/#predefined-cursors
 pub const Cursor = enum {
-    arrow,
-    arrow_busy,
-    busy,
-    text,
-    hand,
+    default,
+    none,
+    context_menu,
+    help,
+    pointer,
+    progress,
+    wait,
+    cell,
     crosshair,
-    forbidden,
+    text,
+    vertical_text,
+    alias,
+    copy,
     move,
-    size_ns,
-    size_ew,
-    size_nesw,
-    size_nwse,
-};
-
-pub const CursorMode = enum {
-    normal,
-    hidden,
-    relative,
+    no_drop,
+    not_allowed,
+    grab,
+    grabbing,
+    e_resize,
+    n_resize,
+    ne_resize,
+    nw_resize,
+    s_resize,
+    se_resize,
+    sw_resize,
+    w_resize,
+    ew_resize,
+    ns_resize,
+    nesw_resize,
+    nwse_resize,
+    col_resize,
+    row_resize,
+    all_scroll,
+    zoom_in,
+    zoom_out,
 };
 
 pub const Button = enum {

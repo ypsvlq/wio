@@ -262,6 +262,20 @@ pub const Window = union {
         }
     }
 
+    pub fn enableRelativeMouse(self: *Window) void {
+        switch (active) {
+            .x11 => self.x11.enableRelativeMouse(),
+            .wayland => self.wayland.enableRelativeMouse(),
+        }
+    }
+
+    pub fn disableRelativeMouse(self: *Window) void {
+        switch (active) {
+            .x11 => self.x11.disableRelativeMouse(),
+            .wayland => self.wayland.disableRelativeMouse(),
+        }
+    }
+
     pub fn setTitle(self: *Window, title: []const u8) void {
         switch (active) {
             .x11 => self.x11.setTitle(title),
@@ -294,13 +308,6 @@ pub const Window = union {
         switch (active) {
             .x11 => self.x11.setCursor(shape),
             .wayland => self.wayland.setCursor(shape),
-        }
-    }
-
-    pub fn setCursorMode(self: *Window, mode: wio.CursorMode) void {
-        switch (active) {
-            .x11 => self.x11.setCursorMode(mode),
-            .wayland => self.wayland.setCursorMode(mode),
         }
     }
 

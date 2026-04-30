@@ -179,8 +179,6 @@ fn logEvent(event: wio.Event) void {
 
 var actions = false;
 var request_attention = false;
-var text_input = false;
-var cursor: u8 = 0;
 
 fn actionEvent(event: wio.Event) !void {
     switch (event) {
@@ -214,6 +212,10 @@ fn actionEvent(event: wio.Event) !void {
     }
 }
 
+var text_input = false;
+var relative_mouse = false;
+var cursor: u8 = 0;
+
 fn action(button: wio.Button) !void {
     switch (button) {
         .enter => {
@@ -222,14 +224,12 @@ fn action(button: wio.Button) !void {
                 context2 = try maybe_window2.?.glCreateContext(.{ .options = gl_options });
             }
         },
-        .@"1" => {
-            if (!text_input) {
-                window.enableTextInput(.{ .cursor = .{ .x = 100, .y = 100 } });
-            } else {
-                window.disableTextInput();
-            }
-            text_input = !text_input;
+        .d => {
+            wio.messageBox(.info, "wio", "info");
+            wio.messageBox(.warn, "wio", "warning");
+            wio.messageBox(.err, "wio", "error");
         },
+        .u => wio.openUri("https://tiredsleepy.net"),
         .l => {
             const modifiers = wio.getModifiers();
             std.log.scoped(.modifiers).info("{s}{s}{s}{s}", .{
@@ -239,8 +239,24 @@ fn action(button: wio.Button) !void {
                 if (modifiers.gui) "gui " else "",
             });
         },
+        .@"1" => {
+            if (!text_input) {
+                window.enableTextInput(.{ .cursor = .{ .x = 100, .y = 100 } });
+            } else {
+                window.disableTextInput();
+            }
+            text_input = !text_input;
+        },
+        .r => {
+            if (!relative_mouse) {
+                window.enableRelativeMouse();
+            } else {
+                window.disableRelativeMouse();
+            }
+            relative_mouse = !relative_mouse;
+        },
         .t => window.setTitle("retitled wio example"),
-        .w => window.setMode(.normal),
+        .n => window.setMode(.normal),
         .m => window.setMode(.maximized),
         .f => window.setMode(.fullscreen),
         .p => {
@@ -248,16 +264,7 @@ fn action(button: wio.Button) !void {
             cursor +%= 1;
             window.setCursor(cursors[cursor % cursors.len]);
         },
-        .n => window.setCursorMode(.normal),
-        .h => window.setCursorMode(.hidden),
-        .r => window.setCursorMode(.relative),
         .a => request_attention = true,
-        .d => {
-            wio.messageBox(.info, "wio", "info");
-            wio.messageBox(.warn, "wio", "warning");
-            wio.messageBox(.err, "wio", "error");
-        },
-        .u => wio.openUri("https://tiredsleepy.net"),
         .equals, .kp_plus => window.setSize(.{ .width = 640, .height = 480 }),
         .minus, .kp_minus => window.setSize(.{ .width = 320, .height = 240 }),
         .c => window.setClipboardText("wio example"),

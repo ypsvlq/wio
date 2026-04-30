@@ -375,8 +375,7 @@ pub const Window = struct {
     ic: h.XIC,
     text: bool = false,
     preedit_string: std.ArrayList(u21) = .empty,
-    cursor: h.Cursor = h.None,
-    cursor_mode: wio.CursorMode = .normal,
+    relative_mouse: bool = false,
     size: wio.Size,
     warped: bool = false,
     drop: if (build_options.drop) struct {
@@ -432,6 +431,17 @@ pub const Window = struct {
         self.text = false;
     }
 
+    pub fn enableRelativeMouse(self: *Window) void {
+        self.relative_mouse = true;
+        self.warped = false;
+        _ = c.XGrabPointer(display, self.window, h.True, 0, h.GrabModeAsync, h.GrabModeAsync, self.window, self.createBlankCursor(), h.CurrentTime);
+    }
+
+    pub fn disableRelativeMouse(self: *Window) void {
+        self.relative_mouse = false;
+        _ = c.XUngrabPointer(display, h.CurrentTime);
+    }
+
     pub fn setTitle(self: *Window, title: []const u8) void {
         _ = c.XChangeProperty(display, self.window, h.XA_WM_NAME, h.XA_STRING, 8, h.PropModeReplace, title.ptr, std.math.cast(c_int, title.len) orelse return);
     }
@@ -462,45 +472,50 @@ pub const Window = struct {
     }
 
     pub fn setCursor(self: *Window, shape: wio.Cursor) void {
-        const name = switch (shape) {
-            .arrow => "default",
-            .arrow_busy => "progress",
-            .busy => "wait",
-            .text => "text",
-            .hand => "pointer",
+        const maybe_name = switch (shape) {
+            .default => "default",
+            .none => null,
+            .context_menu => "context-menu",
+            .help => "help",
+            .pointer => "pointer",
+            .progress => "progress",
+            .wait => "wait",
+            .cell => "cell",
             .crosshair => "crosshair",
-            .forbidden => "not-allowed",
+            .text => "text",
+            .vertical_text => "vertical-text",
+            .alias => "alias",
+            .copy => "copy",
             .move => "move",
-            .size_ns => "ns-resize",
-            .size_ew => "ew-resize",
-            .size_nesw => "nesw-resize",
-            .size_nwse => "nwse-resize",
+            .no_drop => "no-drop",
+            .not_allowed => "not-allowed",
+            .grab => "grab",
+            .grabbing => "grabbing",
+            .e_resize => "e-resize",
+            .n_resize => "n-resize",
+            .ne_resize => "ne-resize",
+            .nw_resize => "nw-resize",
+            .s_resize => "s-resize",
+            .se_resize => "se-resize",
+            .sw_resize => "sw-resize",
+            .w_resize => "w-resize",
+            .ew_resize => "ew-resize",
+            .ns_resize => "ns-resize",
+            .nesw_resize => "nesw-resize",
+            .nwse_resize => "nwse-resize",
+            .col_resize => "col-resize",
+            .row_resize => "row-resize",
+            .all_scroll => "all-scroll",
+            .zoom_in => "zoom-in",
+            .zoom_out => "zoom-out",
         };
-        self.cursor = c.XcursorLibraryLoadCursor(display, name);
-        if (self.cursor_mode == .normal) {
-            _ = c.XDefineCursor(display, self.window, self.cursor);
-        }
-    }
 
-    pub fn setCursorMode(self: *Window, mode: wio.CursorMode) void {
-        self.cursor_mode = mode;
-        if (mode == .normal) {
-            _ = c.XDefineCursor(display, self.window, self.cursor);
-        } else {
-            const pixmap = c.XCreatePixmap(display, self.window, 1, 1, 1);
-            const gc = c.XCreateGC(display, pixmap, 0, null);
-            defer _ = c.XFreeGC(display, gc);
-            _ = c.XDrawPoint(display, pixmap, gc, 0, 0);
-            var color = std.mem.zeroes(h.XColor);
-            const cursor = c.XCreatePixmapCursor(display, pixmap, pixmap, &color, &color, 0, 0);
-            _ = c.XDefineCursor(display, self.window, cursor);
-        }
-        if (mode == .relative) {
-            _ = c.XGrabPointer(display, self.window, h.True, 0, h.GrabModeAsync, h.GrabModeAsync, self.window, h.None, h.CurrentTime);
-            self.warped = false;
-        } else {
-            _ = c.XUngrabPointer(display, h.CurrentTime);
-        }
+        const cursor = if (maybe_name) |name|
+            c.XcursorLibraryLoadCursor(display, name)
+        else
+            self.createBlankCursor();
+
+        _ = c.XDefineCursor(display, self.window, cursor);
     }
 
     pub fn requestAttention(self: *Window) void {
@@ -661,6 +676,15 @@ pub const Window = struct {
             allocation_callbacks,
             surface,
         );
+    }
+
+    fn createBlankCursor(self: *Window) h.Cursor {
+        const pixmap = c.XCreatePixmap(display, self.window, 1, 1, 1);
+        const gc = c.XCreateGC(display, pixmap, 0, null);
+        defer _ = c.XFreeGC(display, gc);
+        _ = c.XDrawPoint(display, pixmap, gc, 0, 0);
+        var color = std.mem.zeroes(h.XColor);
+        return c.XCreatePixmapCursor(display, pixmap, pixmap, &color, &color, 0, 0);
     }
 };
 
@@ -971,7 +995,7 @@ fn handle(event: *h.XEvent) void {
             window.events.push(.{ .button_release = button });
         },
         h.MotionNotify => {
-            if (window.cursor_mode == .relative) {
+            if (window.relative_mouse) {
                 const dx = event.xmotion.x - (window.size.width / 2);
                 const dy = event.xmotion.y - (window.size.height / 2);
                 if (dx != 0 or dy != 0) {

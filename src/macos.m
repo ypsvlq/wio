@@ -487,6 +487,17 @@ void wioDisableTextInput(NSWindow *window) {
     [[window contentView] setTextInput:NO x:0 y:0];
 }
 
+void wioEnableRelativeMouse(NSWindow *window) {
+    [[window contentView] setCursorMode:2];
+    warpCursor(window);
+    CGAssociateMouseAndMouseCursorPosition(NO);
+}
+
+void wioDisableRelativeMouse(NSWindow *window) {
+    [[window contentView] setCursorMode:0];
+    CGAssociateMouseAndMouseCursorPosition(YES);
+}
+
 void wioSetTitle(NSWindow *window, const char *ptr, size_t len) {
     [window setTitle:string(ptr, len)];
 }
@@ -503,25 +514,24 @@ void wioSetSize(NSWindow *window, uint16_t width, uint16_t height) {
 void wioSetCursor(NSWindow *window, uint8_t shape) {
     NSCursor *cursor;
     switch (shape) {
-        case 3: cursor = [NSCursor IBeamCursor]; break;
+        case 2: cursor = [NSCursor contextualMenuCursor]; break;
         case 4: cursor = [NSCursor pointingHandCursor]; break;
-        case 5: cursor = [NSCursor crosshairCursor]; break;
-        case 6: cursor = [NSCursor operationNotAllowedCursor]; break;
-        case 8: cursor = [NSCursor resizeUpDownCursor]; break;
-        case 9: cursor = [NSCursor resizeLeftRightCursor]; break;
+        case 8: cursor = [NSCursor crosshairCursor]; break;
+        case 9: cursor = [NSCursor IBeamCursor]; break;
+        case 10: cursor = [NSCursor IBeamCursorForVerticalLayout]; break;
+        case 12: cursor = [NSCursor dragCopyCursor]; break;
+        case 15: cursor = [NSCursor operationNotAllowedCursor]; break;
+        case 16: cursor = [NSCursor openHandCursor]; break;
+        case 17: cursor = [NSCursor closedHandCursor]; break;
+        case 18: cursor = [NSCursor resizeRightCursor]; break;
+        case 19: cursor = [NSCursor resizeUpCursor]; break;
+        case 22: cursor = [NSCursor resizeDownCursor]; break;
+        case 25: cursor = [NSCursor resizeLeftCursor]; break;
+        case 26: cursor = [NSCursor resizeLeftRightCursor]; break;
+        case 27: cursor = [NSCursor resizeUpDownCursor]; break;
         default: cursor = [NSCursor arrowCursor]; break;
     }
     [[window contentView] setCursor:cursor];
-}
-
-void wioSetCursorMode(NSWindow *window, uint8_t mode) {
-    [[window contentView] setCursorMode:mode];
-    if (mode == 2) {
-        warpCursor(window);
-        CGAssociateMouseAndMouseCursorPosition(NO);
-    } else {
-        CGAssociateMouseAndMouseCursorPosition(YES);
-    }
 }
 
 void wioRequestAttention(void) {

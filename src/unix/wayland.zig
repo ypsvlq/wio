@@ -352,7 +352,7 @@ pub const Window = struct {
     size: wio.Size,
     scale: f32 = 1,
     cursor: u32 = h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_DEFAULT,
-    cursor_mode: wio.CursorMode = .normal,
+    relative_mouse: bool = false,
     drop: if (build_options.drop) struct {
         files: std.ArrayList([]const u8) = .empty,
         text: ?[]const u8 = null,
@@ -449,6 +449,16 @@ pub const Window = struct {
         }
     }
 
+    pub fn enableRelativeMouse(self: *Window) void {
+        self.relative_mouse = true;
+        if (pointer_focus == self) self.applyCursor();
+    }
+
+    pub fn disableRelativeMouse(self: *Window) void {
+        self.relative_mouse = false;
+        if (pointer_focus == self) self.applyCursor();
+    }
+
     pub fn setTitle(self: *Window, title: []const u8) void {
         const title_z = internal.allocator.dupeZ(u8, title) catch return;
         defer internal.allocator.free(title_z);
@@ -475,24 +485,42 @@ pub const Window = struct {
 
     pub fn setCursor(self: *Window, shape: wio.Cursor) void {
         self.cursor = switch (shape) {
-            .arrow => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_DEFAULT,
-            .arrow_busy => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_PROGRESS,
-            .busy => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_WAIT,
-            .text => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_TEXT,
-            .hand => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_POINTER,
+            .default => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_DEFAULT,
+            .none => 0,
+            .context_menu => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_CONTEXT_MENU,
+            .help => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_HELP,
+            .pointer => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_POINTER,
+            .progress => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_PROGRESS,
+            .wait => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_WAIT,
+            .cell => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_CELL,
             .crosshair => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_CROSSHAIR,
-            .forbidden => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_NOT_ALLOWED,
+            .text => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_TEXT,
+            .vertical_text => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_VERTICAL_TEXT,
+            .alias => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_ALIAS,
+            .copy => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_COPY,
             .move => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_MOVE,
-            .size_ns => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_NS_RESIZE,
-            .size_ew => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_EW_RESIZE,
-            .size_nesw => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_NESW_RESIZE,
-            .size_nwse => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_NWSE_RESIZE,
+            .no_drop => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_NO_DROP,
+            .not_allowed => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_NOT_ALLOWED,
+            .grab => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_GRAB,
+            .grabbing => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_GRABBING,
+            .e_resize => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_E_RESIZE,
+            .n_resize => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_N_RESIZE,
+            .ne_resize => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_NE_RESIZE,
+            .nw_resize => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_NW_RESIZE,
+            .s_resize => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_S_RESIZE,
+            .se_resize => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_SE_RESIZE,
+            .sw_resize => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_SW_RESIZE,
+            .w_resize => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_W_RESIZE,
+            .ew_resize => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_EW_RESIZE,
+            .ns_resize => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_NS_RESIZE,
+            .nesw_resize => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_NESW_RESIZE,
+            .nwse_resize => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_NWSE_RESIZE,
+            .col_resize => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_COL_RESIZE,
+            .row_resize => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_ROW_RESIZE,
+            .all_scroll => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_ALL_SCROLL,
+            .zoom_in => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_ZOOM_IN,
+            .zoom_out => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_ZOOM_OUT,
         };
-        if (pointer_focus == self) self.applyCursor();
-    }
-
-    pub fn setCursorMode(self: *Window, mode: wio.CursorMode) void {
-        self.cursor_mode = mode;
         if (pointer_focus == self) self.applyCursor();
     }
 
@@ -697,7 +725,7 @@ pub const Window = struct {
     }
 
     fn applyCursor(self: *Window) void {
-        if (self.cursor_mode == .normal) {
+        if (self.cursor != 0 and !self.relative_mouse) {
             if (cursor_shape_device) |_| {
                 h.wp_cursor_shape_device_v1_set_shape(cursor_shape_device, pointer_enter_serial, self.cursor);
             }
@@ -710,7 +738,7 @@ pub const Window = struct {
             self.locked_pointer = null;
         }
 
-        if (self.cursor_mode == .relative) {
+        if (self.relative_mouse) {
             if (pointer_constraints) |_| {
                 self.locked_pointer = h.zwp_pointer_constraints_v1_lock_pointer(pointer_constraints, self.surface, pointer, null, h.ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
             }
@@ -979,7 +1007,7 @@ const relative_pointer_listener = h.zwp_relative_pointer_v1_listener{
 
 fn relativePointerMotion(_: ?*anyopaque, _: ?*h.zwp_relative_pointer_v1, _: u32, _: u32, _: h.wl_fixed_t, _: h.wl_fixed_t, dx_unaccel: h.wl_fixed_t, dy_unaccel: h.wl_fixed_t) callconv(.c) void {
     if (pointer_focus) |window| {
-        if (window.cursor_mode == .relative) {
+        if (window.relative_mouse) {
             window.events.push(.{ .mouse_relative = .{ .x = std.math.cast(i16, dx_unaccel >> 8) orelse return, .y = std.math.cast(i16, dy_unaccel >> 8) orelse return } });
         }
     }

@@ -19,11 +19,12 @@ extern fn wioCreateWindow(*Window, u16, u16) *NSWindow;
 extern fn wioDestroyWindow(*NSWindow) void;
 extern fn wioEnableTextInput(*NSWindow, u16, u16) void;
 extern fn wioDisableTextInput(*NSWindow) void;
+extern fn wioEnableRelativeMouse(*NSWindow) void;
+extern fn wioDisableRelativeMouse(*NSWindow) void;
 extern fn wioSetTitle(*NSWindow, [*]const u8, usize) void;
 extern fn wioSetMode(*NSWindow, u8) void;
 extern fn wioSetSize(*NSWindow, u16, u16) void;
 extern fn wioSetCursor(*NSWindow, u8) void;
-extern fn wioSetCursorMode(*NSWindow, u8) void;
 extern fn wioRequestAttention() void;
 extern fn wioSetClipboardText([*]const u8, usize) void;
 extern fn wioGetClipboardText(*const std.mem.Allocator, *usize) ?[*]u8;
@@ -260,6 +261,14 @@ pub const Window = struct {
         wioDisableTextInput(self.window);
     }
 
+    pub fn enableRelativeMouse(self: *Window) void {
+        wioEnableRelativeMouse(self.window);
+    }
+
+    pub fn disableRelativeMouse(self: *Window) void {
+        wioDisableRelativeMouse(self.window);
+    }
+
     pub fn setTitle(self: *Window, title: []const u8) void {
         wioSetTitle(self.window, title.ptr, title.len);
     }
@@ -279,10 +288,6 @@ pub const Window = struct {
 
     pub fn setCursor(self: *Window, shape: wio.Cursor) void {
         wioSetCursor(self.window, @intFromEnum(shape));
-    }
-
-    pub fn setCursorMode(self: *Window, mode: wio.CursorMode) void {
-        wioSetCursorMode(self.window, @intFromEnum(mode));
     }
 
     pub fn requestAttention(_: *Window) void {

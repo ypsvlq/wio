@@ -154,32 +154,54 @@ public class WioActivity extends Activity implements SurfaceHolder.Callback, OnG
         imm.hideSoftInputFromWindow(getCurrentFocus().getWindowToken(), 0);
     }
 
+    public void enableRelativeMouse() {
+        getCurrentFocus().requestPointerCapture();
+    }
+
+    public void disableRelativeMouse() {
+        getCurrentFocus().releasePointerCapture();
+    }
+
     static int cursors[] = {
-        PointerIcon.TYPE_NULL,
         PointerIcon.TYPE_ARROW,
-        PointerIcon.TYPE_ARROW, // .arrow_busy
-        PointerIcon.TYPE_WAIT,
-        PointerIcon.TYPE_TEXT,
+        PointerIcon.TYPE_NULL,
+        PointerIcon.TYPE_CONTEXT_MENU,
+        PointerIcon.TYPE_HELP,
         PointerIcon.TYPE_HAND,
+        PointerIcon.TYPE_ARROW, // .progress
+        PointerIcon.TYPE_WAIT,
+        PointerIcon.TYPE_CELL,
         PointerIcon.TYPE_CROSSHAIR,
-        PointerIcon.TYPE_ARROW, // .forbidden
-        PointerIcon.TYPE_ALL_SCROLL,
+        PointerIcon.TYPE_TEXT,
+        PointerIcon.TYPE_VERTICAL_TEXT,
+        PointerIcon.TYPE_ALIAS,
+        PointerIcon.TYPE_COPY,
+        PointerIcon.TYPE_ARROW, // .move
+        PointerIcon.TYPE_NO_DROP,
+        PointerIcon.TYPE_ARROW, // .not_allowed
+        PointerIcon.TYPE_GRAB,
+        PointerIcon.TYPE_GRABBING,
+        PointerIcon.TYPE_HORIZONTAL_DOUBLE_ARROW,
+        PointerIcon.TYPE_VERTICAL_DOUBLE_ARROW,
+        PointerIcon.TYPE_TOP_RIGHT_DIAGONAL_DOUBLE_ARROW,
+        PointerIcon.TYPE_TOP_LEFT_DIAGONAL_DOUBLE_ARROW,
+        PointerIcon.TYPE_HORIZONTAL_DOUBLE_ARROW,
+        PointerIcon.TYPE_TOP_LEFT_DIAGONAL_DOUBLE_ARROW,
+        PointerIcon.TYPE_TOP_RIGHT_DIAGONAL_DOUBLE_ARROW,
+        PointerIcon.TYPE_VERTICAL_DOUBLE_ARROW,
         PointerIcon.TYPE_VERTICAL_DOUBLE_ARROW,
         PointerIcon.TYPE_HORIZONTAL_DOUBLE_ARROW,
         PointerIcon.TYPE_TOP_RIGHT_DIAGONAL_DOUBLE_ARROW,
         PointerIcon.TYPE_TOP_LEFT_DIAGONAL_DOUBLE_ARROW,
+        PointerIcon.TYPE_VERTICAL_DOUBLE_ARROW,
+        PointerIcon.TYPE_HORIZONTAL_DOUBLE_ARROW,
+        PointerIcon.TYPE_ALL_SCROLL,
+        PointerIcon.TYPE_ZOOM_IN,
+        PointerIcon.TYPE_ZOOM_OUT,
     };
 
     public void setCursor(int cursor) {
-        getCurrentFocus().setPointerIcon(PointerIcon.getSystemIcon(this, cursors[cursor + 1]));
-    }
-
-    public void setCursorMode(int mode) {
-        if (mode == 2) {
-            getCurrentFocus().requestPointerCapture();
-        } else {
-            getCurrentFocus().releasePointerCapture();
-        }
+        getCurrentFocus().setPointerIcon(PointerIcon.getSystemIcon(this, cursors[cursor]));
     }
 
     public void setClipboardText(String text) {

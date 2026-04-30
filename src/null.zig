@@ -58,6 +58,14 @@ pub const Window = struct {
         _ = self;
     }
 
+    pub fn enableRelativeMouse(self: *Window) void {
+        _ = self;
+    }
+
+    pub fn disableRelativeMouse(self: *Window) void {
+        _ = self;
+    }
+
     pub fn setTitle(self: *Window, title: []const u8) void {
         _ = self;
         _ = title;
@@ -81,11 +89,6 @@ pub const Window = struct {
     pub fn setCursor(self: *Window, shape: wio.Cursor) void {
         _ = self;
         _ = shape;
-    }
-
-    pub fn setCursorMode(self: *Window, mode: wio.CursorMode) void {
-        _ = self;
-        _ = mode;
     }
 
     pub fn requestAttention(self: *Window) void {

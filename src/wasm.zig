@@ -30,9 +30,10 @@ const js = struct {
     extern "wio" fn createWindow() u32;
     extern "wio" fn enableTextInput(u32, u16, u16) void;
     extern "wio" fn disableTextInput(u32) void;
+    extern "wio" fn enableRelativeMouse(u32) void;
+    extern "wio" fn disableRelativeMouse(u32) void;
     extern "wio" fn setFullscreen(u32, bool) void;
     extern "wio" fn setCursor(u32, u8) void;
-    extern "wio" fn setCursorMode(u32, u8) void;
     extern "wio" fn setSize(u32, u16, u16) void;
     extern "wio" fn setClipboardText([*]const u8, usize) void;
     extern "wio" fn presentFramebuffer(u32, [*]const u32, u16, u16) void;
@@ -142,6 +143,14 @@ pub const Window = struct {
         js.disableTextInput(self.id);
     }
 
+    pub fn enableRelativeMouse(self: *Window) void {
+        js.enableRelativeMouse(self.id);
+    }
+
+    pub fn disableRelativeMouse(self: *Window) void {
+        js.disableRelativeMouse(self.id);
+    }
+
     pub fn setTitle(_: *Window, _: []const u8) void {}
 
     pub fn setMode(self: *Window, mode: wio.WindowMode) void {
@@ -156,10 +165,6 @@ pub const Window = struct {
 
     pub fn setCursor(self: *Window, shape: wio.Cursor) void {
         js.setCursor(self.id, @intFromEnum(shape));
-    }
-
-    pub fn setCursorMode(self: *Window, mode: wio.CursorMode) void {
-        js.setCursorMode(self.id, @intFromEnum(mode));
     }
 
     pub fn requestAttention(_: *Window) void {}

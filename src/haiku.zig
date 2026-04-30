@@ -149,7 +149,7 @@ pub const Window = struct {
     events_mutex: std.Io.Mutex = .init,
     buttons: std.StaticBitSet(5) = .initEmpty(),
     text: bool = false,
-    cursor: wio.Cursor = .arrow,
+    cursor: wio.Cursor = .default,
     drop: if (build_options.drop) struct {
         files: std.ArrayList([]const u8) = .empty,
         text: ?[]const u8 = null,
@@ -183,6 +183,14 @@ pub const Window = struct {
         self.text = false;
     }
 
+    pub fn enableRelativeMouse(self: *Window) void {
+        _ = self;
+    }
+
+    pub fn disableRelativeMouse(self: *Window) void {
+        _ = self;
+    }
+
     pub fn setTitle(self: *Window, title: []const u8) void {
         const title_z = internal.allocator.dupeZ(u8, title) catch return;
         defer internal.allocator.free(title_z);
@@ -203,11 +211,6 @@ pub const Window = struct {
     pub fn setCursor(self: *Window, shape: wio.Cursor) void {
         self.cursor = shape;
         wioSetCursor(@intFromEnum(shape));
-    }
-
-    pub fn setCursorMode(self: *Window, mode: wio.CursorMode) void {
-        _ = self;
-        _ = mode;
     }
 
     pub fn requestAttention(_: *Window) void {}

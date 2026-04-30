@@ -202,40 +202,44 @@ extern "C" {
     }
 
     void wioSetCursor(uint8 shape) {
-        BCursorID id;
-        switch (shape) {
-            case 2:
-                id = B_CURSOR_ID_PROGRESS;
-                break;
-            case 3:
-                id = B_CURSOR_ID_I_BEAM;
-                break;
-            case 4:
-                id = B_CURSOR_ID_FOLLOW_LINK;
-                break;
-            case 6:
-                id = B_CURSOR_ID_NOT_ALLOWED;
-                break;
-            case 7:
-                id = B_CURSOR_ID_MOVE;
-                break;
-            case 8:
-                id = B_CURSOR_ID_RESIZE_NORTH_SOUTH;
-                break;
-            case 9:
-                id = B_CURSOR_ID_RESIZE_EAST_WEST;
-                break;
-            case 10:
-                id = B_CURSOR_ID_RESIZE_NORTH_EAST_SOUTH_WEST;
-                break;
-            case 11:
-                id = B_CURSOR_ID_RESIZE_NORTH_WEST_SOUTH_EAST;
-                break;
-            default:
-                id = B_CURSOR_ID_SYSTEM_DEFAULT;
-                break;
-        }
-        BCursor cursor = BCursor(id);
+        static const BCursorID ids[] = {
+            B_CURSOR_ID_SYSTEM_DEFAULT,
+            B_CURSOR_ID_NO_CURSOR,
+            B_CURSOR_ID_CONTEXT_MENU,
+            B_CURSOR_ID_HELP,
+            B_CURSOR_ID_FOLLOW_LINK,
+            B_CURSOR_ID_SYSTEM_DEFAULT, // .progress
+            B_CURSOR_ID_PROGRESS,
+            B_CURSOR_ID_SYSTEM_DEFAULT, // .cell
+            B_CURSOR_ID_CROSS_HAIR,
+            B_CURSOR_ID_I_BEAM,
+            B_CURSOR_ID_I_BEAM_HORIZONTAL,
+            B_CURSOR_ID_SYSTEM_DEFAULT, // .alias
+            B_CURSOR_ID_COPY,
+            B_CURSOR_ID_MOVE,
+            B_CURSOR_ID_SYSTEM_DEFAULT, // .no_drop
+            B_CURSOR_ID_NOT_ALLOWED,
+            B_CURSOR_ID_GRAB,
+            B_CURSOR_ID_GRABBING,
+            B_CURSOR_ID_RESIZE_EAST,
+            B_CURSOR_ID_RESIZE_NORTH,
+            B_CURSOR_ID_RESIZE_NORTH_EAST,
+            B_CURSOR_ID_RESIZE_NORTH_WEST,
+            B_CURSOR_ID_RESIZE_SOUTH,
+            B_CURSOR_ID_RESIZE_SOUTH_EAST,
+            B_CURSOR_ID_RESIZE_SOUTH_WEST,
+            B_CURSOR_ID_RESIZE_WEST,
+            B_CURSOR_ID_RESIZE_EAST_WEST,
+            B_CURSOR_ID_RESIZE_NORTH_SOUTH,
+            B_CURSOR_ID_RESIZE_NORTH_EAST_SOUTH_WEST,
+            B_CURSOR_ID_RESIZE_NORTH_WEST_SOUTH_EAST,
+            B_CURSOR_ID_RESIZE_EAST_WEST,
+            B_CURSOR_ID_RESIZE_NORTH_SOUTH,
+            B_CURSOR_ID_MOVE,
+            B_CURSOR_ID_ZOOM_IN,
+            B_CURSOR_ID_ZOOM_OUT,
+        };
+        BCursor cursor = BCursor(ids[shape]);
         be_app->SetCursor(&cursor);
     }
 

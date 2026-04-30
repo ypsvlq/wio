@@ -17,8 +17,7 @@ var wait_event: std.Io.Event = .unset;
 var window: ?*c.ANativeWindow = null;
 
 var modifiers: wio.Modifiers = .{};
-var cursor: c.jint = @intFromEnum(wio.Cursor.arrow);
-var cursor_mode: wio.CursorMode = .normal;
+var relative_mouse: bool = false;
 
 var egl_config: c.EGLConfig = null;
 var egl_surface: c.EGLSurface = null;
@@ -105,6 +104,16 @@ pub const Window = struct {
         java.env.*.*.CallVoidMethod.?(java.env, java.activity, java.disableTextInput);
     }
 
+    pub fn enableRelativeMouse(_: *Window) void {
+        java.env.*.*.CallVoidMethod.?(java.env, java.activity, java.enableRelativeMouse);
+        relative_mouse = true;
+    }
+
+    pub fn disableRelativeMouse(_: *Window) void {
+        java.env.*.*.CallVoidMethod.?(java.env, java.activity, java.disableRelativeMouse);
+        relative_mouse = false;
+    }
+
     pub fn setTitle(self: *Window, title: []const u8) void {
         _ = self;
         _ = title;
@@ -117,16 +126,7 @@ pub const Window = struct {
     pub fn setParent(_: *Window, _: usize) void {}
 
     pub fn setCursor(_: *Window, shape: wio.Cursor) void {
-        cursor = @intFromEnum(shape);
-        if (cursor_mode == .normal) {
-            java.env.*.*.CallVoidMethod.?(java.env, java.activity, java.setCursor, cursor);
-        }
-    }
-
-    pub fn setCursorMode(_: *Window, mode: wio.CursorMode) void {
-        cursor_mode = mode;
-        java.env.*.*.CallVoidMethod.?(java.env, java.activity, java.setCursorMode, @as(c.jint, @intFromEnum(mode)));
-        java.env.*.*.CallVoidMethod.?(java.env, java.activity, java.setCursor, if (mode == .normal) cursor else -1);
+        java.env.*.*.CallVoidMethod.?(java.env, java.activity, java.setCursor, @as(c.jint, @intFromEnum(shape)));
     }
 
     pub fn requestAttention(_: *Window) void {}
@@ -375,8 +375,9 @@ export fn JNI_OnLoad(vm: *c.JavaVM, _: ?*anyopaque) c.jint {
     java.vm = vm;
     java.enableTextInput = env.*.*.GetMethodID.?(env, class, "enableTextInput", "()V") orelse return c.JNI_ERR;
     java.disableTextInput = env.*.*.GetMethodID.?(env, class, "disableTextInput", "()V") orelse return c.JNI_ERR;
+    java.enableRelativeMouse = env.*.*.GetMethodID.?(env, class, "enableRelativeMouse", "()V") orelse return c.JNI_ERR;
+    java.disableRelativeMouse = env.*.*.GetMethodID.?(env, class, "disableRelativeMouse", "()V") orelse return c.JNI_ERR;
     java.setCursor = env.*.*.GetMethodID.?(env, class, "setCursor", "(I)V") orelse return c.JNI_ERR;
-    java.setCursorMode = env.*.*.GetMethodID.?(env, class, "setCursorMode", "(I)V") orelse return c.JNI_ERR;
     java.setClipboardText = env.*.*.GetMethodID.?(env, class, "setClipboardText", "(Ljava/lang/String;)V") orelse return c.JNI_ERR;
     java.getClipboardText = env.*.*.GetMethodID.?(env, class, "getClipboardText", "()Ljava/lang/String;") orelse return c.JNI_ERR;
 
@@ -404,8 +405,9 @@ const java = struct {
 
     var enableTextInput: c.jmethodID = undefined;
     var disableTextInput: c.jmethodID = undefined;
+    var enableRelativeMouse: c.jmethodID = undefined;
+    var disableRelativeMouse: c.jmethodID = undefined;
     var setCursor: c.jmethodID = undefined;
-    var setCursorMode: c.jmethodID = undefined;
     var setClipboardText: c.jmethodID = undefined;
     var getClipboardText: c.jmethodID = undefined;
 };
@@ -445,8 +447,8 @@ const native = struct {
     fn onWindowFocusChanged(env: *c.JNIEnv, instance: c.jobject, focused: c.jboolean) callconv(.c) void {
         pushEvent(if (focused == c.JNI_TRUE) .focused else .unfocused);
 
-        if (focused == c.JNI_TRUE and cursor_mode == .relative) {
-            env.*.*.CallVoidMethod.?(env, instance, java.setCursorMode, @as(c.jint, @intFromEnum(cursor_mode)));
+        if (focused == c.JNI_TRUE and relative_mouse) {
+            env.*.*.CallVoidMethod.?(env, instance, java.enableRelativeMouse);
         }
 
         modifiers = .{};
