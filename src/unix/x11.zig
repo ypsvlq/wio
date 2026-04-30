@@ -40,6 +40,7 @@ var imports: extern struct {
     XResizeWindow: *const fn (?*h.Display, h.Window, c_uint, c_uint) callconv(.c) c_int,
     XReparentWindow: *const fn (?*h.Display, h.Window, h.Window, c_int, c_int) callconv(.c) c_int,
     XcursorLibraryLoadCursor: *const fn (dpy: ?*h.Display, file: [*c]const u8) callconv(.c) h.Cursor,
+    XFreeCursor: *const fn (?*h.Display, h.Cursor) callconv(.c) c_int,
     XDefineCursor: *const fn (?*h.Display, h.Window, h.Cursor) callconv(.c) c_int,
     XCreatePixmap: *const fn (?*h.Display, h.Drawable, c_uint, c_uint, c_uint) callconv(.c) h.Pixmap,
     XCreateGC: *const fn (?*h.Display, h.Drawable, c_ulong, [*c]h.XGCValues) callconv(.c) h.GC,
@@ -434,7 +435,9 @@ pub const Window = struct {
     pub fn enableRelativeMouse(self: *Window) void {
         self.relative_mouse = true;
         self.warped = false;
-        _ = c.XGrabPointer(display, self.window, h.True, 0, h.GrabModeAsync, h.GrabModeAsync, self.window, self.createBlankCursor(), h.CurrentTime);
+        const cursor = self.createBlankCursor();
+        defer _ = c.XFreeCursor(display, cursor);
+        _ = c.XGrabPointer(display, self.window, h.True, 0, h.GrabModeAsync, h.GrabModeAsync, self.window, cursor, h.CurrentTime);
     }
 
     pub fn disableRelativeMouse(self: *Window) void {
@@ -510,10 +513,8 @@ pub const Window = struct {
             .zoom_out => "zoom-out",
         };
 
-        const cursor = if (maybe_name) |name|
-            c.XcursorLibraryLoadCursor(display, name)
-        else
-            self.createBlankCursor();
+        const cursor = if (maybe_name) |name| c.XcursorLibraryLoadCursor(display, name) else self.createBlankCursor();
+        defer _ = c.XFreeCursor(display, cursor);
 
         _ = c.XDefineCursor(display, self.window, cursor);
     }
