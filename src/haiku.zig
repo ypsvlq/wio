@@ -20,6 +20,7 @@ extern fn wioDestroyWindow(*BWindow) void;
 extern fn wioEnableRelativeMouse(*BWindow) void;
 extern fn wioDisableRelativeMouse(*BWindow) void;
 extern fn wioSetTitle(*BWindow, [*:0]const u8) void;
+extern fn wioSetMode(*BWindow, u8) void;
 extern fn wioSetSize(*BWindow, f32, f32) void;
 extern fn wioSetCursor(u8) void;
 extern fn wioSetClipboardText([*]const u8, usize) void;
@@ -133,14 +134,18 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
 
     self.events.push(.visible);
     self.events.push(.{ .scale = wio_scale });
-    self.events.push(.{ .mode = .normal });
-    self.events.push(.{ .size_logical = size });
-    self.events.push(.{ .size_physical = size });
+    if (options.mode != .fullscreen) {
+        self.events.push(.{ .mode = .normal });
+        self.events.push(.{ .size_logical = size });
+        self.events.push(.{ .size_physical = size });
+    }
     self.events.push(.draw);
 
     const title = try internal.allocator.dupeZ(u8, options.title);
     defer internal.allocator.free(title);
     self.window = wioCreateWindow(self, title, size.width, size.height);
+
+    if (options.mode != .normal) self.setMode(options.mode);
 
     return self;
 }
@@ -200,8 +205,7 @@ pub const Window = struct {
     }
 
     pub fn setMode(self: *Window, mode: wio.WindowMode) void {
-        _ = self;
-        _ = mode;
+        wioSetMode(self.window, @intFromEnum(mode));
     }
 
     pub fn setSize(self: *Window, size: wio.Size) void {
@@ -469,7 +473,8 @@ export fn wioHidden(self: *Window) void {
     self.pushEvent(.hidden);
 }
 
-export fn wioSize(self: *Window, width: u16, height: u16) void {
+export fn wioSize(self: *Window, mode: u8, width: u16, height: u16) void {
+    self.pushEvent(.{ .mode = @enumFromInt(mode) });
     self.pushEvent(.{ .size_logical = .{ .width = width, .height = height } });
     self.pushEvent(.{ .size_physical = .{ .width = width, .height = height } });
     self.pushEvent(.draw);

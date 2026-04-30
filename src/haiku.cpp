@@ -13,7 +13,7 @@ extern "C" {
     void wioUnfocused(void *);
     void wioVisible(void *);
     void wioHidden(void *);
-    void wioSize(void *, uint16, uint16);
+    void wioSize(void *, uint8, uint16, uint16);
     void wioChars(void *, const char *);
     void wioKey(void *, int32, uint8);
     void wioButtons(void *, uint8);
@@ -33,14 +33,18 @@ extern "C" {
 class WioWindow : public BWindow {
 public:
     void *zig;
+    BRect normal_frame;
     bool relative_mouse;
+    uint8 mode;
 #ifdef WIO_DROP
     bool dropping;
 #endif
 
     WioWindow(void *zig, BRect frame, const char *title) : BWindow(frame, title, B_TITLED_WINDOW, 0) {
         this->zig = zig;
+        this->normal_frame = Frame();
         this->relative_mouse = false;
+        this->mode = 0;
 #ifdef WIO_DROP
         this->dropping = false;
 #endif
@@ -74,7 +78,8 @@ public:
             case B_WINDOW_RESIZED: {
                 int32 width, height;
                 if (message->FindInt32("width", &width) == B_OK && message->FindInt32("height", &height) == B_OK) {
-                    wioSize(zig, width, height);
+                    wioSize(zig, mode, width, height);
+                    mode = 0;
                 }
                 break;
             }
@@ -226,6 +231,28 @@ extern "C" {
 
     void wioSetTitle(WioWindow *window, const char *title) {
         window->SetTitle(title);
+    }
+
+    void wioSetMode(WioWindow *window, uint8 mode) {
+        BRect frame;
+        switch (mode) {
+            case 0:
+                frame = window->normal_frame;
+                break;
+            case 1:
+                return;
+            case 2:
+                frame = BScreen(window).Frame();
+                frame.right += 1;
+                frame.bottom += 1;
+                if (frame == window->Frame()) {
+                    return;
+                }
+                window->mode = 2;
+                break;
+        }
+        window->MoveTo(frame.left, frame.top);
+        window->ResizeTo(frame.right - frame.left, frame.bottom - frame.top);
     }
 
     void wioSetSize(WioWindow *window, float width, float height) {
