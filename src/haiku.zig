@@ -17,6 +17,8 @@ extern fn wioOpenUri([*:0]const u8) void;
 extern fn wioGetModifiers() u32;
 extern fn wioCreateWindow(*Window, [*:0]const u8, u16, u16) *BWindow;
 extern fn wioDestroyWindow(*BWindow) void;
+extern fn wioEnableRelativeMouse(*BWindow) void;
+extern fn wioDisableRelativeMouse(*BWindow) void;
 extern fn wioSetTitle(*BWindow, [*:0]const u8) void;
 extern fn wioSetSize(*BWindow, f32, f32) void;
 extern fn wioSetCursor(u8) void;
@@ -184,11 +186,11 @@ pub const Window = struct {
     }
 
     pub fn enableRelativeMouse(self: *Window) void {
-        _ = self;
+        wioEnableRelativeMouse(self.window);
     }
 
     pub fn disableRelativeMouse(self: *Window) void {
-        _ = self;
+        wioDisableRelativeMouse(self.window);
     }
 
     pub fn setTitle(self: *Window, title: []const u8) void {
@@ -513,6 +515,10 @@ export fn wioButtons(self: *Window, buttons: u8) void {
 
 export fn wioMouse(self: *Window, x: u16, y: u16) void {
     self.pushEvent(.{ .mouse = .{ .x = x, .y = y } });
+}
+
+export fn wioMouseRelative(self: *Window, x: i16, y: i16) void {
+    self.pushEvent(.{ .mouse_relative = .{ .x = x, .y = y } });
 }
 
 export fn wioScroll(self: *Window, vertical: f32, horizontal: f32) void {

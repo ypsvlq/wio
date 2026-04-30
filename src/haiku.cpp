@@ -18,6 +18,7 @@ extern "C" {
     void wioKey(void *, int32, uint8);
     void wioButtons(void *, uint8);
     void wioMouse(void *, uint16, uint16);
+    void wioMouseRelative(void *, int16, int16);
     void wioScroll(void *, float, float);
     void wioDropBegin(void *);
     void wioDropPosition(void *, uint16, uint16);
@@ -30,15 +31,16 @@ extern "C" {
 }
 
 class WioWindow : public BWindow {
-private:
+public:
     void *zig;
+    bool relative_mouse;
 #ifdef WIO_DROP
     bool dropping;
 #endif
 
-public:
     WioWindow(void *zig, BRect frame, const char *title) : BWindow(frame, title, B_TITLED_WINDOW, 0) {
         this->zig = zig;
+        this->relative_mouse = false;
 #ifdef WIO_DROP
         this->dropping = false;
 #endif
@@ -106,8 +108,18 @@ public:
             case B_MOUSE_MOVED: {
                 BPoint where;
                 if (message->FindPoint("where", &where) == B_OK) {
-                    if (where.x > 0 && where.y > 0) {
-                        wioMouse(zig, where.x, where.y);
+                    if (relative_mouse) {
+                        BRect bounds = Bounds();
+                        int16 dx = where.x - (bounds.right / 2);
+                        int16 dy = where.y - (bounds.bottom / 2);
+                        if (dx != 0 || dy != 0) {
+                            wioMouseRelative(zig, dx, dy);
+                            WarpCursor();
+                        }
+                    } else {
+                        if (where.x > 0 && where.y > 0) {
+                            wioMouse(zig, where.x, where.y);
+                        }
                     }
                 }
 
@@ -160,6 +172,12 @@ public:
             BWindow::DispatchMessage(message, target);
         }
     }
+
+    void WarpCursor(void) {
+        BRect bounds = Bounds();
+        BPoint centre = ConvertToScreen(BPoint(bounds.right / 2, bounds.bottom / 2));
+        set_mouse_position(centre.x, centre.y);
+    }
 };
 
 extern "C" {
@@ -191,6 +209,17 @@ extern "C" {
     void wioDestroyWindow(WioWindow *window) {
         window->Lock();
         window->Quit();
+    }
+
+    void wioEnableRelativeMouse(WioWindow *window) {
+        window->relative_mouse = true;
+        be_app->HideCursor();
+        window->WarpCursor();
+    }
+
+    void wioDisableRelativeMouse(WioWindow *window) {
+        window->relative_mouse = false;
+        be_app->ShowCursor();
     }
 
     void wioSetTitle(WioWindow *window, const char *title) {
