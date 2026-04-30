@@ -106,6 +106,21 @@ pub fn build(b: *std.Build) !void {
                     module.addImport("android", android.module("android"));
                 }
 
+                const translate_c = b.addTranslateC(.{
+                    .root_source_file = b.addWriteFiles().add("cimport.c",
+                        \\#include <jni.h>
+                        \\#include <android/input.h>
+                        \\#include <android/native_window_jni.h>
+                        \\#include <EGL/egl.h>
+                        \\#include <vulkan/vulkan.h>
+                        \\#include <vulkan/vulkan_android.h>
+                        \\
+                    ),
+                    .target = target,
+                    .optimize = optimize,
+                });
+                module.addImport("c", translate_c.createModule());
+
                 module.linkSystemLibrary("android", .{});
                 if (enable_opengl) {
                     module.linkSystemLibrary("EGL", .{});

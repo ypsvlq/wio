@@ -11,8 +11,8 @@
             .hash = "opengl-0.0.0-_Vp8-EjsKgDhnkUWeb8Nmr2oEdvsCsDq9bUgmcNi0SuQ",
         },
         .android = .{
-            .url = "https://github.com/silbinarywolf/zig-android-sdk/archive/1a6e3f34d4eeaeb8df4741d670a8d58ba256c0cd.tar.gz",
-            .hash = "android-0.3.0-7iz7QicYAgCURX17qlaWt_3cGZijZDozjrhLJm3kxZM3",
+            .url = "https://github.com/silbinarywolf/zig-android-sdk/archive/e72f0bb19b0b770fe65b74515594fea62ee369cf.tar.gz",
+            .hash = "android-0.3.0-7iz7QkgyAgCCCsGXARq_j2DYLmIZoVlDh5ugZUUhKxAQ",
             .lazy = true,
         },
     },

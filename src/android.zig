@@ -1,17 +1,10 @@
 const std = @import("std");
 const build_options = @import("build_options");
 const android = @import("android");
+const c = @import("c");
 const wio = @import("wio.zig");
 const internal = @import("wio.internal.zig");
 const log = std.log.scoped(.wio);
-const c = @cImport({
-    @cInclude("jni.h");
-    @cInclude("android/input.h");
-    @cInclude("android/native_window_jni.h");
-    @cInclude("EGL/egl.h");
-    @cInclude("vulkan/vulkan.h");
-    @cInclude("vulkan/vulkan_android.h");
-});
 
 pub const logFn = android.logFn;
 
