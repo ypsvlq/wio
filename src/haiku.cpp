@@ -69,6 +69,7 @@ public:
                 if (message->FindBool("minimize", &minimize) == B_OK) {
                     minimize ? wioHidden(zig) : wioVisible(zig);
                 }
+                break;
             }
             case B_WINDOW_RESIZED: {
                 int32 width, height;
@@ -104,6 +105,7 @@ public:
                 if (message->FindInt32("buttons", &buttons) == B_OK) {
                     wioButtons(zig, buttons);
                 }
+                break;
             }
             case B_MOUSE_MOVED: {
                 BPoint where;
@@ -389,6 +391,7 @@ extern "C" {
 #ifdef WIO_AUDIO
 
     static void writeFn(void *data, void *buffer, size_t size, const media_raw_audio_format &format) {
+        (void)format;
         wioAudioOutputWrite(data, buffer, size);
     }
 

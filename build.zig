@@ -256,6 +256,7 @@ pub fn build(b: *std.Build) !void {
             const gcc = b.addSystemCommand(&.{
                 "g++",
                 "-Wall",
+                "-Wextra",
                 switch (optimize) {
                     .Debug => "-O0",
                     .ReleaseFast, .ReleaseSafe => "-O3",
