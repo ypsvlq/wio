@@ -31,12 +31,16 @@ extern "C" {
 class WioWindow : public BWindow {
 private:
     void *zig;
+#ifdef WIO_DROP
     bool dropping;
+#endif
 
 public:
     WioWindow(void *zig, BRect frame, const char *title) : BWindow(frame, title, B_TITLED_WINDOW, 0) {
         this->zig = zig;
+#ifdef WIO_DROP
         this->dropping = false;
+#endif
 #ifdef WIO_FRAMEBUFFER
         AddChild(new BView(Bounds(), "wio", B_FOLLOW_ALL_SIDES, 0));
 #endif
