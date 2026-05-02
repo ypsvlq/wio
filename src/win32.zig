@@ -1212,14 +1212,14 @@ fn loadCursor(shape: wio.Cursor) w.HCURSOR {
         .pointer => w.IDC_HAND,
         .progress => w.IDC_APPSTARTING,
         .wait => w.IDC_WAIT,
-        .crosshair => w.IDC_CROSS,
+        .cell, .crosshair => w.IDC_CROSS,
         .text, .vertical_text => w.IDC_IBEAM,
-        .move, .all_scroll => w.IDC_SIZEALL,
         .not_allowed, .no_drop => w.IDC_NO,
         .ns_resize, .n_resize, .s_resize, .row_resize => w.IDC_SIZENS,
         .ew_resize, .e_resize, .w_resize, .col_resize => w.IDC_SIZEWE,
         .nesw_resize, .ne_resize, .sw_resize => w.IDC_SIZENESW,
         .nwse_resize, .nw_resize, .se_resize => w.IDC_SIZENWSE,
+        .all_scroll => w.IDC_SIZEALL,
         else => w.IDC_ARROW,
     });
 }
