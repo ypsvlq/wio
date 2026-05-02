@@ -533,10 +533,13 @@ void wioSetCursor(NSWindow *window, uint8_t shape) {
         case 1: cursor = nil; break;
         case 2: cursor = [NSCursor contextualMenuCursor]; break;
         case 4: cursor = [NSCursor pointingHandCursor]; break;
+        case 7: cursor = [NSCursor crosshairCursor]; break;
         case 8: cursor = [NSCursor crosshairCursor]; break;
         case 9: cursor = [NSCursor IBeamCursor]; break;
         case 10: cursor = [NSCursor IBeamCursorForVerticalLayout]; break;
+        case 11: cursor = [NSCursor dragLinkCursor]; break;
         case 12: cursor = [NSCursor dragCopyCursor]; break;
+        case 14: cursor = [NSCursor operationNotAllowedCursor]; break;
         case 15: cursor = [NSCursor operationNotAllowedCursor]; break;
         case 16: cursor = [NSCursor openHandCursor]; break;
         case 17: cursor = [NSCursor closedHandCursor]; break;
@@ -546,6 +549,8 @@ void wioSetCursor(NSWindow *window, uint8_t shape) {
         case 25: cursor = [NSCursor resizeLeftCursor]; break;
         case 26: cursor = [NSCursor resizeLeftRightCursor]; break;
         case 27: cursor = [NSCursor resizeUpDownCursor]; break;
+        case 30: cursor = [NSCursor resizeLeftRightCursor]; break;
+        case 31: cursor = [NSCursor resizeUpDownCursor]; break;
         default: cursor = [NSCursor arrowCursor]; break;
     }
     [[window contentView] setCursor:cursor];
