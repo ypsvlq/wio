@@ -266,16 +266,16 @@ extern "C" {
             B_CURSOR_ID_CONTEXT_MENU,
             B_CURSOR_ID_HELP,
             B_CURSOR_ID_FOLLOW_LINK,
-            B_CURSOR_ID_SYSTEM_DEFAULT, // .progress
             B_CURSOR_ID_PROGRESS,
-            B_CURSOR_ID_SYSTEM_DEFAULT, // .cell
+            B_CURSOR_ID_PROGRESS,
+            B_CURSOR_ID_CROSS_HAIR,
             B_CURSOR_ID_CROSS_HAIR,
             B_CURSOR_ID_I_BEAM,
             B_CURSOR_ID_I_BEAM_HORIZONTAL,
-            B_CURSOR_ID_SYSTEM_DEFAULT, // .alias
+            B_CURSOR_ID_CREATE_LINK,
             B_CURSOR_ID_COPY,
             B_CURSOR_ID_MOVE,
-            B_CURSOR_ID_SYSTEM_DEFAULT, // .no_drop
+            B_CURSOR_ID_NOT_ALLOWED,
             B_CURSOR_ID_NOT_ALLOWED,
             B_CURSOR_ID_GRAB,
             B_CURSOR_ID_GRABBING,
