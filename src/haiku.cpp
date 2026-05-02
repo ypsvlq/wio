@@ -79,7 +79,9 @@ public:
                 int32 width, height;
                 if (message->FindInt32("width", &width) == B_OK && message->FindInt32("height", &height) == B_OK) {
                     wioSize(zig, mode, width, height);
-                    mode = 0;
+                    if (mode == 0) {
+                        normal_frame = Frame();
+                    }
                 }
                 break;
             }
@@ -180,6 +182,16 @@ public:
         }
     }
 
+    void Zoom(BPoint origin, float width, float height) {
+        if (origin.x == normal_frame.left && origin.y == normal_frame.top && width == normal_frame.right - normal_frame.left && height == normal_frame.bottom - normal_frame.top) {
+            mode = 0;
+        } else {
+            mode = 1;
+        }
+        MoveTo(origin);
+        ResizeTo(width, height);
+    }
+
     void WarpCursor(void) {
         BRect bounds = Bounds();
         BPoint centre = ConvertToScreen(BPoint(bounds.right / 2, bounds.bottom / 2));
@@ -238,8 +250,12 @@ extern "C" {
         switch (mode) {
             case 0:
                 frame = window->normal_frame;
+                window->mode = 0;
                 break;
             case 1:
+                if (window->mode != 1) {
+                    window->BWindow::Zoom();
+                }
                 return;
             case 2:
                 frame = BScreen(window).Frame();

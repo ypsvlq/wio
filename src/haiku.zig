@@ -134,7 +134,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
 
     self.events.push(.visible);
     self.events.push(.{ .scale = wio_scale });
-    if (options.mode != .fullscreen) {
+    if (options.mode == .normal) {
         self.events.push(.{ .mode = .normal });
         self.events.push(.{ .size_logical = size });
         self.events.push(.{ .size_physical = size });
