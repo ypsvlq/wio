@@ -76,7 +76,9 @@ by changing the `CFBundleExecutable` and `CFBundleName` values in Info.plist.
 
 ### Unix
 
-Message boxes are implementing by spawning `kdialog` or `zenity`.
+`messageBox` is implemented by spawning `kdialog` or `zenity`.
+
+`openUri` is implemented by spawning `xdg-open`.
 
 Unix-like systems support different backends in the same executable. By default
 all backends are enabled, the `unix_backends` build option can be used to
@@ -108,10 +110,17 @@ The following libraries are loaded under Linux:
 - `libudev.so.1` (if joysticks are enabled)
 - `libpulse.so.0` (if audio is enabled)
 
+### Android
+
+To ensure the entry point is exported from the shared library, the root source
+file should contain `comptime { _ = wio; }` at the top level.
+
+[demo/build.zig][7] is an example of a build script supporting Android.
+
 ### WebAssembly
 
 If OpenGL is enabled, wio imports `createContext` and `makeContextCurrent`
-from the `gl` module. WebGL 1 bindings are provided in [demo/wasm.js][7].
+from the `gl` module. WebGL 1 bindings are provided in [demo/wasm.js][8].
 
 `glGetProcAddress` always returns null.
 
@@ -146,6 +155,10 @@ for a given platform:
 
 - `Window.backend.id` is the index into the JavaScript window array
 
+### Haiku
+
+- `Window.backend.window` is the InterfaceKit `BWindow`
+
 
 [1]: https://github.com/ypsvlq/wio/blob/master/src/wio.zig
 [2]: https://github.com/ypsvlq/wio/tree/master/demo
@@ -153,4 +166,5 @@ for a given platform:
 [4]: https://learn.microsoft.com/en-us/windows/win32/sbscs/application-manifests
 [5]: https://github.com/ypsvlq/wio/tree/master/demo/wio.app
 [6]: https://gitlab.freedesktop.org/xorg/lib/libxext/-/work_items/3
-[7]: https://github.com/ypsvlq/wio/blob/master/demo/wasm.js
+[7]: https://github.com/ypsvlq/wio/blob/master/demo/build.zig
+[8]: https://github.com/ypsvlq/wio/blob/master/demo/wasm.js
