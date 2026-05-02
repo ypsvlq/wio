@@ -274,7 +274,7 @@ extern "C" {
             B_CURSOR_ID_I_BEAM_HORIZONTAL,
             B_CURSOR_ID_CREATE_LINK,
             B_CURSOR_ID_COPY,
-            B_CURSOR_ID_MOVE,
+            B_CURSOR_ID_SYSTEM_DEFAULT, // .move
             B_CURSOR_ID_NOT_ALLOWED,
             B_CURSOR_ID_NOT_ALLOWED,
             B_CURSOR_ID_GRAB,
