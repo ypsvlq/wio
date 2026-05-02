@@ -168,7 +168,7 @@ public class WioActivity extends Activity implements SurfaceHolder.Callback, OnG
         PointerIcon.TYPE_CONTEXT_MENU,
         PointerIcon.TYPE_HELP,
         PointerIcon.TYPE_HAND,
-        PointerIcon.TYPE_ARROW, // .progress
+        PointerIcon.TYPE_WAIT,
         PointerIcon.TYPE_WAIT,
         PointerIcon.TYPE_CELL,
         PointerIcon.TYPE_CROSSHAIR,
@@ -178,7 +178,7 @@ public class WioActivity extends Activity implements SurfaceHolder.Callback, OnG
         PointerIcon.TYPE_COPY,
         PointerIcon.TYPE_ARROW, // .move
         PointerIcon.TYPE_NO_DROP,
-        PointerIcon.TYPE_ARROW, // .not_allowed
+        PointerIcon.TYPE_NO_DROP,
         PointerIcon.TYPE_GRAB,
         PointerIcon.TYPE_GRABBING,
         PointerIcon.TYPE_HORIZONTAL_DOUBLE_ARROW,
