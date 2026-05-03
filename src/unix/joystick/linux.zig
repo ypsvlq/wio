@@ -141,7 +141,7 @@ pub const JoystickDevice = struct {
         var abs_bits = std.bit_set.ArrayBitSet(u8, h.ABS_CNT).initEmpty();
         if (std.os.linux.errno(std.os.linux.ioctl(fd, h.EVIOCGBIT(h.EV_ABS, @sizeOf(@TypeOf(abs_bits.masks))), @intFromPtr(&abs_bits.masks))) != .SUCCESS) return error.Unexpected;
         var abs_iter = abs_bits.iterator(.{});
-        var abs_map = [1]u8{0} ** h.ABS_CNT;
+        var abs_map: [h.ABS_CNT]u8 = @splat(0);
         var axis_count: u8 = 0;
         var hat_count: u8 = 0;
         while (abs_iter.next()) |i| {
@@ -170,7 +170,7 @@ pub const JoystickDevice = struct {
         var key_bits = std.bit_set.ArrayBitSet(u8, h.KEY_CNT).initEmpty();
         if (std.os.linux.errno(std.os.linux.ioctl(fd, h.EVIOCGBIT(h.EV_KEY, @sizeOf(@TypeOf(key_bits.masks))), @intFromPtr(&key_bits.masks))) != .SUCCESS) return error.Unexpected;
         var key_iter = key_bits.iterator(.{});
-        var key_map = [1]u16{0} ** h.KEY_CNT;
+        var key_map: [h.KEY_CNT]u16 = @splat(0);
         var button_count: u16 = 0;
         while (key_iter.next()) |i| {
             button_count += 1;
