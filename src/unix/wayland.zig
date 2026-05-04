@@ -775,6 +775,10 @@ pub fn glGetProcAddress(name: [*:0]const u8) ?*const anyopaque {
     return c.eglGetProcAddress(name);
 }
 
+pub fn glReleaseCurrentContext() void {
+    _ = c.eglMakeCurrent(egl.display, h.EGL_NO_SURFACE, h.EGL_NO_SURFACE, h.EGL_NO_CONTEXT);
+}
+
 pub fn getRequiredVulkanInstanceExtensions() []const [*:0]const u8 {
     return &.{ "VK_KHR_surface", "VK_KHR_wayland_surface" };
 }

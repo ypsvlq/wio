@@ -35,6 +35,7 @@ extern fn wioGlCreateContext(?*NSOpenGLPixelFormat, ?*NSOpenGLContext) ?*NSOpenG
 extern fn wioGlMakeContextCurrent(*NSWindow, ?*NSOpenGLContext) void;
 extern fn wioGlSwapBuffers() void;
 extern fn wioGlSwapInterval(i32) void;
+extern fn wioGlReleaseCurrentContext() void;
 extern fn wioCreateMetalLayer(*NSWindow) ?*CAMetalLayer;
 extern const wioHIDDeviceUsagePageKey: c.CFStringRef;
 extern const wioHIDDeviceUsageKey: c.CFStringRef;
@@ -404,6 +405,10 @@ pub const GlContext = struct {
 
 pub fn glGetProcAddress(name: [*:0]const u8) ?*const anyopaque {
     return c.dlsym(c.RTLD_DEFAULT, name);
+}
+
+pub fn glReleaseCurrentContext() void {
+    wioGlReleaseCurrentContext();
 }
 
 pub var vkGetInstanceProcAddr: *const fn (usize, [*:0]const u8) callconv(.c) ?*const fn () void = undefined;

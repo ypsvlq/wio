@@ -79,6 +79,7 @@ fn loop() !bool {
                 audio.close();
                 joystick.close();
 
+                wio.glReleaseCurrentContext();
                 if (maybe_window2) |*window2| {
                     context2.destroy();
                     window2.destroy();

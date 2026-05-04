@@ -248,6 +248,10 @@ pub fn glGetProcAddress(name: [*:0]const u8) ?*const anyopaque {
     return c.eglGetProcAddress(name);
 }
 
+pub fn glReleaseCurrentContext() void {
+    _ = c.eglMakeCurrent(egl.display, c.EGL_NO_SURFACE, c.EGL_NO_SURFACE, c.EGL_NO_CONTEXT);
+}
+
 pub fn vkGetInstanceProcAddr(instance: usize, name: [*:0]const u8) ?*const fn () void {
     return @ptrCast(c.vkGetInstanceProcAddr(@ptrFromInt(instance), name));
 }

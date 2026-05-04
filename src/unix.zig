@@ -427,6 +427,13 @@ pub fn glGetProcAddress(name: [*:0]const u8) ?*const anyopaque {
     }
 }
 
+pub fn glReleaseCurrentContext() void {
+    switch (active) {
+        .x11 => return x11.glReleaseCurrentContext(),
+        .wayland => return wayland.glReleaseCurrentContext(),
+    }
+}
+
 pub var vkGetInstanceProcAddr: *const fn (usize, [*:0]const u8) callconv(.c) ?*const fn () void = undefined;
 
 pub fn getRequiredVulkanInstanceExtensions() []const [*:0]const u8 {

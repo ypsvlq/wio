@@ -719,6 +719,10 @@ pub fn glGetProcAddress(name: [*:0]const u8) ?*const anyopaque {
     return c.glXGetProcAddress(name);
 }
 
+pub fn glReleaseCurrentContext() void {
+    _ = c.glXMakeCurrent(display, h.None, null);
+}
+
 pub fn getRequiredVulkanInstanceExtensions() []const [*:0]const u8 {
     return &.{ "VK_KHR_surface", "VK_KHR_xlib_surface" };
 }

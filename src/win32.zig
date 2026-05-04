@@ -661,6 +661,10 @@ pub fn glGetProcAddress(name: [*:0]const u8) ?*const anyopaque {
     return w.wglGetProcAddress(name) orelse w.GetProcAddress(w.GetModuleHandleW(w.L("opengl32.dll")), name);
 }
 
+pub fn glReleaseCurrentContext() void {
+    _ = w.wglMakeCurrent(null, null);
+}
+
 pub var vkGetInstanceProcAddr: *const fn (usize, [*:0]const u8) callconv(.winapi) ?*const fn () void = undefined;
 
 pub fn getRequiredVulkanInstanceExtensions() []const [*:0]const u8 {

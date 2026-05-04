@@ -301,6 +301,8 @@ pub fn glGetProcAddress(name: [*:0]const u8) ?*const anyopaque {
         null;
 }
 
+pub fn glReleaseCurrentContext() void {}
+
 pub const JoystickDeviceIterator = struct {
     handle: *BJoystick,
     count: i32,

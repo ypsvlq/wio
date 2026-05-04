@@ -323,6 +323,12 @@ pub fn glGetProcAddress(name: [*:0]const u8) ?*const fn () void {
     return @ptrCast(@alignCast(backend.glGetProcAddress(name)));
 }
 
+/// May be called on any thread.
+pub fn glReleaseCurrentContext() void {
+    assertFeature(.opengl);
+    backend.glReleaseCurrentContext();
+}
+
 /// Not available for WebAssembly or Haiku.
 pub fn vkGetInstanceProcAddr(instance: usize, name: [*:0]const u8) ?*const fn () void {
     assertFeature(.vulkan);

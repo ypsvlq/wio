@@ -176,6 +176,8 @@ pub fn glGetProcAddress(name: [*:0]const u8) ?*const anyopaque {
     return null;
 }
 
+pub fn glReleaseCurrentContext() void {}
+
 pub fn vkGetInstanceProcAddr(instance: usize, name: [*:0]const u8) ?*const fn () void {
     _ = instance;
     _ = name;

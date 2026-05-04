@@ -615,6 +615,10 @@ void wioGlSwapInterval(int32_t interval) {
     [[NSOpenGLContext currentContext] setValues:&interval forParameter:NSOpenGLCPSwapInterval];
 }
 
+void wioGlReleaseCurrentContext(void) {
+    [NSOpenGLContext clearCurrentContext];
+}
+
 #endif
 
 #ifdef WIO_VULKAN
