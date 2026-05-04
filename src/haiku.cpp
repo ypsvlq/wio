@@ -1,11 +1,17 @@
 #include <AppKit.h>
 #include <InterfaceKit.h>
+#include <GameKit.h>
+#include <app/Cursor.h>
 #include <NetworkKit.h>
-#include <OpenGLKit.h>
 #include <DeviceKit.h>
 #include <MediaKit.h>
 #include <StorageKit.h>
-#include <app/Cursor.h>
+
+#ifdef WIO_OPENGL
+#ifndef WIO_FRAMEBUFFER
+#define WIO_FRAMEBUFFER
+#endif
+#endif
 
 extern "C" {
     void wioClose(void *);
@@ -362,28 +368,6 @@ extern "C" {
             window->ChildAt(0)->SetViewBitmap(bitmap);
             window->Unlock();
         }
-    }
-
-#endif
-
-#ifdef WIO_OPENGL
-
-    BGLView *wioGlCreateContext(WioWindow *window, bool doublebuffer, bool alpha, bool depth, bool stencil) {
-        BGLView *view = new BGLView(window->Bounds(), "OpenGL", B_FOLLOW_ALL_SIDES, 0, (doublebuffer ? BGL_DOUBLE : 0) | (alpha ? BGL_ALPHA : 0) | (depth ? BGL_DEPTH : 0) | (stencil ? BGL_STENCIL : 0));
-        window->AddChild(view);
-        return view;
-    }
-
-    static BGLView *current;
-
-    void wioGlMakeContextCurrent(BGLView *view) {
-        if (current != NULL) current->UnlockGL();
-        view->LockGL();
-        current = view;
-    }
-
-    void wioGlSwapBuffers(bool vsync) {
-        current->SwapBuffers(vsync);
     }
 
 #endif

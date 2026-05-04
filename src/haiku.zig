@@ -1,14 +1,12 @@
 const std = @import("std");
 const build_options = @import("build_options");
+const c = @import("c");
 const wio = @import("wio.zig");
 const internal = @import("wio.internal.zig");
 const log = std.log.scoped(.wio);
 
-extern "root" fn get_image_symbol(u32, [*:0]const u8, i32, *?*const anyopaque) std.c.status_t;
-
 const BWindow = opaque {};
 const BBitmap = opaque {};
-const BGLView = opaque {};
 const BJoystick = opaque {};
 const BSoundPlayer = opaque {};
 extern fn wioInit() void;
@@ -28,9 +26,6 @@ extern fn wioGetClipboardText(*usize) ?[*]const u8;
 extern fn wioCreateFramebuffer(u16, u16) Framebuffer;
 extern fn wioFramebufferDestroy(*BBitmap) void;
 extern fn wioPresentFramebuffer(*BWindow, *BBitmap) void;
-extern fn wioGlCreateContext(*BWindow, bool, bool, bool, bool) *BGLView;
-extern fn wioGlMakeContextCurrent(*BGLView) void;
-extern fn wioGlSwapBuffers(bool) void;
 extern fn wioJoystickIteratorInit(*i32) *BJoystick;
 extern fn wioJoystickIteratorDeinit(*BJoystick) void;
 extern fn wioJoystickIteratorNext(*BJoystick, i32, [*]u8) void;
@@ -42,23 +37,14 @@ extern fn wioAudioOutputClose(*BSoundPlayer) void;
 
 export var wio_scale: f32 = undefined;
 
-var libGL: u32 = undefined;
+threadlocal var gl_state: struct {
+    context: c.OSMesaContext = null,
+    size: wio.Size = undefined,
+    framebuffer: Framebuffer = undefined,
+} = .{};
 
 pub fn init() !void {
     wioInit();
-
-    if (build_options.opengl) blk: {
-        var info: std.c.image_info = undefined;
-        var cookie: i32 = 0;
-        while (std.c._get_next_image_info(0, &cookie, &info, @sizeOf(std.c.image_info)) == 0) {
-            const name = std.mem.sliceTo(&info.name, 0);
-            if (std.mem.indexOf(u8, name, "/libGL.so") != null) {
-                libGL = info.id;
-                break :blk;
-            }
-        }
-        return error.Unexpected;
-    }
 
     if (build_options.joystick) {
         if (internal.init_options.joystickConnectedFn) |callback| {
@@ -147,6 +133,14 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
 
     if (options.mode != .normal) self.setMode(options.mode);
 
+    if (build_options.opengl) {
+        if (options.gl_options) |_| {
+            self.opengl = .{
+                .size = size,
+            };
+        }
+    }
+
     return self;
 }
 
@@ -162,7 +156,7 @@ pub const Window = struct {
         text: ?[]const u8 = null,
     } else struct {} = .{},
     opengl: if (build_options.opengl) struct {
-        vsync: bool = false,
+        size: wio.Size = .{ .width = 0, .height = 0 },
     } else struct {} = .{},
 
     pub fn destroy(self: *Window) void {
@@ -179,7 +173,18 @@ pub const Window = struct {
     pub fn getEvent(self: *Window) ?wio.Event {
         self.events_mutex.lockUncancelable(internal.io);
         defer self.events_mutex.unlock(internal.io);
-        return self.events.pop();
+
+        const maybe_event = self.events.pop();
+        if (maybe_event) |event| {
+            switch (event) {
+                .size_physical => |size| if (build_options.opengl) {
+                    self.opengl.size = size;
+                },
+                else => {},
+            }
+        }
+
+        return maybe_event;
     }
 
     pub fn enableTextInput(self: *Window, _: wio.TextInputOptions) void {
@@ -243,25 +248,52 @@ pub const Window = struct {
         wioPresentFramebuffer(self.window, framebuffer.bitmap);
     }
 
-    pub fn glCreateContext(self: *Window, options: wio.GlCreateContextOptions) !GlContext {
+    pub fn glCreateContext(_: *Window, options: wio.GlCreateContextOptions) !GlContext {
         return .{
-            .view = if (options.share == null)
-                wioGlCreateContext(self.window, options.options.doublebuffer, (options.options.alpha_bits > 0), (options.options.depth_bits > 0), (options.options.stencil_bits > 0))
-            else
-                return error.UnsupportedContextOptions,
+            .context = c.OSMesaCreateContextAttribs(
+                &[_]c_int{
+                    c.OSMESA_FORMAT,                c.OSMESA_BGRA,
+                    c.OSMESA_DEPTH_BITS,            options.options.depth_bits,
+                    c.OSMESA_STENCIL_BITS,          options.options.stencil_bits,
+                    c.OSMESA_PROFILE,               if (options.options.profile == .core) c.OSMESA_CORE_PROFILE else c.OSMESA_COMPAT_PROFILE,
+                    c.OSMESA_CONTEXT_MAJOR_VERSION, options.options.major_version,
+                    c.OSMESA_CONTEXT_MINOR_VERSION, options.options.minor_version,
+                    0,
+                },
+                if (options.share) |share| share.backend.context else null,
+            ) orelse return error.UnsupportedContextOptions,
         };
     }
 
-    pub fn glMakeContextCurrent(_: *Window, context: GlContext) void {
-        wioGlMakeContextCurrent(context.view);
+    pub fn glMakeContextCurrent(self: *Window, context: GlContext) void {
+        if (context.context == gl_state.context) return;
+        glReleaseCurrentContext();
+        const size = self.opengl.size;
+        const framebuffer = wioCreateFramebuffer(size.width, size.height);
+        gl_state = .{
+            .context = context.context,
+            .size = size,
+            .framebuffer = framebuffer,
+        };
+        _ = c.OSMesaMakeCurrent(context.context, framebuffer.bits, c.GL_UNSIGNED_BYTE, size.width, size.height);
+        c.OSMesaPixelStore(c.OSMESA_ROW_LENGTH, @intCast(framebuffer.bytes_per_row / @sizeOf(u32)));
+        c.OSMesaPixelStore(c.OSMESA_Y_UP, 0);
     }
 
     pub fn glSwapBuffers(self: *Window) void {
-        wioGlSwapBuffers(self.opengl.vsync);
+        if (gl_state.size.isEqual(self.opengl.size)) {
+            c.glFinish();
+            self.presentFramebuffer(&gl_state.framebuffer);
+        } else {
+            glReleaseCurrentContext();
+            self.glMakeContextCurrent(.{ .context = gl_state.context });
+            self.pushEvent(.draw);
+        }
     }
 
     pub fn glSwapInterval(self: *Window, interval: i32) void {
-        self.opengl.vsync = (interval > 0);
+        _ = self;
+        _ = interval;
     }
 
     fn pushEvent(self: *Window, event: wio.Event) void {
@@ -288,20 +320,23 @@ pub const Framebuffer = extern struct {
 };
 
 pub const GlContext = struct {
-    view: *BGLView,
+    context: c.OSMesaContext,
 
-    pub fn destroy(_: GlContext) void {}
+    pub fn destroy(self: GlContext) void {
+        c.OSMesaDestroyContext(self.context);
+    }
 };
 
 pub fn glGetProcAddress(name: [*:0]const u8) ?*const anyopaque {
-    var location: ?*const anyopaque = undefined;
-    return if (get_image_symbol(libGL, name, 0x2, &location) == 0)
-        location
-    else
-        null;
+    return c.OSMesaGetProcAddress(name);
 }
 
-pub fn glReleaseCurrentContext() void {}
+pub fn glReleaseCurrentContext() void {
+    if (gl_state.context != null) {
+        gl_state.framebuffer.destroy();
+        gl_state.context = null;
+    }
+}
 
 pub const JoystickDeviceIterator = struct {
     handle: *BJoystick,

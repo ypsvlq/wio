@@ -247,9 +247,19 @@ pub fn build(b: *std.Build) !void {
             }
         },
         .haiku => {
+            const translate_c = b.addTranslateC(.{
+                .root_source_file = b.addWriteFiles().add("cimport.c",
+                    \\#include <GL/osmesa.h>
+                    \\
+                ),
+                .target = target,
+                .optimize = optimize,
+            });
+            module.addImport("c", translate_c.createModule());
+
             module.linkSystemLibrary("be", .{});
             module.linkSystemLibrary("game", .{});
-            if (enable_opengl) module.linkSystemLibrary("GL", .{});
+            if (enable_opengl) module.linkSystemLibrary("OSmesa", .{});
             if (enable_joystick) module.linkSystemLibrary("device", .{});
             if (enable_audio) module.linkSystemLibrary("media", .{});
 

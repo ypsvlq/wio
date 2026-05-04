@@ -95,6 +95,10 @@ pub const Size = struct {
     width: u16,
     height: u16,
 
+    pub fn isEqual(self: Size, other: Size) bool {
+        return (self.width == other.width and self.height == other.height);
+    }
+
     pub fn multiply(self: Size, scale: f32) Size {
         const width: f32 = @floatFromInt(self.width);
         const height: f32 = @floatFromInt(self.height);
