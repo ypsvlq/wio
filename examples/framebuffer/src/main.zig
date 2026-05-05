@@ -27,8 +27,7 @@ pub fn main() !void {
             switch (event) {
                 .close => return,
                 .size_physical => |new_size| {
-                    if (new_size.width != size.width or new_size.height != size.height) {
-                        fb.destroy();
+                    if (!std.meta.eql(new_size, size)) {
                         fb = try window.createFramebuffer(new_size);
                         size = new_size;
                     }

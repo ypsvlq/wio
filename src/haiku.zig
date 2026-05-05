@@ -281,7 +281,7 @@ pub const Window = struct {
     }
 
     pub fn glSwapBuffers(self: *Window) void {
-        if (gl_state.size.isEqual(self.opengl.size)) {
+        if (std.meta.eql(gl_state.size, self.opengl.size)) {
             c.glFinish();
             self.presentFramebuffer(&gl_state.framebuffer);
         } else {

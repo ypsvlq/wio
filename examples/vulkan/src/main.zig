@@ -527,7 +527,7 @@ fn loop() !bool {
                 return false;
             },
             .size_physical => |new_size| {
-                if (new_size.width != size.width or new_size.height != size.height) {
+                if (!std.meta.eql(new_size, size)) {
                     size = new_size;
                     if (surface != .null_handle) {
                         try recreateSwapchain();
