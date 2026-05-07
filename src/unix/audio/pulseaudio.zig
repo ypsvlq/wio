@@ -144,14 +144,14 @@ pub fn update() void {
 
             if (internal.init_options.audioDefaultOutputFn) |callback| {
                 if (sink) {
-                    if (internal.allocator.dupeZ(u8, last_default_sink)) |id| {
+                    if (internal.allocator.dupeSentinel(u8, last_default_sink, 0)) |id| {
                         callback(.{ .backend = .{ .id = id, .type = .output } });
                     } else |_| {}
                 }
             }
             if (internal.init_options.audioDefaultInputFn) |callback| {
                 if (source) {
-                    if (internal.allocator.dupeZ(u8, last_default_source)) |id| {
+                    if (internal.allocator.dupeSentinel(u8, last_default_source, 0)) |id| {
                         callback(.{ .backend = .{ .id = id, .type = .input } });
                     } else |_| {}
                 }
@@ -355,7 +355,7 @@ fn sourceNameCallback(_: ?*h.pa_context, info: ?*const h.pa_source_info, eol: c_
 fn sinkListCallback(_: ?*h.pa_context, info: ?*const h.pa_sink_info, eol: c_int, data: ?*anyopaque) callconv(.c) void {
     const list: *std.ArrayList(AudioDevice) = @ptrCast(@alignCast(data));
     if (eol == 0) {
-        const id = internal.allocator.dupeZ(u8, std.mem.sliceTo(info.?.name, 0)) catch return;
+        const id = internal.allocator.dupeSentinel(u8, std.mem.sliceTo(info.?.name, 0), 0) catch return;
         list.append(internal.allocator, .{ .id = id, .type = .output }) catch {
             internal.allocator.free(id);
             return;
@@ -368,7 +368,7 @@ fn sinkListCallback(_: ?*h.pa_context, info: ?*const h.pa_sink_info, eol: c_int,
 fn sourceListCallback(_: ?*h.pa_context, info: ?*const h.pa_source_info, eol: c_int, data: ?*anyopaque) callconv(.c) void {
     const list: *std.ArrayList(AudioDevice) = @ptrCast(@alignCast(data));
     if (eol == 0) {
-        const id = internal.allocator.dupeZ(u8, std.mem.sliceTo(info.?.name, 0)) catch return;
+        const id = internal.allocator.dupeSentinel(u8, std.mem.sliceTo(info.?.name, 0), 0) catch return;
         list.append(internal.allocator, .{ .id = id, .type = .input }) catch {
             internal.allocator.free(id);
             return;

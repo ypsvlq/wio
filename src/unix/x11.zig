@@ -354,7 +354,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
     self.setMode(options.mode);
 
     {
-        const id = try internal.allocator.dupeZ(u8, options.app_id orelse options.title);
+        const id = try internal.allocator.dupeSentinel(u8, options.app_id orelse options.title, 0);
         defer internal.allocator.free(id);
         var class_hint = h.XClassHint{ .res_name = @constCast(id.ptr), .res_class = @constCast(id.ptr) };
         _ = c.XSetClassHint(display, window, &class_hint);

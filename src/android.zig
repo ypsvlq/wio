@@ -132,7 +132,7 @@ pub const Window = struct {
     pub fn requestAttention(_: *Window) void {}
 
     pub fn setClipboardText(_: *Window, text: []const u8) void {
-        const text_z = internal.allocator.dupeZ(u8, text) catch return;
+        const text_z = internal.allocator.dupeSentinel(u8, text, 0) catch return;
         defer internal.allocator.free(text_z);
 
         const text_j = java.env.*.*.NewStringUTF.?(java.env, text_z) orelse return;

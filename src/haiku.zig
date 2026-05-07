@@ -85,15 +85,15 @@ pub fn cancelWait() void {
 }
 
 pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []const u8) void {
-    const title_z = internal.allocator.dupeZ(u8, title) catch return;
+    const title_z = internal.allocator.dupeSentinel(u8, title, 0) catch return;
     defer internal.allocator.free(title_z);
-    const message_z = internal.allocator.dupeZ(u8, message) catch return;
+    const message_z = internal.allocator.dupeSentinel(u8, message, 0) catch return;
     defer internal.allocator.free(message_z);
     wioMessageBox(@intFromEnum(style), title_z, message_z);
 }
 
 pub fn openUri(uri: []const u8) void {
-    const uri_z = internal.allocator.dupeZ(u8, uri) catch return;
+    const uri_z = internal.allocator.dupeSentinel(u8, uri, 0) catch return;
     defer internal.allocator.free(uri_z);
     wioOpenUri(uri_z);
 }
@@ -127,7 +127,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
     }
     self.events.push(.draw);
 
-    const title = try internal.allocator.dupeZ(u8, options.title);
+    const title = try internal.allocator.dupeSentinel(u8, options.title, 0);
     defer internal.allocator.free(title);
     self.window = wioCreateWindow(self, title, size.width, size.height);
 
@@ -204,7 +204,7 @@ pub const Window = struct {
     }
 
     pub fn setTitle(self: *Window, title: []const u8) void {
-        const title_z = internal.allocator.dupeZ(u8, title) catch return;
+        const title_z = internal.allocator.dupeSentinel(u8, title, 0) catch return;
         defer internal.allocator.free(title_z);
         wioSetTitle(self.window, title_z);
     }

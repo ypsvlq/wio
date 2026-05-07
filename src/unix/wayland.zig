@@ -320,7 +320,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
     self.setMode(options.mode);
 
     {
-        const id = try internal.allocator.dupeZ(u8, options.app_id orelse options.title);
+        const id = try internal.allocator.dupeSentinel(u8, options.app_id orelse options.title, 0);
         defer internal.allocator.free(id);
         c.libdecor_frame_set_app_id(self.frame, id.ptr);
     }
@@ -460,7 +460,7 @@ pub const Window = struct {
     }
 
     pub fn setTitle(self: *Window, title: []const u8) void {
-        const title_z = internal.allocator.dupeZ(u8, title) catch return;
+        const title_z = internal.allocator.dupeSentinel(u8, title, 0) catch return;
         defer internal.allocator.free(title_z);
         c.libdecor_frame_set_title(self.frame, title_z);
     }
