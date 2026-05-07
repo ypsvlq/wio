@@ -257,29 +257,14 @@ pub fn build(b: *std.Build) !void {
             });
             module.addImport("c", translate_c.createModule());
 
+            module.addCSourceFile(.{ .file = b.path("src/haiku.cpp") });
+            module.link_libcpp = true;
+
             module.linkSystemLibrary("be", .{});
             module.linkSystemLibrary("game", .{});
             if (enable_opengl) module.linkSystemLibrary("OSmesa", .{});
             if (enable_joystick) module.linkSystemLibrary("device", .{});
             if (enable_audio) module.linkSystemLibrary("media", .{});
-
-            const gcc = b.addSystemCommand(&.{
-                "g++",
-                "-Wall",
-                "-Wextra",
-                switch (optimize) {
-                    .Debug => "-O0",
-                    .ReleaseFast, .ReleaseSafe => "-O3",
-                    .ReleaseSmall => "-Os",
-                },
-                "-g",
-                "-c",
-                "-o",
-            });
-            const output = gcc.addOutputFileArg("haiku.o");
-            gcc.addFileArg(b.path("src/haiku.cpp"));
-            gcc.addArgs(module.c_macros.items);
-            module.addObjectFile(output);
         },
         else => {
             if (target.result.cpu.arch.isWasm()) {
