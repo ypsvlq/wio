@@ -909,7 +909,7 @@ export fn wioMouseLeave(self: *Window) void {
 }
 
 export fn wioScroll(self: *Window, x: f32, y: f32) void {
-    if (x != 0) self.events.push(.{ .scroll_horizontal = x });
+    if (x != 0) self.events.push(.{ .scroll_horizontal = -x });
     if (y != 0) self.events.push(.{ .scroll_vertical = -y });
 }
 
