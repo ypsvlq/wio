@@ -81,10 +81,10 @@ pub fn build(b: *std.Build) !void {
         .macos => {
             module.addCSourceFile(.{ .file = b.path("src/macos.m"), .flags = &.{ "-fobjc-arc", "-Wno-deprecated-declarations" } });
 
-            if (b.lazyDependency("xcode_frameworks", .{})) |xcode_frameworks| {
-                module.addSystemFrameworkPath(xcode_frameworks.path("Frameworks"));
-                module.addSystemIncludePath(xcode_frameworks.path("include"));
-                module.addLibraryPath(xcode_frameworks.path("lib"));
+            if (b.lazyDependency("wio_macos_sdk", .{})) |macos_sdk| {
+                module.addSystemFrameworkPath(macos_sdk.path("System/Library/Frameworks"));
+                module.addSystemIncludePath(macos_sdk.path("usr/include"));
+                module.addLibraryPath(macos_sdk.path("usr/lib"));
             }
 
             module.linkFramework("Cocoa", .{});
