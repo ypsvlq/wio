@@ -111,7 +111,7 @@ fn makeDevice(path: []const u8, device: *h.udev_device) ?JoystickDevice {
     if (!std.mem.startsWith(u8, basename, "event")) return null;
 
     var buf: [std.fs.max_path_bytes:0]u8 = undefined;
-    _ = std.fmt.bufPrintZ(&buf, "/dev/input/{s}", .{basename}) catch return null;
+    _ = std.fmt.bufPrintSentinel(&buf, "/dev/input/{s}", .{basename}, 0) catch return null;
     const result = std.os.linux.open(&buf, .{ .NONBLOCK = true }, 0);
     if (std.os.linux.errno(result) != .SUCCESS) return null;
     return .{

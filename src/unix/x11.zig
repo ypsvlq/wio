@@ -172,7 +172,7 @@ pub fn init() !bool {
         h.XIMPreeditNothing | h.XIMStatusNothing,
     };
     for (preferred_styles) |style| {
-        if (std.mem.indexOfScalar(h.XIMStyle, supported_styles, style) != null) {
+        if (std.mem.findScalar(h.XIMStyle, supported_styles, style) != null) {
             im_style = style;
             break;
         }

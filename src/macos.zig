@@ -59,7 +59,7 @@ pub fn init() !void {
                 if (c.CFBundleCopyPrivateFrameworksURL(bundle)) |url| {
                     var buf: [std.fs.max_path_bytes:0]u8 = undefined;
                     if (c.CFURLGetFileSystemRepresentation(url, 1, &buf, buf.len) == 1) {
-                        _ = try std.fmt.bufPrintZ(buf[std.mem.indexOfScalar(u8, &buf, 0).?..], "/libvulkan.1.dylib", .{});
+                        _ = try std.fmt.bufPrintSentinel(buf[std.mem.findScalar(u8, &buf, 0).?..], "/libvulkan.1.dylib", .{}, 0);
                         if (std.DynLib.openZ(&buf)) |lib| {
                             break :blk lib;
                         } else |err| switch (err) {

@@ -1429,7 +1429,7 @@ fn helperWindowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM
                         return 0;
                     }
 
-                    if (std.mem.indexOf(u16, interface, w.L("IG_"))) |_| {
+                    if (std.mem.find(u16, interface, w.L("IG_"))) |_| {
                         var iter = xinput.iterator(.{ .kind = .unset });
                         while (iter.next()) |i| {
                             var state: w.XINPUT_STATE = undefined;
