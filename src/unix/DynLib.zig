@@ -10,7 +10,7 @@ pub fn open(comptime name: [:0]const u8) !DynLib {
     return .{
         .handle = if (build_options.system_integration) {} else try std.DynLib.openZ(
             if (builtin.os.tag == .openbsd or builtin.os.tag == .netbsd)
-                name[0..comptime std.mem.lastIndexOfScalar(u8, name, '.').?] ++ ""
+                name[0..comptime std.mem.findScalarLast(u8, name, '.').?] ++ ""
             else
                 name,
         ),

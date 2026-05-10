@@ -107,7 +107,7 @@ pub const JoystickDeviceIterator = struct {
 };
 
 fn makeDevice(path: []const u8, device: *h.udev_device) ?JoystickDevice {
-    const basename = path[std.mem.lastIndexOfScalar(u8, path, '/').? + 1 ..];
+    const basename = path[std.mem.findScalarLast(u8, path, '/').? + 1 ..];
     if (!std.mem.startsWith(u8, basename, "event")) return null;
 
     var buf: [std.fs.max_path_bytes:0]u8 = undefined;
