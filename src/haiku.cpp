@@ -84,7 +84,7 @@ public:
             case B_WINDOW_RESIZED: {
                 int32 width, height;
                 if (message->FindInt32("width", &width) == B_OK && message->FindInt32("height", &height) == B_OK) {
-                    wioSize(zig, mode, width, height);
+                    wioSize(zig, mode, width + 1, height + 1);
                     if (mode == 0) {
                         normal_frame = Frame();
                     }
@@ -226,7 +226,7 @@ extern "C" {
     }
 
     WioWindow *wioCreateWindow(void *zig, const char *title, uint16 width, uint16 height) {
-        WioWindow *window = new WioWindow(zig, BRect(370, 70, 370 + width, 70 + height), title);
+        WioWindow *window = new WioWindow(zig, BRect(370, 70, 370 + width - 1, 70 + height - 1), title);
         window->Show();
         return window;
     }
@@ -278,7 +278,7 @@ extern "C" {
     }
 
     void wioSetSize(WioWindow *window, float width, float height) {
-        window->ResizeTo(width, height);
+        window->ResizeTo(width - 1, height - 1);
     }
 
     void wioSetCursor(uint8 shape) {
