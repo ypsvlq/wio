@@ -392,13 +392,20 @@ export fn JNI_OnLoad(vm: *c.JavaVM, _: ?*anyopaque) c.jint {
     return c.JNI_VERSION_1_6;
 }
 
-fn main() void {
+fn threadMain() void {
     if (java.vm.*.*.AttachCurrentThread.?(java.vm, @ptrCast(&java.env), null) != c.JNI_OK) {
         log.err("AttachCurrentThread failed", .{});
         return;
     }
 
-    @import("root").main() catch |err| {
+    const main = @import("root").main;
+    const info = @typeInfo(@TypeOf(main)).@"fn";
+    const args = if (info.params.len == 0)
+        .{}
+    else if (info.params[0].type.? == std.process.Init.Minimal)
+        .{std.process.Init.Minimal{ .args = .{ .vector = &.{} }, .environ = .{ .block = .{ .slice = &.{} } } }};
+
+    @call(.auto, main, args) catch |err| {
         std.log.err("{s}", .{@errorName(err)});
     };
 
@@ -441,7 +448,7 @@ const native = struct {
     fn onCreate(env: *c.JNIEnv, instance: c.jobject) callconv(.c) void {
         java.activity = env.*.*.NewGlobalRef.?(env, instance);
 
-        const thread = std.Thread.spawn(.{}, main, .{}) catch |err| {
+        const thread = std.Thread.spawn(.{}, threadMain, .{}) catch |err| {
             std.log.err("{s}", .{@errorName(err)});
             return;
         };
