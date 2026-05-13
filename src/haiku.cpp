@@ -19,6 +19,7 @@ extern "C" {
     void wioUnfocused(void *);
     void wioVisible(void *);
     void wioHidden(void *);
+    void wioPosition(void *, int16, int16);
     void wioSize(void *, uint8, uint16, uint16);
     void wioChars(void *, const char *);
     void wioKey(void *, int32, uint8);
@@ -78,6 +79,13 @@ public:
                 bool minimize;
                 if (message->FindBool("minimize", &minimize) == B_OK) {
                     minimize ? wioHidden(zig) : wioVisible(zig);
+                }
+                break;
+            }
+            case B_WINDOW_MOVED: {
+                BPoint where;
+                if (message->FindPoint("where", &where) == B_OK) {
+                    wioPosition(zig, where.x, where.y);
                 }
                 break;
             }
@@ -225,8 +233,8 @@ extern "C" {
         return modifiers();
     }
 
-    WioWindow *wioCreateWindow(void *zig, const char *title, uint16 width, uint16 height) {
-        WioWindow *window = new WioWindow(zig, BRect(370, 70, 370 + width - 1, 70 + height - 1), title);
+    WioWindow *wioCreateWindow(void *zig, const char *title, int16 x, int16 y, uint16 width, uint16 height) {
+        WioWindow *window = new WioWindow(zig, BRect(x, y, x + width - 1, y + height - 1), title);
         window->Show();
         return window;
     }
@@ -275,6 +283,10 @@ extern "C" {
         }
         window->MoveTo(frame.left, frame.top);
         window->ResizeTo(frame.right - frame.left, frame.bottom - frame.top);
+    }
+
+    void wioSetPosition(WioWindow *window, float x, float y) {
+        window->MoveTo(x, y);
     }
 
     void wioSetSize(WioWindow *window, float width, float height) {

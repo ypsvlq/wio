@@ -13,12 +13,13 @@ extern fn wioInit() void;
 extern fn wioMessageBox(u8, [*:0]const u8, [*:0]const u8) void;
 extern fn wioOpenUri([*:0]const u8) void;
 extern fn wioGetModifiers() u32;
-extern fn wioCreateWindow(*Window, [*:0]const u8, u16, u16) *BWindow;
+extern fn wioCreateWindow(*Window, [*:0]const u8, i16, i16, u16, u16) *BWindow;
 extern fn wioDestroyWindow(*BWindow) void;
 extern fn wioEnableRelativeMouse(*BWindow) void;
 extern fn wioDisableRelativeMouse(*BWindow) void;
 extern fn wioSetTitle(*BWindow, [*:0]const u8) void;
 extern fn wioSetMode(*BWindow, u8) void;
+extern fn wioSetPosition(*BWindow, f32, f32) void;
 extern fn wioSetSize(*BWindow, f32, f32) void;
 extern fn wioSetCursor(u8) void;
 extern fn wioSetClipboardText([*]const u8, usize) void;
@@ -116,6 +117,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
         .events = .init(),
     };
 
+    const position: wio.RelativePosition = options.position orelse .{ .x = 370, .y = 70 };
     const size = if (options.scale) |base| options.size.multiply(wio_scale / base) else options.size;
 
     self.events.push(.visible);
@@ -129,7 +131,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
 
     const title = try internal.allocator.dupeSentinel(u8, options.title, 0);
     defer internal.allocator.free(title);
-    self.window = wioCreateWindow(self, title, size.width, size.height);
+    self.window = wioCreateWindow(self, title, position.x, position.y, size.width, size.height);
 
     if (options.mode != .normal) self.setMode(options.mode);
 
@@ -211,6 +213,10 @@ pub const Window = struct {
 
     pub fn setMode(self: *Window, mode: wio.WindowMode) void {
         wioSetMode(self.window, @intFromEnum(mode));
+    }
+
+    pub fn setPosition(self: *Window, position: wio.RelativePosition) void {
+        wioSetPosition(self.window, @floatFromInt(position.x), @floatFromInt(position.y));
     }
 
     pub fn setSize(self: *Window, size: wio.Size) void {
@@ -508,6 +514,10 @@ export fn wioVisible(self: *Window) void {
 
 export fn wioHidden(self: *Window) void {
     self.pushEvent(.hidden);
+}
+
+export fn wioPosition(self: *Window, x: i16, y: i16) void {
+    self.pushEvent(.{ .position = .{ .x = x, .y = y } });
 }
 
 export fn wioSize(self: *Window, mode: u8, width: u16, height: u16) void {

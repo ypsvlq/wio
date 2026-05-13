@@ -37,7 +37,7 @@ var imports: extern struct {
     Xutf8LookupString: *const fn (h.XIC, [*c]h.XKeyPressedEvent, [*c]u8, c_int, [*c]h.KeySym, [*c]c_int) callconv(.c) c_int,
     XSendEvent: *const fn (?*h.Display, h.Window, c_int, c_long, [*c]h.XEvent) callconv(.c) c_int,
     XSetICValues: *const fn (h.XIC, ...) callconv(.c) [*c]u8,
-    XResizeWindow: *const fn (?*h.Display, h.Window, c_uint, c_uint) callconv(.c) c_int,
+    XConfigureWindow: *const fn (?*h.Display, h.Window, c_uint, [*c]h.XWindowChanges) callconv(.c) c_int,
     XReparentWindow: *const fn (?*h.Display, h.Window, h.Window, c_int, c_int) callconv(.c) c_int,
     XcursorLibraryLoadCursor: *const fn (dpy: ?*h.Display, file: [*c]const u8) callconv(.c) h.Cursor,
     XFreeCursor: *const fn (?*h.Display, h.Cursor) callconv(.c) c_int,
@@ -289,12 +289,13 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
         }
     };
 
+    const position: wio.RelativePosition = options.position orelse .{ .x = 0, .y = 0 };
     const size = if (options.scale) |base| options.size.multiply(scale / base) else options.size;
     const window = c.XCreateWindow(
         display,
         if (options.parent != 0) options.parent else h.DefaultRootWindow(display),
-        0,
-        0,
+        position.x,
+        position.y,
         size.width,
         size.height,
         0,
@@ -466,8 +467,18 @@ pub const Window = struct {
         _ = c.XSendEvent(display, h.DefaultRootWindow(display), h.False, h.SubstructureRedirectMask | h.SubstructureNotifyMask, &event);
     }
 
+    pub fn setPosition(self: *Window, position: wio.RelativePosition) void {
+        var changes: h.XWindowChanges = undefined;
+        changes.x = position.x;
+        changes.y = position.y;
+        _ = c.XConfigureWindow(display, self.window, h.CWX | h.CWY, &changes);
+    }
+
     pub fn setSize(self: *Window, size: wio.Size) void {
-        _ = c.XResizeWindow(display, self.window, size.width, size.height);
+        var changes: h.XWindowChanges = undefined;
+        changes.width = size.width;
+        changes.height = size.height;
+        _ = c.XConfigureWindow(display, self.window, h.CWWidth | h.CWHeight, &changes);
     }
 
     pub fn setParent(self: *Window, parent: usize) void {
@@ -952,6 +963,8 @@ fn handle(event: *h.XEvent) void {
             }
             if (mode == .normal and maximized_horz and maximized_vert) mode = .maximized;
             window.events.push(.{ .mode = mode });
+
+            window.events.push(.{ .position = .{ .x = std.math.lossyCast(i16, event.xconfigure.x), .y = std.math.lossyCast(i16, event.xconfigure.y) } });
 
             window.size = wio.Size{ .width = std.math.lossyCast(u16, event.xconfigure.width), .height = std.math.lossyCast(u16, event.xconfigure.height) };
             window.events.push(.{ .size_logical = window.size });

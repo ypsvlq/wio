@@ -130,6 +130,7 @@ fn loop() !bool {
             logEvent(event);
             switch (event) {
                 .close => {
+                    context2.destroy();
                     window2.destroy();
                     maybe_window2 = null;
                     break;
@@ -161,9 +162,10 @@ fn loop() !bool {
 
 fn logEvent(event: wio.Event) void {
     switch (event) {
+        .mode => |mode| std.log.info("{s}", .{@tagName(mode)}),
+        .position => |position| std.log.info("position ({},{})", .{ position.x, position.y }),
         .size_logical, .size_physical => |size| std.log.info("{s} {}x{}", .{ @tagName(event), size.width, size.height }),
         .scale => |scale| std.log.info("scale {d}", .{scale}),
-        .mode => |mode| std.log.info("{s}", .{@tagName(mode)}),
         .char, .preview_char => |char| std.log.info("{s}: {u}", .{ @tagName(event), char }),
         .preview_cursor => |active| std.log.info("preview_cursor {}..{}", .{ active[0], active[1] }),
         .button_press => |button| std.log.info("+{s}", .{@tagName(button)}),
@@ -237,7 +239,7 @@ fn action(button: wio.Button) !void {
             wio.messageBox(.err, "wio", "error");
         },
         .u => wio.openUri("https://tiredsleepy.net"),
-        .l => {
+        .h => {
             const modifiers = wio.getModifiers();
             std.log.scoped(.modifiers).info("{s}{s}{s}{s}", .{
                 if (modifiers.control) "control " else "",
@@ -266,14 +268,15 @@ fn action(button: wio.Button) !void {
         .n => window.setMode(.normal),
         .m => window.setMode(.maximized),
         .f => window.setMode(.fullscreen),
+        .l => window.setPosition(.{ .x = 100, .y = 100 }),
+        .equals => window.setSize(.{ .width = 640, .height = 480 }),
+        .minus => window.setSize(.{ .width = 320, .height = 240 }),
         .p => {
             const cursors = std.enums.values(wio.Cursor);
             cursor +%= 1;
             window.setCursor(cursors[cursor % cursors.len]);
         },
         .a => request_attention = true,
-        .equals, .kp_plus => window.setSize(.{ .width = 640, .height = 480 }),
-        .minus, .kp_minus => window.setSize(.{ .width = 320, .height = 240 }),
         .c => window.setClipboardText("wio example"),
         .v => {
             if (window.getClipboardText(allocator)) |text| {

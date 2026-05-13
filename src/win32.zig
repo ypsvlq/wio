@@ -473,6 +473,11 @@ pub const Window = struct {
         }
     }
 
+    pub fn setPosition(self: *Window, position: wio.RelativePosition) void {
+        _ = self;
+        _ = position;
+    }
+
     pub fn setSize(self: *Window, size: wio.Size) void {
         const style: u32 = @bitCast(@as(i32, @intCast(w.GetWindowLongPtrW(self.window, w.GWL_STYLE))));
         const window_size = clientToWindow(size, style);

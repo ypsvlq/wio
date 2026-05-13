@@ -290,6 +290,13 @@ pub const Window = union {
         }
     }
 
+    pub fn setPosition(self: *Window, position: wio.RelativePosition) void {
+        switch (active) {
+            .x11 => self.x11.setPosition(position),
+            .wayland => self.wayland.setPosition(position),
+        }
+    }
+
     pub fn setSize(self: *Window, size: wio.Size) void {
         switch (active) {
             .x11 => self.x11.setSize(size),

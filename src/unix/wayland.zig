@@ -307,14 +307,15 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
     }
     errdefer if (self.fractional_scale) |_| h.wp_fractional_scale_v1_destroy(self.fractional_scale);
 
+    self.events.push(.{ .position = .{ .x = 0, .y = 0 } });
+    self.events.push(.visible);
+    if (self.fractional_scale == null) self.events.push(.{ .scale = 1 });
+
     h.wl_surface_commit(surface);
     c.libdecor_frame_map(frame);
     while (!self.configured) {
         if (c.wl_display_dispatch(display) == -1) return error.Unexpected;
     }
-
-    self.events.push(.visible);
-    if (self.fractional_scale == null) self.events.push(.{ .scale = 1 });
 
     self.setTitle(options.title);
     self.setMode(options.mode);
@@ -472,6 +473,11 @@ pub const Window = struct {
             .maximized => c.libdecor_frame_set_maximized(self.frame),
             .fullscreen => c.libdecor_frame_set_fullscreen(self.frame, null),
         }
+    }
+
+    pub fn setPosition(self: *Window, position: wio.RelativePosition) void {
+        _ = self;
+        _ = position;
     }
 
     pub fn setSize(self: *Window, size: wio.Size) void {

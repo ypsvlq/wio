@@ -112,10 +112,11 @@ pub const Window = struct {
             .unfocused => .unfocused,
             .visible => .visible,
             .draw => .draw,
+            .mode => .{ .mode = @enumFromInt(js.shift(self.id)) },
+            .position => .{ .position = .{ .x = @intCast(js.shift(self.id)), .y = @intCast(js.shift(self.id)) } },
             .size_logical => .{ .size_logical = .{ .width = @intCast(js.shift(self.id)), .height = @intCast(js.shift(self.id)) } },
             .size_physical => .{ .size_physical = .{ .width = @intCast(js.shift(self.id)), .height = @intCast(js.shift(self.id)) } },
             .scale => .{ .scale = js.shiftFloat(self.id) },
-            .mode => .{ .mode = @enumFromInt(js.shift(self.id)) },
             .char => .{ .char = @intCast(js.shift(self.id)) },
             .preview_reset => .preview_reset,
             .preview_char => .{ .preview_char = @intCast(js.shift(self.id)) },
@@ -156,6 +157,8 @@ pub const Window = struct {
     pub fn setMode(self: *Window, mode: wio.WindowMode) void {
         js.setFullscreen(self.id, mode == .fullscreen);
     }
+
+    pub fn setPosition(_: *Window, _: wio.RelativePosition) void {}
 
     pub fn setSize(self: *Window, size: wio.Size) void {
         js.setSize(self.id, size.width, size.height);

@@ -71,7 +71,7 @@ class Wio {
             const canvas = this.canvases.shift();
             if (canvas === undefined) throw new Error("no canvas available");
 
-            const events = [3];
+            const events = [3, 7, 0, 0];
 
             const input = document.createElement("input");
             input.tabIndex = -1;
@@ -91,10 +91,10 @@ class Wio {
                     case "insertReplacementText":
                     case "insertFromYank":
                         if (event.inputType === "insertCompositionText") {
-                            events.push(11);
+                            events.push(12);
                         }
                         for (const char of event.data) {
-                            events.push((event.isComposing ? 12 : 10), char.codePointAt(0));
+                            events.push((event.isComposing ? 13 : 11), char.codePointAt(0));
                         }
                         if (!event.isComposing) {
                             input.value = "";
@@ -127,9 +127,9 @@ class Wio {
                 canvas.height = canvas.scrollHeight * devicePixelRatio;
                 events.push(
                     6, (document.fullscreenElement === canvas) ? 2 : 0,
-                    7, canvas.scrollWidth, canvas.scrollHeight,
-                    8, canvas.width, canvas.height,
-                    9, devicePixelRatio,
+                    8, canvas.scrollWidth, canvas.scrollHeight,
+                    9, canvas.width, canvas.height,
+                    10, devicePixelRatio,
                     5,
                 );
             }).observe(canvas);
@@ -148,46 +148,46 @@ class Wio {
             canvas.addEventListener("keydown", (event) => {
                 event.preventDefault();
                 const key = Wio.keys[event.code];
-                if (key) events.push(event.repeat ? 15 : 14, key);
+                if (key) events.push(event.repeat ? 16 : 13, key);
                 this.updateModifiers(event);
             });
             canvas.addEventListener("keyup", (event) => {
                 const key = Wio.keys[event.code];
-                if (key) events.push(16, key);
+                if (key) events.push(17, key);
                 this.updateModifiers(event);
             });
             canvas.addEventListener("mousedown", (event) => {
                 const button = Wio.buttons[event.button];
-                if (button !== undefined) events.push(14, button);
+                if (button !== undefined) events.push(15, button);
                 if (window.relative_mouse) canvas.requestPointerLock({ unadjustedMovement: true });
                 this.updateModifiers(event);
             });
             canvas.addEventListener("mouseup", (event) => {
                 const button = Wio.buttons[event.button];
-                if (button !== undefined) events.push(16, button);
+                if (button !== undefined) events.push(17, button);
             });
             canvas.addEventListener("mousemove", (event) => {
                 if (!window.relative_mouse) {
-                    events.push(17, event.offsetX, event.offsetY);
+                    events.push(18, event.offsetX, event.offsetY);
                 } else {
-                    events.push(18, event.movementX, event.movementY);
+                    events.push(19, event.movementX, event.movementY);
                 }
                 this.updateModifiers(event);
             });
-            canvas.addEventListener("mouseleave", () => events.push(19));
+            canvas.addEventListener("mouseleave", () => events.push(20));
             canvas.addEventListener("wheel", (event) => {
-                if (event.deltaY !== 0) events.push(20, event.deltaY);
-                if (event.deltaX !== 0) events.push(21, event.deltaX);
+                if (event.deltaY !== 0) events.push(21, event.deltaY);
+                if (event.deltaX !== 0) events.push(22, event.deltaX);
             });
             canvas.addEventListener("dragenter", (event) => {
                 event.preventDefault();
                 window.drop_files = [];
                 window.drop_text = null;
-                events.push(24);
+                events.push(25);
             });
             canvas.addEventListener("dragover", (event) => {
                 event.preventDefault();
-                events.push(25, event.offsetX, event.offsetY);
+                events.push(26, event.offsetX, event.offsetY);
             });
             canvas.addEventListener("drop", (event) => {
                 event.preventDefault();
@@ -196,7 +196,7 @@ class Wio {
                 }
                 const text = event.dataTransfer.getData("text/plain");
                 window.drop_text = text.length > 0 ? text : null;
-                events.push(26);
+                events.push(27);
             });
 
             this.windows.push(window);

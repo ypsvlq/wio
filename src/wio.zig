@@ -112,8 +112,9 @@ pub const CreateWindowOptions = struct {
     title: []const u8 = "wio",
     /// Application identifier used as the window class (X11) or app_id (Wayland).
     app_id: ?[]const u8 = null,
-    mode: WindowMode = .normal,
 
+    mode: WindowMode = .normal,
+    position: ?RelativePosition = null,
     size: Size = .{ .width = 640, .height = 480 },
     /// Base scale factor for `size`. If set, adjusts for high-DPI on relevant platforms.
     ///
@@ -170,6 +171,10 @@ pub const Window = struct {
 
     pub fn setMode(self: *Window, mode: WindowMode) void {
         self.backend.setMode(mode);
+    }
+
+    pub fn setPosition(self: *Window, position: RelativePosition) void {
+        self.backend.setPosition(position);
     }
 
     pub fn setSize(self: *Window, size: Size) void {
@@ -480,6 +485,9 @@ pub const AudioInput = struct {
     }
 };
 
+pub const TouchEvent = struct { id: u8, x: u16, y: u16 };
+pub const TouchEndEvent = struct { id: u8, ignore: bool };
+
 pub const Event = union(enum) {
     close: void,
     focused: void,
@@ -488,12 +496,17 @@ pub const Event = union(enum) {
     hidden: void,
     draw: void,
 
-    /// Sent before `size`.
+    /// Sent before `size_logical`.
     mode: WindowMode,
+    position: RelativePosition,
     /// Window size as used by mouse and touch events.
     size_logical: Size,
     /// Window size in pixels.
     size_physical: Size,
+    /// Suggested render scale.
+    ///
+    /// Depending on the platform, this may be equal to `size_physical / size_logical`,
+    /// or a configured scale factor.
     scale: f32,
 
     char: u21,
@@ -511,8 +524,8 @@ pub const Event = union(enum) {
     scroll_vertical: f32,
     scroll_horizontal: f32,
 
-    touch: struct { id: u8, x: u16, y: u16 },
-    touch_end: struct { id: u8, ignore: bool },
+    touch: TouchEvent,
+    touch_end: TouchEndEvent,
 
     drop_begin: void,
     drop_position: Position,

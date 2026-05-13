@@ -76,6 +76,8 @@ pub fn createWindow(options: wio.CreateWindowOptions) !Window {
     if (created) return error.AlreadyCreated;
     created = true;
 
+    pushEvent(.{ .position = .{ .x = 0, .y = 0 } });
+
     if (build_options.opengl) {
         if (options.gl_options) |gl| {
             egl_config = try egl.chooseConfig(gl);
@@ -120,6 +122,8 @@ pub const Window = struct {
     }
 
     pub fn setMode(_: *Window, _: wio.WindowMode) void {}
+
+    pub fn setPosition(_: *Window, _: wio.RelativePosition) void {}
 
     pub fn setSize(_: *Window, _: wio.Size) void {}
 
