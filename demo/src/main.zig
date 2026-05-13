@@ -33,12 +33,12 @@ const gl_options: wio.GlOptions = .{
     .samples = 4,
 };
 
-pub fn main() !void {
+pub fn main(init: std.process.Init.Minimal) !void {
     if (builtin.cpu.arch.isWasm()) {
         allocator = std.heap.wasm_allocator;
     } else {
         allocator = debug_allocator.allocator();
-        threaded = std.Io.Threaded.init(allocator, .{});
+        threaded = std.Io.Threaded.init(allocator, .{ .environ = init.environ });
         io = threaded.io();
     }
 
