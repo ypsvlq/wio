@@ -319,10 +319,10 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
     self.setTitle(options.title);
     self.setMode(options.mode);
 
-    {
-        const id = try internal.allocator.dupeSentinel(u8, options.app_id orelse options.title, 0);
+    if (options.app_id) |app_id| {
+        const id = try internal.allocator.dupeSentinel(u8, app_id, 0);
         defer internal.allocator.free(id);
-        c.libdecor_frame_set_app_id(self.frame, id.ptr);
+        c.libdecor_frame_set_app_id(self.frame, id);
     }
 
     if (build_options.opengl) {

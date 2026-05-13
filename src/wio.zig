@@ -111,7 +111,6 @@ pub const RelativePosition = struct { x: i16, y: i16 };
 pub const CreateWindowOptions = struct {
     title: []const u8 = "wio",
     /// Application identifier used as the window class (X11) or app_id (Wayland).
-    /// Defaults to the title if empty.
     app_id: ?[]const u8 = null,
     mode: WindowMode = .normal,
 

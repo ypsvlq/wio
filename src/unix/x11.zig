@@ -353,8 +353,8 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
     self.setTitle(options.title);
     self.setMode(options.mode);
 
-    {
-        const id = try internal.allocator.dupeSentinel(u8, options.app_id orelse options.title, 0);
+    if (options.app_id) |app_id| {
+        const id = try internal.allocator.dupeSentinel(u8, app_id, 0);
         defer internal.allocator.free(id);
         var class_hint = h.XClassHint{ .res_name = @constCast(id.ptr), .res_class = @constCast(id.ptr) };
         _ = c.XSetClassHint(display, window, &class_hint);
