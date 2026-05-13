@@ -65,6 +65,8 @@ class Wio {
 
         messageBox: (ptr, len) => alert(this.getString(ptr, len)),
 
+        openUri: (ptr, len) => open(this.getString(ptr, len)),
+
         getModifiers: () => this.modifiers,
 
         createWindow: () => {
@@ -148,7 +150,7 @@ class Wio {
             canvas.addEventListener("keydown", (event) => {
                 event.preventDefault();
                 const key = Wio.keys[event.code];
-                if (key) events.push(event.repeat ? 16 : 13, key);
+                if (key) events.push(event.repeat ? 16 : 15, key);
                 this.updateModifiers(event);
             });
             canvas.addEventListener("keyup", (event) => {

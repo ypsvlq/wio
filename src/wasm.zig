@@ -26,6 +26,7 @@ const js = struct {
     extern "wio" fn shift(u32) u32;
     extern "wio" fn shiftFloat(u32) f32;
     extern "wio" fn messageBox([*]const u8, usize) void;
+    extern "wio" fn openUri([*]const u8, usize) void;
     extern "wio" fn getModifiers() u8;
     extern "wio" fn createWindow() u32;
     extern "wio" fn enableTextInput(u32, u16, u16) void;
@@ -80,7 +81,7 @@ pub fn messageBox(_: wio.MessageBoxStyle, _: []const u8, message: []const u8) vo
 }
 
 pub fn openUri(uri: []const u8) void {
-    _ = uri;
+    js.openUri(uri.ptr, uri.len);
 }
 
 pub fn getModifiers() wio.Modifiers {
