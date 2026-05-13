@@ -478,7 +478,7 @@ pub const Window = struct {
     }
 
     pub fn setSize(self: *Window, size: wio.Size) void {
-        const style: u32 = @bitCast(@as(i32, @intCast(w.GetWindowLongPtrW(self.window, w.GWL_STYLE))));
+        const style: u32 = @bitCast(@as(i32, @truncate(w.GetWindowLongPtrW(self.window, w.GWL_STYLE))));
         const window_size = clientToWindow(size, style);
         _ = w.SetWindowPos(self.window, null, 0, 0, window_size.width, window_size.height, w.SWP_NOMOVE | w.SWP_NOZORDER);
     }
