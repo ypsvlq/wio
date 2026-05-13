@@ -496,8 +496,9 @@ pub const Event = union(enum) {
     hidden: void,
     draw: void,
 
-    /// Sent before `size_logical`.
+    /// On change, sent before `position` or `size_logical`.
     mode: WindowMode,
+    /// Relative to an unspecified origin.
     position: RelativePosition,
     /// Window size as used by mouse and touch events.
     size_logical: Size,
@@ -512,6 +513,8 @@ pub const Event = union(enum) {
     char: u21,
     preview_reset: void,
     preview_char: u21,
+    /// If the values are equal an I-beam should be displayed after that character,
+    /// otherwise they are an inclusive range of characters to be underlined.
     preview_cursor: [2]u16,
 
     button_press: Button,
