@@ -7,6 +7,7 @@ extern void wioFocused(void *);
 extern void wioUnfocused(void *);
 extern void wioVisible(void *);
 extern void wioHidden(void *);
+extern void wioPosition(void *, SInt16, SInt16);
 extern void wioSizeLogical(void *, UInt8, UInt16, UInt16);
 extern void wioSizePhysical(void *, UInt16, UInt16);
 extern void wioScale(void *, Float32);
@@ -108,6 +109,12 @@ static void warpCursor(NSWindow *window) {
     } else {
         wioHidden(zig);
     }
+}
+
+- (void)windowDidMove:(NSNotification *)notification {
+    NSWindow *window = [notification object];
+    NSRect rect = [window frame];
+    wioPosition(zig, rect.origin.x, rect.origin.y);
 }
 
 - (void)windowDidResize:(NSNotification *)notification {
@@ -521,6 +528,10 @@ void wioSetTitle(NSWindow *window, const char *ptr, size_t len) {
 void wioSetMode(NSWindow *window, uint8_t mode) {
     if (!!([window styleMask] & NSWindowStyleMaskFullScreen) != (mode == 2)) [window toggleFullScreen:nil];
     if (mode != 2 && mode != [window isZoomed]) [window performZoom:nil];
+}
+
+void wioSetPosition(NSWindow *window, int16_t x, int16_t y) {
+    [window setFrameOrigin:NSMakePoint(x, y)];
 }
 
 void wioSetSize(NSWindow *window, uint16_t width, uint16_t height) {

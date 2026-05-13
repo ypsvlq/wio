@@ -23,6 +23,7 @@ extern fn wioEnableRelativeMouse(*NSWindow) void;
 extern fn wioDisableRelativeMouse(*NSWindow) void;
 extern fn wioSetTitle(*NSWindow, [*]const u8, usize) void;
 extern fn wioSetMode(*NSWindow, u8) void;
+extern fn wioSetPosition(*NSWindow, i16, i16) void;
 extern fn wioSetSize(*NSWindow, u16, u16) void;
 extern fn wioSetCursor(*NSWindow, u8) void;
 extern fn wioRequestAttention() void;
@@ -200,6 +201,7 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
 
     self.setTitle(options.title);
     self.setMode(options.mode);
+    if (options.position) |position| self.setPosition(position);
 
     if (build_options.opengl) {
         if (options.gl_options) |gl| {
@@ -279,8 +281,7 @@ pub const Window = struct {
     }
 
     pub fn setPosition(self: *Window, position: wio.RelativePosition) void {
-        _ = self;
-        _ = position;
+        wioSetPosition(self.window, position.x, position.y);
     }
 
     pub fn setSize(self: *Window, size: wio.Size) void {
@@ -845,6 +846,10 @@ export fn wioVisible(self: *Window) void {
 
 export fn wioHidden(self: *Window) void {
     self.events.push(.hidden);
+}
+
+export fn wioPosition(self: *Window, x: i16, y: i16) void {
+    self.events.push(.{ .position = .{ .x = x, .y = y } });
 }
 
 export fn wioSizeLogical(self: *Window, mode: u8, width: u16, height: u16) void {
