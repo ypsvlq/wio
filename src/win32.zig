@@ -262,8 +262,8 @@ pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
         class_name,
         title.ptr,
         style,
-        w.CW_USEDEFAULT,
-        w.CW_USEDEFAULT,
+        if (options.position) |position| position.x else w.CW_USEDEFAULT,
+        if (options.position) |position| position.y else w.CW_USEDEFAULT,
         size.width,
         size.height,
         @ptrFromInt(options.parent),
@@ -474,8 +474,7 @@ pub const Window = struct {
     }
 
     pub fn setPosition(self: *Window, position: wio.RelativePosition) void {
-        _ = self;
-        _ = position;
+        _ = w.SetWindowPos(self.window, null, position.x, position.y, 0, 0, w.SWP_NOSIZE | w.SWP_NOZORDER);
     }
 
     pub fn setSize(self: *Window, size: wio.Size) void {
@@ -1584,6 +1583,10 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
         w.WM_PAINT => {
             self.events.push(.draw);
             _ = w.ValidateRgn(window, null);
+            return 0;
+        },
+        w.WM_MOVE => {
+            self.events.push(.{ .position = .{ .x = LOSHORT(lParam), .y = HISHORT(lParam) } });
             return 0;
         },
         w.WM_SIZE => {
