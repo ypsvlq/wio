@@ -517,12 +517,15 @@ export fn wioHidden(self: *Window) void {
     self.pushEvent(.hidden);
 }
 
+export fn wioMode(self: *Window, mode: u8) void {
+    self.pushEvent(.{ .mode = @enumFromInt(mode) });
+}
+
 export fn wioPosition(self: *Window, x: i16, y: i16) void {
     self.pushEvent(.{ .position = .{ .x = x, .y = y } });
 }
 
-export fn wioSize(self: *Window, mode: u8, width: u16, height: u16) void {
-    self.pushEvent(.{ .mode = @enumFromInt(mode) });
+export fn wioSize(self: *Window, width: u16, height: u16) void {
     self.pushEvent(.{ .size_logical = .{ .width = width, .height = height } });
     self.pushEvent(.{ .size_physical = .{ .width = width, .height = height } });
     self.pushEvent(.draw);

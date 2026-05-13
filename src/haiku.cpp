@@ -19,8 +19,9 @@ extern "C" {
     void wioUnfocused(void *);
     void wioVisible(void *);
     void wioHidden(void *);
+    void wioMode(void *, uint8);
     void wioPosition(void *, int16, int16);
-    void wioSize(void *, uint8, uint16, uint16);
+    void wioSize(void *, uint16, uint16);
     void wioChars(void *, const char *);
     void wioKey(void *, int32, uint8);
     void wioButtons(void *, uint8);
@@ -85,6 +86,7 @@ public:
             case B_WINDOW_MOVED: {
                 BPoint where;
                 if (message->FindPoint("where", &where) == B_OK) {
+                    wioMode(zig, mode);
                     wioPosition(zig, where.x, where.y);
                 }
                 break;
@@ -92,7 +94,8 @@ public:
             case B_WINDOW_RESIZED: {
                 int32 width, height;
                 if (message->FindInt32("width", &width) == B_OK && message->FindInt32("height", &height) == B_OK) {
-                    wioSize(zig, mode, width + 1, height + 1);
+                    wioMode(zig, mode);
+                    wioSize(zig, width + 1, height + 1);
                     if (mode == 0) {
                         normal_frame = Frame();
                     }
