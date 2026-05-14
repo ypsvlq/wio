@@ -15,8 +15,8 @@
             .lazy = true,
         },
         .wio_unix_headers = .{
-            .url = "https://github.com/ypsvlq/wio-unix-headers/archive/ef3bb4f5fd7ff27ac70589881b412039f8170ce2.tar.gz",
-            .hash = "wio_unix_headers-0.0.0-seffXMKiPgA1DrdfGicP_LNqV-e2xj4cal0qOYjjr8k_",
+            .url = "https://github.com/ypsvlq/wio-unix-headers/archive/d805a5e4cd255c4fed0c78ab84ae2d2a6c421b54.tar.gz",
+            .hash = "wio_unix_headers-0.0.0-seffXHufPgBv1UhlS_Rgps0xFv26W152HZQw7-niIn9s",
             .lazy = true,
         },
         .android = .{
