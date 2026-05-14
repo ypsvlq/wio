@@ -49,6 +49,11 @@ pub const Window = struct {
         return null;
     }
 
+    pub fn shouldPresent(self: *Window) bool {
+        _ = self;
+        return true;
+    }
+
     pub fn enableTextInput(self: *Window, options: wio.TextInputOptions) void {
         _ = self;
         _ = options;

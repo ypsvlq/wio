@@ -136,6 +136,10 @@ pub const Window = struct {
         };
     }
 
+    pub fn shouldPresent(_: *Window) bool {
+        return true;
+    }
+
     pub fn enableTextInput(self: *Window, options: wio.TextInputOptions) void {
         const x, const y = if (options.cursor) |cursor| .{ cursor.x, cursor.y } else .{ 0, 0 };
         js.enableTextInput(self.id, x, y);

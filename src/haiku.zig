@@ -190,6 +190,10 @@ pub const Window = struct {
         return maybe_event;
     }
 
+    pub fn shouldPresent(_: *Window) bool {
+        return true;
+    }
+
     pub fn enableTextInput(self: *Window, _: wio.TextInputOptions) void {
         self.text = true;
     }

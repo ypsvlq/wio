@@ -398,6 +398,10 @@ pub const Window = struct {
         return self.events.pop();
     }
 
+    pub fn shouldPresent(_: *Window) bool {
+        return true;
+    }
+
     pub fn enableTextInput(self: *Window, _: wio.TextInputOptions) void {
         self.text = true;
     }

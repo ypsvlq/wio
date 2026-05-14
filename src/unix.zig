@@ -248,6 +248,13 @@ pub const Window = union {
         }
     }
 
+    pub fn shouldPresent(self: *Window) bool {
+        switch (active) {
+            .x11 => return self.x11.shouldPresent(),
+            .wayland => return self.wayland.shouldPresent(),
+        }
+    }
+
     pub fn enableTextInput(self: *Window, options: wio.TextInputOptions) void {
         switch (active) {
             .x11 => self.x11.enableTextInput(options),

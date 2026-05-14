@@ -545,7 +545,7 @@ fn loop() !bool {
         }
     }
 
-    if (visible and surface != .null_handle) {
+    if (visible and surface != .null_handle and window.shouldPresent()) {
         drawFrame() catch |err| switch (err) {
             error.OutOfDateKHR => try recreateSwapchain(),
             error.SurfaceLostKHR => {

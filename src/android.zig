@@ -98,6 +98,10 @@ pub const Window = struct {
         return events.pop();
     }
 
+    pub fn shouldPresent(_: *Window) bool {
+        return true;
+    }
+
     pub fn enableTextInput(_: *Window, _: wio.TextInputOptions) void {
         java.env.*.*.CallVoidMethod.?(java.env, java.activity, java.enableTextInput);
     }

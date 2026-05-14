@@ -346,6 +346,7 @@ pub const Window = struct {
     viewport: ?*h.wp_viewport = null,
     fractional_scale: ?*h.wp_fractional_scale_v1 = null,
     locked_pointer: ?*h.zwp_locked_pointer_v1 = null,
+    should_present_callback: ?*h.wl_callback = null,
     resize_frame_callback: ?*h.wl_callback = null,
     repeat_key: u32 = 0,
     repeat_timestamp: i64 = undefined,
@@ -393,6 +394,7 @@ pub const Window = struct {
         }
 
         if (self.resize_frame_callback) |_| h.wl_callback_destroy(self.resize_frame_callback);
+        if (self.should_present_callback) |_| h.wl_callback_destroy(self.should_present_callback);
         if (self.fractional_scale) |_| h.wp_fractional_scale_v1_destroy(self.fractional_scale);
         if (self.viewport) |_| h.wp_viewport_destroy(self.viewport);
         c.libdecor_frame_unref(self.frame);
@@ -427,6 +429,15 @@ pub const Window = struct {
         }
 
         return maybe_event;
+    }
+
+    pub fn shouldPresent(self: *Window) bool {
+        if (self.should_present_callback == null) {
+            self.should_present_callback = h.wl_surface_frame(self.surface);
+            _ = h.wl_callback_add_listener(self.should_present_callback, &should_present_callback_listener, self);
+            return true;
+        }
+        return false;
     }
 
     pub fn enableTextInput(self: *Window, options: wio.TextInputOptions) void {
@@ -799,6 +810,17 @@ pub fn getRequiredVulkanInstanceExtensions() []const [*:0]const u8 {
 fn getWindow(surface: ?*h.wl_surface) ?*Window {
     const window: *Window = @ptrCast(@alignCast(h.wl_surface_get_user_data(surface orelse return null) orelse return null));
     return if (windows.contains(window)) window else null;
+}
+
+const should_present_callback_listener: h.wl_callback_listener = .{
+    .done = shouldPresentCallback,
+};
+
+fn shouldPresentCallback(data: ?*anyopaque, callback: ?*h.wl_callback, _: u32) callconv(.c) void {
+    h.wl_callback_destroy(callback);
+
+    const self: *Window = @ptrCast(@alignCast(data));
+    self.should_present_callback = null;
 }
 
 const resize_frame_callback_listener: h.wl_callback_listener = .{

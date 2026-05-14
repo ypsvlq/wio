@@ -144,6 +144,10 @@ pub const Window = struct {
         return self.backend.getEvent();
     }
 
+    pub fn shouldPresent(self: *Window) bool {
+        return self.backend.shouldPresent();
+    }
+
     /// When text input is enabled, character keys will send `.char` events instead of `.button_press`.
     ///
     /// Text input is disabled by default.
