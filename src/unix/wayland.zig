@@ -806,9 +806,11 @@ const resize_frame_callback_listener: h.wl_callback_listener = .{
 };
 
 fn resizeFrameCallback(data: ?*anyopaque, callback: ?*h.wl_callback, _: u32) callconv(.c) void {
+    h.wl_callback_destroy(callback);
+
     const self: *Window = @ptrCast(@alignCast(data));
     self.resize_frame_callback = null;
-    h.wl_callback_destroy(callback);
+    self.events.push(.draw);
 }
 
 const registry_listener: h.wl_registry_listener = .{
