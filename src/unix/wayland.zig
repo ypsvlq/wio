@@ -346,6 +346,7 @@ pub const Window = struct {
     viewport: ?*h.wp_viewport = null,
     fractional_scale: ?*h.wp_fractional_scale_v1 = null,
     locked_pointer: ?*h.zwp_locked_pointer_v1 = null,
+    resize_frame_callback: ?*h.wl_callback = null,
     repeat_key: u32 = 0,
     repeat_timestamp: i64 = undefined,
     repeat_ignore: bool = false,
@@ -391,6 +392,7 @@ pub const Window = struct {
             if (self.drop.text) |text| internal.allocator.free(text);
         }
 
+        if (self.resize_frame_callback) |_| h.wl_callback_destroy(self.resize_frame_callback);
         if (self.fractional_scale) |_| h.wp_fractional_scale_v1_destroy(self.fractional_scale);
         if (self.viewport) |_| h.wp_viewport_destroy(self.viewport);
         c.libdecor_frame_unref(self.frame);
@@ -706,7 +708,12 @@ pub const Window = struct {
 
         self.events.push(.{ .size_logical = size });
         self.events.push(.{ .size_physical = framebuffer });
-        self.events.push(.draw);
+
+        if (self.resize_frame_callback == null) {
+            self.events.push(.draw);
+            self.resize_frame_callback = h.wl_surface_frame(self.surface);
+            _ = h.wl_callback_add_listener(self.resize_frame_callback, &resize_frame_callback_listener, self);
+        }
     }
 
     fn pushKeyEvent(self: *Window, key: u32, comptime event: wio.EventType) void {
@@ -794,7 +801,17 @@ fn getWindow(surface: ?*h.wl_surface) ?*Window {
     return if (windows.contains(window)) window else null;
 }
 
-const registry_listener = h.wl_registry_listener{
+const resize_frame_callback_listener: h.wl_callback_listener = .{
+    .done = resizeFrameCallback,
+};
+
+fn resizeFrameCallback(data: ?*anyopaque, callback: ?*h.wl_callback, _: u32) callconv(.c) void {
+    const self: *Window = @ptrCast(@alignCast(data));
+    self.resize_frame_callback = null;
+    h.wl_callback_destroy(callback);
+}
+
+const registry_listener: h.wl_registry_listener = .{
     .global = registryGlobal,
     .global_remove = registryGlobalRemove,
 };
@@ -829,7 +846,7 @@ fn registryGlobal(_: ?*anyopaque, _: ?*h.wl_registry, name: u32, interface_ptr: 
 
 fn registryGlobalRemove(_: ?*anyopaque, _: ?*h.wl_registry, _: u32) callconv(.c) void {}
 
-const seat_listener = h.wl_seat_listener{
+const seat_listener: h.wl_seat_listener = .{
     .capabilities = seatCapabilities,
     .name = seatName,
 };
@@ -881,7 +898,7 @@ fn seatCapabilities(_: ?*anyopaque, _: ?*h.wl_seat, capabilities: h.wl_seat_capa
 
 fn seatName(_: ?*anyopaque, _: ?*h.wl_seat, _: [*c]const u8) callconv(.c) void {}
 
-const keyboard_listener = h.wl_keyboard_listener{
+const keyboard_listener: h.wl_keyboard_listener = .{
     .keymap = keyboardKeymap,
     .enter = keyboardEnter,
     .leave = keyboardLeave,
@@ -956,7 +973,7 @@ fn keyboardRepeatInfo(_: ?*anyopaque, _: ?*h.wl_keyboard, rate: i32, delay: i32)
     }
 }
 
-const pointer_listener = h.wl_pointer_listener{
+const pointer_listener: h.wl_pointer_listener = .{
     .enter = pointerEnter,
     .leave = pointerLeave,
     .motion = pointerMotion,
@@ -1011,7 +1028,7 @@ fn pointerAxis(_: ?*anyopaque, _: ?*h.wl_pointer, _: u32, axis: h.wl_pointer_axi
     }
 }
 
-const relative_pointer_listener = h.zwp_relative_pointer_v1_listener{
+const relative_pointer_listener: h.zwp_relative_pointer_v1_listener = .{
     .relative_motion = relativePointerMotion,
 };
 
@@ -1023,7 +1040,7 @@ fn relativePointerMotion(_: ?*anyopaque, _: ?*h.zwp_relative_pointer_v1, _: u32,
     }
 }
 
-const touch_listener = h.wl_touch_listener{
+const touch_listener: h.wl_touch_listener = .{
     .down = touchDown,
     .up = touchUp,
     .motion = touchMotion,
@@ -1067,7 +1084,7 @@ fn touchCancel(_: ?*anyopaque, _: ?*h.wl_touch) callconv(.c) void {
     touch_info.clearRetainingCapacity();
 }
 
-const fractional_scale_listener = h.wp_fractional_scale_v1_listener{
+const fractional_scale_listener: h.wp_fractional_scale_v1_listener = .{
     .preferred_scale = fractionalScalePreferredScale,
 };
 
@@ -1078,7 +1095,7 @@ fn fractionalScalePreferredScale(data: ?*anyopaque, _: ?*h.wp_fractional_scale_v
     self.events.push(.{ .scale = self.scale });
 }
 
-const text_input_listener = h.zwp_text_input_v3_listener{
+const text_input_listener: h.zwp_text_input_v3_listener = .{
     .enter = textInputEnter,
     .leave = textInputLeave,
     .preedit_string = textInputPreeditString,
@@ -1168,7 +1185,7 @@ fn textInputDone(_: ?*anyopaque, _: ?*h.zwp_text_input_v3, _: u32) callconv(.c) 
     }
 }
 
-const data_device_listener = h.wl_data_device_listener{
+const data_device_listener: h.wl_data_device_listener = .{
     .data_offer = dataDeviceDataOffer,
     .enter = dataDeviceEnter,
     .leave = dataDeviceLeave,
@@ -1288,7 +1305,7 @@ fn dataDeviceSelection(_: ?*anyopaque, _: ?*h.wl_data_device, offer: ?*h.wl_data
     data_offer = offer;
 }
 
-const data_offer_listener = h.wl_data_offer_listener{
+const data_offer_listener: h.wl_data_offer_listener = .{
     .offer = dataOfferMime,
     .source_actions = dataOfferSourceActions,
     .action = dataOfferAction,
@@ -1306,7 +1323,7 @@ fn dataOfferMime(_: ?*anyopaque, _: ?*h.wl_data_offer, mime: [*c]const u8) callc
 fn dataOfferAction(_: ?*anyopaque, _: ?*h.wl_data_offer, _: u32) callconv(.c) void {}
 fn dataOfferSourceActions(_: ?*anyopaque, _: ?*h.wl_data_offer, _: u32) callconv(.c) void {}
 
-const data_source_listener = h.wl_data_source_listener{
+const data_source_listener: h.wl_data_source_listener = .{
     .target = dataSourceTarget,
     .send = dataSourceSend,
     .cancelled = dataSourceCancelled,
@@ -1321,7 +1338,7 @@ fn dataSourceSend(_: ?*anyopaque, _: ?*h.wl_data_source, _: [*c]const u8, fd: i3
 
 fn dataSourceCancelled(_: ?*anyopaque, _: ?*h.wl_data_source) callconv(.c) void {}
 
-const activation_token_listener = h.xdg_activation_token_v1_listener{
+const activation_token_listener: h.xdg_activation_token_v1_listener = .{
     .done = activationTokenDone,
 };
 
@@ -1330,7 +1347,7 @@ fn activationTokenDone(surface: ?*anyopaque, token: ?*h.xdg_activation_token_v1,
     h.xdg_activation_token_v1_destroy(token);
 }
 
-var libdecor_interface = h.libdecor_interface{
+var libdecor_interface: h.libdecor_interface = .{
     .@"error" = libdecorError,
 };
 
@@ -1338,7 +1355,7 @@ fn libdecorError(_: ?*h.libdecor, _: h.libdecor_error, message: [*c]const u8) ca
     log.err("{s}", .{message});
 }
 
-var libdecor_frame_interface = h.libdecor_frame_interface{
+var libdecor_frame_interface: h.libdecor_frame_interface = .{
     .configure = frameConfigure,
     .close = frameClose,
     .commit = frameCommit,
