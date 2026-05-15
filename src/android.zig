@@ -447,6 +447,8 @@ const native = struct {
         .{ .name = "onGlobalLayoutNative", .signature = "()V", .fnPtr = @ptrCast(@constCast(&onGlobalLayout)) },
         .{ .name = "onCapturedPointerEventNative", .signature = "(II)V", .fnPtr = @ptrCast(@constCast(&onCapturedPointerEvent)) },
         .{ .name = "pushCharEventNative", .signature = "(I)V", .fnPtr = @ptrCast(@constCast(&pushCharEvent)) },
+        .{ .name = "pushPreviewResetEventNative", .signature = "()V", .fnPtr = @ptrCast(@constCast(&pushPreviewResetEvent)) },
+        .{ .name = "pushPreviewCharEventNative", .signature = "(I)V", .fnPtr = @ptrCast(@constCast(&pushPreviewCharEvent)) },
     };
 
     fn onCreate(env: *c.JNIEnv, instance: c.jobject) callconv(.c) void {
@@ -598,6 +600,14 @@ const native = struct {
 
     fn pushCharEvent(_: *c.JNIEnv, _: c.jobject, codepoint: c.jint) callconv(.c) void {
         pushEvent(.{ .char = std.math.cast(u21, codepoint) orelse return });
+    }
+
+    fn pushPreviewResetEvent(_: *c.JNIEnv, _: c.jobject) callconv(.c) void {
+        pushEvent(.preview_reset);
+    }
+
+    fn pushPreviewCharEvent(_: *c.JNIEnv, _: c.jobject, codepoint: c.jint) callconv(.c) void {
+        pushEvent(.{ .preview_char = std.math.cast(u21, codepoint) orelse return });
     }
 };
 

@@ -10,11 +10,12 @@ public class WioSurfaceView extends SurfaceView {
 
     public WioSurfaceView(WioActivity context) {
         super(context);
-        inputConnection = new WioInputConnection(this, true);
+        inputConnection = new WioInputConnection(this);
     }
 
     @Override
     public InputConnection onCreateInputConnection(EditorInfo outAttrs) {
+        outAttrs.inputType = EditorInfo.TYPE_CLASS_TEXT;
         return inputConnection;
     }
 

@@ -34,6 +34,8 @@ public class WioActivity extends Activity implements SurfaceHolder.Callback, OnG
     static native void onGlobalLayoutNative();
     static native void onCapturedPointerEventNative(int x, int y);
     static native void pushCharEventNative(int codepoint);
+    static native void pushPreviewResetEventNative();
+    static native void pushPreviewCharEventNative(int codepoint);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
