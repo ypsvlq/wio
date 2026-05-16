@@ -45,6 +45,10 @@ static void warpCursor(NSWindow *window) {
 
 @implementation WioApplicationDelegate
 
+- (void)applicationDidFinishLaunching:(NSNotification *)notification {
+    [NSApp activateIgnoringOtherApps:YES];
+}
+
 - (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender {
     for (NSWindow *window in [NSApp windows]) {
         id delegate = [window delegate];
