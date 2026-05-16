@@ -45,10 +45,6 @@ static void warpCursor(NSWindow *window) {
 
 @implementation WioApplicationDelegate
 
-- (void)applicationDidFinishLaunching:(NSNotification *)notification {
-    [NSApp activateIgnoringOtherApps:YES];
-}
-
 - (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender {
     for (NSWindow *window in [NSApp windows]) {
         id delegate = [window delegate];
@@ -415,6 +411,7 @@ void wioInit() {
     [[NSBundle mainBundle] loadNibNamed:@"MainMenu" owner:NSApp topLevelObjects:nil];
     [NSApp setDelegate:[[WioApplicationDelegate alloc] init]];
     [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+    [NSApp activateIgnoringOtherApps:YES];
     [NSApp finishLaunching];
 }
 
