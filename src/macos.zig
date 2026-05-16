@@ -113,7 +113,9 @@ pub fn init() !void {
             var id: c.AudioObjectID = undefined;
             var size: u32 = @sizeOf(c.AudioObjectID);
             try succeed(c.AudioObjectGetPropertyData(c.kAudioObjectSystemObject, &address, 0, null, &size, &id), "GetProperty(DefaultOutputDevice)");
-            callback(.{ .backend = .{ .id = id } });
+            if (id != 0) {
+                callback(.{ .backend = .{ .id = id } });
+            }
             try succeed(c.AudioObjectAddPropertyListener(c.kAudioObjectSystemObject, &address, defaultOutputChanged, null), "AddPropertyListener");
         }
         if (internal.init_options.audioDefaultInputFn) |callback| {
@@ -125,7 +127,9 @@ pub fn init() !void {
             var id: c.AudioObjectID = undefined;
             var size: u32 = @sizeOf(c.AudioObjectID);
             try succeed(c.AudioObjectGetPropertyData(c.kAudioObjectSystemObject, &address, 0, null, &size, &id), "GetProperty(DefaultInputDevice)");
-            callback(.{ .backend = .{ .id = id } });
+            if (id != 0) {
+                callback(.{ .backend = .{ .id = id } });
+            }
             try succeed(c.AudioObjectAddPropertyListener(c.kAudioObjectSystemObject, &address, defaultInputChanged, null), "AddPropertyListener");
         }
     }
