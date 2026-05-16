@@ -45,10 +45,6 @@ static void warpCursor(NSWindow *window) {
 
 @implementation WioApplicationDelegate
 
-- (void)applicationDidFinishLaunching:(NSNotification *)notification {
-    [NSApp activateIgnoringOtherApps:YES];
-}
-
 - (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender {
     for (NSWindow *window in [NSApp windows]) {
         id delegate = [window delegate];
@@ -482,9 +478,6 @@ void *wioCreateWindow(void *zig, uint16_t width, uint16_t height) {
     [window setTabbingMode:NSWindowTabbingModeDisallowed];
     [window center];
     [window makeKeyAndOrderFront:nil];
-    [window orderFrontRegardless];
-    [window makeKeyWindow];
-    [NSApp activateIgnoringOtherApps:YES];
 
     wioVisible(zig);
     wioScale(zig, [window backingScaleFactor]);
