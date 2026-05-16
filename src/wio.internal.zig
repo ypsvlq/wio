@@ -95,6 +95,11 @@ pub fn egl(c: anytype, h: anytype) type {
         }
 
         pub fn createContext(config: h.EGLConfig, options: wio.GlOptions, share: h.EGLContext) !h.EGLContext {
+            if (c.eglBindAPI(switch (options.api) {
+                .gl => h.EGL_OPENGL_API,
+                .gles1, .gles2 => h.EGL_OPENGL_ES_API,
+            }) == h.EGL_FALSE) return logError("eglBindAPI");
+
             return c.eglCreateContext(
                 display,
                 config,
