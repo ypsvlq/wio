@@ -618,7 +618,10 @@ pub const AudioDeviceIterator = struct {
         var size: u32 = undefined;
         succeed(c.AudioObjectGetPropertyDataSize(c.kAudioObjectSystemObject, &address, 0, null, &size), "GetPropertySize(Devices)") catch return .{};
         const devices = internal.allocator.alloc(c.AudioObjectID, size / @sizeOf(c.AudioObjectID)) catch return .{};
-        succeed(c.AudioObjectGetPropertyData(c.kAudioObjectSystemObject, &address, 0, null, &size, devices.ptr), "GetProperty(Devices)") catch return .{};
+        succeed(c.AudioObjectGetPropertyData(c.kAudioObjectSystemObject, &address, 0, null, &size, devices.ptr), "GetProperty(Devices)") catch {
+            internal.allocator.free(devices);
+            return .{};
+        };
         return .{ .devices = devices, .mode = mode };
     }
 
@@ -650,19 +653,18 @@ pub const AudioDevice = struct {
     pub fn release(_: AudioDevice) void {}
 
     pub fn openOutput(self: AudioDevice, writeFn: *const fn ([]f32) void, format: wio.AudioFormat) !AudioOutput {
-        const component_desc = c.AudioComponentDescription{
+        const component = c.AudioComponentFindNext(null, &.{
             .componentType = c.kAudioUnitType_Output,
             .componentSubType = c.kAudioUnitSubType_HALOutput,
             .componentManufacturer = c.kAudioUnitManufacturer_Apple,
             .componentFlags = 0,
             .componentFlagsMask = 0,
-        };
-        const component = c.AudioComponentFindNext(null, &component_desc);
+        });
         var unit: c.AudioComponentInstance = undefined;
         try succeed(c.AudioComponentInstanceNew(component, &unit), "AudioComponentInstanceNew");
         try succeed(c.AudioUnitSetProperty(unit, c.kAudioOutputUnitProperty_CurrentDevice, c.kAudioUnitScope_Global, 0, &self.id, @sizeOf(c.AudioDeviceID)), "SetProperty(CurrentDevice)");
 
-        const stream_desc = c.AudioStreamBasicDescription{
+        const stream_desc: c.AudioStreamBasicDescription = .{
             .mSampleRate = @floatFromInt(format.sample_rate),
             .mFormatID = c.kAudioFormatLinearPCM,
             .mFormatFlags = c.kAudioFormatFlagIsFloat,
@@ -674,7 +676,7 @@ pub const AudioDevice = struct {
         };
         try succeed(c.AudioUnitSetProperty(unit, c.kAudioUnitProperty_StreamFormat, c.kAudioUnitScope_Input, 0, &stream_desc, @sizeOf(c.AudioStreamBasicDescription)), "SetProperty(StreamFormat)");
 
-        const callback = c.AURenderCallbackStruct{
+        const callback: c.AURenderCallbackStruct = .{
             .inputProc = AudioOutput.callback,
             .inputProcRefCon = @constCast(writeFn),
         };
@@ -685,14 +687,13 @@ pub const AudioDevice = struct {
     }
 
     pub fn openInput(self: AudioDevice, readFn: *const fn ([]const f32) void, format: wio.AudioFormat) !*AudioInput {
-        const component_desc = c.AudioComponentDescription{
+        const component = c.AudioComponentFindNext(null, &.{
             .componentType = c.kAudioUnitType_Output,
             .componentSubType = c.kAudioUnitSubType_HALOutput,
             .componentManufacturer = c.kAudioUnitManufacturer_Apple,
             .componentFlags = 0,
             .componentFlagsMask = 0,
-        };
-        const component = c.AudioComponentFindNext(null, &component_desc);
+        });
         var unit: c.AudioComponentInstance = undefined;
         try succeed(c.AudioComponentInstanceNew(component, &unit), "AudioComponentInstanceNew");
 
@@ -705,7 +706,7 @@ pub const AudioDevice = struct {
         var native_sample_rate: f32 = undefined;
         var size: u32 = undefined;
         try succeed(c.AudioUnitGetProperty(unit, c.kAudioUnitProperty_SampleRate, c.kAudioUnitScope_Output, 1, &native_sample_rate, &size), "GetProperty(SampleRate)");
-        var source_format = c.AudioStreamBasicDescription{
+        const source_format: c.AudioStreamBasicDescription = .{
             .mSampleRate = native_sample_rate,
             .mFormatID = c.kAudioFormatLinearPCM,
             .mFormatFlags = c.kAudioFormatFlagIsFloat,
@@ -728,7 +729,7 @@ pub const AudioDevice = struct {
             .converter = converter,
             .readFn = readFn,
         };
-        const callback = c.AURenderCallbackStruct{
+        const callback: c.AURenderCallbackStruct = .{
             .inputProc = AudioInput.callback,
             .inputProcRefCon = input,
         };
@@ -794,7 +795,7 @@ pub const AudioInput = struct {
     fn callback(data: ?*anyopaque, flags: [*c]c.AudioUnitRenderActionFlags, timestamp: [*c]const c.AudioTimeStamp, bus: u32, frames: u32, _: [*c]c.AudioBufferList) callconv(.c) c.OSStatus {
         const self: *AudioInput = @ptrCast(@alignCast(data));
 
-        var list = c.AudioBufferList{
+        var list: c.AudioBufferList = .{
             .mNumberBuffers = 1,
             .mBuffers = .{.{
                 .mNumberChannels = 0,
@@ -806,7 +807,7 @@ pub const AudioInput = struct {
 
         var remaining = frames;
         while (remaining > 0) {
-            var output = c.AudioBufferList{
+            var output: c.AudioBufferList = .{
                 .mNumberBuffers = 1,
                 .mBuffers = .{.{
                     .mNumberChannels = list.mBuffers[0].mNumberChannels,
