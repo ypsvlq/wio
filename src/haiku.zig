@@ -44,11 +44,11 @@ threadlocal var gl_state: struct {
     framebuffer: Framebuffer = undefined,
 } = .{};
 
-pub fn init() !void {
+pub fn init(options: wio.InitOptions) !void {
     wioInit();
 
     if (build_options.joystick) {
-        if (internal.init_options.joystickConnectedFn) |callback| {
+        if (options.joystickConnectedFn) |callback| {
             var iter = wio.JoystickDeviceIterator.init();
             defer iter.deinit();
             while (iter.next()) |device| callback(device);
@@ -56,7 +56,7 @@ pub fn init() !void {
     }
 
     if (build_options.audio) {
-        if (internal.init_options.audioDefaultOutputFn) |callback| {
+        if (options.audioDefaultOutputFn) |callback| {
             callback(.{ .backend = .{} });
         }
     }

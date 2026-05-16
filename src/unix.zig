@@ -27,7 +27,7 @@ var pipe: [2]std.c.fd_t = undefined;
 
 pub var libvulkan: DynLib = undefined;
 
-pub fn init() !void {
+pub fn init(options: wio.InitOptions) !void {
     if (!build_options.system_integration and builtin.os.tag == .linux and builtin.output_mode == .Exe and builtin.link_mode == .static) @compileError("dynamic link required");
 
     pollfds = .empty;
@@ -53,9 +53,9 @@ pub fn init() !void {
     }
     errdefer if (build_options.vulkan) libvulkan.close();
 
-    if (build_options.joystick) try joystick.init();
+    if (build_options.joystick) try joystick.init(options);
     errdefer if (build_options.joystick) joystick.deinit();
-    if (build_options.audio) try audio.init();
+    if (build_options.audio) try audio.init(options);
     errdefer if (build_options.audio) audio.deinit();
 
     var try_x11 = true;

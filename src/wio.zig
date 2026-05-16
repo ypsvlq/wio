@@ -32,8 +32,7 @@ pub const InitOptions = struct {
 pub fn init(allocator: std.mem.Allocator, io: std.Io, options: InitOptions) !void {
     internal.allocator = allocator;
     internal.io = io;
-    internal.init_options = options;
-    try backend.init();
+    try backend.init(options);
 }
 
 /// All windows and devices must be closed before calling.

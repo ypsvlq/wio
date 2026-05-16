@@ -51,7 +51,7 @@ var libvulkan: std.DynLib = undefined;
 var hid: c.IOHIDManagerRef = undefined;
 var removed_joysticks: std.AutoHashMapUnmanaged(c.IOHIDDeviceRef, bool) = undefined;
 
-pub fn init() !void {
+pub fn init(options: wio.InitOptions) !void {
     wioInit();
 
     if (build_options.vulkan) {
@@ -94,8 +94,8 @@ pub fn init() !void {
 
         removed_joysticks = .empty;
         c.IOHIDManagerRegisterDeviceRemovalCallback(hid, joystickRemoved, null);
-        if (internal.init_options.joystickConnectedFn != null) {
-            c.IOHIDManagerRegisterDeviceMatchingCallback(hid, joystickConnected, null);
+        if (options.joystickConnectedFn) |callback| {
+            c.IOHIDManagerRegisterDeviceMatchingCallback(hid, joystickConnected, @constCast(callback));
         }
 
         c.IOHIDManagerScheduleWithRunLoop(hid, c.CFRunLoopGetMain(), c.kCFRunLoopDefaultMode);
@@ -104,8 +104,8 @@ pub fn init() !void {
     errdefer if (build_options.joystick) c.CFRelease(hid);
 
     if (build_options.audio) {
-        if (internal.init_options.audioDefaultOutputFn) |callback| {
-            const address = c.AudioObjectPropertyAddress{
+        if (options.audioDefaultOutputFn) |callback| {
+            const address: c.AudioObjectPropertyAddress = .{
                 .mSelector = c.kAudioHardwarePropertyDefaultOutputDevice,
                 .mScope = c.kAudioObjectPropertyScopeGlobal,
                 .mElement = c.kAudioObjectPropertyElementMain,
@@ -116,10 +116,10 @@ pub fn init() !void {
             if (id != 0) {
                 callback(.{ .backend = .{ .id = id } });
             }
-            try succeed(c.AudioObjectAddPropertyListener(c.kAudioObjectSystemObject, &address, defaultOutputChanged, null), "AddPropertyListener");
+            try succeed(c.AudioObjectAddPropertyListener(c.kAudioObjectSystemObject, &address, defaultAudioOutputChanged, @constCast(callback)), "AddPropertyListener");
         }
-        if (internal.init_options.audioDefaultInputFn) |callback| {
-            const address = c.AudioObjectPropertyAddress{
+        if (options.audioDefaultInputFn) |callback| {
+            const address: c.AudioObjectPropertyAddress = .{
                 .mSelector = c.kAudioHardwarePropertyDefaultInputDevice,
                 .mScope = c.kAudioObjectPropertyScopeGlobal,
                 .mElement = c.kAudioObjectPropertyElementMain,
@@ -130,7 +130,7 @@ pub fn init() !void {
             if (id != 0) {
                 callback(.{ .backend = .{ .id = id } });
             }
-            try succeed(c.AudioObjectAddPropertyListener(c.kAudioObjectSystemObject, &address, defaultInputChanged, null), "AddPropertyListener");
+            try succeed(c.AudioObjectAddPropertyListener(c.kAudioObjectSystemObject, &address, defaultAudioInputChanged, @constCast(callback)), "AddPropertyListener");
         }
     }
 }
@@ -610,7 +610,7 @@ pub const AudioDeviceIterator = struct {
     mode: wio.AudioDeviceType = undefined,
 
     pub fn init(mode: wio.AudioDeviceType) AudioDeviceIterator {
-        const address = c.AudioObjectPropertyAddress{
+        const address: c.AudioObjectPropertyAddress = .{
             .mSelector = c.kAudioHardwarePropertyDevices,
             .mScope = c.kAudioObjectPropertyScopeGlobal,
             .mElement = c.kAudioObjectPropertyElementMain,
@@ -632,13 +632,12 @@ pub const AudioDeviceIterator = struct {
         const id = self.devices[self.index];
         self.index += 1;
 
-        var address = c.AudioObjectPropertyAddress{
+        var size: u32 = undefined;
+        _ = c.AudioObjectGetPropertyDataSize(id, &.{
             .mSelector = c.kAudioDevicePropertyStreams,
             .mScope = if (self.mode == .output) c.kAudioDevicePropertyScopeOutput else c.kAudioDevicePropertyScopeInput,
             .mElement = c.kAudioObjectPropertyElementMain,
-        };
-        var size: u32 = undefined;
-        _ = c.AudioObjectGetPropertyDataSize(id, &address, 0, null, &size);
+        }, 0, null, &size);
         if (size == 0) return self.next();
 
         return .{ .id = id };
@@ -740,27 +739,25 @@ pub const AudioDevice = struct {
     }
 
     pub fn getId(self: AudioDevice, allocator: std.mem.Allocator) ![]u8 {
-        const address = c.AudioObjectPropertyAddress{
+        var string: c.CFStringRef = undefined;
+        var size: u32 = @sizeOf(c.CFStringRef);
+        try succeed(c.AudioObjectGetPropertyData(self.id, &.{
             .mSelector = c.kAudioDevicePropertyDeviceUID,
             .mScope = c.kAudioObjectPropertyScopeGlobal,
             .mElement = c.kAudioObjectPropertyElementMain,
-        };
-        var string: c.CFStringRef = undefined;
-        var size: u32 = @sizeOf(c.CFStringRef);
-        try succeed(c.AudioObjectGetPropertyData(self.id, &address, 0, null, &size, @ptrCast(&string)), "GetProperty(DeviceUID)");
+        }, 0, null, &size, @ptrCast(&string)), "GetProperty(DeviceUID)");
         defer c.CFRelease(string);
         return cfStringToUtf8(allocator, string);
     }
 
     pub fn getName(self: AudioDevice, allocator: std.mem.Allocator) ![]u8 {
-        const address = c.AudioObjectPropertyAddress{
+        var string: c.CFStringRef = undefined;
+        var size: u32 = @sizeOf(c.CFStringRef);
+        try succeed(c.AudioObjectGetPropertyData(self.id, &.{
             .mSelector = c.kAudioObjectPropertyName,
             .mScope = c.kAudioObjectPropertyScopeGlobal,
             .mElement = c.kAudioObjectPropertyElementMain,
-        };
-        var string: c.CFStringRef = undefined;
-        var size: u32 = @sizeOf(c.CFStringRef);
-        try succeed(c.AudioObjectGetPropertyData(self.id, &address, 0, null, &size, @ptrCast(&string)), "GetProperty(Name)");
+        }, 0, null, &size, @ptrCast(&string)), "GetProperty(Name)");
         defer c.CFRelease(string);
         return cfStringToUtf8(allocator, string);
     }
@@ -956,37 +953,40 @@ fn usageDictionary(page: i32, usage: i32) !c.CFDictionaryRef {
     ) orelse error.Unexpected;
 }
 
-fn joystickConnected(_: ?*anyopaque, _: c.IOReturn, _: ?*anyopaque, device: c.IOHIDDeviceRef) callconv(.c) void {
-    internal.init_options.joystickConnectedFn.?(.{ .backend = .{ .device = device } });
+fn joystickConnected(data: ?*anyopaque, _: c.IOReturn, _: ?*anyopaque, device: c.IOHIDDeviceRef) callconv(.c) void {
+    const callback: *const fn (wio.JoystickDevice) void = @ptrCast(@alignCast(data));
+    callback(.{ .backend = .{ .device = device } });
 }
 
 fn joystickRemoved(_: ?*anyopaque, _: c.IOReturn, _: ?*anyopaque, device: c.IOHIDDeviceRef) callconv(.c) void {
     if (removed_joysticks.getPtr(device)) |removed| removed.* = true;
 }
 
-fn defaultOutputChanged(_: c.AudioObjectID, _: u32, _: [*c]const c.AudioObjectPropertyAddress, _: ?*anyopaque) callconv(.c) c.OSStatus {
-    const address = c.AudioObjectPropertyAddress{
+fn defaultAudioOutputChanged(_: c.AudioObjectID, _: u32, _: [*c]const c.AudioObjectPropertyAddress, data: ?*anyopaque) callconv(.c) c.OSStatus {
+    var id: c.AudioObjectID = undefined;
+    var size: u32 = @sizeOf(c.AudioObjectID);
+    succeed(c.AudioObjectGetPropertyData(c.kAudioObjectSystemObject, &.{
         .mSelector = c.kAudioHardwarePropertyDefaultOutputDevice,
         .mScope = c.kAudioObjectPropertyScopeGlobal,
         .mElement = c.kAudioObjectPropertyElementMain,
-    };
-    var id: c.AudioObjectID = undefined;
-    var size: u32 = @sizeOf(c.AudioObjectID);
-    succeed(c.AudioObjectGetPropertyData(c.kAudioObjectSystemObject, &address, 0, null, &size, &id), "GetProperty(DefaultOutputDevice)") catch return c.noErr;
-    internal.init_options.audioDefaultOutputFn.?(.{ .backend = .{ .id = id } });
+    }, 0, null, &size, &id), "GetProperty(DefaultOutputDevice)") catch return c.noErr;
+
+    const callback: *const fn (wio.AudioDevice) void = @ptrCast(@alignCast(data));
+    callback(.{ .backend = .{ .id = id } });
     return c.noErr;
 }
 
-fn defaultInputChanged(_: c.AudioObjectID, _: u32, _: [*c]const c.AudioObjectPropertyAddress, _: ?*anyopaque) callconv(.c) c.OSStatus {
-    const address = c.AudioObjectPropertyAddress{
+fn defaultAudioInputChanged(_: c.AudioObjectID, _: u32, _: [*c]const c.AudioObjectPropertyAddress, data: ?*anyopaque) callconv(.c) c.OSStatus {
+    var id: c.AudioObjectID = undefined;
+    var size: u32 = @sizeOf(c.AudioObjectID);
+    succeed(c.AudioObjectGetPropertyData(c.kAudioObjectSystemObject, &.{
         .mSelector = c.kAudioHardwarePropertyDefaultInputDevice,
         .mScope = c.kAudioObjectPropertyScopeGlobal,
         .mElement = c.kAudioObjectPropertyElementMain,
-    };
-    var id: c.AudioObjectID = undefined;
-    var size: u32 = @sizeOf(c.AudioObjectID);
-    succeed(c.AudioObjectGetPropertyData(c.kAudioObjectSystemObject, &address, 0, null, &size, &id), "GetProperty(DefaultInputDevice)") catch return c.noErr;
-    internal.init_options.audioDefaultInputFn.?(.{ .backend = .{ .id = id } });
+    }, 0, null, &size, &id), "GetProperty(DefaultInputDevice)") catch return c.noErr;
+
+    const callback: *const fn (wio.AudioDevice) void = @ptrCast(@alignCast(data));
+    callback(.{ .backend = .{ .id = id } });
     return c.noErr;
 }
 

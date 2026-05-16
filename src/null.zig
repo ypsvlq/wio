@@ -3,7 +3,9 @@ const wio = @import("wio.zig");
 const internal = @import("wio.internal.zig");
 const log = std.log.scoped(.wio);
 
-pub fn init() !void {}
+pub fn init(options: wio.InitOptions) !void {
+    _ = options;
+}
 
 pub fn deinit() void {}
 

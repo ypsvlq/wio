@@ -55,7 +55,11 @@ const gl = struct {
     extern "gl" fn makeContextCurrent(u32) void;
 };
 
-pub fn init() !void {}
+var init_options: wio.InitOptions = undefined;
+
+pub fn init(options: wio.InitOptions) !void {
+    init_options = options;
+}
 
 pub fn deinit() void {}
 
@@ -385,7 +389,7 @@ pub const AudioInput = struct {
 };
 
 export fn wioJoystick(index: u32) void {
-    if (internal.init_options.joystickConnectedFn) |callback| {
+    if (init_options.joystickConnectedFn) |callback| {
         callback(.{ .backend = .{ .index = index } });
     }
 }

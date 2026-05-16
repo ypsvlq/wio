@@ -1,7 +1,7 @@
 const std = @import("std");
 const wio = @import("../../wio.zig");
 
-pub fn init() !void {}
+pub fn init(_: wio.InitOptions) !void {}
 
 pub fn deinit() void {}
 

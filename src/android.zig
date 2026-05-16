@@ -23,7 +23,9 @@ var egl_config: c.EGLConfig = null;
 var egl_surface: c.EGLSurface = null;
 var egl_surface_mutex: std.Io.Mutex = .init;
 
-pub fn init() !void {
+pub fn init(options: wio.InitOptions) !void {
+    _ = options;
+
     if (build_options.opengl) {
         try egl.init(c.EGL_DEFAULT_DISPLAY);
     }

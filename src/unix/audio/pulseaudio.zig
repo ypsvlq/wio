@@ -53,7 +53,13 @@ var libpulse: DynLib = undefined;
 var loop: *h.pa_threaded_mainloop = undefined;
 var context: *h.pa_context = undefined;
 
-pub fn init() !void {
+var defaultOutputFn: ?*const fn (wio.AudioDevice) void = null;
+var defaultInputFn: ?*const fn (wio.AudioDevice) void = null;
+
+pub fn init(options: wio.InitOptions) !void {
+    defaultOutputFn = options.audioDefaultOutputFn;
+    defaultInputFn = options.audioDefaultInputFn;
+
     try DynLib.load(&imports, &.{.{ .handle = &libpulse, .name = "libpulse.so.0" }});
     errdefer libpulse.close();
 
@@ -81,7 +87,7 @@ pub fn init() !void {
         }
     }
 
-    if (internal.init_options.audioDefaultOutputFn != null or internal.init_options.audioDefaultInputFn != null) {
+    if (defaultOutputFn != null or defaultInputFn != null) {
         c.pa_context_set_subscribe_callback(context, subscribeCallback, null);
         const operation = c.pa_context_subscribe(context, h.PA_SUBSCRIPTION_MASK_SERVER, successCallback, null);
         defer c.pa_operation_unref(operation);
@@ -106,7 +112,7 @@ var last_default_sink: []const u8 = "";
 var last_default_source: []const u8 = "";
 
 pub fn update() void {
-    if (internal.init_options.audioDefaultOutputFn != null or internal.init_options.audioDefaultInputFn != null) {
+    if (defaultOutputFn != null or defaultInputFn != null) {
         if (server_info_changed) {
             var sink: bool = false;
             var source: bool = false;
@@ -123,7 +129,7 @@ pub fn update() void {
                 defer c.pa_threaded_mainloop_accept(loop);
 
                 if (maybe_info) |info| {
-                    if (internal.init_options.audioDefaultOutputFn != null) {
+                    if (defaultOutputFn != null) {
                         const default_sink = std.mem.sliceTo(info.default_sink_name, 0);
                         if (!std.mem.eql(u8, default_sink, last_default_sink)) {
                             internal.allocator.free(last_default_sink);
@@ -131,7 +137,7 @@ pub fn update() void {
                             sink = true;
                         }
                     }
-                    if (internal.init_options.audioDefaultInputFn != null) {
+                    if (defaultInputFn != null) {
                         const default_source = std.mem.sliceTo(info.default_source_name, 0);
                         if (!std.mem.eql(u8, default_source, last_default_source)) {
                             internal.allocator.free(last_default_source);
@@ -142,14 +148,14 @@ pub fn update() void {
                 }
             }
 
-            if (internal.init_options.audioDefaultOutputFn) |callback| {
+            if (defaultOutputFn) |callback| {
                 if (sink) {
                     if (internal.allocator.dupeSentinel(u8, last_default_sink, 0)) |id| {
                         callback(.{ .backend = .{ .id = id, .type = .output } });
                     } else |_| {}
                 }
             }
-            if (internal.init_options.audioDefaultInputFn) |callback| {
+            if (defaultInputFn) |callback| {
                 if (source) {
                     if (internal.allocator.dupeSentinel(u8, last_default_source, 0)) |id| {
                         callback(.{ .backend = .{ .id = id, .type = .input } });
