@@ -147,7 +147,7 @@ pub const Window = struct {
         return self.backend.shouldPresent();
     }
 
-    /// When text input is enabled, character keys will send `.char` events instead of `.button_press`.
+    /// When enabled, character keys will send `.char` events instead of `.button_press`.
     ///
     /// Text input is disabled by default.
     ///
@@ -160,6 +160,9 @@ pub const Window = struct {
         self.backend.disableTextInput();
     }
 
+    /// When enabled, mouse motion will send `.mouse_relative` events instead of `.mouse`.
+    ///
+    /// Relative mouse is disabled by default.
     pub fn enableRelativeMouse(self: *Window) void {
         self.backend.enableRelativeMouse();
     }
@@ -513,11 +516,12 @@ pub const Event = union(enum) {
     /// or a configured scale factor.
     scale: f32,
 
+    /// Only sent when `Window.enableTextInput` has been called.
     char: u21,
     preview_reset: void,
     preview_char: u21,
-    /// If the values are equal an I-beam should be displayed after that character,
-    /// otherwise they are an inclusive range of characters to be underlined.
+    /// If the values are equal an I-beam should be displayed at that position,
+    /// otherwise characters within the range should be highlighted.
     preview_cursor: [2]u16,
 
     button_press: Button,
@@ -525,12 +529,15 @@ pub const Event = union(enum) {
     button_release: Button,
 
     mouse: Position,
+    /// Only sent when `Window.enableRelativeMouse` has been called.
     mouse_relative: RelativePosition,
     mouse_leave: void,
     scroll_vertical: f32,
     scroll_horizontal: f32,
 
     touch: TouchEvent,
+    /// If `ignore` is true, the touch was processed by the system and should
+    /// not affect the program.
     touch_end: TouchEndEvent,
 
     drop_begin: void,
@@ -589,6 +596,7 @@ pub const Cursor = enum {
     zoom_out,
 };
 
+/// See https://www.usb.org/sites/default/files/hut1_7.pdf
 pub const Button = enum {
     mouse_left,
     mouse_right,
