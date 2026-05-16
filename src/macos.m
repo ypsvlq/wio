@@ -555,6 +555,8 @@ void wioSetCursor(NSWindow *window, uint8_t shape) {
         case 27: cursor = [NSCursor resizeUpDownCursor]; break;
         case 30: cursor = [NSCursor resizeLeftRightCursor]; break;
         case 31: cursor = [NSCursor resizeUpDownCursor]; break;
+        case 33: cursor = ([NSCursor respondsToSelector:@selector(zoomInCursor)] ? [NSCursor zoomInCursor] : [NSCursor arrowCursor]); break;
+        case 34: cursor = ([NSCursor respondsToSelector:@selector(zoomOutCursor)] ? [NSCursor zoomOutCursor] : [NSCursor arrowCursor]); break;
         default: cursor = [NSCursor arrowCursor]; break;
     }
     [[window contentView] setCursor:cursor];
