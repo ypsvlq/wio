@@ -537,6 +537,7 @@ void wioSetSize(NSWindow *window, uint16_t width, uint16_t height) {
 
 void wioSetCursor(NSWindow *window, uint8_t shape) {
     NSCursor *cursor;
+    SEL selector = NULL;
     switch (shape) {
         case 1: cursor = nil; break;
         case 2: cursor = [NSCursor contextualMenuCursor]; break;
@@ -553,15 +554,28 @@ void wioSetCursor(NSWindow *window, uint8_t shape) {
         case 17: cursor = [NSCursor closedHandCursor]; break;
         case 18: cursor = [NSCursor resizeRightCursor]; break;
         case 19: cursor = [NSCursor resizeUpCursor]; break;
+        case 20: selector = @selector(_windowResizeNorthEastSouthWestCursor); break;
+        case 21: selector = @selector(_windowResizeNorthWestSouthEastCursor); break;
         case 22: cursor = [NSCursor resizeDownCursor]; break;
+        case 23: selector = @selector(_windowResizeNorthWestSouthEastCursor); break;
+        case 24: selector = @selector(_windowResizeNorthEastSouthWestCursor); break;
         case 25: cursor = [NSCursor resizeLeftCursor]; break;
         case 26: cursor = [NSCursor resizeLeftRightCursor]; break;
         case 27: cursor = [NSCursor resizeUpDownCursor]; break;
+        case 28: selector = @selector(_windowResizeNorthEastSouthWestCursor); break;
+        case 29: selector = @selector(_windowResizeNorthWestSouthEastCursor); break;
         case 30: cursor = [NSCursor resizeLeftRightCursor]; break;
         case 31: cursor = [NSCursor resizeUpDownCursor]; break;
-        case 33: cursor = ([NSCursor respondsToSelector:@selector(zoomInCursor)] ? [NSCursor zoomInCursor] : [NSCursor arrowCursor]); break;
-        case 34: cursor = ([NSCursor respondsToSelector:@selector(zoomOutCursor)] ? [NSCursor zoomOutCursor] : [NSCursor arrowCursor]); break;
+        case 33: selector = @selector(zoomInCursor); break;
+        case 34: selector = @selector(zoomOutCursor); break;
         default: cursor = [NSCursor arrowCursor]; break;
+    }
+    if (selector != NULL) {
+        if ([NSCursor respondsToSelector:selector]) {
+            cursor = [NSCursor performSelector:selector];
+        } else {
+            cursor = [NSCursor arrowCursor];
+        }
     }
     [[window contentView] setCursor:cursor];
 }
