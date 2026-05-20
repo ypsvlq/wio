@@ -7,8 +7,8 @@
             .path = "../..",
         },
         .vulkan = .{
-            .url = "https://github.com/Snektron/vulkan-zig/archive/3adbeefbc833c12656791d304b37a6315b357745.tar.gz",
-            .hash = "vulkan-0.0.0-r7YtxyBsAwD35FvkFhT2xruTNdCByD3TtGw44XWtfun8",
+            .url = "https://github.com/Snektron/vulkan-zig/archive/b496a6a561ffbbeb530b0f9ed4e059f88c0723a5.tar.gz",
+            .hash = "vulkan-0.0.0-r7Ytx7N9AwD7IZt5_XNHtkJ4G9qY0pCH-cpcOsbL8wzD",
         },
         .vulkan_headers = .{
             .url = "https://github.com/KhronosGroup/Vulkan-Headers/archive/v1.4.349.tar.gz",
