@@ -123,7 +123,7 @@ var preedit_string: std.ArrayList(u8) = .empty;
 var preedit_cursors: [2]i32 = .{ 0, 0 };
 var preedit_active = false;
 var commit_string: std.ArrayList(u8) = .empty;
-var touch_ids: std.StaticBitSet(256) = .initEmpty();
+var touch_ids: std.StaticBitSet(256) = .empty;
 var touch_info: std.AutoHashMapUnmanaged(i32, struct { public_id: u8, window: *Window }) = .empty;
 var clipboard_text: []const u8 = "";
 
@@ -879,7 +879,7 @@ fn seatCapabilities(_: ?*anyopaque, _: ?*h.wl_seat, capabilities: h.wl_seat_capa
     if (touch) |_| {
         h.wl_touch_destroy(touch);
         touch = null;
-        touch_ids = .initEmpty();
+        touch_ids = .empty;
         touch_info.clearRetainingCapacity();
     }
     if (relative_pointer) |_| {
@@ -1104,7 +1104,7 @@ fn touchCancel(_: ?*anyopaque, _: ?*h.wl_touch) callconv(.c) void {
     while (iter.next()) |info| {
         info.window.events.push(.{ .touch_end = .{ .id = info.public_id, .ignore = true } });
     }
-    touch_ids = .initEmpty();
+    touch_ids = .empty;
     touch_info.clearRetainingCapacity();
 }
 

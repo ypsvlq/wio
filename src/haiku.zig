@@ -151,7 +151,7 @@ pub const Window = struct {
     window: *BWindow,
     events: internal.EventQueue,
     events_mutex: std.Io.Mutex = .init,
-    buttons: std.StaticBitSet(5) = .initEmpty(),
+    buttons: std.StaticBitSet(5) = .empty,
     text: bool = false,
     cursor: wio.Cursor = .default,
     drop: if (build_options.drop) struct {

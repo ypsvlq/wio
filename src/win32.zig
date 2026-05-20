@@ -23,7 +23,7 @@ const JoystickInfo = struct {
     joystick: ?*RawInputJoystick = null,
 };
 var joysticks: std.AutoHashMapUnmanaged(w.HANDLE, JoystickInfo) = undefined;
-var xinput = std.StaticBitSet(4).initEmpty();
+var xinput: std.StaticBitSet(4) = .empty;
 var helper_input: []u8 = &.{};
 
 var mm_device_enumerator: *w.IMMDeviceEnumerator = undefined;
@@ -369,7 +369,7 @@ pub const Window = struct {
     input: []u8 = &.{},
     last_x: u16 = 0,
     last_y: u16 = 0,
-    touch_bitmap: std.StaticBitSet(256) = .initEmpty(),
+    touch_bitmap: std.StaticBitSet(256) = .empty,
     touch_ids: std.AutoHashMapUnmanaged(u16, u8) = .empty,
     drop: if (build_options.drop) struct {
         target: DropTarget = undefined,
