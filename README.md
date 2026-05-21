@@ -13,6 +13,9 @@ wio is a platform abstraction library, providing:
 
 ## Getting started
 
+wio targets the latest Zig release, but compatibility with Zig master is
+maintained when possible.
+
 The public API can be browsed in [src/wio.zig][1].
 
 The [demo][2] directory contains a test program which covers most functionality
