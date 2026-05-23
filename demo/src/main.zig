@@ -44,7 +44,7 @@ pub fn main(init: std.process.Init.Minimal) !void {
         io = threaded.io();
     }
 
-    try wio.init(allocator, io, wio.EventQueue.eventFn, .{
+    try wio.init(allocator, io, eventFn, .{
         .joystickConnectedFn = joystick.connected,
         .audioDefaultOutputFn = audio.defaultOutput,
         .audioDefaultInputFn = audio.defaultInput,
@@ -75,9 +75,31 @@ pub fn main(init: std.process.Init.Minimal) !void {
     return wio.run(loop);
 }
 
+fn eventFn(data: ?*anyopaque, event: wio.Event) void {
+    switch (event) {
+        .mode => |mode| std.log.info("{s}", .{@tagName(mode)}),
+        .position => |position| std.log.info("position ({},{})", .{ position.x, position.y }),
+        .size_logical, .size_physical => |size| std.log.info("{s} {}x{}", .{ @tagName(event), size.width, size.height }),
+        .scale => |scale| std.log.info("scale {d}", .{scale}),
+        .char, .preview_char => |char| std.log.info("{s}: {u}", .{ @tagName(event), char }),
+        .preview_cursor => |active| std.log.info("preview_cursor {}..{}", .{ active[0], active[1] }),
+        .button_press => |button| std.log.info("+{s}", .{@tagName(button)}),
+        .button_repeat => |button| std.log.info("*{s}", .{@tagName(button)}),
+        .button_release => |button| std.log.info("-{s}", .{@tagName(button)}),
+        .mouse => |mouse| std.log.info("({},{})", .{ mouse.x, mouse.y }),
+        .mouse_relative => |mouse| std.log.info("{},{}", .{ mouse.x, mouse.y }),
+        .scroll_vertical, .scroll_horizontal => |value| std.log.info("{s} {d}", .{ @tagName(event), value }),
+        .touch => |touch| std.log.info("touch {}: ({},{})", .{ touch.id, touch.x, touch.y }),
+        .touch_end => |touch| std.log.info("touch {}: {s}", .{ touch.id, if (touch.ignore) "ignore" else "end" }),
+        .drop_position => |pos| std.log.info("drop_position ({},{})", .{ pos.x, pos.y }),
+        else => std.log.info("{s}", .{@tagName(event)}),
+    }
+
+    wio.EventQueue.eventFn(data, event);
+}
+
 fn loop() !bool {
     while (events.pop()) |event| {
-        logEvent(event);
         switch (event) {
             .close => {
                 audio.close();
@@ -132,7 +154,6 @@ fn loop() !bool {
 
     if (maybe_window2) |*window2| {
         while (events2.pop()) |event| {
-            logEvent(event);
             switch (event) {
                 .close => {
                     context2.destroy();
@@ -164,27 +185,6 @@ fn loop() !bool {
     wio.wait(.{ .timeout_ns = 1 * std.time.ns_per_s });
 
     return true;
-}
-
-fn logEvent(event: wio.Event) void {
-    switch (event) {
-        .mode => |mode| std.log.info("{s}", .{@tagName(mode)}),
-        .position => |position| std.log.info("position ({},{})", .{ position.x, position.y }),
-        .size_logical, .size_physical => |size| std.log.info("{s} {}x{}", .{ @tagName(event), size.width, size.height }),
-        .scale => |scale| std.log.info("scale {d}", .{scale}),
-        .char, .preview_char => |char| std.log.info("{s}: {u}", .{ @tagName(event), char }),
-        .preview_cursor => |active| std.log.info("preview_cursor {}..{}", .{ active[0], active[1] }),
-        .button_press => |button| std.log.info("+{s}", .{@tagName(button)}),
-        .button_repeat => |button| std.log.info("*{s}", .{@tagName(button)}),
-        .button_release => |button| std.log.info("-{s}", .{@tagName(button)}),
-        .mouse => |mouse| std.log.info("({},{})", .{ mouse.x, mouse.y }),
-        .mouse_relative => |mouse| std.log.info("{},{}", .{ mouse.x, mouse.y }),
-        .scroll_vertical, .scroll_horizontal => |value| std.log.info("{s} {d}", .{ @tagName(event), value }),
-        .touch => |touch| std.log.info("touch {}: ({},{})", .{ touch.id, touch.x, touch.y }),
-        .touch_end => |touch| std.log.info("touch {}: {s}", .{ touch.id, if (touch.ignore) "ignore" else "end" }),
-        .drop_position => |pos| std.log.info("drop_position ({},{})", .{ pos.x, pos.y }),
-        else => std.log.info("{s}", .{@tagName(event)}),
-    }
 }
 
 var actions = false;
