@@ -2,18 +2,18 @@ const std = @import("std");
 const wio = @import("wio");
 const w = @import("win32");
 
-pub fn main() !void {
-    var debug_allocator = std.heap.DebugAllocator(.{}).init;
-    defer _ = debug_allocator.deinit();
-    const allocator = debug_allocator.allocator();
-
-    var threaded = std.Io.Threaded.init(allocator, .{});
-    defer threaded.deinit();
-
-    try wio.init(allocator, threaded.io(), .{});
+pub fn main(init: std.process.Init) !void {
+    try wio.init(init.gpa, init.io, wio.EventQueue.eventFn, .{});
     defer wio.deinit();
 
-    var window = try wio.createWindow(.{ .title = "D3D11", .scale = 1 });
+    var events: wio.EventQueue = .empty;
+    defer events.deinit();
+
+    var window = try wio.Window.create(.{
+        .event_fn_data = &events,
+        .title = "D3D11",
+        .scale = 1,
+    });
     defer window.destroy();
 
     try createDevice(window);
@@ -25,7 +25,7 @@ pub fn main() !void {
 
     while (true) {
         wio.update();
-        while (window.getEvent()) |event| {
+        while (events.pop()) |event| {
             switch (event) {
                 .close => return,
                 .size_physical => |size| try resize(size),

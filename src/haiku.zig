@@ -109,48 +109,9 @@ pub fn getModifiers() wio.Modifiers {
     };
 }
 
-pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
-    const self = try internal.allocator.create(Window);
-    errdefer internal.allocator.destroy(self);
-    self.* = .{
-        .window = undefined,
-        .events = .init(),
-    };
-
-    const position: wio.RelativePosition = options.position orelse .{ .x = 370, .y = 70 };
-    const size = if (options.scale) |base| options.size.multiply(wio_scale / base) else options.size;
-
-    self.events.push(.visible);
-    self.events.push(.{ .scale = wio_scale });
-    if (options.mode == .normal) {
-        self.events.push(.{ .mode = .normal });
-        self.events.push(.{ .position = position });
-        self.events.push(.{ .size_logical = size });
-        self.events.push(.{ .size_physical = size });
-    }
-    self.events.push(.draw);
-
-    const title = try internal.allocator.dupeSentinel(u8, options.title, 0);
-    defer internal.allocator.free(title);
-    self.window = wioCreateWindow(self, title, position.x, position.y, size.width, size.height);
-
-    if (options.mode != .normal) self.setMode(options.mode);
-
-    if (build_options.opengl) {
-        if (options.gl_options) |_| {
-            self.opengl = .{
-                .size = size,
-            };
-        }
-    }
-
-    return self;
-}
-
 pub const Window = struct {
+    event_fn_data: ?*anyopaque,
     window: *BWindow,
-    events: internal.EventQueue,
-    events_mutex: std.Io.Mutex = .init,
     buttons: std.StaticBitSet(5) = .empty,
     text: bool = false,
     cursor: wio.Cursor = .default,
@@ -162,6 +123,44 @@ pub const Window = struct {
         size: wio.Size = .{ .width = 0, .height = 0 },
     } else struct {} = .{},
 
+    pub fn create(options: wio.CreateWindowOptions) !*Window {
+        const self = try internal.allocator.create(Window);
+        errdefer internal.allocator.destroy(self);
+        self.* = .{
+            .event_fn_data = options.event_fn_data,
+            .window = undefined,
+        };
+
+        const position: wio.RelativePosition = options.position orelse .{ .x = 370, .y = 70 };
+        const size = if (options.scale) |base| options.size.multiply(wio_scale / base) else options.size;
+
+        internal.eventFn(self.event_fn_data, .visible);
+        internal.eventFn(self.event_fn_data, .{ .scale = wio_scale });
+        if (options.mode == .normal) {
+            internal.eventFn(self.event_fn_data, .{ .mode = .normal });
+            internal.eventFn(self.event_fn_data, .{ .position = position });
+            internal.eventFn(self.event_fn_data, .{ .size_logical = size });
+            internal.eventFn(self.event_fn_data, .{ .size_physical = size });
+        }
+        internal.eventFn(self.event_fn_data, .draw);
+
+        const title = try internal.allocator.dupeSentinel(u8, options.title, 0);
+        defer internal.allocator.free(title);
+        self.window = wioCreateWindow(self, title, position.x, position.y, size.width, size.height);
+
+        if (options.mode != .normal) self.setMode(options.mode);
+
+        if (build_options.opengl) {
+            if (options.gl_options) |_| {
+                self.opengl = .{
+                    .size = size,
+                };
+            }
+        }
+
+        return self;
+    }
+
     pub fn destroy(self: *Window) void {
         if (build_options.drop) {
             for (self.drop.files.items) |file| internal.allocator.free(file);
@@ -169,25 +168,7 @@ pub const Window = struct {
             if (self.drop.text) |text| internal.allocator.free(text);
         }
         wioDestroyWindow(self.window);
-        self.events.deinit();
         internal.allocator.destroy(self);
-    }
-
-    pub fn getEvent(self: *Window) ?wio.Event {
-        self.events_mutex.lockUncancelable(internal.io);
-        defer self.events_mutex.unlock(internal.io);
-
-        const maybe_event = self.events.pop();
-        if (maybe_event) |event| {
-            switch (event) {
-                .size_physical => |size| if (build_options.opengl) {
-                    self.opengl.size = size;
-                },
-                else => {},
-            }
-        }
-
-        return maybe_event;
     }
 
     pub fn shouldPresent(_: *Window) bool {
@@ -298,20 +279,13 @@ pub const Window = struct {
         } else {
             glReleaseCurrentContext();
             self.glMakeContextCurrent(.{ .context = gl_state.context });
-            self.pushEvent(.draw);
+            internal.eventFn(self.event_fn_data, .draw);
         }
     }
 
     pub fn glSwapInterval(self: *Window, interval: i32) void {
         _ = self;
         _ = interval;
-    }
-
-    fn pushEvent(self: *Window, event: wio.Event) void {
-        self.events_mutex.lockUncancelable(internal.io);
-        defer self.events_mutex.unlock(internal.io);
-        self.events.push(event);
-        wait_event.set(internal.io);
     }
 };
 
@@ -501,38 +475,44 @@ pub const AudioInput = struct {
 };
 
 export fn wioClose(self: *Window) void {
-    self.pushEvent(.close);
+    internal.eventFn(self.event_fn_data, .close);
 }
 
 export fn wioFocused(self: *Window) void {
-    self.pushEvent(.focused);
+    internal.eventFn(self.event_fn_data, .focused);
     wioSetCursor(@intFromEnum(self.cursor));
 }
 
 export fn wioUnfocused(self: *Window) void {
-    self.pushEvent(.unfocused);
+    internal.eventFn(self.event_fn_data, .unfocused);
 }
 
 export fn wioVisible(self: *Window) void {
-    self.pushEvent(.visible);
+    internal.eventFn(self.event_fn_data, .visible);
 }
 
 export fn wioHidden(self: *Window) void {
-    self.pushEvent(.hidden);
+    internal.eventFn(self.event_fn_data, .hidden);
 }
 
 export fn wioMode(self: *Window, mode: u8) void {
-    self.pushEvent(.{ .mode = @enumFromInt(mode) });
+    internal.eventFn(self.event_fn_data, .{ .mode = @enumFromInt(mode) });
 }
 
 export fn wioPosition(self: *Window, x: i16, y: i16) void {
-    self.pushEvent(.{ .position = .{ .x = x, .y = y } });
+    internal.eventFn(self.event_fn_data, .{ .position = .{ .x = x, .y = y } });
 }
 
 export fn wioSize(self: *Window, width: u16, height: u16) void {
-    self.pushEvent(.{ .size_logical = .{ .width = width, .height = height } });
-    self.pushEvent(.{ .size_physical = .{ .width = width, .height = height } });
-    self.pushEvent(.draw);
+    const size: wio.Size = .{ .width = width, .height = height };
+
+    internal.eventFn(self.event_fn_data, .{ .size_logical = size });
+    internal.eventFn(self.event_fn_data, .{ .size_physical = size });
+    internal.eventFn(self.event_fn_data, .draw);
+
+    if (build_options.opengl) {
+        self.opengl.size = size;
+    }
 }
 
 export fn wioChars(self: *Window, chars: [*:0]const u8) void {
@@ -541,7 +521,7 @@ export fn wioChars(self: *Window, chars: [*:0]const u8) void {
         var iter = view.iterator();
         while (iter.nextCodepoint()) |char| {
             if (char >= ' ' and char != 0x7F) {
-                self.pushEvent(.{ .char = char });
+                internal.eventFn(self.event_fn_data, .{ .char = char });
             }
         }
     }
@@ -549,14 +529,12 @@ export fn wioChars(self: *Window, chars: [*:0]const u8) void {
 
 export fn wioKey(self: *Window, key: i32, event: u8) void {
     if (keyToButton(key)) |button| {
-        self.pushEvent(
-            switch (event) {
-                0 => .{ .button_press = button },
-                1 => .{ .button_repeat = button },
-                2 => .{ .button_release = button },
-                else => unreachable,
-            },
-        );
+        internal.eventFn(self.event_fn_data, switch (event) {
+            0 => .{ .button_press = button },
+            1 => .{ .button_repeat = button },
+            2 => .{ .button_release = button },
+            else => unreachable,
+        });
     }
 }
 
@@ -565,25 +543,25 @@ export fn wioButtons(self: *Window, buttons: u8) void {
     var iter = changes.iterator(.{});
     while (iter.next()) |i| {
         if (self.buttons.isSet(i)) {
-            self.pushEvent(.{ .button_release = @enumFromInt(i) });
+            internal.eventFn(self.event_fn_data, .{ .button_release = @enumFromInt(i) });
         } else {
-            self.pushEvent(.{ .button_press = @enumFromInt(i) });
+            internal.eventFn(self.event_fn_data, .{ .button_press = @enumFromInt(i) });
         }
     }
     self.buttons = self.buttons.xorWith(changes);
 }
 
 export fn wioMouse(self: *Window, x: u16, y: u16) void {
-    self.pushEvent(.{ .mouse = .{ .x = x, .y = y } });
+    internal.eventFn(self.event_fn_data, .{ .mouse = .{ .x = x, .y = y } });
 }
 
 export fn wioMouseRelative(self: *Window, x: i16, y: i16) void {
-    self.pushEvent(.{ .mouse_relative = .{ .x = x, .y = y } });
+    internal.eventFn(self.event_fn_data, .{ .mouse_relative = .{ .x = x, .y = y } });
 }
 
 export fn wioScroll(self: *Window, vertical: f32, horizontal: f32) void {
-    if (vertical != 0) self.pushEvent(.{ .scroll_vertical = vertical });
-    if (horizontal != 0) self.pushEvent(.{ .scroll_horizontal = horizontal });
+    if (vertical != 0) internal.eventFn(self.event_fn_data, .{ .scroll_vertical = vertical });
+    if (horizontal != 0) internal.eventFn(self.event_fn_data, .{ .scroll_horizontal = horizontal });
 }
 
 fn wioDropBegin(self: *Window) callconv(.c) void {
@@ -591,11 +569,11 @@ fn wioDropBegin(self: *Window) callconv(.c) void {
     self.drop.files.clearRetainingCapacity();
     if (self.drop.text) |t| internal.allocator.free(t);
     self.drop.text = null;
-    self.pushEvent(.drop_begin);
+    internal.eventFn(self.event_fn_data, .drop_begin);
 }
 
 fn wioDropPosition(self: *Window, x: u16, y: u16) callconv(.c) void {
-    self.pushEvent(.{ .drop_position = .{ .x = x, .y = y } });
+    internal.eventFn(self.event_fn_data, .{ .drop_position = .{ .x = x, .y = y } });
 }
 
 fn wioDropFile(self: *Window, ptr: [*:0]const u8) callconv(.c) void {
@@ -611,7 +589,7 @@ fn wioDropText(self: *Window, ptr: [*]const u8, len: usize) callconv(.c) void {
 }
 
 fn wioDropComplete(self: *Window) callconv(.c) void {
-    self.pushEvent(.drop_complete);
+    internal.eventFn(self.event_fn_data, .drop_complete);
 }
 
 fn wioAudioOutputWrite(data: *const anyopaque, buffer: [*]f32, size: usize) callconv(.c) void {

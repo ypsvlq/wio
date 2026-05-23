@@ -23,8 +23,10 @@ var threaded: std.Io.Threaded = undefined;
 var io: std.Io = undefined;
 
 var window: wio.Window = undefined;
+var events: wio.EventQueue = .empty;
 var context: wio.GlContext = undefined;
 var maybe_window2: ?wio.Window = null;
+var events2: wio.EventQueue = undefined;
 var context2: wio.GlContext = undefined;
 
 const gl_options: wio.GlOptions = .{
@@ -42,13 +44,14 @@ pub fn main(init: std.process.Init.Minimal) !void {
         io = threaded.io();
     }
 
-    try wio.init(allocator, io, .{
+    try wio.init(allocator, io, wio.EventQueue.eventFn, .{
         .joystickConnectedFn = joystick.connected,
         .audioDefaultOutputFn = audio.defaultOutput,
         .audioDefaultInputFn = audio.defaultInput,
     });
 
-    window = try wio.createWindow(.{
+    window = try .create(.{
+        .event_fn_data = &events,
         .title = "wio example",
         .app_id = "wio demo",
         .scale = 1,
@@ -73,7 +76,7 @@ pub fn main(init: std.process.Init.Minimal) !void {
 }
 
 fn loop() !bool {
-    while (window.getEvent()) |event| {
+    while (events.pop()) |event| {
         logEvent(event);
         switch (event) {
             .close => {
@@ -84,9 +87,11 @@ fn loop() !bool {
                 if (maybe_window2) |*window2| {
                     context2.destroy();
                     window2.destroy();
+                    events2.deinit();
                 }
                 context.destroy();
                 window.destroy();
+                events.deinit();
 
                 wio.deinit();
                 if (!builtin.cpu.arch.isWasm()) {
@@ -126,12 +131,13 @@ fn loop() !bool {
     }
 
     if (maybe_window2) |*window2| {
-        while (window2.getEvent()) |event| {
+        while (events2.pop()) |event| {
             logEvent(event);
             switch (event) {
                 .close => {
                     context2.destroy();
                     window2.destroy();
+                    events2.deinit();
                     maybe_window2 = null;
                     break;
                 },
@@ -224,7 +230,9 @@ fn action(button: wio.Button) !void {
     switch (button) {
         .enter => {
             if (maybe_window2 == null) {
-                maybe_window2 = try wio.createWindow(.{
+                events2 = .empty;
+                maybe_window2 = try .create(.{
+                    .event_fn_data = &events2,
                     .app_id = "wio demo",
                     .size = .{ .width = 320, .height = 240 },
                     .scale = 1,

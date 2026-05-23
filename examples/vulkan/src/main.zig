@@ -12,6 +12,7 @@ const allocator = debug_allocator.allocator();
 var threaded: std.Io.Threaded = undefined;
 
 var window: wio.Window = undefined;
+var events: wio.EventQueue = .empty;
 var size = wio.Size{ .width = 640, .height = 480 };
 
 var vkb: vk.BaseWrapper = undefined;
@@ -19,8 +20,13 @@ var vkb: vk.BaseWrapper = undefined;
 pub fn main() !void {
     threaded = .init(allocator, .{});
 
-    try wio.init(allocator, threaded.io(), .{});
-    window = try wio.createWindow(.{ .title = "Vulkan", .size = size, .scale = 1 });
+    try wio.init(allocator, threaded.io(), wio.EventQueue.eventFn, .{});
+    window = try .create(.{
+        .event_fn_data = &events,
+        .title = "Vulkan",
+        .size = size,
+        .scale = 1,
+    });
 
     vkb = .load(@as(*const fn (vk.Instance, [*:0]const u8) ?*const fn () void, @ptrCast(&wio.vkGetInstanceProcAddr)));
     try createInstance();
@@ -513,7 +519,7 @@ fn drawFrame() !void {
 var visible = false;
 
 fn loop() !bool {
-    while (window.getEvent()) |event| {
+    while (events.pop()) |event| {
         switch (event) {
             .close => {
                 if (surface != .null_handle) {
@@ -522,6 +528,7 @@ fn loop() !bool {
                 }
                 instance.destroyInstance(null);
                 window.destroy();
+                events.deinit();
                 wio.deinit();
                 _ = debug_allocator.deinit();
                 return false;

@@ -130,10 +130,8 @@ pub fn wait(options: wio.WaitOptions) void {
     }
     if (build_options.wayland and active == .wayland and wayland.repeat_period > 0) {
         if (timeout == -1 or wayland.repeat_period < timeout) {
-            if (wayland.keyboard_focus) |focus| {
-                if (focus.repeat_key != 0) {
-                    timeout = wayland.repeat_period;
-                }
+            if (wayland.repeat_key != 0) {
+                timeout = wayland.repeat_period;
             }
         }
     }
@@ -223,28 +221,21 @@ pub fn getModifiers() wio.Modifiers {
     };
 }
 
-pub fn createWindow(options: wio.CreateWindowOptions) !Window {
-    switch (active) {
-        .x11 => return .{ .x11 = try x11.createWindow(options) },
-        .wayland => return .{ .wayland = try wayland.createWindow(options) },
-    }
-}
-
 pub const Window = union {
     x11: *x11.Window,
     wayland: *wayland.Window,
+
+    pub fn create(options: wio.CreateWindowOptions) !Window {
+        switch (active) {
+            .x11 => return .{ .x11 = try .create(options) },
+            .wayland => return .{ .wayland = try .create(options) },
+        }
+    }
 
     pub fn destroy(self: *Window) void {
         switch (active) {
             .x11 => self.x11.destroy(),
             .wayland => self.wayland.destroy(),
-        }
-    }
-
-    pub fn getEvent(self: *Window) ?wio.Event {
-        switch (active) {
-            .x11 => return self.x11.getEvent(),
-            .wayland => return self.wayland.getEvent(),
         }
     }
 

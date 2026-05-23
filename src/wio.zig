@@ -29,9 +29,18 @@ pub const InitOptions = struct {
 /// Must be called only once.
 ///
 /// Unless otherwise noted, all calls to wio functions must be made on the same thread.
-pub fn init(allocator: std.mem.Allocator, io: std.Io, options: InitOptions) !void {
+///
+/// `eventFn` is the low-level window event callback which may run on other threads,
+/// using `EventQueue.eventFn` is recommended.
+pub fn init(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    eventFn: fn (?*anyopaque, Event) void,
+    options: InitOptions,
+) !void {
     internal.allocator = allocator;
     internal.io = io;
+    internal.eventFn = eventFn;
     try backend.init(options);
 }
 
@@ -108,6 +117,8 @@ pub const Position = struct { x: u16, y: u16 };
 pub const RelativePosition = struct { x: i16, y: i16 };
 
 pub const CreateWindowOptions = struct {
+    event_fn_data: ?*anyopaque,
+
     title: []const u8 = "wio",
     /// Application identifier used as the window class (X11) or app_id (Wayland).
     app_id: ?[]const u8 = null,
@@ -128,19 +139,15 @@ pub const CreateWindowOptions = struct {
     gl_options: ?GlOptions = null,
 };
 
-pub fn createWindow(options: CreateWindowOptions) !Window {
-    return .{ .backend = try backend.createWindow(options) };
-}
-
 pub const Window = struct {
-    backend: @typeInfo(@typeInfo(@TypeOf(backend.createWindow)).@"fn".return_type.?).error_union.payload,
+    backend: @typeInfo(@typeInfo(@TypeOf(backend.Window.create)).@"fn".return_type.?).error_union.payload,
+
+    pub fn create(options: CreateWindowOptions) !Window {
+        return .{ .backend = try backend.Window.create(options) };
+    }
 
     pub fn destroy(self: *Window) void {
         self.backend.destroy();
-    }
-
-    pub fn getEvent(self: *Window) ?Event {
-        return self.backend.getEvent();
     }
 
     pub fn shouldPresent(self: *Window) bool {
@@ -491,8 +498,71 @@ pub const AudioInput = struct {
     }
 };
 
-pub const TouchEvent = struct { id: u8, x: u16, y: u16 };
-pub const TouchEndEvent = struct { id: u8, ignore: bool };
+pub const EventQueue = struct {
+    events: std.ArrayList(Event),
+    head: usize,
+    mutex: if (use_mutex) std.Io.Mutex else void,
+
+    const use_mutex = switch (builtin.target.os.tag) {
+        .linux => if (builtin.target.abi.isAndroid()) true else false,
+        .haiku => true,
+        else => false,
+    };
+
+    pub const empty: EventQueue = .{
+        .events = .empty,
+        .head = 0,
+        .mutex = if (use_mutex) .init else {},
+    };
+
+    pub fn deinit(self: *EventQueue) void {
+        self.events.deinit(internal.allocator);
+    }
+
+    pub fn push(self: *EventQueue, event: Event) void {
+        if (use_mutex) self.mutex.lockUncancelable(internal.io);
+        defer if (use_mutex) self.mutex.unlock(internal.io);
+
+        if (self.head != 0) {
+            self.events.replaceRangeAssumeCapacity(0, self.head, &.{});
+            self.head = 0;
+        }
+
+        switch (std.meta.activeTag(event)) {
+            .draw, .mode, .size_logical, .size_physical => |tag| {
+                for (self.events.items, 0..) |item, i| {
+                    if (item == tag) {
+                        _ = self.events.orderedRemove(i);
+                        break;
+                    }
+                }
+            },
+            else => {},
+        }
+
+        self.events.append(internal.allocator, event) catch {};
+    }
+
+    pub fn pop(self: *EventQueue) ?Event {
+        if (use_mutex) self.mutex.lockUncancelable(internal.io);
+        defer if (use_mutex) self.mutex.unlock(internal.io);
+
+        if (self.head == self.events.items.len) return null;
+        defer self.head += 1;
+        return self.events.items[self.head];
+    }
+
+    pub fn eventFn(data: ?*anyopaque, event: Event) void {
+        const self: *EventQueue = @ptrCast(@alignCast(data));
+        self.push(event);
+
+        if (use_mutex) {
+            cancelWait();
+        } else {
+            internal.wait = false;
+        }
+    }
+};
 
 pub const Event = union(enum) {
     close: void,
@@ -535,14 +605,17 @@ pub const Event = union(enum) {
     scroll_vertical: f32,
     scroll_horizontal: f32,
 
-    touch: TouchEvent,
+    touch: Touch,
     /// If `ignore` is true, the touch was processed by the system and should
     /// not affect the program.
-    touch_end: TouchEndEvent,
+    touch_end: TouchEnd,
 
     drop_begin: void,
     drop_position: Position,
     drop_complete: void,
+
+    pub const Touch = struct { id: u8, x: u16, y: u16 };
+    pub const TouchEnd = struct { id: u8, ignore: bool };
 };
 
 pub const EventType = @typeInfo(Event).@"union".tag_type.?;

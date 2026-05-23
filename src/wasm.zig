@@ -23,12 +23,10 @@ pub fn logFn(comptime level: std.log.Level, comptime scope: @TypeOf(.enum_litera
 const js = struct {
     extern "wio" fn write([*]const u8, usize) void;
     extern "wio" fn flush() void;
-    extern "wio" fn shift(u32) u32;
-    extern "wio" fn shiftFloat(u32) f32;
     extern "wio" fn messageBox([*]const u8, usize) void;
     extern "wio" fn openUri([*]const u8, usize) void;
     extern "wio" fn getModifiers() u8;
-    extern "wio" fn createWindow() u32;
+    extern "wio" fn createWindow(?*anyopaque) u32;
     extern "wio" fn enableTextInput(u32, u16, u16) void;
     extern "wio" fn disableTextInput(u32) void;
     extern "wio" fn enableRelativeMouse(u32) void;
@@ -73,13 +71,6 @@ pub fn wait(_: wio.WaitOptions) void {}
 
 pub fn cancelWait() void {}
 
-export fn wioLoop() bool {
-    return loop() catch |err| {
-        std.log.err("{s}", .{@errorName(err)});
-        return false;
-    };
-}
-
 pub fn messageBox(_: wio.MessageBoxStyle, _: []const u8, message: []const u8) void {
     js.messageBox(message.ptr, message.len);
 }
@@ -98,47 +89,16 @@ pub fn getModifiers() wio.Modifiers {
     };
 }
 
-pub fn createWindow(options: wio.CreateWindowOptions) !Window {
-    const id = js.createWindow();
-    if (options.mode == .fullscreen) js.setFullscreen(id, true);
-    return .{ .id = id };
-}
-
 pub const Window = struct {
     id: u32,
 
-    pub fn destroy(_: *Window) void {}
-
-    pub fn getEvent(self: *Window) ?wio.Event {
-        const event: wio.EventType = @enumFromInt(js.shift(self.id));
-        return switch (event) {
-            .close => null, // never sent, EventType 0 is reused to indicate empty queue
-            .focused => .focused,
-            .unfocused => .unfocused,
-            .visible => .visible,
-            .draw => .draw,
-            .mode => .{ .mode = @enumFromInt(js.shift(self.id)) },
-            .position => .{ .position = .{ .x = @intCast(js.shift(self.id)), .y = @intCast(js.shift(self.id)) } },
-            .size_logical => .{ .size_logical = .{ .width = @intCast(js.shift(self.id)), .height = @intCast(js.shift(self.id)) } },
-            .size_physical => .{ .size_physical = .{ .width = @intCast(js.shift(self.id)), .height = @intCast(js.shift(self.id)) } },
-            .scale => .{ .scale = js.shiftFloat(self.id) },
-            .char => .{ .char = @intCast(js.shift(self.id)) },
-            .preview_reset => .preview_reset,
-            .preview_char => .{ .preview_char = @intCast(js.shift(self.id)) },
-            .button_press => .{ .button_press = @enumFromInt(js.shift(self.id)) },
-            .button_repeat => .{ .button_repeat = @enumFromInt(js.shift(self.id)) },
-            .button_release => .{ .button_release = @enumFromInt(js.shift(self.id)) },
-            .mouse => .{ .mouse = .{ .x = @intCast(js.shift(self.id)), .y = @intCast(js.shift(self.id)) } },
-            .mouse_relative => .{ .mouse_relative = .{ .x = @intCast(@as(i32, @bitCast(js.shift(self.id)))), .y = @intCast(@as(i32, @bitCast(js.shift(self.id)))) } },
-            .mouse_leave => .mouse_leave,
-            .scroll_vertical => .{ .scroll_vertical = js.shiftFloat(self.id) },
-            .scroll_horizontal => .{ .scroll_horizontal = js.shiftFloat(self.id) },
-            .drop_begin => .drop_begin,
-            .drop_position => .{ .drop_position = .{ .x = @intCast(js.shift(self.id)), .y = @intCast(js.shift(self.id)) } },
-            .drop_complete => .drop_complete,
-            else => unreachable,
-        };
+    pub fn create(options: wio.CreateWindowOptions) !Window {
+        const id = js.createWindow(options.event_fn_data);
+        if (options.mode == .fullscreen) js.setFullscreen(id, true);
+        return .{ .id = id };
     }
+
+    pub fn destroy(_: *Window) void {}
 
     pub fn shouldPresent(_: *Window) bool {
         return true;
@@ -387,6 +347,42 @@ pub const AudioInput = struct {
         _ = self;
     }
 };
+
+export fn wioLoop() bool {
+    return loop() catch |err| {
+        std.log.err("{s}", .{@errorName(err)});
+        return false;
+    };
+}
+
+export fn wioEvent(data: ?*anyopaque, event: u32, int0: u32, int1: u32, float0: f32) void {
+    internal.eventFn(data, switch (@as(wio.EventType, @enumFromInt(event))) {
+        .focused => .focused,
+        .unfocused => .unfocused,
+        .visible => .visible,
+        .draw => .draw,
+        .mode => .{ .mode = @enumFromInt(int0) },
+        .position => .{ .position = .{ .x = @intCast(int0), .y = @intCast(int1) } },
+        .size_logical => .{ .size_logical = .{ .width = @intCast(int0), .height = @intCast(int1) } },
+        .size_physical => .{ .size_physical = .{ .width = @intCast(int0), .height = @intCast(int1) } },
+        .scale => .{ .scale = float0 },
+        .char => .{ .char = @intCast(int0) },
+        .preview_reset => .preview_reset,
+        .preview_char => .{ .preview_char = @intCast(int0) },
+        .button_press => .{ .button_press = @enumFromInt(int0) },
+        .button_repeat => .{ .button_repeat = @enumFromInt(int0) },
+        .button_release => .{ .button_release = @enumFromInt(int0) },
+        .mouse => .{ .mouse = .{ .x = @intCast(int0), .y = @intCast(int1) } },
+        .mouse_relative => .{ .mouse_relative = .{ .x = @intCast(@as(i32, @bitCast(int0))), .y = @intCast(@as(i32, @bitCast(int1))) } },
+        .mouse_leave => .mouse_leave,
+        .scroll_vertical => .{ .scroll_vertical = float0 },
+        .scroll_horizontal => .{ .scroll_horizontal = float0 },
+        .drop_begin => .drop_begin,
+        .drop_position => .{ .drop_position = .{ .x = @intCast(int0), .y = @intCast(int1) } },
+        .drop_complete => .drop_complete,
+        else => unreachable,
+    });
+}
 
 export fn wioJoystick(index: u32) void {
     if (init_options.joystickConnectedFn) |callback| {

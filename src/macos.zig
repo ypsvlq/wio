@@ -195,65 +195,60 @@ pub fn getModifiers() wio.Modifiers {
     };
 }
 
-pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
-    const self = try internal.allocator.create(Window);
-    self.* = .{
-        .events = .init(),
-        .window = undefined,
-    };
-    self.window = wioCreateWindow(self, options.size.width, options.size.height);
-
-    self.setTitle(options.title);
-    self.setMode(options.mode);
-    if (options.position) |position| self.setPosition(position);
-
-    if (build_options.opengl) {
-        if (options.gl_options) |gl| {
-            const profile: c.CGLPixelFormatAttribute = if (gl.major_version <= 2)
-                c.kCGLOGLPVersion_Legacy
-            else if (gl.major_version == 3 and (gl.minor_version == 2 or gl.minor_version == 3) and gl.profile == .core)
-                c.kCGLOGLPVersion_GL3_Core
-            else if (gl.major_version == 4 and gl.minor_version <= 1 and gl.profile == .core)
-                c.kCGLOGLPVersion_GL4_Core
-            else
-                return error.UnsupportedContextOptions;
-
-            self.opengl.format = wioGlChoosePixelFormat(&.{
-                c.kCGLPFAOpenGLProfile, profile,
-                c.kCGLPFAColorSize,     gl.red_bits + gl.green_bits + gl.blue_bits,
-                c.kCGLPFAAlphaSize,     gl.alpha_bits,
-                c.kCGLPFADepthSize,     gl.depth_bits,
-                c.kCGLPFAStencilSize,   gl.stencil_bits,
-                c.kCGLPFASampleBuffers, if (gl.samples == 0) 0 else 1,
-                c.kCGLPFASamples,       gl.samples,
-                if (gl.doublebuffer)
-                    c.kCGLPFADoubleBuffer
-                else
-                    0,
-                0,
-            });
-        }
-    }
-
-    return self;
-}
-
 pub const Window = struct {
-    events: internal.EventQueue,
+    event_fn_data: ?*anyopaque,
     window: *NSWindow,
     opengl: if (build_options.opengl) struct {
         format: ?*NSOpenGLPixelFormat = null,
     } else struct {} = .{},
 
+    pub fn create(options: wio.CreateWindowOptions) !*Window {
+        const self = try internal.allocator.create(Window);
+        self.* = .{
+            .event_fn_data = options.event_fn_data,
+            .window = undefined,
+        };
+        self.window = wioCreateWindow(self, options.size.width, options.size.height);
+
+        self.setTitle(options.title);
+        self.setMode(options.mode);
+        if (options.position) |position| self.setPosition(position);
+
+        if (build_options.opengl) {
+            if (options.gl_options) |gl| {
+                const profile: c.CGLPixelFormatAttribute = if (gl.major_version <= 2)
+                    c.kCGLOGLPVersion_Legacy
+                else if (gl.major_version == 3 and (gl.minor_version == 2 or gl.minor_version == 3) and gl.profile == .core)
+                    c.kCGLOGLPVersion_GL3_Core
+                else if (gl.major_version == 4 and gl.minor_version <= 1 and gl.profile == .core)
+                    c.kCGLOGLPVersion_GL4_Core
+                else
+                    return error.UnsupportedContextOptions;
+
+                self.opengl.format = wioGlChoosePixelFormat(&.{
+                    c.kCGLPFAOpenGLProfile, profile,
+                    c.kCGLPFAColorSize,     gl.red_bits + gl.green_bits + gl.blue_bits,
+                    c.kCGLPFAAlphaSize,     gl.alpha_bits,
+                    c.kCGLPFADepthSize,     gl.depth_bits,
+                    c.kCGLPFAStencilSize,   gl.stencil_bits,
+                    c.kCGLPFASampleBuffers, if (gl.samples == 0) 0 else 1,
+                    c.kCGLPFASamples,       gl.samples,
+                    if (gl.doublebuffer)
+                        c.kCGLPFADoubleBuffer
+                    else
+                        0,
+                    0,
+                });
+            }
+        }
+
+        return self;
+    }
+
     pub fn destroy(self: *Window) void {
         if (build_options.opengl) wioRelease(self.opengl.format);
         wioDestroyWindow(self.window);
-        self.events.deinit();
         internal.allocator.destroy(self);
-    }
-
-    pub fn getEvent(self: *Window) ?wio.Event {
-        return self.events.pop();
     }
 
     pub fn shouldPresent(_: *Window) bool {
@@ -835,48 +830,48 @@ pub const AudioInput = struct {
 };
 
 export fn wioClose(self: *Window) void {
-    self.events.push(.close);
+    internal.eventFn(self.event_fn_data, .close);
 }
 
 export fn wioFocused(self: *Window) void {
-    self.events.push(.focused);
+    internal.eventFn(self.event_fn_data, .focused);
 }
 
 export fn wioUnfocused(self: *Window) void {
-    self.events.push(.unfocused);
+    internal.eventFn(self.event_fn_data, .unfocused);
 }
 
 export fn wioVisible(self: *Window) void {
-    self.events.push(.visible);
+    internal.eventFn(self.event_fn_data, .visible);
 }
 
 export fn wioHidden(self: *Window) void {
-    self.events.push(.hidden);
+    internal.eventFn(self.event_fn_data, .hidden);
 }
 
 export fn wioPosition(self: *Window, x: i16, y: i16) void {
-    self.events.push(.{ .position = .{ .x = x, .y = y } });
+    internal.eventFn(self.event_fn_data, .{ .position = .{ .x = x, .y = y } });
 }
 
 export fn wioSizeLogical(self: *Window, mode: u8, width: u16, height: u16) void {
-    self.events.push(.{ .mode = @enumFromInt(mode) });
-    self.events.push(.{ .size_logical = .{ .width = width, .height = height } });
+    internal.eventFn(self.event_fn_data, .{ .mode = @enumFromInt(mode) });
+    internal.eventFn(self.event_fn_data, .{ .size_logical = .{ .width = width, .height = height } });
 }
 
 export fn wioSizePhysical(self: *Window, width: u16, height: u16) void {
-    self.events.push(.{ .size_physical = .{ .width = width, .height = height } });
-    self.events.push(.draw);
+    internal.eventFn(self.event_fn_data, .{ .size_physical = .{ .width = width, .height = height } });
+    internal.eventFn(self.event_fn_data, .draw);
 }
 
 export fn wioScale(self: *Window, scale: f32) void {
-    self.events.push(.{ .scale = scale });
+    internal.eventFn(self.event_fn_data, .{ .scale = scale });
 }
 
 export fn wioChars(self: *Window, buf: [*:0]const u8) void {
     const view = std.unicode.Utf8View.init(std.mem.sliceTo(buf, 0)) catch return;
     var iter = view.iterator();
     while (iter.nextCodepoint()) |char| {
-        self.events.push(.{ .char = char });
+        internal.eventFn(self.event_fn_data, .{ .char = char });
     }
 }
 
@@ -884,49 +879,49 @@ export fn wioPreviewChars(self: *Window, buf: [*:0]const u8, cursor_start: u16, 
     const view = std.unicode.Utf8View.init(std.mem.sliceTo(buf, 0)) catch return;
     var iter = view.iterator();
     while (iter.nextCodepoint()) |char| {
-        self.events.push(.{ .preview_char = char });
+        internal.eventFn(self.event_fn_data, .{ .preview_char = char });
     }
-    self.events.push(.{ .preview_cursor = .{ cursor_start, cursor_start + cursor_length } });
+    internal.eventFn(self.event_fn_data, .{ .preview_cursor = .{ cursor_start, cursor_start + cursor_length } });
 }
 
 export fn wioPreviewReset(self: *Window) void {
-    self.events.push(.preview_reset);
+    internal.eventFn(self.event_fn_data, .preview_reset);
 }
 
 export fn wioKey(self: *Window, key: u16, event: u8) void {
     if (keycodeToButton(key)) |button| {
         switch (event) {
-            0 => self.events.push(.{ .button_press = button }),
-            1 => self.events.push(.{ .button_repeat = button }),
-            2 => self.events.push(.{ .button_release = button }),
+            0 => internal.eventFn(self.event_fn_data, .{ .button_press = button }),
+            1 => internal.eventFn(self.event_fn_data, .{ .button_repeat = button }),
+            2 => internal.eventFn(self.event_fn_data, .{ .button_release = button }),
             else => unreachable,
         }
     }
 }
 
 export fn wioButtonPress(self: *Window, button: u8) void {
-    self.events.push(.{ .button_press = @enumFromInt(button) });
+    internal.eventFn(self.event_fn_data, .{ .button_press = @enumFromInt(button) });
 }
 
 export fn wioButtonRelease(self: *Window, button: u8) void {
-    self.events.push(.{ .button_release = @enumFromInt(button) });
+    internal.eventFn(self.event_fn_data, .{ .button_release = @enumFromInt(button) });
 }
 
 export fn wioMouse(self: *Window, x: u16, y: u16) void {
-    self.events.push(.{ .mouse = .{ .x = x, .y = y } });
+    internal.eventFn(self.event_fn_data, .{ .mouse = .{ .x = x, .y = y } });
 }
 
 export fn wioMouseRelative(self: *Window, x: i16, y: i16) void {
-    self.events.push(.{ .mouse_relative = .{ .x = x, .y = y } });
+    internal.eventFn(self.event_fn_data, .{ .mouse_relative = .{ .x = x, .y = y } });
 }
 
 export fn wioMouseLeave(self: *Window) void {
-    self.events.push(.mouse_leave);
+    internal.eventFn(self.event_fn_data, .mouse_leave);
 }
 
 export fn wioScroll(self: *Window, x: f32, y: f32) void {
-    if (x != 0) self.events.push(.{ .scroll_horizontal = -x });
-    if (y != 0) self.events.push(.{ .scroll_vertical = -y });
+    if (x != 0) internal.eventFn(self.event_fn_data, .{ .scroll_horizontal = -x });
+    if (y != 0) internal.eventFn(self.event_fn_data, .{ .scroll_vertical = -y });
 }
 
 export fn wioDupeClipboardText(allocator: *const std.mem.Allocator, bytes: [*:0]const u8, len: *usize) ?[*]u8 {

@@ -247,132 +247,8 @@ pub fn getModifiers() wio.Modifiers {
     };
 }
 
-pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
-    var attributes: h.XSetWindowAttributes = undefined;
-    attributes.event_mask = h.PropertyChangeMask | h.FocusChangeMask | h.ExposureMask | h.StructureNotifyMask | h.KeyPressMask | h.KeyReleaseMask | h.ButtonPressMask | h.ButtonReleaseMask | h.PointerMotionMask | h.LeaveWindowMask;
-    attributes.colormap = h.CopyFromParent;
-
-    var depth: c_int = h.CopyFromParent;
-    var visual: ?*h.Visual = null;
-    var config: h.GLXFBConfig = null;
-    if (build_options.opengl) {
-        if (options.gl_options) |gl| {
-            var count: c_int = undefined;
-            const configs = c.glXChooseFBConfig(display, h.DefaultScreen(display), &[_]c_int{
-                h.GLX_DOUBLEBUFFER,   if (gl.doublebuffer) h.True else h.False,
-                h.GLX_RED_SIZE,       gl.red_bits,
-                h.GLX_GREEN_SIZE,     gl.green_bits,
-                h.GLX_BLUE_SIZE,      gl.blue_bits,
-                h.GLX_ALPHA_SIZE,     gl.alpha_bits,
-                h.GLX_DEPTH_SIZE,     gl.depth_bits,
-                h.GLX_STENCIL_SIZE,   gl.stencil_bits,
-                h.GLX_SAMPLE_BUFFERS, if (gl.samples != 0) 1 else 0,
-                h.GLX_SAMPLES,        gl.samples,
-                h.None,
-            }, &count) orelse return internal.logUnexpected("glXChooseFBConfig");
-            defer _ = c.XFree(@ptrCast(configs));
-
-            config = configs[0];
-
-            const info: *h.XVisualInfo = c.glXGetVisualFromFBConfig(display, config) orelse return internal.logUnexpected("glXGetVisualFromFBConfig");
-            defer _ = c.XFree(info);
-            visual = info.visual;
-            depth = info.depth;
-
-            attributes.colormap = c.XCreateColormap(display, h.DefaultRootWindow(display), visual, h.AllocNone);
-            errdefer _ = c.XFreeColormap(display, attributes.colormap);
-        }
-    }
-    errdefer if (build_options.opengl) {
-        if (options.gl_options != null) {
-            _ = c.XFreeColormap(display, attributes.colormap);
-        }
-    };
-
-    const position: wio.RelativePosition = options.position orelse .{ .x = 0, .y = 0 };
-    const size = if (options.scale) |base| options.size.multiply(scale / base) else options.size;
-    const window = c.XCreateWindow(
-        display,
-        if (options.parent != 0) options.parent else h.DefaultRootWindow(display),
-        position.x,
-        position.y,
-        size.width,
-        size.height,
-        0,
-        depth,
-        h.InputOutput,
-        visual,
-        h.CWEventMask | h.CWColormap,
-        &attributes,
-    );
-    errdefer _ = c.XDestroyWindow(display, window);
-    _ = c.XMapWindow(display, window);
-
-    const protocols = [_]h.Atom{atoms.WM_DELETE_WINDOW};
-    _ = c.XChangeProperty(display, window, atoms.WM_PROTOCOLS, h.XA_ATOM, 32, h.PropModeReplace, @ptrCast(&protocols), protocols.len);
-
-    if (build_options.drop) {
-        const xdnd_version: c_long = 5;
-        _ = c.XChangeProperty(display, window, atoms.XdndAware, h.XA_ATOM, 32, h.PropModeReplace, @ptrCast(&xdnd_version), 1);
-    }
-
-    const self = try internal.allocator.create(Window);
-    errdefer internal.allocator.destroy(self);
-
-    const preedit_attributes = c.XVaCreateNestedList(
-        0,
-        h.XNPreeditStartCallback,
-        &h.XIMCallback{ .callback = @ptrCast(&preeditStart) },
-        h.XNPreeditDoneCallback,
-        &h.XIMCallback{ .client_data = @ptrCast(self), .callback = @ptrCast(&preeditDone) },
-        h.XNPreeditDrawCallback,
-        &h.XIMCallback{ .client_data = @ptrCast(self), .callback = @ptrCast(&preeditDraw) },
-        @as(usize, 0),
-    );
-    defer _ = c.XFree(preedit_attributes);
-
-    const ic = c.XCreateIC(
-        im,
-        h.XNInputStyle,
-        im_style,
-        h.XNClientWindow,
-        window,
-        h.XNPreeditAttributes,
-        preedit_attributes,
-        @as(usize, 0),
-    ) orelse return internal.logUnexpected("XCreateIC");
-    errdefer _ = c.XDestroyIC(ic);
-
-    self.* = .{
-        .events = .init(),
-        .window = window,
-        .ic = ic,
-        .size = options.size,
-        .opengl = if (build_options.opengl) .{ .config = config, .colormap = attributes.colormap } else .{},
-    };
-
-    self.setTitle(options.title);
-    self.setMode(options.mode);
-
-    if (options.app_id) |app_id| {
-        const id = try internal.allocator.dupeSentinel(u8, app_id, 0);
-        defer internal.allocator.free(id);
-        var class_hint = h.XClassHint{ .res_name = @constCast(id.ptr), .res_class = @constCast(id.ptr) };
-        _ = c.XSetClassHint(display, window, &class_hint);
-    }
-
-    self.events.push(.visible);
-    self.events.push(.{ .scale = scale });
-    self.events.push(.{ .size_logical = size });
-    self.events.push(.{ .size_physical = size });
-    self.events.push(.draw);
-
-    try windows.put(internal.allocator, window, self);
-    return self;
-}
-
 pub const Window = struct {
-    events: internal.EventQueue,
+    event_fn_data: ?*anyopaque,
     window: h.Window,
     ic: h.XIC,
     text: bool = false,
@@ -393,6 +269,130 @@ pub const Window = struct {
         colormap: h.Colormap,
     } else struct {},
 
+    pub fn create(options: wio.CreateWindowOptions) !*Window {
+        var attributes: h.XSetWindowAttributes = undefined;
+        attributes.event_mask = h.PropertyChangeMask | h.FocusChangeMask | h.ExposureMask | h.StructureNotifyMask | h.KeyPressMask | h.KeyReleaseMask | h.ButtonPressMask | h.ButtonReleaseMask | h.PointerMotionMask | h.LeaveWindowMask;
+        attributes.colormap = h.CopyFromParent;
+
+        var depth: c_int = h.CopyFromParent;
+        var visual: ?*h.Visual = null;
+        var config: h.GLXFBConfig = null;
+        if (build_options.opengl) {
+            if (options.gl_options) |gl| {
+                var count: c_int = undefined;
+                const configs = c.glXChooseFBConfig(display, h.DefaultScreen(display), &[_]c_int{
+                    h.GLX_DOUBLEBUFFER,   if (gl.doublebuffer) h.True else h.False,
+                    h.GLX_RED_SIZE,       gl.red_bits,
+                    h.GLX_GREEN_SIZE,     gl.green_bits,
+                    h.GLX_BLUE_SIZE,      gl.blue_bits,
+                    h.GLX_ALPHA_SIZE,     gl.alpha_bits,
+                    h.GLX_DEPTH_SIZE,     gl.depth_bits,
+                    h.GLX_STENCIL_SIZE,   gl.stencil_bits,
+                    h.GLX_SAMPLE_BUFFERS, if (gl.samples != 0) 1 else 0,
+                    h.GLX_SAMPLES,        gl.samples,
+                    h.None,
+                }, &count) orelse return internal.logUnexpected("glXChooseFBConfig");
+                defer _ = c.XFree(@ptrCast(configs));
+
+                config = configs[0];
+
+                const info: *h.XVisualInfo = c.glXGetVisualFromFBConfig(display, config) orelse return internal.logUnexpected("glXGetVisualFromFBConfig");
+                defer _ = c.XFree(info);
+                visual = info.visual;
+                depth = info.depth;
+
+                attributes.colormap = c.XCreateColormap(display, h.DefaultRootWindow(display), visual, h.AllocNone);
+                errdefer _ = c.XFreeColormap(display, attributes.colormap);
+            }
+        }
+        errdefer if (build_options.opengl) {
+            if (options.gl_options != null) {
+                _ = c.XFreeColormap(display, attributes.colormap);
+            }
+        };
+
+        const position: wio.RelativePosition = options.position orelse .{ .x = 0, .y = 0 };
+        const size = if (options.scale) |base| options.size.multiply(scale / base) else options.size;
+        const window = c.XCreateWindow(
+            display,
+            if (options.parent != 0) options.parent else h.DefaultRootWindow(display),
+            position.x,
+            position.y,
+            size.width,
+            size.height,
+            0,
+            depth,
+            h.InputOutput,
+            visual,
+            h.CWEventMask | h.CWColormap,
+            &attributes,
+        );
+        errdefer _ = c.XDestroyWindow(display, window);
+        _ = c.XMapWindow(display, window);
+
+        const protocols = [_]h.Atom{atoms.WM_DELETE_WINDOW};
+        _ = c.XChangeProperty(display, window, atoms.WM_PROTOCOLS, h.XA_ATOM, 32, h.PropModeReplace, @ptrCast(&protocols), protocols.len);
+
+        if (build_options.drop) {
+            const xdnd_version: c_long = 5;
+            _ = c.XChangeProperty(display, window, atoms.XdndAware, h.XA_ATOM, 32, h.PropModeReplace, @ptrCast(&xdnd_version), 1);
+        }
+
+        const self = try internal.allocator.create(Window);
+        errdefer internal.allocator.destroy(self);
+
+        const preedit_attributes = c.XVaCreateNestedList(
+            0,
+            h.XNPreeditStartCallback,
+            &h.XIMCallback{ .callback = @ptrCast(&preeditStart) },
+            h.XNPreeditDoneCallback,
+            &h.XIMCallback{ .client_data = @ptrCast(self), .callback = @ptrCast(&preeditDone) },
+            h.XNPreeditDrawCallback,
+            &h.XIMCallback{ .client_data = @ptrCast(self), .callback = @ptrCast(&preeditDraw) },
+            @as(usize, 0),
+        );
+        defer _ = c.XFree(preedit_attributes);
+
+        const ic = c.XCreateIC(
+            im,
+            h.XNInputStyle,
+            im_style,
+            h.XNClientWindow,
+            window,
+            h.XNPreeditAttributes,
+            preedit_attributes,
+            @as(usize, 0),
+        ) orelse return internal.logUnexpected("XCreateIC");
+        errdefer _ = c.XDestroyIC(ic);
+
+        self.* = .{
+            .event_fn_data = options.event_fn_data,
+            .window = window,
+            .ic = ic,
+            .size = options.size,
+            .opengl = if (build_options.opengl) .{ .config = config, .colormap = attributes.colormap } else .{},
+        };
+
+        self.setTitle(options.title);
+        self.setMode(options.mode);
+
+        if (options.app_id) |app_id| {
+            const id = try internal.allocator.dupeSentinel(u8, app_id, 0);
+            defer internal.allocator.free(id);
+            var class_hint = h.XClassHint{ .res_name = @constCast(id.ptr), .res_class = @constCast(id.ptr) };
+            _ = c.XSetClassHint(display, window, &class_hint);
+        }
+
+        internal.eventFn(self.event_fn_data, .visible);
+        internal.eventFn(self.event_fn_data, .{ .scale = scale });
+        internal.eventFn(self.event_fn_data, .{ .size_logical = size });
+        internal.eventFn(self.event_fn_data, .{ .size_physical = size });
+        internal.eventFn(self.event_fn_data, .draw);
+
+        try windows.put(internal.allocator, window, self);
+        return self;
+    }
+
     pub fn destroy(self: *Window) void {
         _ = windows.remove(self.window);
 
@@ -411,13 +411,8 @@ pub const Window = struct {
         _ = c.XFlush(display);
 
         self.preedit_string.deinit(internal.allocator);
-        self.events.deinit();
 
         internal.allocator.destroy(self);
-    }
-
-    pub fn getEvent(self: *Window) ?wio.Event {
-        return self.events.pop();
     }
 
     pub fn shouldPresent(_: *Window) bool {
@@ -748,7 +743,7 @@ fn preeditStart(_: h.XIC, _: h.XPointer, _: h.XPointer) callconv(.c) c_int {
 
 fn preeditDone(_: h.XIC, window: *Window, _: h.XPointer) callconv(.c) void {
     window.preedit_string.clearRetainingCapacity();
-    window.events.push(.preview_reset);
+    internal.eventFn(window.event_fn_data, .preview_reset);
 }
 
 fn preeditDraw(_: h.XIC, window: *Window, data: *h.XIMPreeditDrawCallbackStruct) callconv(.c) void {
@@ -787,12 +782,12 @@ fn preeditDraw(_: h.XIC, window: *Window, data: *h.XIMPreeditDrawCallbackStruct)
         window.preedit_string.replaceRangeAssumeCapacity(chg_first, chg_length, &.{});
     }
 
-    window.events.push(.preview_reset);
+    internal.eventFn(window.event_fn_data, .preview_reset);
     for (window.preedit_string.items) |char| {
-        window.events.push(.{ .preview_char = char });
+        internal.eventFn(window.event_fn_data, .{ .preview_char = char });
     }
     if (window.preedit_string.items.len > 0) {
-        window.events.push(.{ .preview_cursor = cursor });
+        internal.eventFn(window.event_fn_data, .{ .preview_cursor = cursor });
     }
 }
 
@@ -840,7 +835,7 @@ fn handle(event: *h.XEvent) void {
         h.ClientMessage => {
             if (event.xclient.message_type == atoms.WM_PROTOCOLS) {
                 if (event.xclient.data.l[0] == atoms.WM_DELETE_WINDOW) {
-                    window.events.push(.close);
+                    internal.eventFn(window.event_fn_data, .close);
                 }
             } else if (build_options.drop) {
                 if (event.xclient.message_type == atoms.XdndEnter) {
@@ -884,7 +879,7 @@ fn handle(event: *h.XEvent) void {
                     window.drop.files.clearRetainingCapacity();
                     if (window.drop.text) |t| internal.allocator.free(t);
                     window.drop.text = null;
-                    window.events.push(.drop_begin);
+                    internal.eventFn(window.event_fn_data, .drop_begin);
                 } else if (event.xclient.message_type == atoms.XdndPosition) {
                     const root_x: c_int = @intCast(event.xclient.data.l[2] >> 16);
                     const root_y: c_int = @intCast(event.xclient.data.l[2] & 0xffff);
@@ -894,7 +889,7 @@ fn handle(event: *h.XEvent) void {
                     _ = c.XTranslateCoordinates(display, h.DefaultRootWindow(display), window.window, root_x, root_y, &win_x, &win_y, &child);
                     if (std.math.cast(u16, win_x)) |x| {
                         if (std.math.cast(u16, win_y)) |y| {
-                            window.events.push(.{ .drop_position = .{ .x = x, .y = y } });
+                            internal.eventFn(window.event_fn_data, .{ .drop_position = .{ .x = x, .y = y } });
                         }
                     }
 
@@ -911,7 +906,7 @@ fn handle(event: *h.XEvent) void {
                     _ = c.XSendEvent(display, window.drop.xdnd_source, h.False, h.NoEventMask, &reply);
                     _ = c.XFlush(display);
                 } else if (event.xclient.message_type == atoms.XdndLeave) {
-                    window.events.push(.drop_complete);
+                    internal.eventFn(window.event_fn_data, .drop_complete);
                     window.drop.xdnd_source = 0;
                     window.drop.xdnd_req = h.None;
                 } else if (event.xclient.message_type == atoms.XdndDrop) {
@@ -933,13 +928,13 @@ fn handle(event: *h.XEvent) void {
             }
         },
         h.FocusIn => {
-            window.events.push(.focused);
+            internal.eventFn(window.event_fn_data, .focused);
             window.warped = false;
         },
-        h.FocusOut => window.events.push(.unfocused),
+        h.FocusOut => internal.eventFn(window.event_fn_data, .unfocused),
         h.Expose => {
             if (event.xexpose.count == 0) {
-                window.events.push(.draw);
+                internal.eventFn(window.event_fn_data, .draw);
             }
         },
         h.ConfigureNotify => {
@@ -966,14 +961,14 @@ fn handle(event: *h.XEvent) void {
                 }
             }
             if (mode == .normal and maximized_horz and maximized_vert) mode = .maximized;
-            window.events.push(.{ .mode = mode });
+            internal.eventFn(window.event_fn_data, .{ .mode = mode });
 
-            window.events.push(.{ .position = .{ .x = std.math.lossyCast(i16, event.xconfigure.x), .y = std.math.lossyCast(i16, event.xconfigure.y) } });
+            internal.eventFn(window.event_fn_data, .{ .position = .{ .x = std.math.lossyCast(i16, event.xconfigure.x), .y = std.math.lossyCast(i16, event.xconfigure.y) } });
 
             window.size = wio.Size{ .width = std.math.lossyCast(u16, event.xconfigure.width), .height = std.math.lossyCast(u16, event.xconfigure.height) };
-            window.events.push(.{ .size_logical = window.size });
-            window.events.push(.{ .size_physical = window.size });
-            window.events.push(.draw);
+            internal.eventFn(window.event_fn_data, .{ .size_logical = window.size });
+            internal.eventFn(window.event_fn_data, .{ .size_physical = window.size });
+            internal.eventFn(window.event_fn_data, .draw);
         },
         h.KeyPress => handleKeyPress(window, event, false),
         h.KeyRelease => {
@@ -988,22 +983,22 @@ fn handle(event: *h.XEvent) void {
                 }
             }
             const button = keycodes[event.xkey.keycode - 8];
-            if (button != .mouse_left) window.events.push(.{ .button_release = button });
+            if (button != .mouse_left) internal.eventFn(window.event_fn_data, .{ .button_release = button });
         },
         h.ButtonPress => {
             const button: wio.Button = switch (event.xbutton.button) {
                 1 => .mouse_left,
                 2 => .mouse_middle,
                 3 => .mouse_right,
-                4 => return window.events.push(.{ .scroll_vertical = -1 }),
-                5 => return window.events.push(.{ .scroll_vertical = 1 }),
-                6 => return window.events.push(.{ .scroll_horizontal = -1 }),
-                7 => return window.events.push(.{ .scroll_horizontal = 1 }),
+                4 => return internal.eventFn(window.event_fn_data, .{ .scroll_vertical = -1 }),
+                5 => return internal.eventFn(window.event_fn_data, .{ .scroll_vertical = 1 }),
+                6 => return internal.eventFn(window.event_fn_data, .{ .scroll_horizontal = -1 }),
+                7 => return internal.eventFn(window.event_fn_data, .{ .scroll_horizontal = 1 }),
                 8 => .mouse_back,
                 9 => .mouse_forward,
                 else => return,
             };
-            window.events.push(.{ .button_press = button });
+            internal.eventFn(window.event_fn_data, .{ .button_press = button });
         },
         h.ButtonRelease => {
             const button: wio.Button = switch (event.xbutton.button) {
@@ -1014,25 +1009,25 @@ fn handle(event: *h.XEvent) void {
                 9 => .mouse_forward,
                 else => return,
             };
-            window.events.push(.{ .button_release = button });
+            internal.eventFn(window.event_fn_data, .{ .button_release = button });
         },
         h.MotionNotify => {
             if (window.relative_mouse) {
                 const dx = event.xmotion.x - (window.size.width / 2);
                 const dy = event.xmotion.y - (window.size.height / 2);
                 if (dx != 0 or dy != 0) {
-                    if (window.warped) window.events.push(.{ .mouse_relative = .{ .x = std.math.cast(i16, dx) orelse return, .y = std.math.cast(i16, dy) orelse return } });
+                    if (window.warped) internal.eventFn(window.event_fn_data, .{ .mouse_relative = .{ .x = std.math.cast(i16, dx) orelse return, .y = std.math.cast(i16, dy) orelse return } });
                     _ = c.XWarpPointer(display, h.None, window.window, 0, 0, 0, 0, window.size.width / 2, window.size.height / 2);
                     window.warped = true;
                 }
             } else {
                 const x = std.math.cast(u16, event.xmotion.x) orelse return;
                 const y = std.math.cast(u16, event.xmotion.y) orelse return;
-                window.events.push(.{ .mouse = .{ .x = x, .y = y } });
+                internal.eventFn(window.event_fn_data, .{ .mouse = .{ .x = x, .y = y } });
             }
         },
         h.LeaveNotify => {
-            window.events.push(.mouse_leave);
+            internal.eventFn(window.event_fn_data, .mouse_leave);
         },
         h.SelectionNotify => {
             if (build_options.drop and window.drop.xdnd_req != h.None and event.xselection.property != h.None and event.xselection.selection == atoms.XdndSelection) {
@@ -1060,7 +1055,7 @@ fn handle(event: *h.XEvent) void {
                         }
                     }
                 }
-                window.events.push(.drop_complete);
+                internal.eventFn(window.event_fn_data, .drop_complete);
 
                 var reply = h.XEvent{ .xclient = std.mem.zeroInit(h.XClientMessageEvent, .{
                     .type = h.ClientMessage,
@@ -1089,7 +1084,7 @@ fn handleKeyPress(window: *Window, event: *h.XEvent, repeat: bool) void {
     if (event.xkey.keycode != 0) {
         const button = keycodes[event.xkey.keycode - 8];
         if (button != .mouse_left) {
-            window.events.push(if (repeat) .{ .button_repeat = button } else .{ .button_press = button });
+            internal.eventFn(window.event_fn_data, if (repeat) .{ .button_repeat = button } else .{ .button_press = button });
         }
     }
 
@@ -1109,7 +1104,7 @@ fn handleKeyPress(window: *Window, event: *h.XEvent, repeat: bool) void {
         var iter = view.iterator();
         while (iter.nextCodepoint()) |codepoint| {
             if (codepoint >= ' ' and codepoint != 0x7F) {
-                window.events.push(.{ .char = codepoint });
+                internal.eventFn(window.event_fn_data, .{ .char = codepoint });
             }
         }
     }

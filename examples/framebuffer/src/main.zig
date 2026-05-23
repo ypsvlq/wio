@@ -9,11 +9,19 @@ pub fn main() !void {
     var threaded = std.Io.Threaded.init(allocator, .{});
     defer threaded.deinit();
 
-    try wio.init(allocator, threaded.io(), .{});
+    try wio.init(allocator, threaded.io(), wio.EventQueue.eventFn, .{});
     defer wio.deinit();
 
+    var events: wio.EventQueue = .empty;
+    defer events.deinit();
+
     var size: wio.Size = .{ .width = 640, .height = 480 };
-    var window = try wio.createWindow(.{ .title = "software", .size = size, .scale = 1 });
+    var window = try wio.Window.create(.{
+        .event_fn_data = &events,
+        .title = "software",
+        .size = size,
+        .scale = 1,
+    });
     defer window.destroy();
 
     var fb = try window.createFramebuffer(size);
@@ -23,7 +31,7 @@ pub fn main() !void {
 
     while (true) {
         wio.update();
-        while (window.getEvent()) |event| {
+        while (events.pop()) |event| {
             switch (event) {
                 .close => return,
                 .size_physical => |new_size| {

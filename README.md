@@ -11,9 +11,42 @@ wio is a platform abstraction library, providing:
 - OpenGL context creation
 - Vulkan WSI
 
+## Minimal example
+
+```zig
+const std = @import("std");
+const wio = @import("wio");
+
+pub fn main(init: std.process.Init) !void {
+    try wio.init(init.gpa, init.io, wio.EventQueue.eventFn, .{});
+    defer wio.deinit();
+
+    var events: wio.EventQueue = .empty;
+    defer events.deinit();
+
+    var window = try wio.Window.create(.{ .event_fn_data = &events });
+    defer window.destroy();
+
+    var framebuffer = try window.createFramebuffer(.{ .width = 1, .height = 1 });
+    defer framebuffer.destroy();
+    framebuffer.setPixel(0, 0, 0xF7A41D);
+
+    while (true) {
+        wio.update();
+        while (events.pop()) |event| {
+            switch (event) {
+                .close => return,
+                .draw => window.presentFramebuffer(&framebuffer),
+                else => {},
+            }
+        }
+    }
+}
+```
+
 ## Getting started
 
-wio targets the latest Zig release, but compatibility with Zig master is
+wio supports the latest Zig release, but compatibility with Zig master is
 maintained when possible.
 
 The public API can be browsed in [src/wio.zig][1].

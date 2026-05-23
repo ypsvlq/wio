@@ -35,20 +35,15 @@ pub fn getModifiers() wio.Modifiers {
     return .{};
 }
 
-pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
-    const self = try internal.allocator.create(Window);
-    _ = options;
-    return self;
-}
-
 pub const Window = struct {
-    pub fn destroy(self: *Window) void {
-        internal.allocator.destroy(self);
+    pub fn create(options: wio.CreateWindowOptions) !*Window {
+        const self = try internal.allocator.create(Window);
+        _ = options;
+        return self;
     }
 
-    pub fn getEvent(self: *Window) ?wio.Event {
-        _ = self;
-        return null;
+    pub fn destroy(self: *Window) void {
+        internal.allocator.destroy(self);
     }
 
     pub fn shouldPresent(self: *Window) bool {

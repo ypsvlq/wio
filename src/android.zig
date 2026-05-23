@@ -10,12 +10,10 @@ pub const logFn = android.logFn;
 
 const egl = internal.egl(c, c);
 
-var events: internal.EventQueue = .{};
-var events_mutex: std.Io.Mutex = .init;
-var wait_event: std.Io.Event = .unset;
-
 var window: ?*c.ANativeWindow = null;
 
+var wait_event: std.Io.Event = .unset;
+var event_fn_data: ?*anyopaque = undefined;
 var modifiers: wio.Modifiers = .{};
 var relative_mouse: bool = false;
 
@@ -72,33 +70,27 @@ pub fn getModifiers() wio.Modifiers {
     return modifiers;
 }
 
-var created = false;
-
-pub fn createWindow(options: wio.CreateWindowOptions) !Window {
-    if (created) return error.AlreadyCreated;
-    created = true;
-
-    pushEvent(.{ .position = .{ .x = 0, .y = 0 } });
-
-    if (build_options.opengl) {
-        if (options.gl_options) |gl| {
-            egl_config = try egl.chooseConfig(gl);
-        }
-    }
-
-    return .{};
-}
-
 pub const Window = struct {
-    pub fn destroy(_: *Window) void {
-        events.deinit();
+    var created = false;
+
+    pub fn create(options: wio.CreateWindowOptions) !Window {
+        if (created) return error.AlreadyCreated;
+        created = true;
+
+        event_fn_data = options.event_fn_data;
+
+        internal.eventFn(event_fn_data, .{ .position = .{ .x = 0, .y = 0 } });
+
+        if (build_options.opengl) {
+            if (options.gl_options) |gl| {
+                egl_config = try egl.chooseConfig(gl);
+            }
+        }
+
+        return .{};
     }
 
-    pub fn getEvent(_: *Window) ?wio.Event {
-        events_mutex.lockUncancelable(internal.io);
-        defer events_mutex.unlock(internal.io);
-        return events.pop();
-    }
+    pub fn destroy(_: *Window) void {}
 
     pub fn shouldPresent(_: *Window) bool {
         return true;
@@ -464,11 +456,11 @@ const native = struct {
     }
 
     fn onDestroy(_: *c.JNIEnv, _: c.jobject) callconv(.c) void {
-        pushEvent(.close);
+        internal.eventFn(event_fn_data, .close);
     }
 
     fn onWindowFocusChanged(env: *c.JNIEnv, instance: c.jobject, focused: c.jboolean) callconv(.c) void {
-        pushEvent(if (focused == c.JNI_TRUE) .focused else .unfocused);
+        internal.eventFn(event_fn_data, if (focused == c.JNI_TRUE) .focused else .unfocused);
 
         if (focused == c.JNI_TRUE and relative_mouse) {
             env.*.*.CallVoidMethod.?(env, instance, java.enableRelativeMouse);
@@ -483,14 +475,14 @@ const native = struct {
             c.AMOTION_EVENT_ACTION_DOWN,
             c.AMOTION_EVENT_ACTION_MOVE,
             c.AMOTION_EVENT_ACTION_POINTER_DOWN,
-            => pushEvent(.{ .touch = .{ .id = id, .x = std.math.cast(u16, x) orelse return, .y = std.math.cast(u16, y) orelse return } }),
+            => internal.eventFn(event_fn_data, .{ .touch = .{ .id = id, .x = std.math.cast(u16, x) orelse return, .y = std.math.cast(u16, y) orelse return } }),
 
             c.AMOTION_EVENT_ACTION_UP,
             c.AMOTION_EVENT_ACTION_POINTER_UP,
-            => pushEvent(.{ .touch_end = .{ .id = id, .ignore = false } }),
+            => internal.eventFn(event_fn_data, .{ .touch_end = .{ .id = id, .ignore = false } }),
 
             c.AMOTION_EVENT_ACTION_CANCEL,
-            => pushEvent(.{ .touch_end = .{ .id = id, .ignore = true } }),
+            => internal.eventFn(event_fn_data, .{ .touch_end = .{ .id = id, .ignore = true } }),
 
             else => {},
         }
@@ -499,7 +491,7 @@ const native = struct {
     var last_buttons: c.jint = 0;
 
     fn pushMouseEvent(_: *c.JNIEnv, _: c.jobject, x: c.jint, y: c.jint, buttons: c.jint) callconv(.c) void {
-        pushEvent(.{ .mouse = .{ .x = std.math.cast(u16, x) orelse return, .y = std.math.cast(u16, y) orelse return } });
+        internal.eventFn(event_fn_data, .{ .mouse = .{ .x = std.math.cast(u16, x) orelse return, .y = std.math.cast(u16, y) orelse return } });
 
         const changes = last_buttons ^ buttons;
         if (changes != 0) {
@@ -516,9 +508,9 @@ const native = struct {
                         else => unreachable,
                     };
                     if (buttons & i != 0) {
-                        pushEvent(.{ .button_press = button });
+                        internal.eventFn(event_fn_data, .{ .button_press = button });
                     } else {
-                        pushEvent(.{ .button_release = button });
+                        internal.eventFn(event_fn_data, .{ .button_release = button });
                     }
                 }
             }
@@ -526,13 +518,13 @@ const native = struct {
     }
 
     fn pushScrollEvent(_: *c.JNIEnv, _: c.jobject, vertical: c.jfloat, horizontal: c.jfloat) callconv(.c) void {
-        if (vertical != 0) pushEvent(.{ .scroll_vertical = -vertical });
-        if (horizontal != 0) pushEvent(.{ .scroll_horizontal = -horizontal });
+        if (vertical != 0) internal.eventFn(event_fn_data, .{ .scroll_vertical = -vertical });
+        if (horizontal != 0) internal.eventFn(event_fn_data, .{ .scroll_horizontal = -horizontal });
     }
 
     fn onKeyDown(_: *c.JNIEnv, _: c.jobject, keycode: c.jint, repeat: c.jint) callconv(.c) c.jboolean {
         const button = keycodeToButton(keycode) orelse return c.JNI_FALSE;
-        pushEvent(if (repeat == 0) .{ .button_press = button } else .{ .button_repeat = button });
+        internal.eventFn(event_fn_data, if (repeat == 0) .{ .button_press = button } else .{ .button_repeat = button });
         switch (button) {
             .left_control, .right_control => modifiers.control = true,
             .left_shift, .right_shift => modifiers.shift = true,
@@ -544,7 +536,7 @@ const native = struct {
 
     fn onKeyUp(_: *c.JNIEnv, _: c.jobject, keycode: c.jint) callconv(.c) c.jboolean {
         const button = keycodeToButton(keycode) orelse return c.JNI_FALSE;
-        pushEvent(.{ .button_release = button });
+        internal.eventFn(event_fn_data, .{ .button_release = button });
         switch (button) {
             .left_control, .right_control => modifiers.control = false,
             .left_shift, .right_shift => modifiers.shift = false,
@@ -556,7 +548,7 @@ const native = struct {
 
     fn surfaceCreated(env: *c.JNIEnv, _: c.jobject, surface: c.jobject) callconv(.c) void {
         window = c.ANativeWindow_fromSurface(env, surface);
-        pushEvent(.visible);
+        internal.eventFn(event_fn_data, .visible);
 
         if (build_options.opengl) {
             if (egl_config != null) {
@@ -572,15 +564,15 @@ const native = struct {
 
     fn surfaceChanged(_: *c.JNIEnv, _: c.jobject, density: c.jfloat, width: c.jint, height: c.jint) callconv(.c) void {
         const size: wio.Size = .{ .width = std.math.lossyCast(u16, width), .height = std.math.lossyCast(u16, height) };
-        pushEvent(.{ .scale = density });
-        pushEvent(.{ .size_logical = size });
-        pushEvent(.{ .size_physical = size });
+        internal.eventFn(event_fn_data, .{ .scale = density });
+        internal.eventFn(event_fn_data, .{ .size_logical = size });
+        internal.eventFn(event_fn_data, .{ .size_physical = size });
     }
 
     fn surfaceDestroyed(_: *c.JNIEnv, _: c.jobject) callconv(.c) void {
         c.ANativeWindow_release(window);
         window = null;
-        pushEvent(.hidden);
+        internal.eventFn(event_fn_data, .hidden);
 
         if (build_options.opengl) {
             if (egl_surface) |_| {
@@ -593,32 +585,25 @@ const native = struct {
     }
 
     fn onGlobalLayout(_: *c.JNIEnv, _: c.jobject) callconv(.c) void {
-        pushEvent(.draw);
+        internal.eventFn(event_fn_data, .draw);
     }
 
     fn onCapturedPointerEvent(_: *c.JNIEnv, _: c.jobject, x: c.jint, y: c.jint) callconv(.c) void {
-        pushEvent(.{ .mouse_relative = .{ .x = std.math.cast(i16, x) orelse return, .y = std.math.cast(i16, y) orelse return } });
+        internal.eventFn(event_fn_data, .{ .mouse_relative = .{ .x = std.math.cast(i16, x) orelse return, .y = std.math.cast(i16, y) orelse return } });
     }
 
     fn pushCharEvent(_: *c.JNIEnv, _: c.jobject, codepoint: c.jint) callconv(.c) void {
-        pushEvent(.{ .char = std.math.cast(u21, codepoint) orelse return });
+        internal.eventFn(event_fn_data, .{ .char = std.math.cast(u21, codepoint) orelse return });
     }
 
     fn pushPreviewResetEvent(_: *c.JNIEnv, _: c.jobject) callconv(.c) void {
-        pushEvent(.preview_reset);
+        internal.eventFn(event_fn_data, .preview_reset);
     }
 
     fn pushPreviewCharEvent(_: *c.JNIEnv, _: c.jobject, codepoint: c.jint) callconv(.c) void {
-        pushEvent(.{ .preview_char = std.math.cast(u21, codepoint) orelse return });
+        internal.eventFn(event_fn_data, .{ .preview_char = std.math.cast(u21, codepoint) orelse return });
     }
 };
-
-fn pushEvent(event: wio.Event) void {
-    events_mutex.lockUncancelable(internal.io);
-    defer events_mutex.unlock(internal.io);
-    events.push(event);
-    wait_event.set(internal.io);
-}
 
 fn logUnexpectedEgl(name: []const u8) error{Unexpected} {
     logEglError(name);

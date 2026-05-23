@@ -255,101 +255,8 @@ pub fn getModifiers() wio.Modifiers {
     };
 }
 
-pub fn createWindow(options: wio.CreateWindowOptions) !*Window {
-    const title = try std.unicode.utf8ToUtf16LeAllocZ(internal.allocator, options.title);
-    defer internal.allocator.free(title);
-    const style: u32 = w.WS_OVERLAPPEDWINDOW;
-    const size = clientToWindow(options.size, style);
-    const window = w.CreateWindowExW(
-        0,
-        class_name,
-        title.ptr,
-        style,
-        if (options.position) |position| position.x else w.CW_USEDEFAULT,
-        if (options.position) |position| position.y else w.CW_USEDEFAULT,
-        size.width,
-        size.height,
-        @ptrFromInt(options.parent),
-        null,
-        w.GetModuleHandleW(null),
-        null,
-    ) orelse return logLastError("CreateWindowExW");
-
-    const self = try internal.allocator.create(Window);
-    errdefer internal.allocator.destroy(self);
-    self.* = .{
-        .events = .init(),
-        .window = window,
-        .cursor = loadCursor(.default),
-    };
-    _ = w.SetWindowLongPtrW(window, w.GWLP_USERDATA, @bitCast(@intFromPtr(self)));
-
-    const dpi: f32 = @floatFromInt(w.GetDpiForWindow(window));
-    const scale = dpi / w.USER_DEFAULT_SCREEN_DPI;
-    self.events.push(.{ .scale = scale });
-
-    if (options.scale) |base| {
-        const scaled = clientToWindow(options.size.multiply(scale / base), style);
-        _ = w.SetWindowPos(window, null, 0, 0, scaled.width, scaled.height, w.SWP_NOMOVE | w.SWP_NOZORDER);
-    }
-
-    self.setMode(options.mode);
-
-    if (build_options.drop) {
-        self.drop.target = .{ .window = self };
-        _ = w.RegisterDragDrop(window, &self.drop.target.interface);
-    }
-
-    if (build_options.opengl) {
-        if (options.gl_options) |gl| {
-            self.opengl.dc = w.GetDC(self.window);
-
-            var format: i32 = undefined;
-            var pfd: w.PIXELFORMATDESCRIPTOR = undefined;
-            var valid_pfd = false;
-            if (wgl.choosePixelFormatARB) |choosePixelFormatARB| {
-                var count: u32 = undefined;
-                if (choosePixelFormatARB(self.opengl.dc, &.{
-                    0x2011, if (gl.doublebuffer) w.TRUE else w.FALSE,
-                    0x2015, gl.red_bits,
-                    0x2017, gl.green_bits,
-                    0x2019, gl.blue_bits,
-                    0x201B, gl.alpha_bits,
-                    0x2022, gl.depth_bits,
-                    0x2023, gl.stencil_bits,
-                    0x2041, if (gl.samples != 0) 1 else 0,
-                    0x2042, gl.samples,
-                    0,
-                }, null, 1, &format, &count) == w.FALSE) return logLastError("wglChoosePixelFormatARB");
-                if (count == 1) {
-                    if (w.DescribePixelFormat(self.opengl.dc, format, @sizeOf(w.PIXELFORMATDESCRIPTOR), &pfd) != 0) {
-                        valid_pfd = true;
-                    }
-                }
-            }
-            if (!valid_pfd) {
-                pfd = std.mem.zeroInit(w.PIXELFORMATDESCRIPTOR, .{
-                    .nSize = @sizeOf(w.PIXELFORMATDESCRIPTOR),
-                    .nVersion = 1,
-                    .dwFlags = w.PFD_DRAW_TO_WINDOW | w.PFD_SUPPORT_OPENGL | if (gl.doublebuffer) w.PFD_DOUBLEBUFFER else 0,
-                    .iPixelType = w.PFD_TYPE_RGBA,
-                    .cColorBits = gl.red_bits + gl.green_bits + gl.blue_bits,
-                    .cAlphaBits = gl.alpha_bits,
-                    .cDepthBits = gl.depth_bits,
-                    .cStencilBits = gl.stencil_bits,
-                });
-                format = w.ChoosePixelFormat(self.opengl.dc, &pfd);
-                if (format == 0) return logLastError("ChoosePixelFormat");
-            }
-            _ = w.SetPixelFormat(self.opengl.dc, format, &pfd);
-        }
-    }
-
-    return self;
-}
-
 pub const Window = struct {
-    events: internal.EventQueue,
+    event_fn_data: ?*anyopaque,
     window: w.HWND,
     cursor: w.HCURSOR,
     text: bool = false,
@@ -380,6 +287,99 @@ pub const Window = struct {
         dc: w.HDC = null,
     } else struct {} = .{},
 
+    pub fn create(options: wio.CreateWindowOptions) !*Window {
+        const title = try std.unicode.utf8ToUtf16LeAllocZ(internal.allocator, options.title);
+        defer internal.allocator.free(title);
+        const style: u32 = w.WS_OVERLAPPEDWINDOW;
+        const size = clientToWindow(options.size, style);
+        const window = w.CreateWindowExW(
+            0,
+            class_name,
+            title.ptr,
+            style,
+            if (options.position) |position| position.x else w.CW_USEDEFAULT,
+            if (options.position) |position| position.y else w.CW_USEDEFAULT,
+            size.width,
+            size.height,
+            @ptrFromInt(options.parent),
+            null,
+            w.GetModuleHandleW(null),
+            null,
+        ) orelse return logLastError("CreateWindowExW");
+
+        const self = try internal.allocator.create(Window);
+        errdefer internal.allocator.destroy(self);
+        self.* = .{
+            .event_fn_data = options.event_fn_data,
+            .window = window,
+            .cursor = loadCursor(.default),
+        };
+        _ = w.SetWindowLongPtrW(window, w.GWLP_USERDATA, @bitCast(@intFromPtr(self)));
+
+        const dpi: f32 = @floatFromInt(w.GetDpiForWindow(window));
+        const scale = dpi / w.USER_DEFAULT_SCREEN_DPI;
+        internal.eventFn(self.event_fn_data, .{ .scale = scale });
+
+        if (options.scale) |base| {
+            const scaled = clientToWindow(options.size.multiply(scale / base), style);
+            _ = w.SetWindowPos(window, null, 0, 0, scaled.width, scaled.height, w.SWP_NOMOVE | w.SWP_NOZORDER);
+        }
+
+        self.setMode(options.mode);
+
+        if (build_options.drop) {
+            self.drop.target = .{ .window = self };
+            _ = w.RegisterDragDrop(window, &self.drop.target.interface);
+        }
+
+        if (build_options.opengl) {
+            if (options.gl_options) |gl| {
+                self.opengl.dc = w.GetDC(self.window);
+
+                var format: i32 = undefined;
+                var pfd: w.PIXELFORMATDESCRIPTOR = undefined;
+                var valid_pfd = false;
+                if (wgl.choosePixelFormatARB) |choosePixelFormatARB| {
+                    var count: u32 = undefined;
+                    if (choosePixelFormatARB(self.opengl.dc, &.{
+                        0x2011, if (gl.doublebuffer) w.TRUE else w.FALSE,
+                        0x2015, gl.red_bits,
+                        0x2017, gl.green_bits,
+                        0x2019, gl.blue_bits,
+                        0x201B, gl.alpha_bits,
+                        0x2022, gl.depth_bits,
+                        0x2023, gl.stencil_bits,
+                        0x2041, if (gl.samples != 0) 1 else 0,
+                        0x2042, gl.samples,
+                        0,
+                    }, null, 1, &format, &count) == w.FALSE) return logLastError("wglChoosePixelFormatARB");
+                    if (count == 1) {
+                        if (w.DescribePixelFormat(self.opengl.dc, format, @sizeOf(w.PIXELFORMATDESCRIPTOR), &pfd) != 0) {
+                            valid_pfd = true;
+                        }
+                    }
+                }
+                if (!valid_pfd) {
+                    pfd = std.mem.zeroInit(w.PIXELFORMATDESCRIPTOR, .{
+                        .nSize = @sizeOf(w.PIXELFORMATDESCRIPTOR),
+                        .nVersion = 1,
+                        .dwFlags = w.PFD_DRAW_TO_WINDOW | w.PFD_SUPPORT_OPENGL | if (gl.doublebuffer) w.PFD_DOUBLEBUFFER else 0,
+                        .iPixelType = w.PFD_TYPE_RGBA,
+                        .cColorBits = gl.red_bits + gl.green_bits + gl.blue_bits,
+                        .cAlphaBits = gl.alpha_bits,
+                        .cDepthBits = gl.depth_bits,
+                        .cStencilBits = gl.stencil_bits,
+                    });
+                    format = w.ChoosePixelFormat(self.opengl.dc, &pfd);
+                    if (format == 0) return logLastError("ChoosePixelFormat");
+                }
+                _ = w.SetPixelFormat(self.opengl.dc, format, &pfd);
+            }
+        }
+
+        return self;
+    }
+
     pub fn destroy(self: *Window) void {
         if (build_options.opengl) {
             _ = w.ReleaseDC(self.window, self.opengl.dc);
@@ -392,13 +392,8 @@ pub const Window = struct {
         }
         _ = w.DestroyWindow(self.window);
         self.touch_ids.deinit(internal.allocator);
-        self.events.deinit();
         internal.allocator.free(self.input);
         internal.allocator.destroy(self);
-    }
-
-    pub fn getEvent(self: *Window) ?wio.Event {
-        return self.events.pop();
     }
 
     pub fn shouldPresent(_: *Window) bool {
@@ -1312,7 +1307,7 @@ const DropTarget = struct {
         _ = w.ScreenToClient(window.window, &point);
         const x = std.math.cast(u16, point.x) orelse return;
         const y = std.math.cast(u16, point.y) orelse return;
-        window.events.push(.{ .drop_position = .{ .x = x, .y = y } });
+        internal.eventFn(window.event_fn_data, .{ .drop_position = .{ .x = x, .y = y } });
     }
 
     fn dragEnter(iface: *w.IDropTarget, data: [*c]w.IDataObject, _: u32, pt: w.POINTL, effect: [*c]u32) callconv(.winapi) w.HRESULT {
@@ -1328,7 +1323,7 @@ const DropTarget = struct {
             dt.window.drop.files.clearRetainingCapacity();
             if (dt.window.drop.text) |t| internal.allocator.free(t);
             dt.window.drop.text = null;
-            dt.window.events.push(.drop_begin);
+            internal.eventFn(dt.window.event_fn_data, .drop_begin);
             pushPosition(dt.window, pt);
         } else {
             effect.* = w.DROPEFFECT_NONE;
@@ -1362,7 +1357,7 @@ const DropTarget = struct {
         pushPosition(dt.window, pt);
         if (dt.has_files) extractFiles(dt.window, data_obj);
         if (dt.has_text) extractText(dt.window, data_obj);
-        dt.window.events.push(.drop_complete);
+        internal.eventFn(dt.window.event_fn_data, .drop_complete);
         return w.S_OK;
     }
 
@@ -1546,13 +1541,13 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
     if (self.left_shift) {
         if (w.GetAsyncKeyState(w.VK_LSHIFT) == 0) {
             self.left_shift = false;
-            self.events.push(.{ .button_release = .left_shift });
+            internal.eventFn(self.event_fn_data, .{ .button_release = .left_shift });
         }
     }
     if (self.right_shift) {
         if (w.GetAsyncKeyState(w.VK_RSHIFT) == 0) {
             self.right_shift = false;
-            self.events.push(.{ .button_release = .right_shift });
+            internal.eventFn(self.event_fn_data, .{ .button_release = .right_shift });
         }
     }
 
@@ -1573,27 +1568,27 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
             }
         },
         w.WM_CLOSE => {
-            self.events.push(.close);
+            internal.eventFn(self.event_fn_data, .close);
             return 0;
         },
         w.WM_SETFOCUS => {
-            self.events.push(.focused);
+            internal.eventFn(self.event_fn_data, .focused);
             if (self.relative_mouse) {
                 self.clipCursor();
             }
             return 0;
         },
         w.WM_KILLFOCUS => {
-            self.events.push(.unfocused);
+            internal.eventFn(self.event_fn_data, .unfocused);
             return 0;
         },
         w.WM_PAINT => {
-            self.events.push(.draw);
+            internal.eventFn(self.event_fn_data, .draw);
             _ = w.ValidateRgn(window, null);
             return 0;
         },
         w.WM_MOVE => {
-            self.events.push(.{ .position = .{ .x = LOSHORT(lParam), .y = HISHORT(lParam) } });
+            internal.eventFn(self.event_fn_data, .{ .position = .{ .x = LOSHORT(lParam), .y = HISHORT(lParam) } });
             return 0;
         },
         w.WM_SIZE => {
@@ -1607,13 +1602,13 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
                     if (wParam == w.SIZE_RESTORED and !fullscreen) {
                         _ = w.GetWindowRect(window, &self.rect);
                     }
-                    self.events.push(.visible);
-                    self.events.push(.{ .mode = if (fullscreen) .fullscreen else if (wParam == w.SIZE_MAXIMIZED) .maximized else .normal });
-                    self.events.push(.{ .size_logical = size });
-                    self.events.push(.{ .size_physical = size });
-                    self.events.push(.draw);
+                    internal.eventFn(self.event_fn_data, .visible);
+                    internal.eventFn(self.event_fn_data, .{ .mode = if (fullscreen) .fullscreen else if (wParam == w.SIZE_MAXIMIZED) .maximized else .normal });
+                    internal.eventFn(self.event_fn_data, .{ .size_logical = size });
+                    internal.eventFn(self.event_fn_data, .{ .size_physical = size });
+                    internal.eventFn(self.event_fn_data, .draw);
                 },
-                w.SIZE_MINIMIZED => self.events.push(.hidden),
+                w.SIZE_MINIMIZED => internal.eventFn(self.event_fn_data, .hidden),
                 else => {},
             }
             return 0;
@@ -1621,7 +1616,7 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
         w.WM_DPICHANGED => {
             const dpi: f32 = @floatFromInt(LOWORD(wParam));
             const scale = dpi / w.USER_DEFAULT_SCREEN_DPI;
-            self.events.push(.{ .scale = scale });
+            internal.eventFn(self.event_fn_data, .{ .scale = scale });
             return 0;
         },
         w.WM_CHAR => {
@@ -1639,7 +1634,7 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
                     }
                 };
                 if (codepoint >= ' ') {
-                    self.events.push(.{ .char = codepoint });
+                    internal.eventFn(self.event_fn_data, .{ .char = codepoint });
                 }
             }
             return 0;
@@ -1650,7 +1645,7 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
             }
 
             if (msg == w.WM_SYSKEYDOWN and wParam == w.VK_F4) {
-                self.events.push(.close);
+                internal.eventFn(self.event_fn_data, .close);
             }
 
             const flags = HIWORD(lParam);
@@ -1686,10 +1681,10 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
                         repeat = ptr.*;
                         ptr.* = true;
                     }
-                    self.events.push(if (repeat) .{ .button_repeat = button } else .{ .button_press = button });
+                    internal.eventFn(self.event_fn_data, if (repeat) .{ .button_repeat = button } else .{ .button_press = button });
                 } else {
                     if (modifier) |ptr| ptr.* = false;
-                    self.events.push(.{ .button_release = button });
+                    internal.eventFn(self.event_fn_data, .{ .button_release = button });
                 }
             }
             return 0;
@@ -1715,8 +1710,8 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
                 w.WM_MBUTTONDOWN,
                 w.WM_RBUTTONDOWN,
                 w.WM_XBUTTONDOWN,
-                => self.events.push(.{ .button_press = button }),
-                else => self.events.push(.{ .button_release = button }),
+                => internal.eventFn(self.event_fn_data, .{ .button_press = button }),
+                else => internal.eventFn(self.event_fn_data, .{ .button_release = button }),
             }
 
             return if (msg == w.WM_XBUTTONDOWN or msg == w.WM_XBUTTONUP) w.TRUE else 0;
@@ -1726,7 +1721,7 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
                 const x = LOSHORT(lParam);
                 const y = HISHORT(lParam);
                 if (x >= 0 and y >= 0) {
-                    self.events.push(.{ .mouse = .{ .x = @intCast(x), .y = @intCast(y) } });
+                    internal.eventFn(self.event_fn_data, .{ .mouse = .{ .x = @intCast(x), .y = @intCast(y) } });
                 }
             }
 
@@ -1755,26 +1750,26 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
                 if (raw.data.mouse.usFlags & w.MOUSE_MOVE_ABSOLUTE != 0) {
                     if (raw.data.mouse.lLastX != 0 or raw.data.mouse.lLastY != 0) { // prevent spurious (0,0)
                         if (raw.data.mouse.Anonymous.Anonymous.usButtonFlags == 0) { // prevent jumping on touch input
-                            self.events.push(.{ .mouse_relative = .{ .x = @intCast(raw.data.mouse.lLastX - self.last_x), .y = @intCast(raw.data.mouse.lLastY - self.last_y) } });
+                            internal.eventFn(self.event_fn_data, .{ .mouse_relative = .{ .x = @intCast(raw.data.mouse.lLastX - self.last_x), .y = @intCast(raw.data.mouse.lLastY - self.last_y) } });
                         }
                         self.last_x = @intCast(raw.data.mouse.lLastX);
                         self.last_y = @intCast(raw.data.mouse.lLastY);
                     }
                 } else {
-                    self.events.push(.{ .mouse_relative = .{ .x = @intCast(raw.data.mouse.lLastX), .y = @intCast(raw.data.mouse.lLastY) } });
+                    internal.eventFn(self.event_fn_data, .{ .mouse_relative = .{ .x = @intCast(raw.data.mouse.lLastX), .y = @intCast(raw.data.mouse.lLastY) } });
                 }
             }
             return 0;
         },
         w.WM_MOUSELEAVE => {
-            self.events.push(.mouse_leave);
+            internal.eventFn(self.event_fn_data, .mouse_leave);
             self.tracking = false;
             return 0;
         },
         w.WM_MOUSEWHEEL, w.WM_MOUSEHWHEEL => {
             const delta: f32 = @floatFromInt(HISHORT(wParam));
             const value = delta / w.WHEEL_DELTA;
-            self.events.push(if (msg == w.WM_MOUSEWHEEL) .{ .scroll_vertical = -value } else .{ .scroll_horizontal = value });
+            internal.eventFn(self.event_fn_data, if (msg == w.WM_MOUSEWHEEL) .{ .scroll_vertical = -value } else .{ .scroll_horizontal = value });
             return 0;
         },
         w.WM_POINTERDOWN, w.WM_POINTERUPDATE => {
@@ -1790,12 +1785,12 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
             if (flags & w.POINTER_FLAG_INCONTACT == 0) return 0;
             var point = w.POINT{ .x = LOSHORT(lParam), .y = HISHORT(lParam) };
             _ = w.ScreenToClient(self.window, &point);
-            self.events.push(.{ .touch = .{ .id = id, .x = std.math.cast(u16, point.x) orelse return 0, .y = std.math.cast(u16, point.y) orelse return 0 } });
+            internal.eventFn(self.event_fn_data, .{ .touch = .{ .id = id, .x = std.math.cast(u16, point.x) orelse return 0, .y = std.math.cast(u16, point.y) orelse return 0 } });
             return 0;
         },
         w.WM_POINTERUP, w.WM_POINTERCAPTURECHANGED => {
             const id = self.touch_ids.get(LOWORD(wParam)) orelse return 0;
-            self.events.push(.{ .touch_end = .{ .id = id, .ignore = if (msg == w.WM_POINTERUP) false else true } });
+            internal.eventFn(self.event_fn_data, .{ .touch_end = .{ .id = id, .ignore = if (msg == w.WM_POINTERUP) false else true } });
             self.touch_bitmap.unset(id);
             return 0;
         },

@@ -282,6 +282,7 @@ pub fn build(b: *std.Build) !void {
             if (target.result.cpu.arch.isWasm()) {
                 var exports: std.ArrayList([]const u8) = .empty;
                 try exports.append(b.allocator, "wioLoop");
+                try exports.append(b.allocator, "wioEvent");
                 if (enable_joystick) {
                     try exports.append(b.allocator, "wioJoystick");
                 }
