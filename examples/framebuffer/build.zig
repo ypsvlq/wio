@@ -4,19 +4,21 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const exe_mod = b.createModule(.{
-        .root_source_file = b.path("src/main.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-
     const wio = b.dependency("wio", .{
         .target = target,
         .optimize = optimize,
         .enable_framebuffer = true,
         .unix_backends = b.option([]const u8, "unix_backends", "List of enabled wio backends"),
     });
-    exe_mod.addImport("wio", wio.module("wio"));
+
+    const exe_mod = b.createModule(.{
+        .root_source_file = b.path("src/main.zig"),
+        .imports = &.{
+            .{ .name = "wio", .module = wio.module("wio") },
+        },
+        .target = target,
+        .optimize = optimize,
+    });
 
     const exe = b.addExecutable(.{
         .name = "framebuffer",

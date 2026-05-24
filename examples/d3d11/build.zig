@@ -4,23 +4,25 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const exe_mod = b.createModule(.{
-        .root_source_file = b.path("src/main.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-
     const wio = b.dependency("wio", .{
         .target = target,
         .optimize = optimize,
     });
-    exe_mod.addImport("wio", wio.module("wio"));
 
     const win32 = b.dependency("win32", .{
         .target = target,
         .optimize = optimize,
     });
-    exe_mod.addImport("win32", win32.module("win32"));
+
+    const exe_mod = b.createModule(.{
+        .root_source_file = b.path("src/main.zig"),
+        .imports = &.{
+            .{ .name = "wio", .module = wio.module("wio") },
+            .{ .name = "win32", .module = win32.module("win32") },
+        },
+        .target = target,
+        .optimize = optimize,
+    });
 
     const exe = b.addExecutable(.{
         .name = "d3d11",
