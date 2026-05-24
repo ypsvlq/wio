@@ -52,6 +52,10 @@ jobs:
       name: Build D3D11 example
       working-directory: examples/d3d11
       run: ${{ env.build }}
+    - if: ${{ endsWith(matrix.target, '-macos') }}
+      name: Build Metal example
+      working-directory: examples/metal
+      run: ${{ env.build }}
   build_android:
     runs-on: ubuntu-latest
     steps:
