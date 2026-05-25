@@ -255,7 +255,7 @@ pub const Joystick = struct {
                             value -= @floatFromInt(info.minimum);
                             value /= @floatFromInt(info.maximum - info.minimum);
                             value *= 0xFFFF;
-                            self.axes[index - 1] = @intFromFloat(value);
+                            self.axes[index - 1] = @trunc(value);
                         } else {
                             const hat = &self.hats[index - 1];
                             if (event.code & 1 != 0) {

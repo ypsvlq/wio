@@ -1500,7 +1500,7 @@ fn helperWindowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM
                                     float -= @floatFromInt(caps.LogicalMin);
                                     float /= @floatFromInt(caps.LogicalMax - caps.LogicalMin);
                                     float *= 0xFFFF;
-                                    joystick.axes[axis.index] = @intFromFloat(float);
+                                    joystick.axes[axis.index] = @trunc(float);
                                 } else {
                                     // broken report descriptor, probably a u16
                                     joystick.axes[axis.index] = @truncate(data.Anonymous.RawValue);

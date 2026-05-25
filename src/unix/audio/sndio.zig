@@ -123,7 +123,7 @@ const AudioSession = struct {
             writeFn(self.buffer);
             for (self.buffer) |*float| {
                 const int: *i32 = @ptrCast(float);
-                int.* = @intFromFloat(float.* * @as(f32, @floatFromInt(std.math.maxInt(i32))));
+                int.* = @trunc(float.* * @as(f32, @floatFromInt(std.math.maxInt(i32))));
             }
             _ = c.sio_write(self.handle, self.buffer.ptr, self.buffer.len * 4);
         }

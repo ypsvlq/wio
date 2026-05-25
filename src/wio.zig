@@ -107,8 +107,8 @@ pub const Size = struct {
         const width: f32 = @floatFromInt(self.width);
         const height: f32 = @floatFromInt(self.height);
         return .{
-            .width = @intFromFloat(width * scale),
-            .height = @intFromFloat(height * scale),
+            .width = @round(width * scale),
+            .height = @round(height * scale),
         };
     }
 };

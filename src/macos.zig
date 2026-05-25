@@ -575,7 +575,7 @@ pub const Joystick = struct {
             float -= @floatFromInt(min);
             float /= @floatFromInt(max - min);
             float *= 0xFFFF;
-            axis.* = @intFromFloat(float);
+            axis.* = @trunc(float);
         }
         for (self.hat_elements, self.hats) |element, *hat| {
             _ = c.IOHIDDeviceGetValue(self.device, element, &value);
