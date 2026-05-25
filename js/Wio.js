@@ -111,6 +111,7 @@ class Wio {
                 input: input,
                 text: false,
                 relative_mouse: false,
+                relative_mouse_unadjusted: false,
                 cursor: "default",
                 drop_files: [],
                 drop_text: null,
@@ -156,7 +157,7 @@ class Wio {
             canvas.addEventListener("mousedown", (event) => {
                 const button = Wio.buttons[event.button];
                 if (button !== undefined) wioEvent(data, 15, button);
-                if (window.relative_mouse) canvas.requestPointerLock({ unadjustedMovement: true });
+                if (window.relative_mouse) canvas.requestPointerLock({ unadjustedMovement: window.relative_mouse_unadjusted });
                 this.updateModifiers(event);
             });
             canvas.addEventListener("mouseup", (event) => {
@@ -219,9 +220,10 @@ class Wio {
             }
         },
 
-        enableRelativeMouse: (id) => {
+        enableRelativeMouse: (id, unadjusted) => {
             this.windows[id].relative_mouse = true;
-            this.windows[id].canvas.requestPointerLock({ unadjustedMovement: true });
+            this.windows[id].relative_mouse_unadjusted = unadjusted;
+            this.windows[id].canvas.requestPointerLock({ unadjustedMovement: unadjusted });
         },
 
         disableRelativeMouse: (id) => {

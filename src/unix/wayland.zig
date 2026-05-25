@@ -301,7 +301,7 @@ pub const Window = struct {
     size: wio.Size,
     scale: f32 = 1,
     cursor: u32 = h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_DEFAULT,
-    relative_mouse: bool = false,
+    relative_mouse: ?wio.RelativeMouseOptions = null,
     drop: if (build_options.drop) struct {
         files: std.ArrayList([]const u8) = .empty,
         text: ?[]const u8 = null,
@@ -445,13 +445,13 @@ pub const Window = struct {
         }
     }
 
-    pub fn enableRelativeMouse(self: *Window) void {
-        self.relative_mouse = true;
+    pub fn enableRelativeMouse(self: *Window, options: wio.RelativeMouseOptions) void {
+        self.relative_mouse = options;
         if (pointer_focus == self) self.applyCursor();
     }
 
     pub fn disableRelativeMouse(self: *Window) void {
-        self.relative_mouse = false;
+        self.relative_mouse = null;
         if (pointer_focus == self) self.applyCursor();
     }
 
@@ -731,7 +731,7 @@ pub const Window = struct {
     }
 
     fn applyCursor(self: *Window) void {
-        if (self.cursor != 0 and !self.relative_mouse) {
+        if (self.cursor != 0 and self.relative_mouse == null) {
             if (cursor_shape_device) |_| {
                 h.wp_cursor_shape_device_v1_set_shape(cursor_shape_device, pointer_enter_serial, self.cursor);
             }
@@ -744,7 +744,7 @@ pub const Window = struct {
             self.locked_pointer = null;
         }
 
-        if (self.relative_mouse) {
+        if (self.relative_mouse != null) {
             if (pointer_constraints) |_| {
                 self.locked_pointer = h.zwp_pointer_constraints_v1_lock_pointer(pointer_constraints, self.surface, pointer, null, h.ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
             }
@@ -1038,10 +1038,12 @@ const relative_pointer_listener: h.zwp_relative_pointer_v1_listener = .{
     .relative_motion = relativePointerMotion,
 };
 
-fn relativePointerMotion(_: ?*anyopaque, _: ?*h.zwp_relative_pointer_v1, _: u32, _: u32, _: h.wl_fixed_t, _: h.wl_fixed_t, dx_unaccel: h.wl_fixed_t, dy_unaccel: h.wl_fixed_t) callconv(.c) void {
+fn relativePointerMotion(_: ?*anyopaque, _: ?*h.zwp_relative_pointer_v1, _: u32, _: u32, dx: h.wl_fixed_t, dy: h.wl_fixed_t, dx_unaccel: h.wl_fixed_t, dy_unaccel: h.wl_fixed_t) callconv(.c) void {
     if (pointer_focus) |window| {
-        if (window.relative_mouse) {
-            internal.eventFn(window.event_fn_data, .{ .mouse_relative = .{ .x = std.math.cast(i16, dx_unaccel >> 8) orelse return, .y = std.math.cast(i16, dy_unaccel >> 8) orelse return } });
+        if (window.relative_mouse) |options| {
+            const x = std.math.cast(i16, (if (options.unaccelerated) dx_unaccel else dx) >> 8) orelse return;
+            const y = std.math.cast(i16, (if (options.unaccelerated) dy_unaccel else dy) >> 8) orelse return;
+            internal.eventFn(window.event_fn_data, .{ .mouse_relative = .{ .x = x, .y = y } });
         }
     }
 }

@@ -104,7 +104,7 @@ pub const Window = struct {
         java.env.*.*.CallVoidMethod.?(java.env, java.activity, java.disableTextInput);
     }
 
-    pub fn enableRelativeMouse(_: *Window) void {
+    pub fn enableRelativeMouse(_: *Window, _: wio.RelativeMouseOptions) void {
         java.env.*.*.CallVoidMethod.?(java.env, java.activity, java.enableRelativeMouse);
         relative_mouse = true;
     }

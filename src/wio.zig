@@ -167,11 +167,14 @@ pub const Window = struct {
         self.backend.disableTextInput();
     }
 
-    /// When enabled, mouse motion will send `.mouse_relative` events instead of `.mouse`.
+    /// When enabled, `.mouse_relative` events will be sent instead of `.mouse` and the
+    /// cursor will be hidden.
     ///
     /// Relative mouse is disabled by default.
-    pub fn enableRelativeMouse(self: *Window) void {
-        self.backend.enableRelativeMouse();
+    ///
+    /// May be called repeatedly to change `options`.
+    pub fn enableRelativeMouse(self: *Window, options: RelativeMouseOptions) void {
+        self.backend.enableRelativeMouse(options);
     }
 
     pub fn disableRelativeMouse(self: *Window) void {
@@ -628,6 +631,10 @@ pub const WindowMode = enum {
 
 pub const TextInputOptions = struct {
     cursor: ?Position = null,
+};
+
+pub const RelativeMouseOptions = struct {
+    unaccelerated: bool,
 };
 
 /// See https://drafts.csswg.org/css-ui-4/#predefined-cursors

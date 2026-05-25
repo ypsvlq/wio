@@ -408,7 +408,7 @@ pub const Window = struct {
         self.text = false;
     }
 
-    pub fn enableRelativeMouse(self: *Window) void {
+    pub fn enableRelativeMouse(self: *Window, _: wio.RelativeMouseOptions) void {
         self.relative_mouse = true;
         enableRawMouse();
         self.clipCursor();

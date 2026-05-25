@@ -183,7 +183,7 @@ pub const Window = struct {
         self.text = false;
     }
 
-    pub fn enableRelativeMouse(self: *Window) void {
+    pub fn enableRelativeMouse(self: *Window, _: wio.RelativeMouseOptions) void {
         wioEnableRelativeMouse(self.window);
     }
 

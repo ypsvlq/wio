@@ -60,7 +60,7 @@ pub const Window = struct {
         _ = self;
     }
 
-    pub fn enableRelativeMouse(self: *Window) void {
+    pub fn enableRelativeMouse(self: *Window, _: wio.RelativeMouseOptions) void {
         _ = self;
     }
 

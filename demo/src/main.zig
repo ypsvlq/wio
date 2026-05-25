@@ -266,7 +266,7 @@ fn action(button: wio.Button) !void {
         },
         .r => {
             if (!relative_mouse) {
-                window.enableRelativeMouse();
+                window.enableRelativeMouse(.{ .unaccelerated = true });
             } else {
                 window.disableRelativeMouse();
             }

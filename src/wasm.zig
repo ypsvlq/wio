@@ -29,7 +29,7 @@ const js = struct {
     extern "wio" fn createWindow(?*anyopaque) u32;
     extern "wio" fn enableTextInput(u32, u16, u16) void;
     extern "wio" fn disableTextInput(u32) void;
-    extern "wio" fn enableRelativeMouse(u32) void;
+    extern "wio" fn enableRelativeMouse(u32, bool) void;
     extern "wio" fn disableRelativeMouse(u32) void;
     extern "wio" fn setFullscreen(u32, bool) void;
     extern "wio" fn setCursor(u32, u8) void;
@@ -113,8 +113,8 @@ pub const Window = struct {
         js.disableTextInput(self.id);
     }
 
-    pub fn enableRelativeMouse(self: *Window) void {
-        js.enableRelativeMouse(self.id);
+    pub fn enableRelativeMouse(self: *Window, options: wio.RelativeMouseOptions) void {
+        js.enableRelativeMouse(self.id, options.unaccelerated);
     }
 
     pub fn disableRelativeMouse(self: *Window) void {

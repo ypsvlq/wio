@@ -260,10 +260,10 @@ pub const Window = union {
         }
     }
 
-    pub fn enableRelativeMouse(self: *Window) void {
+    pub fn enableRelativeMouse(self: *Window, options: wio.RelativeMouseOptions) void {
         switch (active) {
-            .x11 => self.x11.enableRelativeMouse(),
-            .wayland => self.wayland.enableRelativeMouse(),
+            .x11 => self.x11.enableRelativeMouse(options),
+            .wayland => self.wayland.enableRelativeMouse(options),
         }
     }
 
