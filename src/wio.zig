@@ -613,12 +613,36 @@ pub const Event = union(enum) {
     /// not affect the program.
     touch_end: TouchEnd,
 
+    gesture_hold: Gesture,
+    gesture_pan_x: Gesture,
+    gesture_pan_y: Gesture,
+    gesture_scale: Gesture,
+    gesture_rotate: Gesture,
+    gesture_end: GestureEnd,
+
     drop_begin: void,
     drop_position: Position,
     drop_complete: void,
 
-    pub const Touch = struct { id: u8, x: u16, y: u16 };
-    pub const TouchEnd = struct { id: u8, ignore: bool };
+    pub const Touch = struct {
+        id: u8,
+        x: u16,
+        y: u16,
+    };
+
+    pub const TouchEnd = struct {
+        id: u8,
+        ignore: bool,
+    };
+
+    pub const Gesture = struct {
+        fingers: u8,
+        value: f32,
+    };
+
+    pub const GestureEnd = struct {
+        ignore: bool,
+    };
 };
 
 pub const EventType = @typeInfo(Event).@"union".tag_type.?;

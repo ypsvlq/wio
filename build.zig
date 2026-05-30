@@ -168,6 +168,7 @@ pub fn build(b: *std.Build) !void {
                         \\#include <cursor-shape-v1-protocol.c>
                         \\#include <pointer-constraints-unstable-v1-protocol.c>
                         \\#include <relative-pointer-unstable-v1-protocol.c>
+                        \\#include <pointer-gestures-unstable-v1-protocol.c>
                         \\#include <xdg-activation-v1-protocol.c>
                         \\#include <wayland-client-protocol.h>
                         \\#include <viewporter-client-protocol.h>
@@ -176,6 +177,7 @@ pub fn build(b: *std.Build) !void {
                         \\#include <cursor-shape-v1-client-protocol.h>
                         \\#include <pointer-constraints-unstable-v1-client-protocol.h>
                         \\#include <relative-pointer-unstable-v1-client-protocol.h>
+                        \\#include <pointer-gestures-unstable-v1-client-protocol.h>
                         \\#include <xdg-activation-v1-client-protocol.h>
                         \\#include <xkbcommon/xkbcommon.h>
                         \\#include <xkbcommon/xkbcommon-compose.h>

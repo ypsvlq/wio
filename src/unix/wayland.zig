@@ -94,12 +94,16 @@ var text_input_manager: ?*h.zwp_text_input_manager_v3 = null;
 var cursor_shape_manager: ?*h.wp_cursor_shape_manager_v1 = null;
 var pointer_constraints: ?*h.zwp_pointer_constraints_v1 = null;
 var relative_pointer_manager: ?*h.zwp_relative_pointer_manager_v1 = null;
+var pointer_gestures: ?*h.zwp_pointer_gestures_v1 = null;
 var data_device_manager: ?*h.wl_data_device_manager = null;
 var activation: ?*h.xdg_activation_v1 = null;
 
 var text_input: ?*h.zwp_text_input_v3 = null;
 var cursor_shape_device: ?*h.wp_cursor_shape_device_v1 = null;
 var relative_pointer: ?*h.zwp_relative_pointer_v1 = null;
+var swipe_gesture: ?*h.zwp_pointer_gesture_swipe_v1 = null;
+var pinch_gesture: ?*h.zwp_pointer_gesture_pinch_v1 = null;
+var hold_gesture: ?*h.zwp_pointer_gesture_hold_v1 = null;
 var data_device: ?*h.wl_data_device = null;
 var data_offer: ?*h.wl_data_offer = null;
 var data_source: ?*h.wl_data_source = null;
@@ -114,6 +118,7 @@ var libdecor_context: *h.libdecor = undefined;
 var windows: std.AutoHashMapUnmanaged(*Window, void) = .empty;
 pub var keyboard_focus: ?*Window = null;
 var pointer_focus: ?*Window = null;
+var gesture_focus: ?*Window = null;
 var modifiers: wio.Modifiers = .{};
 var last_serial: u32 = 0;
 var pointer_enter_serial: u32 = 0;
@@ -127,6 +132,7 @@ var preedit_active = false;
 var commit_string: std.ArrayList(u8) = .empty;
 var touch_ids: std.StaticBitSet(256) = .empty;
 var touch_info: std.AutoHashMapUnmanaged(i32, struct { public_id: u8, window: *Window }) = .empty;
+var gesture_fingers: u8 = undefined;
 var clipboard_text: []const u8 = "";
 
 var pending_drag_has_uri: bool = false;
@@ -251,11 +257,15 @@ fn destroyProxies() void {
     if (data_source) |_| h.wl_data_source_destroy(data_source);
     if (data_offer) |_| h.wl_data_offer_destroy(data_offer);
     if (data_device) |_| h.wl_data_device_destroy(data_device);
+    if (hold_gesture) |_| h.zwp_pointer_gesture_hold_v1_destroy(hold_gesture);
+    if (pinch_gesture) |_| h.zwp_pointer_gesture_pinch_v1_destroy(pinch_gesture);
+    if (swipe_gesture) |_| h.zwp_pointer_gesture_swipe_v1_destroy(swipe_gesture);
     if (relative_pointer) |_| h.zwp_relative_pointer_v1_destroy(relative_pointer);
     if (cursor_shape_device) |_| h.wp_cursor_shape_device_v1_destroy(cursor_shape_device);
     if (text_input) |_| h.zwp_text_input_v3_destroy(text_input);
     if (activation) |_| h.xdg_activation_v1_destroy(activation);
     if (data_device_manager) |_| h.wl_data_device_manager_destroy(data_device_manager);
+    if (pointer_gestures) |_| h.zwp_pointer_gestures_v1_destroy(pointer_gestures);
     if (relative_pointer_manager) |_| h.zwp_relative_pointer_manager_v1_destroy(relative_pointer_manager);
     if (pointer_constraints) |_| h.zwp_pointer_constraints_v1_destroy(pointer_constraints);
     if (cursor_shape_manager) |_| h.wp_cursor_shape_manager_v1_destroy(cursor_shape_manager);
@@ -376,6 +386,7 @@ pub const Window = struct {
     }
 
     pub fn destroy(self: *Window) void {
+        if (gesture_focus == self) gesture_focus = null;
         if (pointer_focus == self) pointer_focus = null;
         if (keyboard_focus == self) keyboard_focus = null;
         _ = windows.remove(self);
@@ -794,6 +805,10 @@ fn getWindow(surface: ?*h.wl_surface) ?*Window {
     return if (windows.contains(window)) window else null;
 }
 
+fn fixedToFloat(value: h.wl_fixed_t) f32 {
+    return @as(f32, @floatFromInt(value)) / 256;
+}
+
 const should_present_callback_listener: h.wl_callback_listener = .{
     .done = shouldPresentCallback,
 };
@@ -843,6 +858,8 @@ fn registryGlobal(_: ?*anyopaque, _: ?*h.wl_registry, name: u32, interface_ptr: 
         pointer_constraints = @ptrCast(h.wl_registry_bind(registry, name, &h.zwp_pointer_constraints_v1_interface, @min(version, 1)));
     } else if (std.mem.eql(u8, interface, "zwp_relative_pointer_manager_v1")) {
         relative_pointer_manager = @ptrCast(h.wl_registry_bind(registry, name, &h.zwp_relative_pointer_manager_v1_interface, @min(version, 1)));
+    } else if (std.mem.eql(u8, interface, "zwp_pointer_gestures_v1")) {
+        pointer_gestures = @ptrCast(h.wl_registry_bind(registry, name, &h.zwp_pointer_gestures_v1_interface, @min(version, 3)));
     } else if (std.mem.eql(u8, interface, "wl_data_device_manager")) {
         data_device_manager = @ptrCast(h.wl_registry_bind(registry, name, &h.wl_data_device_manager_interface, @min(version, 1)));
     } else if (std.mem.eql(u8, interface, "xdg_activation_v1")) {
@@ -863,6 +880,18 @@ fn seatCapabilities(_: ?*anyopaque, _: ?*h.wl_seat, capabilities: h.wl_seat_capa
         touch = null;
         touch_ids = .empty;
         touch_info.clearRetainingCapacity();
+    }
+    if (hold_gesture) |_| {
+        h.zwp_pointer_gesture_hold_v1_destroy(hold_gesture);
+        hold_gesture = null;
+    }
+    if (pinch_gesture) |_| {
+        h.zwp_pointer_gesture_pinch_v1_destroy(pinch_gesture);
+        pinch_gesture = null;
+    }
+    if (swipe_gesture) |_| {
+        h.zwp_pointer_gesture_swipe_v1_destroy(swipe_gesture);
+        swipe_gesture = null;
     }
     if (relative_pointer) |_| {
         h.zwp_relative_pointer_v1_destroy(relative_pointer);
@@ -894,6 +923,14 @@ fn seatCapabilities(_: ?*anyopaque, _: ?*h.wl_seat, capabilities: h.wl_seat_capa
         if (relative_pointer_manager) |_| {
             relative_pointer = h.zwp_relative_pointer_manager_v1_get_relative_pointer(relative_pointer_manager, pointer);
             _ = h.zwp_relative_pointer_v1_add_listener(relative_pointer, &relative_pointer_listener, null);
+        }
+        if (pointer_gestures) |_| {
+            swipe_gesture = h.zwp_pointer_gestures_v1_get_swipe_gesture(pointer_gestures, pointer);
+            _ = h.zwp_pointer_gesture_swipe_v1_add_listener(swipe_gesture, &swipe_gesture_listener, null);
+            pinch_gesture = h.zwp_pointer_gestures_v1_get_pinch_gesture(pointer_gestures, pointer);
+            _ = h.zwp_pointer_gesture_pinch_v1_add_listener(pinch_gesture, &pinch_gesture_listener, null);
+            hold_gesture = h.zwp_pointer_gestures_v1_get_hold_gesture(pointer_gestures, pointer);
+            _ = h.zwp_pointer_gesture_hold_v1_add_listener(hold_gesture, &hold_gesture_listener, null);
         }
     }
     if (capabilities & h.WL_SEAT_CAPABILITY_TOUCH != 0) {
@@ -1025,7 +1062,7 @@ fn pointerButton(_: ?*anyopaque, _: ?*h.wl_pointer, serial: u32, _: u32, button:
 
 fn pointerAxis(_: ?*anyopaque, _: ?*h.wl_pointer, _: u32, axis: h.wl_pointer_axis, value: h.wl_fixed_t) callconv(.c) void {
     if (pointer_focus) |window| {
-        const float = @as(f32, @floatFromInt(value)) / 2560;
+        const float = fixedToFloat(value);
         switch (axis) {
             h.WL_POINTER_AXIS_VERTICAL_SCROLL => internal.eventFn(window.event_fn_data, .{ .scroll_vertical = float }),
             h.WL_POINTER_AXIS_HORIZONTAL_SCROLL => internal.eventFn(window.event_fn_data, .{ .scroll_horizontal = float }),
@@ -1045,6 +1082,91 @@ fn relativePointerMotion(_: ?*anyopaque, _: ?*h.zwp_relative_pointer_v1, _: u32,
             const y = std.math.cast(i16, (if (options.unaccelerated) dy_unaccel else dy) >> 8) orelse return;
             internal.eventFn(window.event_fn_data, .{ .mouse_relative = .{ .x = x, .y = y } });
         }
+    }
+}
+
+const swipe_gesture_listener: h.zwp_pointer_gesture_swipe_v1_listener = .{
+    .begin = swipeBegin,
+    .update = swipeUpdate,
+    .end = swipeEnd,
+};
+
+fn swipeBegin(_: ?*anyopaque, _: ?*h.zwp_pointer_gesture_swipe_v1, _: u32, _: u32, surface: ?*h.wl_surface, fingers: u32) callconv(.c) void {
+    if (getWindow(surface)) |window| {
+        gesture_focus = window;
+        gesture_fingers = @truncate(fingers);
+    }
+}
+
+fn swipeUpdate(_: ?*anyopaque, _: ?*h.zwp_pointer_gesture_swipe_v1, _: u32, dx: h.wl_fixed_t, dy: h.wl_fixed_t) callconv(.c) void {
+    if (gesture_focus) |window| {
+        if (dx != 0) {
+            internal.eventFn(window.event_fn_data, .{ .gesture_pan_x = .{ .fingers = gesture_fingers, .value = fixedToFloat(dx) } });
+        }
+        if (dy != 0) {
+            internal.eventFn(window.event_fn_data, .{ .gesture_pan_y = .{ .fingers = gesture_fingers, .value = fixedToFloat(dy) } });
+        }
+    }
+}
+
+fn swipeEnd(_: ?*anyopaque, _: ?*h.zwp_pointer_gesture_swipe_v1, _: u32, _: u32, cancelled: i32) callconv(.c) void {
+    if (gesture_focus) |window| {
+        internal.eventFn(window.event_fn_data, .{ .gesture_end = .{ .ignore = (cancelled == 1) } });
+    }
+}
+
+const pinch_gesture_listener: h.zwp_pointer_gesture_pinch_v1_listener = .{
+    .begin = pinchBegin,
+    .update = pinchUpdate,
+    .end = pinchEnd,
+};
+
+fn pinchBegin(_: ?*anyopaque, _: ?*h.zwp_pointer_gesture_pinch_v1, _: u32, _: u32, surface: ?*h.wl_surface, fingers: u32) callconv(.c) void {
+    if (getWindow(surface)) |window| {
+        gesture_focus = window;
+        gesture_fingers = @truncate(fingers);
+    }
+}
+
+fn pinchUpdate(_: ?*anyopaque, _: ?*h.zwp_pointer_gesture_pinch_v1, _: u32, dx: h.wl_fixed_t, dy: h.wl_fixed_t, scale: h.wl_fixed_t, rotation: h.wl_fixed_t) callconv(.c) void {
+    if (gesture_focus) |window| {
+        if (dx != 0) {
+            internal.eventFn(window.event_fn_data, .{ .gesture_pan_x = .{ .fingers = gesture_fingers, .value = fixedToFloat(dx) } });
+        }
+        if (dy != 0) {
+            internal.eventFn(window.event_fn_data, .{ .gesture_pan_y = .{ .fingers = gesture_fingers, .value = fixedToFloat(dy) } });
+        }
+        if (scale != 0) {
+            internal.eventFn(window.event_fn_data, .{ .gesture_scale = .{ .fingers = gesture_fingers, .value = fixedToFloat(scale) } });
+        }
+        if (rotation != 0) {
+            internal.eventFn(window.event_fn_data, .{ .gesture_rotate = .{ .fingers = gesture_fingers, .value = fixedToFloat(rotation) } });
+        }
+    }
+}
+
+fn pinchEnd(_: ?*anyopaque, _: ?*h.zwp_pointer_gesture_pinch_v1, _: u32, _: u32, cancelled: i32) callconv(.c) void {
+    if (gesture_focus) |window| {
+        internal.eventFn(window.event_fn_data, .{ .gesture_end = .{ .ignore = (cancelled == 1) } });
+    }
+}
+
+const hold_gesture_listener: h.zwp_pointer_gesture_hold_v1_listener = .{
+    .begin = holdBegin,
+    .end = holdEnd,
+};
+
+fn holdBegin(_: ?*anyopaque, _: ?*h.zwp_pointer_gesture_hold_v1, _: u32, _: u32, surface: ?*h.wl_surface, fingers: u32) callconv(.c) void {
+    if (getWindow(surface)) |window| {
+        gesture_focus = window;
+        gesture_fingers = @truncate(fingers);
+        internal.eventFn(window.event_fn_data, .{ .gesture_hold = .{ .fingers = gesture_fingers, .value = 0 } });
+    }
+}
+
+fn holdEnd(_: ?*anyopaque, _: ?*h.zwp_pointer_gesture_hold_v1, _: u32, _: u32, cancelled: i32) callconv(.c) void {
+    if (gesture_focus) |window| {
+        internal.eventFn(window.event_fn_data, .{ .gesture_end = .{ .ignore = (cancelled == 1) } });
     }
 }
 
