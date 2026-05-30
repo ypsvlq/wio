@@ -163,19 +163,19 @@ pub fn build(b: *std.Build) !void {
                     try cimport.appendSlice(b.allocator,
                         \\#include <viewporter-protocol.c>
                         \\#include <fractional-scale-v1-protocol.c>
-                        \\#include <text-input-v3-protocol.c>
+                        \\#include <text-input-unstable-v3-protocol.c>
                         \\#include <tablet-v2-protocol.c>
                         \\#include <cursor-shape-v1-protocol.c>
-                        \\#include <pointer-constraints-v1-protocol.c>
-                        \\#include <relative-pointer-v1-protocol.c>
+                        \\#include <pointer-constraints-unstable-v1-protocol.c>
+                        \\#include <relative-pointer-unstable-v1-protocol.c>
                         \\#include <xdg-activation-v1-protocol.c>
                         \\#include <wayland-client-protocol.h>
                         \\#include <viewporter-client-protocol.h>
                         \\#include <fractional-scale-v1-client-protocol.h>
-                        \\#include <text-input-v3-client-protocol.h>
+                        \\#include <text-input-unstable-v3-client-protocol.h>
                         \\#include <cursor-shape-v1-client-protocol.h>
-                        \\#include <pointer-constraints-v1-client-protocol.h>
-                        \\#include <relative-pointer-v1-client-protocol.h>
+                        \\#include <pointer-constraints-unstable-v1-client-protocol.h>
+                        \\#include <relative-pointer-unstable-v1-client-protocol.h>
                         \\#include <xdg-activation-v1-client-protocol.h>
                         \\#include <xkbcommon/xkbcommon.h>
                         \\#include <xkbcommon/xkbcommon-compose.h>
@@ -212,7 +212,7 @@ pub fn build(b: *std.Build) !void {
                     .optimize = optimize,
                 });
                 if (b.lazyDependency("wio_unix_headers", .{})) |unix_headers| {
-                    translate_c.addIncludePath(unix_headers.path("."));
+                    translate_c.addIncludePath(unix_headers.path("include"));
                 }
                 module.addImport("c", translate_c.createModule());
 
