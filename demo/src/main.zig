@@ -93,7 +93,6 @@ fn eventFn(data: ?*anyopaque, event: wio.Event) void {
         .touch_end => |touch| std.log.info("touch {}: {s}", .{ touch.id, if (touch.ignore) "ignore" else "end" }),
         .gesture_hold => |gesture| std.log.info("{s} ({} fingers)", .{ @tagName(event), gesture.fingers }),
         .gesture_pan_x, .gesture_pan_y, .gesture_scale, .gesture_rotate => |gesture| std.log.info("{s} ({} fingers) {}", .{ @tagName(event), gesture.fingers, gesture.value }),
-        .gesture_end => |gesture_end| std.log.info("gesture_end{s}", .{if (gesture_end.ignore) " (ignore)" else ""}),
         .drop_position => |pos| std.log.info("drop_position ({},{})", .{ pos.x, pos.y }),
         else => std.log.info("{s}", .{@tagName(event)}),
     }
