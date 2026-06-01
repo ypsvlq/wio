@@ -616,7 +616,7 @@ pub const Event = union(enum) {
     gesture_hold: Gesture,
     gesture_pan_x: Gesture,
     gesture_pan_y: Gesture,
-    gesture_scale: Gesture,
+    gesture_zoom: Gesture,
     gesture_rotate: Gesture,
     gesture_ignore: void,
 

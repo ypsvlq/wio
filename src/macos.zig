@@ -924,6 +924,14 @@ export fn wioScroll(self: *Window, x: f32, y: f32) void {
     if (y != 0) internal.eventFn(self.event_fn_data, .{ .scroll_vertical = -y });
 }
 
+export fn wioGestureZoom(self: *Window, value: f32) void {
+    internal.eventFn(self.event_fn_data, .{ .gesture_zoom = .{ .fingers = 2, .value = value + 1 } });
+}
+
+export fn wioGestureRotate(self: *Window, value: f32) void {
+    internal.eventFn(self.event_fn_data, .{ .gesture_rotate = .{ .fingers = 2, .value = -value } });
+}
+
 export fn wioDupeClipboardText(allocator: *const std.mem.Allocator, bytes: [*:0]const u8, len: *usize) ?[*]u8 {
     const slice = std.mem.sliceTo(bytes, 0);
     if (allocator.dupe(u8, slice)) |dupe| {

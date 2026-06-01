@@ -21,6 +21,8 @@ extern void wioMouse(void *, UInt16, UInt16);
 extern void wioMouseRelative(void *, SInt16, SInt16);
 extern void wioMouseLeave(void *);
 extern void wioScroll(void *, Float32, Float32);
+extern void wioGestureZoom(void *, Float32);
+extern void wioGestureRotate(void *, Float32);
 extern char *wioDupeClipboardText(const void *, const char *, size_t *);
 
 static NSString *string(const char *ptr, size_t len) {
@@ -389,6 +391,15 @@ static void warpCursor(NSWindow *window) {
     wioScroll(zig, [event scrollingDeltaX], [event scrollingDeltaY]);
 }
 
+- (void)handleMagnificationGesture:(NSMagnificationGestureRecognizer *)gestureRecognizer {
+    wioGestureZoom(zig, [gestureRecognizer magnification]);
+}
+
+- (void)handleRotationGesture:(NSRotationGestureRecognizer *)gestureRecognizer {
+    wioGestureRotate(zig, [gestureRecognizer rotationInDegrees]);
+    [gestureRecognizer setRotation:0];
+}
+
 #ifdef WIO_FRAMEBUFFER
 
 - (void)setBitmap:(CGContextRef)value {
@@ -479,6 +490,11 @@ void *wioCreateWindow(void *zig, uint16_t width, uint16_t height) {
     [window setTabbingMode:NSWindowTabbingModeDisallowed];
     [window center];
     [window makeKeyAndOrderFront:nil];
+
+    [view setGestureRecognizers:@[
+        [[NSMagnificationGestureRecognizer alloc] initWithTarget:view action:@selector(handleMagnificationGesture:)],
+        [[NSRotationGestureRecognizer alloc] initWithTarget:view action:@selector(handleRotationGesture:)],
+    ]];
 
     wioVisible(zig);
     wioScale(zig, [window backingScaleFactor]);

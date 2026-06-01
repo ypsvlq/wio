@@ -1139,7 +1139,7 @@ fn pinchUpdate(_: ?*anyopaque, _: ?*h.zwp_pointer_gesture_pinch_v1, _: u32, dx: 
             internal.eventFn(window.event_fn_data, .{ .gesture_pan_y = .{ .fingers = gesture_fingers, .value = fixedToFloat(dy) } });
         }
         if (scale != 0) {
-            internal.eventFn(window.event_fn_data, .{ .gesture_scale = .{ .fingers = gesture_fingers, .value = fixedToFloat(scale) } });
+            internal.eventFn(window.event_fn_data, .{ .gesture_zoom = .{ .fingers = gesture_fingers, .value = fixedToFloat(scale) } });
         }
         if (rotation != 0) {
             internal.eventFn(window.event_fn_data, .{ .gesture_rotate = .{ .fingers = gesture_fingers, .value = fixedToFloat(rotation) } });
