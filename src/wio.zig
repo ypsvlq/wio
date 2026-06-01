@@ -618,7 +618,7 @@ pub const Event = union(enum) {
     gesture_pan_y: Gesture,
     gesture_scale: Gesture,
     gesture_rotate: Gesture,
-    gesture_end: GestureEnd,
+    gesture_ignore: void,
 
     drop_begin: void,
     drop_position: Position,
@@ -638,10 +638,6 @@ pub const Event = union(enum) {
     pub const Gesture = struct {
         fingers: u8,
         value: f32,
-    };
-
-    pub const GestureEnd = struct {
-        ignore: bool,
     };
 };
 

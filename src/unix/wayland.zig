@@ -1111,7 +1111,9 @@ fn swipeUpdate(_: ?*anyopaque, _: ?*h.zwp_pointer_gesture_swipe_v1, _: u32, dx: 
 
 fn swipeEnd(_: ?*anyopaque, _: ?*h.zwp_pointer_gesture_swipe_v1, _: u32, _: u32, cancelled: i32) callconv(.c) void {
     if (gesture_focus) |window| {
-        internal.eventFn(window.event_fn_data, .{ .gesture_end = .{ .ignore = (cancelled == 1) } });
+        if (cancelled == 1) {
+            internal.eventFn(window.event_fn_data, .gesture_ignore);
+        }
     }
 }
 
@@ -1147,7 +1149,9 @@ fn pinchUpdate(_: ?*anyopaque, _: ?*h.zwp_pointer_gesture_pinch_v1, _: u32, dx: 
 
 fn pinchEnd(_: ?*anyopaque, _: ?*h.zwp_pointer_gesture_pinch_v1, _: u32, _: u32, cancelled: i32) callconv(.c) void {
     if (gesture_focus) |window| {
-        internal.eventFn(window.event_fn_data, .{ .gesture_end = .{ .ignore = (cancelled == 1) } });
+        if (cancelled == 1) {
+            internal.eventFn(window.event_fn_data, .gesture_ignore);
+        }
     }
 }
 
@@ -1166,7 +1170,9 @@ fn holdBegin(_: ?*anyopaque, _: ?*h.zwp_pointer_gesture_hold_v1, _: u32, _: u32,
 
 fn holdEnd(_: ?*anyopaque, _: ?*h.zwp_pointer_gesture_hold_v1, _: u32, _: u32, cancelled: i32) callconv(.c) void {
     if (gesture_focus) |window| {
-        internal.eventFn(window.event_fn_data, .{ .gesture_end = .{ .ignore = (cancelled == 1) } });
+        if (cancelled == 1) {
+            internal.eventFn(window.event_fn_data, .gesture_ignore);
+        }
     }
 }
 
