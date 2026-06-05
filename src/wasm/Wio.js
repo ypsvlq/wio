@@ -181,11 +181,11 @@ class Wio {
                 event.preventDefault();
                 window.drop_files = [];
                 window.drop_text = null;
-                wioEvent(data, 31);
+                wioEvent(data, 30);
             });
             canvas.addEventListener("dragover", (event) => {
                 event.preventDefault();
-                wioEvent(data, 32, event.offsetX, event.offsetY);
+                wioEvent(data, 31, event.offsetX, event.offsetY);
             });
             canvas.addEventListener("drop", (event) => {
                 event.preventDefault();
@@ -194,7 +194,7 @@ class Wio {
                 }
                 const text = event.dataTransfer.getData("text/plain");
                 window.drop_text = text.length > 0 ? text : null;
-                wioEvent(data, 33);
+                wioEvent(data, 32);
             });
 
             this.windows.push(window);

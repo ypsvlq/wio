@@ -613,11 +613,10 @@ pub const Event = union(enum) {
     /// not affect the program.
     touch_end: TouchEnd,
 
-    gesture_hold: Gesture,
-    gesture_pan_x: Gesture,
-    gesture_pan_y: Gesture,
-    gesture_zoom: Gesture,
-    gesture_rotate: Gesture,
+    gesture_pan_x: f32,
+    gesture_pan_y: f32,
+    gesture_zoom: f32,
+    gesture_rotate: f32,
     gesture_ignore: void,
 
     drop_begin: void,
@@ -633,11 +632,6 @@ pub const Event = union(enum) {
     pub const TouchEnd = struct {
         id: u8,
         ignore: bool,
-    };
-
-    pub const Gesture = struct {
-        fingers: u8,
-        value: f32,
     };
 };
 
