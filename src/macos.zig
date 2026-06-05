@@ -14,7 +14,6 @@ extern fn wioWait(f64) void;
 extern fn wioCancelWait() void;
 extern fn wioMessageBox(u8, [*]const u8, usize) void;
 extern fn wioOpenUri([*]const u8, usize) void;
-extern fn wioGetModifiers() c_ulong;
 extern fn wioCreateWindow(*Window, u16, u16) *NSWindow;
 extern fn wioDestroyWindow(*NSWindow) void;
 extern fn wioEnableTextInput(*NSWindow, u16, u16) void;
@@ -183,16 +182,6 @@ pub fn messageBox(style: wio.MessageBoxStyle, _: []const u8, message: []const u8
 
 pub fn openUri(uri: []const u8) void {
     wioOpenUri(uri.ptr, uri.len);
-}
-
-pub fn getModifiers() wio.Modifiers {
-    const modifiers = wioGetModifiers();
-    return .{
-        .control = (modifiers & (1 << 18) != 0),
-        .shift = (modifiers & (1 << 17) != 0),
-        .alt = (modifiers & (1 << 19) != 0),
-        .gui = (modifiers & (1 << 20) != 0),
-    };
 }
 
 pub const Window = struct {
@@ -865,6 +854,17 @@ export fn wioSizePhysical(self: *Window, width: u16, height: u16) void {
 
 export fn wioScale(self: *Window, scale: f32) void {
     internal.eventFn(self.event_fn_data, .{ .scale = scale });
+}
+
+export fn wioModifiers(self: *Window, modifiers: u32) void {
+    internal.eventFn(self.event_fn_data, .{
+        .modifiers = .{
+            .control = (modifiers & (1 << 18) != 0),
+            .shift = (modifiers & (1 << 17) != 0),
+            .alt = (modifiers & (1 << 19) != 0),
+            .gui = (modifiers & (1 << 20) != 0),
+        },
+    });
 }
 
 export fn wioChars(self: *Window, buf: [*:0]const u8) void {

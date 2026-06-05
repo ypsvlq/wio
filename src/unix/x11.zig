@@ -19,8 +19,8 @@ var imports: extern struct {
     XkbGetMap: *const fn (?*h.Display, c_uint, c_uint) callconv(.c) h.XkbDescPtr,
     XkbFreeKeyboard: *const fn (h.XkbDescPtr, c_uint, c_int) callconv(.c) void,
     XkbGetNames: *const fn (?*h.Display, c_uint, h.XkbDescPtr) callconv(.c) c_int,
+    XkbSelectEvents: *const fn (?*h.Display, c_uint, c_uint, c_uint) callconv(.c) c_int,
     XGetDefault: *const fn (?*h.Display, [*c]const u8, [*c]const u8) callconv(.c) [*c]u8,
-    XkbGetState: *const fn (?*h.Display, c_uint, h.XkbStatePtr) callconv(.c) c_int,
     XFlush: *const fn (?*h.Display) callconv(.c) c_int,
     XCreateWindow: *const fn (?*h.Display, h.Window, c_int, c_int, c_uint, c_uint, c_uint, c_int, c_uint, [*c]h.Visual, c_ulong, [*c]h.XSetWindowAttributes) callconv(.c) h.Window,
     XDestroyWindow: *const fn (?*h.Display, h.Window) callconv(.c) c_int,
@@ -31,6 +31,7 @@ var imports: extern struct {
     XDestroyIC: *const fn (h.XIC) callconv(.c) void,
     XNextEvent: *const fn (?*h.Display, [*c]h.XEvent) callconv(.c) c_int,
     XPending: *const fn (?*h.Display) callconv(.c) c_int,
+    XGetInputFocus: *const fn (?*h.Display, [*c]h.Window, [*c]c_int) callconv(.c) c_int,
     XFilterEvent: *const fn ([*c]h.XEvent, h.Window) callconv(.c) c_int,
     XPeekEvent: *const fn (?*h.Display, [*c]h.XEvent) callconv(.c) c_int,
     XGetWindowProperty: *const fn (?*h.Display, h.Window, h.Atom, c_long, c_long, c_int, h.Atom, [*c]h.Atom, [*c]c_int, [*c]c_ulong, [*c]c_ulong, [*c][*c]u8) callconv(.c) c_int,
@@ -114,10 +115,12 @@ var libGL: DynLib = undefined;
 var libXext: DynLib = undefined;
 var windows: std.AutoHashMapUnmanaged(h.Window, *Window) = undefined;
 pub var display: *h.Display = undefined;
+var xkb_event_code: c_int = undefined;
 var im: h.XIM = undefined;
 var im_style: h.XIMStyle = 0;
 var keycodes: [248]wio.Button = undefined;
 var scale: f32 = 1;
+var xkb_mods: c_uint = 0;
 var clipboard_text: []const u8 = "";
 
 pub fn init() !bool {
@@ -139,7 +142,7 @@ pub fn init() !bool {
     }
     errdefer if (build_options.vulkan) libXext.close();
 
-    display = c.XkbOpenDisplay(null, null, null, null, null, null) orelse return false;
+    display = c.XkbOpenDisplay(null, &xkb_event_code, null, null, null, null) orelse return false;
     errdefer _ = c.XCloseDisplay(display);
     try unix.pollfds.append(internal.allocator, .{ .fd = h.ConnectionNumber(display), .events = std.c.POLL.IN, .revents = undefined });
 
@@ -195,6 +198,8 @@ pub fn init() !bool {
         keycode.* = nameToButton(key.name) orelse aliases.get(key.name) orelse .mouse_left;
     }
 
+    _ = c.XkbSelectEvents(display, h.XkbUseCoreKbd, h.XkbStateNotifyMask, h.XkbStateNotifyMask);
+
     if (c.XGetDefault(display, "Xft", "dpi")) |string| {
         if (std.fmt.parseFloat(f32, std.mem.sliceTo(string, 0))) |dpi| {
             scale = dpi / 96;
@@ -236,21 +241,11 @@ pub fn update() void {
     }
 }
 
-pub fn getModifiers() wio.Modifiers {
-    var state: h.XkbStateRec = undefined;
-    _ = c.XkbGetState(display, h.XkbUseCoreKbd, &state);
-    return .{
-        .control = (state.mods & h.ControlMask != 0),
-        .shift = (state.mods & h.ShiftMask != 0),
-        .alt = (state.mods & h.Mod1Mask != 0),
-        .gui = (state.mods & h.Mod4Mask != 0),
-    };
-}
-
 pub const Window = struct {
     event_fn_data: ?*anyopaque,
     window: h.Window,
     ic: h.XIC,
+    xkb_mods: c_uint = 0,
     text: bool = false,
     preedit_string: std.ArrayList(u21) = .empty,
     relative_mouse: bool = false,
@@ -792,6 +787,27 @@ fn preeditDraw(_: h.XIC, window: *Window, data: *h.XIMPreeditDrawCallbackStruct)
 }
 
 fn handle(event: *h.XEvent) void {
+    if (event.type == xkb_event_code) {
+        const xkb_event: *h.XkbEvent = @ptrCast(event);
+        switch (xkb_event.any.xkb_type) {
+            h.XkbStateNotify => {
+                xkb_mods = xkb_event.state.mods;
+
+                var focus: h.Window = undefined;
+                var revert_to: c_int = undefined;
+                _ = c.XGetInputFocus(display, &focus, &revert_to);
+                var message: h.XEvent = .{ .xclient = .{
+                    .type = h.ClientMessage,
+                    .window = focus,
+                    .format = 8,
+                } };
+                _ = c.XSendEvent(display, focus, h.True, h.NoEventMask, &message);
+            },
+            else => {},
+        }
+        return;
+    }
+
     if (event.type == h.SelectionRequest) {
         const requestor = event.xselectionrequest.requestor;
         const target = event.xselectionrequest.target;
@@ -826,6 +842,18 @@ fn handle(event: *h.XEvent) void {
         _ = c.XFilterEvent(event, h.None);
         return;
     };
+
+    if (window.xkb_mods != xkb_mods) {
+        internal.eventFn(window.event_fn_data, .{
+            .modifiers = .{
+                .control = (xkb_mods & h.ControlMask != 0),
+                .shift = (xkb_mods & h.ShiftMask != 0),
+                .alt = (xkb_mods & h.Mod1Mask != 0),
+                .gui = (xkb_mods & h.Mod4Mask != 0),
+            },
+        });
+        window.xkb_mods = xkb_mods;
+    }
 
     if (window.text and c.XFilterEvent(event, h.None) == h.True) {
         return;

@@ -232,10 +232,6 @@ extern "C" {
         BUrl(uri, false).OpenWithPreferredApplication();
     }
 
-    uint32 wioGetModifiers(void) {
-        return modifiers();
-    }
-
     WioWindow *wioCreateWindow(void *zig, const char *title, int16 x, int16 y, uint16 width, uint16 height) {
         WioWindow *window = new WioWindow(zig, BRect(x, y, x + width - 1, y + height - 1), title);
         window->Show();

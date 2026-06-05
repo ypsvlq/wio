@@ -31,10 +31,6 @@ pub fn openUri(uri: []const u8) void {
     _ = uri;
 }
 
-pub fn getModifiers() wio.Modifiers {
-    return .{};
-}
-
 pub const Window = struct {
     pub fn create(options: wio.CreateWindowOptions) !*Window {
         const self = try internal.allocator.create(Window);

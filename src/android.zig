@@ -66,10 +66,6 @@ pub fn openUri(uri: []const u8) void {
     _ = uri;
 }
 
-pub fn getModifiers() wio.Modifiers {
-    return modifiers;
-}
-
 pub const Window = struct {
     var created = false;
 
@@ -525,24 +521,14 @@ const native = struct {
     fn onKeyDown(_: *c.JNIEnv, _: c.jobject, keycode: c.jint, repeat: c.jint) callconv(.c) c.jboolean {
         const button = keycodeToButton(keycode) orelse return c.JNI_FALSE;
         internal.eventFn(event_fn_data, if (repeat == 0) .{ .button_press = button } else .{ .button_repeat = button });
-        switch (button) {
-            .left_control, .right_control => modifiers.control = true,
-            .left_shift, .right_shift => modifiers.shift = true,
-            .left_alt, .right_alt => modifiers.alt = true,
-            else => {},
-        }
+        updateModifiers(button, true);
         return c.JNI_TRUE;
     }
 
     fn onKeyUp(_: *c.JNIEnv, _: c.jobject, keycode: c.jint) callconv(.c) c.jboolean {
         const button = keycodeToButton(keycode) orelse return c.JNI_FALSE;
         internal.eventFn(event_fn_data, .{ .button_release = button });
-        switch (button) {
-            .left_control, .right_control => modifiers.control = false,
-            .left_shift, .right_shift => modifiers.shift = false,
-            .left_alt, .right_alt => modifiers.alt = false,
-            else => {},
-        }
+        updateModifiers(button, false);
         return c.JNI_TRUE;
     }
 
@@ -604,6 +590,19 @@ const native = struct {
         internal.eventFn(event_fn_data, .{ .preview_char = std.math.cast(u21, codepoint) orelse return });
     }
 };
+
+fn updateModifiers(button: wio.Button, value: bool) void {
+    const modifier = switch (button) {
+        .left_control, .right_control => &modifiers.control,
+        .left_shift, .right_shift => &modifiers.shift,
+        .left_alt, .right_alt => &modifiers.alt,
+        else => return,
+    };
+    if (modifier.* != value) {
+        modifier.* = value;
+        internal.eventFn(event_fn_data, .{ .modifiers = modifiers });
+    }
+}
 
 fn logUnexpectedEgl(name: []const u8) error{Unexpected} {
     logEglError(name);

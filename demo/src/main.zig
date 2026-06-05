@@ -81,6 +81,7 @@ fn eventFn(data: ?*anyopaque, event: wio.Event) void {
         .position => |position| std.log.info("position ({},{})", .{ position.x, position.y }),
         .size_logical, .size_physical => |size| std.log.info("{s} {}x{}", .{ @tagName(event), size.width, size.height }),
         .scale => |scale| std.log.info("scale {d}", .{scale}),
+        .modifiers => |modifiers| std.log.info("modifiers: {s}{s}{s}{s}", .{ if (modifiers.control) "control " else "", if (modifiers.shift) "shift " else "", if (modifiers.alt) "alt " else "", if (modifiers.gui) "gui " else "" }),
         .char, .preview_char => |char| std.log.info("{s}: {u}", .{ @tagName(event), char }),
         .preview_cursor => |active| std.log.info("preview_cursor {}..{}", .{ active[0], active[1] }),
         .button_press => |button| std.log.info("+{s}", .{@tagName(button)}),
@@ -124,12 +125,7 @@ fn loop() !bool {
 
                 return false;
             },
-            .focused => {
-                const modifiers = wio.getModifiers();
-                if (modifiers.control or modifiers.shift or modifiers.alt or modifiers.gui) {
-                    std.log.scoped(.modifiers).info("{s}{s}{s}{s}", .{ if (modifiers.control) "control " else "", if (modifiers.shift) "shift " else "", if (modifiers.alt) "alt " else "", if (modifiers.gui) "gui " else "" });
-                }
-            },
+
             .draw => {
                 if (wio.build_options.opengl) {
                     window.glMakeContextCurrent(context);
@@ -248,15 +244,6 @@ fn action(button: wio.Button) !void {
             wio.messageBox(.err, "wio", "error");
         },
         .u => wio.openUri("https://tiredsleepy.net"),
-        .h => {
-            const modifiers = wio.getModifiers();
-            std.log.scoped(.modifiers).info("{s}{s}{s}{s}", .{
-                if (modifiers.control) "control " else "",
-                if (modifiers.shift) "shift " else "",
-                if (modifiers.alt) "alt " else "",
-                if (modifiers.gui) "gui " else "",
-            });
-        },
         .@"1" => {
             if (!text_input) {
                 window.enableTextInput(.{ .cursor = .{ .x = 100, .y = 100 } });

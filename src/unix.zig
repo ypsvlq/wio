@@ -214,13 +214,6 @@ pub fn openUri(uri: []const u8) void {
     _ = child.wait(internal.io) catch {};
 }
 
-pub fn getModifiers() wio.Modifiers {
-    return switch (active) {
-        .x11 => x11.getModifiers(),
-        .wayland => wayland.getModifiers(),
-    };
-}
-
 pub const Window = union {
     x11: *x11.Window,
     wayland: *wayland.Window,

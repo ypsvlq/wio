@@ -25,7 +25,6 @@ const js = struct {
     extern "wio" fn flush() void;
     extern "wio" fn messageBox([*]const u8, usize) void;
     extern "wio" fn openUri([*]const u8, usize) void;
-    extern "wio" fn getModifiers() u8;
     extern "wio" fn createWindow(?*anyopaque) u32;
     extern "wio" fn enableTextInput(u32, u16, u16) void;
     extern "wio" fn disableTextInput(u32) void;
@@ -77,16 +76,6 @@ pub fn messageBox(_: wio.MessageBoxStyle, _: []const u8, message: []const u8) vo
 
 pub fn openUri(uri: []const u8) void {
     js.openUri(uri.ptr, uri.len);
-}
-
-pub fn getModifiers() wio.Modifiers {
-    const modifiers = js.getModifiers();
-    return .{
-        .control = (modifiers & (1 << 0) != 0),
-        .shift = (modifiers & (1 << 1) != 0),
-        .alt = (modifiers & (1 << 2) != 0),
-        .gui = (modifiers & (1 << 3) != 0),
-    };
 }
 
 pub const Window = struct {
@@ -366,6 +355,12 @@ export fn wioEvent(data: ?*anyopaque, event: u32, int0: u32, int1: u32, float0: 
         .size_logical => .{ .size_logical = .{ .width = @intCast(int0), .height = @intCast(int1) } },
         .size_physical => .{ .size_physical = .{ .width = @intCast(int0), .height = @intCast(int1) } },
         .scale => .{ .scale = float0 },
+        .modifiers => .{ .modifiers = .{
+            .control = (int0 & (1 << 0) != 0),
+            .shift = (int0 & (1 << 1) != 0),
+            .alt = (int0 & (1 << 2) != 0),
+            .gui = (int0 & (1 << 3) != 0),
+        } },
         .char => .{ .char = @intCast(int0) },
         .preview_reset => .preview_reset,
         .preview_char => .{ .preview_char = @intCast(int0) },

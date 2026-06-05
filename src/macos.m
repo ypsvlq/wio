@@ -11,6 +11,7 @@ extern void wioPosition(void *, SInt16, SInt16);
 extern void wioSizeLogical(void *, UInt8, UInt16, UInt16);
 extern void wioSizePhysical(void *, UInt16, UInt16);
 extern void wioScale(void *, Float32);
+extern void wioModifiers(void *, UInt32);
 extern void wioChars(void *, const char *);
 extern void wioPreviewChars(void *, const char *, uint16_t, uint16_t);
 extern void wioPreviewReset(void *);
@@ -322,7 +323,9 @@ static void warpCursor(NSWindow *window) {
             return;
         default: return;
     }
-    wioKey(zig, key, [event modifierFlags] & flag ? 0 : 2);
+    NSUInteger modifiers = [event modifierFlags];
+    wioKey(zig, key, modifiers & flag ? 0 : 2);
+    wioModifiers(zig, modifiers);
 }
 
 - (void)mouseDown:(NSEvent *)event {
@@ -467,10 +470,6 @@ void wioMessageBox(uint8_t style, const char *ptr, size_t len) {
 
 void wioOpenUri(const char *ptr, size_t len) {
     [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:string(ptr, len)]];
-}
-
-NSUInteger wioGetModifiers(void) {
-    return [NSEvent modifierFlags];
 }
 
 void *wioCreateWindow(void *zig, uint16_t width, uint16_t height) {

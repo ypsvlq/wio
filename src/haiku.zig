@@ -99,16 +99,6 @@ pub fn openUri(uri: []const u8) void {
     wioOpenUri(uri_z);
 }
 
-pub fn getModifiers() wio.Modifiers {
-    const modifiers = wioGetModifiers();
-    return .{
-        .control = (modifiers & (1 << 2) != 0),
-        .shift = (modifiers & (1 << 0) != 0),
-        .alt = (modifiers & (1 << 1) != 0),
-        .gui = (modifiers & (1 << 6) != 0),
-    };
-}
-
 pub const Window = struct {
     event_fn_data: ?*anyopaque,
     window: *BWindow,

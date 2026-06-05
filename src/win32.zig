@@ -246,15 +246,6 @@ pub fn openUri(uri: []const u8) void {
     _ = w.ShellExecuteW(null, w.L("open"), uri_w, null, null, w.SW_SHOWNORMAL);
 }
 
-pub fn getModifiers() wio.Modifiers {
-    return .{
-        .control = (w.GetAsyncKeyState(w.VK_CONTROL) < 0),
-        .shift = (w.GetAsyncKeyState(w.VK_SHIFT) < 0),
-        .alt = (w.GetAsyncKeyState(w.VK_MENU) < 0),
-        .gui = (w.GetAsyncKeyState(w.VK_LWIN) < 0 or w.GetAsyncKeyState(w.VK_RWIN) < 0),
-    };
-}
-
 pub const Window = struct {
     event_fn_data: ?*anyopaque,
     window: w.HWND,
@@ -1675,6 +1666,7 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
                     .international4 => &self.international4,
                     else => null,
                 };
+
                 if (flags & w.KF_UP == 0) {
                     var repeat = (flags & w.KF_REPEAT != 0);
                     if (modifier) |ptr| {
@@ -1685,6 +1677,17 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
                 } else {
                     if (modifier) |ptr| ptr.* = false;
                     internal.eventFn(self.event_fn_data, .{ .button_release = button });
+                }
+
+                if (modifier != null) {
+                    internal.eventFn(self.event_fn_data, .{
+                        .modifiers = .{
+                            .control = (w.GetAsyncKeyState(w.VK_CONTROL) < 0),
+                            .shift = (w.GetAsyncKeyState(w.VK_SHIFT) < 0),
+                            .alt = (w.GetAsyncKeyState(w.VK_MENU) < 0),
+                            .gui = (w.GetAsyncKeyState(w.VK_LWIN) < 0 or w.GetAsyncKeyState(w.VK_RWIN) < 0),
+                        },
+                    });
                 }
             }
             return 0;

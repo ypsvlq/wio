@@ -288,10 +288,6 @@ pub fn update() void {
     }
 }
 
-pub fn getModifiers() wio.Modifiers {
-    return modifiers;
-}
-
 pub const Window = struct {
     event_fn_data: ?*anyopaque,
     surface: *h.wl_surface,
@@ -982,13 +978,19 @@ fn keyboardKey(_: ?*anyopaque, _: ?*h.wl_keyboard, serial: u32, _: u32, key: u32
 }
 
 fn keyboardModifiers(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, mods_depressed: u32, mods_latched: u32, mods_locked: u32, _: u32) callconv(.c) void {
-    const mods = mods_depressed | mods_latched | mods_locked;
-    modifiers = .{
-        .control = (mods & (1 << 2) != 0),
-        .shift = (mods & (1 << 0) != 0),
-        .alt = (mods & (1 << 3) != 0),
-        .gui = (mods & (1 << 6) != 0),
-    };
+    if (keyboard_focus) |window| {
+        const mods = mods_depressed | mods_latched | mods_locked;
+
+        internal.eventFn(window.event_fn_data, .{
+            .modifiers = .{
+                .control = (mods & (1 << 2) != 0),
+                .shift = (mods & (1 << 0) != 0),
+                .alt = (mods & (1 << 3) != 0),
+                .gui = (mods & (1 << 6) != 0),
+            },
+        });
+    }
+
     _ = c.xkb_state_update_mask(xkb_state, mods_depressed, mods_latched, mods_locked, 0, 0, 0);
 }
 

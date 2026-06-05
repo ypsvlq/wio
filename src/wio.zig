@@ -88,17 +88,6 @@ pub fn openUri(uri: []const u8) void {
     backend.openUri(uri);
 }
 
-pub fn getModifiers() Modifiers {
-    return backend.getModifiers();
-}
-
-pub const Modifiers = struct {
-    control: bool = false,
-    shift: bool = false,
-    alt: bool = false,
-    gui: bool = false,
-};
-
 pub const Size = struct {
     width: u16,
     height: u16,
@@ -589,6 +578,8 @@ pub const Event = union(enum) {
     /// or a configured scale factor.
     scale: f32,
 
+    modifiers: Modifiers,
+
     /// Only sent when `Window.enableTextInput` has been called.
     char: u21,
     preview_reset: void,
@@ -641,6 +632,13 @@ pub const WindowMode = enum {
     normal,
     maximized,
     fullscreen,
+};
+
+pub const Modifiers = struct {
+    control: bool = false,
+    shift: bool = false,
+    alt: bool = false,
+    gui: bool = false,
 };
 
 pub const TextInputOptions = struct {
