@@ -92,7 +92,8 @@ fn eventFn(data: ?*anyopaque, event: wio.Event) void {
         .scroll_vertical, .scroll_horizontal => |value| std.log.info("{s} {d}", .{ @tagName(event), value }),
         .touch => |touch| std.log.info("touch {}: ({},{})", .{ touch.id, touch.x, touch.y }),
         .touch_end => |touch| std.log.info("touch {}: {s}", .{ touch.id, if (touch.ignore) "ignore" else "end" }),
-        .gesture_pan_x, .gesture_pan_y, .gesture_zoom, .gesture_rotate => |value| std.log.info("{s} {}", .{ @tagName(event), value }),
+        .gesture_zoom, .gesture_rotate => |value| std.log.info("{s} {}", .{ @tagName(event), value }),
+        .gesture_ignore => |ignore| std.log.info("gesture_ignore {}", .{ignore}),
         .drop_position => |pos| std.log.info("drop_position ({},{})", .{ pos.x, pos.y }),
         else => std.log.info("{s}", .{@tagName(event)}),
     }

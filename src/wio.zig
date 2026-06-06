@@ -600,15 +600,13 @@ pub const Event = union(enum) {
     scroll_horizontal: f32,
 
     touch: Touch,
-    /// If `ignore` is true, the touch was processed by the system and should
-    /// not affect the program.
     touch_end: TouchEnd,
 
-    gesture_pan_x: f32,
-    gesture_pan_y: f32,
     gesture_zoom: f32,
+    /// Delta in degrees.
     gesture_rotate: f32,
-    gesture_ignore: void,
+    /// If true, gestures since the last `.gesture_ignore = false` should not affect the program.
+    gesture_ignore: bool,
 
     drop_begin: void,
     drop_position: Position,
@@ -622,6 +620,7 @@ pub const Event = union(enum) {
 
     pub const TouchEnd = struct {
         id: u8,
+        /// If true, the touch was processed by the system and should not affect the program.
         ignore: bool,
     };
 };

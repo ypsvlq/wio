@@ -1090,10 +1090,10 @@ fn gesturePinchBegin(_: ?*anyopaque, _: ?*h.zwp_pointer_gesture_pinch_v1, _: u32
 fn gesturePinchUpdate(_: ?*anyopaque, _: ?*h.zwp_pointer_gesture_pinch_v1, _: u32, dx: h.wl_fixed_t, dy: h.wl_fixed_t, scale: h.wl_fixed_t, rotation: h.wl_fixed_t) callconv(.c) void {
     if (gesture_focus) |window| {
         if (dx != 0) {
-            internal.eventFn(window.event_fn_data, .{ .gesture_pan_x = fixedToFloat(dx) });
+            internal.eventFn(window.event_fn_data, .{ .scroll_horizontal = -fixedToFloat(dx) });
         }
         if (dy != 0) {
-            internal.eventFn(window.event_fn_data, .{ .gesture_pan_y = fixedToFloat(dy) });
+            internal.eventFn(window.event_fn_data, .{ .scroll_vertical = -fixedToFloat(dy) });
         }
         if (scale != 0) {
             internal.eventFn(window.event_fn_data, .{ .gesture_zoom = fixedToFloat(scale) });
@@ -1106,9 +1106,7 @@ fn gesturePinchUpdate(_: ?*anyopaque, _: ?*h.zwp_pointer_gesture_pinch_v1, _: u3
 
 fn gesturePinchEnd(_: ?*anyopaque, _: ?*h.zwp_pointer_gesture_pinch_v1, _: u32, _: u32, cancelled: i32) callconv(.c) void {
     if (gesture_focus) |window| {
-        if (cancelled == 1) {
-            internal.eventFn(window.event_fn_data, .gesture_ignore);
-        }
+        internal.eventFn(window.event_fn_data, .{ .gesture_ignore = (cancelled == 1) });
     }
 }
 
