@@ -80,6 +80,7 @@ var atoms: blk: {
     const names = [_][]const u8{
         "WM_PROTOCOLS",
         "WM_DELETE_WINDOW",
+        "_NET_WM_NAME",
         "_NET_WM_STATE",
         "_NET_WM_STATE_MAXIMIZED_VERT",
         "_NET_WM_STATE_MAXIMIZED_HORZ",
@@ -441,7 +442,7 @@ pub const Window = struct {
     }
 
     pub fn setTitle(self: *Window, title: []const u8) void {
-        _ = c.XChangeProperty(display, self.window, h.XA_WM_NAME, h.XA_STRING, 8, h.PropModeReplace, title.ptr, std.math.cast(c_int, title.len) orelse return);
+        _ = c.XChangeProperty(display, self.window, atoms._NET_WM_NAME, atoms.UTF8_STRING, 8, h.PropModeReplace, title.ptr, std.math.cast(c_int, title.len) orelse return);
     }
 
     pub fn setMode(self: *Window, mode: wio.WindowMode) void {

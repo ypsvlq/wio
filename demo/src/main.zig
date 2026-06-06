@@ -261,7 +261,7 @@ fn action(button: wio.Button) !void {
             }
             relative_mouse = !relative_mouse;
         },
-        .t => window.setTitle("retitled wio example"),
+        .t => window.setTitle("retitled wio example 😀"),
         .n => window.setMode(.normal),
         .m => window.setMode(.maximized),
         .f => window.setMode(.fullscreen),
