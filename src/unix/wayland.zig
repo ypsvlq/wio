@@ -717,18 +717,23 @@ pub const Window = struct {
         }
 
         if (self.text_options) |_| {
-            var sym = c.xkb_state_key_get_one_sym(xkb_state, key + 8);
-            if (compose_state) |_| {
-                if (c.xkb_compose_state_feed(compose_state, sym) == h.XKB_COMPOSE_FEED_ACCEPTED) {
-                    switch (c.xkb_compose_state_get_status(compose_state)) {
-                        h.XKB_COMPOSE_COMPOSED => sym = c.xkb_compose_state_get_one_sym(compose_state),
-                        h.XKB_COMPOSE_COMPOSING, h.XKB_COMPOSE_CANCELLED => return,
-                        else => {},
+            if (!modifiers.control and !modifiers.alt) {
+                var sym = c.xkb_state_key_get_one_sym(xkb_state, key + 8);
+                if (compose_state) |_| {
+                    if (c.xkb_compose_state_feed(compose_state, sym) == h.XKB_COMPOSE_FEED_ACCEPTED) {
+                        switch (c.xkb_compose_state_get_status(compose_state)) {
+                            h.XKB_COMPOSE_COMPOSED => sym = c.xkb_compose_state_get_one_sym(compose_state),
+                            h.XKB_COMPOSE_COMPOSING, h.XKB_COMPOSE_CANCELLED => return,
+                            else => {},
+                        }
+                    }
+                }
+                if (std.math.cast(u21, c.xkb_keysym_to_utf32(sym))) |char| {
+                    if (char >= ' ' and char != 0x7F) {
+                        internal.eventFn(self.event_fn_data, .{ .char = char });
                     }
                 }
             }
-            const char = std.math.cast(u21, c.xkb_keysym_to_utf32(sym)) orelse return;
-            if (char >= ' ' and char != 0x7F) internal.eventFn(self.event_fn_data, .{ .char = char });
         }
     }
 
@@ -980,15 +985,13 @@ fn keyboardKey(_: ?*anyopaque, _: ?*h.wl_keyboard, serial: u32, _: u32, key: u32
 fn keyboardModifiers(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, mods_depressed: u32, mods_latched: u32, mods_locked: u32, _: u32) callconv(.c) void {
     if (keyboard_focus) |window| {
         const mods = mods_depressed | mods_latched | mods_locked;
-
-        internal.eventFn(window.event_fn_data, .{
-            .modifiers = .{
-                .control = (mods & (1 << 2) != 0),
-                .shift = (mods & (1 << 0) != 0),
-                .alt = (mods & (1 << 3) != 0),
-                .gui = (mods & (1 << 6) != 0),
-            },
-        });
+        modifiers = .{
+            .control = (mods & (1 << 2) != 0),
+            .shift = (mods & (1 << 0) != 0),
+            .alt = (mods & (1 << 3) != 0),
+            .gui = (mods & (1 << 6) != 0),
+        };
+        internal.eventFn(window.event_fn_data, .{ .modifiers = modifiers });
     }
 
     _ = c.xkb_state_update_mask(xkb_state, mods_depressed, mods_latched, mods_locked, 0, 0, 0);
