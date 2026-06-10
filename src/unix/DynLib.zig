@@ -6,15 +6,22 @@ const DynLib = @This();
 
 handle: if (build_options.system_integration) void else std.DynLib,
 
-pub fn open(comptime name: [:0]const u8) !DynLib {
-    return .{
-        .handle = if (build_options.system_integration) {} else try std.DynLib.openZ(
-            if (builtin.os.tag == .openbsd or builtin.os.tag == .netbsd)
-                name[0..comptime std.mem.findScalarLast(u8, name, '.').?] ++ ""
-            else
-                name,
-        ),
-    };
+pub fn open(comptime versioned_name: [:0]const u8) !DynLib {
+    if (build_options.system_integration) {
+        return .{ .handle = {} };
+    } else {
+        const name = switch (builtin.os.tag) {
+            .openbsd, .netbsd => versioned_name[0..comptime std.mem.findScalarLast(u8, versioned_name, '.').?] ++ "",
+            else => versioned_name,
+        };
+
+        return .{
+            .handle = std.DynLib.openZ(name) catch |err| {
+                log.err("could not load {s}: {s}", .{ name, @errorName(err) });
+                return err;
+            },
+        };
+    }
 }
 
 pub fn close(self: *DynLib) void {
