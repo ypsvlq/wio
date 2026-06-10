@@ -83,7 +83,13 @@ pub const Window = struct {
 
     pub fn create(options: wio.CreateWindowOptions) !Window {
         const id = js.createWindow(options.event_fn_data);
+
+        internal.eventFn(options.event_fn_data, .visible);
+        internal.eventFn(options.event_fn_data, .{ .mode = .normal });
+        internal.eventFn(options.event_fn_data, .{ .position = .{ .x = 0, .y = 0 } });
+
         if (options.mode == .fullscreen) js.setFullscreen(id, true);
+
         return .{ .id = id };
     }
 
@@ -348,12 +354,10 @@ export fn wioEvent(data: ?*anyopaque, event: u32, int0: u32, int1: u32, float0: 
     internal.eventFn(data, switch (@as(wio.EventType, @enumFromInt(event))) {
         .focused => .focused,
         .unfocused => .unfocused,
-        .visible => .visible,
         .draw => .draw,
         .mode => .{ .mode = @enumFromInt(int0) },
-        .position => .{ .position = .{ .x = @intCast(int0), .y = @intCast(int1) } },
-        .size_logical => .{ .size_logical = .{ .width = @intCast(int0), .height = @intCast(int1) } },
-        .size_physical => .{ .size_physical = .{ .width = @intCast(int0), .height = @intCast(int1) } },
+        .size_logical => .{ .size_logical = .{ .width = @truncate(int0), .height = @truncate(int1) } },
+        .size_physical => .{ .size_physical = .{ .width = @truncate(int0), .height = @truncate(int1) } },
         .scale => .{ .scale = float0 },
         .modifiers => .{ .modifiers = .{
             .control = (int0 & (1 << 0) != 0),
@@ -367,13 +371,13 @@ export fn wioEvent(data: ?*anyopaque, event: u32, int0: u32, int1: u32, float0: 
         .button_press => .{ .button_press = @enumFromInt(int0) },
         .button_repeat => .{ .button_repeat = @enumFromInt(int0) },
         .button_release => .{ .button_release = @enumFromInt(int0) },
-        .mouse => .{ .mouse = .{ .x = @intCast(int0), .y = @intCast(int1) } },
-        .mouse_relative => .{ .mouse_relative = .{ .x = @intCast(@as(i32, @bitCast(int0))), .y = @intCast(@as(i32, @bitCast(int1))) } },
+        .mouse => .{ .mouse = .{ .x = @truncate(int0), .y = @truncate(int1) } },
+        .mouse_relative => .{ .mouse_relative = .{ .x = @truncate(@as(i32, @bitCast(int0))), .y = @truncate(@as(i32, @bitCast(int1))) } },
         .mouse_leave => .mouse_leave,
         .scroll_vertical => .{ .scroll_vertical = float0 },
         .scroll_horizontal => .{ .scroll_horizontal = float0 },
         .drop_begin => .drop_begin,
-        .drop_position => .{ .drop_position = .{ .x = @intCast(int0), .y = @intCast(int1) } },
+        .drop_position => .{ .drop_position = .{ .x = @truncate(int0), .y = @truncate(int1) } },
         .drop_complete => .drop_complete,
         else => unreachable,
     });

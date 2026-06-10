@@ -72,8 +72,6 @@ class Wio {
             if (canvas === undefined) throw new Error("no canvas available");
 
             const wioEvent = this.instance.exports.wioEvent;
-            wioEvent(data, 3);
-            wioEvent(data, 7, 0, 0);
 
             const input = document.createElement("input");
             input.tabIndex = -1;
