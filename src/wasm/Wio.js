@@ -42,7 +42,7 @@ class Wio {
     }
 
     getString(ptr, len) {
-        return new TextDecoder().decode(new Uint8Array(this.instance.exports.memory.buffer, ptr, len));
+        return new TextDecoder().decode(new Uint8Array(this.instance.exports.memory.buffer, ptr, len).slice());
     }
 
     updateModifiers(data, event) {

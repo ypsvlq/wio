@@ -13,7 +13,7 @@ class GL {
             const array = new Uint8Array(wio.instance.exports.memory.buffer, ptr);
             let len = 0;
             while (array[len]) len++;
-            return new TextDecoder().decode(array.subarray(0, len));
+            return new TextDecoder().decode(array.slice(0, len));
         };
 
         this.setStringZ = (ptr, max, length, string) => {

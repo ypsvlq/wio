@@ -18,7 +18,7 @@ jobs:
         - wasm32-freestanding
     runs-on: ubuntu-latest
     env:
-      build: zig build -Dtarget=${{ matrix.target }} ${{ matrix.target == 'native' && '-fsys=wio' || '' }}
+      build: zig build -Dtarget=${{ matrix.target }} ${{ matrix.target == 'wasm32-freestanding' && '-Dcpu=bleeding_edge' || '' }} ${{ matrix.target == 'native' && '-fsys=wio' || '' }}
     steps:
     - name: Checkout
       uses: actions/checkout@v6

@@ -47,6 +47,11 @@ pub fn build(b: *std.Build) void {
         });
         b.installArtifact(exe);
 
+        if (target.result.cpu.arch.isWasm()) {
+            exe.max_memory = 2 * 1024 * 1024;
+            exe.shared_memory = true;
+        }
+
         const run_cmd = b.addRunArtifact(exe);
         run_cmd.step.dependOn(b.getInstallStep());
 
