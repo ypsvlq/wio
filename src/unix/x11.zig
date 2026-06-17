@@ -547,6 +547,7 @@ pub const Window = struct {
         internal.allocator.free(clipboard_text);
         clipboard_text = internal.allocator.dupe(u8, text) catch "";
         _ = c.XSetSelectionOwner(display, atoms.CLIPBOARD, self.window, h.CurrentTime);
+        _ = c.XSetSelectionOwner(display, h.XA_PRIMARY, self.window, h.CurrentTime);
     }
 
     pub fn getClipboardText(self: *Window, allocator: std.mem.Allocator) ?[]u8 {
