@@ -21,10 +21,15 @@
         <script type="module">
             import Wio from "../src/wasm/Wio.js";
             import { GL } from "./wasm.js";
+            const memory = new WebAssembly.Memory({ initial: 32, maximum: 64, shared: true });
             const wio = new Wio([document.getElementById("canvas"), document.getElementById("canvas2")]);
             const gl = new GL(wio);
-            WebAssembly.instantiateStreaming(fetch("zig-out/bin/demo.wasm"), { wio: wio.imports, gl: gl.imports })
-                .then(result => wio.run(result.instance));
+            const imports = {
+                env: { memory: memory },
+                wio: wio.imports,
+                gl: gl.imports,
+            };
+            WebAssembly.instantiateStreaming(fetch("zig-out/bin/demo.wasm"), imports).then((result) => { wio.run(memory, result.module, result.instance); });
         </script>
     </body>
 </html>

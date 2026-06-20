@@ -288,6 +288,9 @@ pub fn build(b: *std.Build) !void {
                 if (enable_joystick) {
                     try exports.append(b.allocator, "wioJoystick");
                 }
+                if (enable_audio) {
+                    try exports.append(b.allocator, "wioAudioCallback");
+                }
                 module.export_symbol_names = exports.items;
             }
         },

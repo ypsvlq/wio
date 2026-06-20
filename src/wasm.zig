@@ -45,6 +45,9 @@ const js = struct {
     extern "wio" fn getJoystickId(u32, [*]u8) void;
     extern "wio" fn openJoystick(u32, *[2]u32) bool;
     extern "wio" fn getJoystickState(u32, [*]u16, usize, [*]bool, usize) bool;
+    extern "wio" fn openAudioOutput(*const anyopaque, [*]f32, u32, u8) u32;
+    extern "wio" fn openAudioInput(*const anyopaque, [*]f32, u32, u8) u32;
+    extern "wio" fn closeAudioContext(u32) void;
 };
 
 const gl = struct {
@@ -52,10 +55,16 @@ const gl = struct {
     extern "gl" fn makeContextCurrent(u32) void;
 };
 
-var init_options: wio.InitOptions = undefined;
+var joystickConnectedFn: ?*const fn (wio.JoystickDevice) void = null;
 
 pub fn init(options: wio.InitOptions) !void {
-    init_options = options;
+    if (build_options.joystick) {
+        joystickConnectedFn = options.joystickConnectedFn;
+    }
+    if (build_options.audio) {
+        if (options.audioDefaultOutputFn) |callback| callback(.{ .backend = .{} });
+        if (options.audioDefaultInputFn) |callback| callback(.{ .backend = .{} });
+    }
 }
 
 pub fn deinit() void {}
@@ -284,62 +293,62 @@ pub const Joystick = struct {
 };
 
 pub const AudioDeviceIterator = struct {
-    pub fn init(mode: wio.AudioDeviceType) AudioDeviceIterator {
-        _ = mode;
+    used: bool = false,
+
+    pub fn init(_: wio.AudioDeviceType) AudioDeviceIterator {
         return .{};
     }
 
-    pub fn deinit(self: *AudioDeviceIterator) void {
-        _ = self;
-    }
+    pub fn deinit(_: *AudioDeviceIterator) void {}
 
     pub fn next(self: *AudioDeviceIterator) ?AudioDevice {
-        _ = self;
-        return null;
+        if (self.used) return null;
+        self.used = true;
+        return .{};
     }
 };
 
 pub const AudioDevice = struct {
-    pub fn release(self: AudioDevice) void {
-        _ = self;
+    pub fn release(_: AudioDevice) void {}
+
+    pub fn openOutput(_: AudioDevice, writeFn: *const fn ([]f32) void, format: wio.AudioFormat) !AudioOutput {
+        const buffer = try internal.allocator.alloc(f32, @as(usize, 128) * format.channels);
+        const id = js.openAudioOutput(writeFn, buffer.ptr, format.sample_rate, format.channels);
+        return .{ .id = id, .buffer = buffer };
     }
 
-    pub fn openOutput(self: AudioDevice, writeFn: *const fn ([]f32) void, format: wio.AudioFormat) !AudioOutput {
-        _ = self;
-        _ = writeFn;
-        _ = format;
+    pub fn openInput(_: AudioDevice, readFn: *const fn ([]const f32) void, format: wio.AudioFormat) !AudioInput {
+        const buffer = try internal.allocator.alloc(f32, @as(usize, 128) * format.channels);
+        const id = js.openAudioInput(readFn, buffer.ptr, format.sample_rate, format.channels);
+        return .{ .id = id, .buffer = buffer };
+    }
+
+    pub fn getId(_: AudioDevice, _: std.mem.Allocator) ![]u8 {
         return error.Unexpected;
     }
 
-    pub fn openInput(self: AudioDevice, readFn: *const fn ([]const f32) void, format: wio.AudioFormat) !AudioInput {
-        _ = self;
-        _ = readFn;
-        _ = format;
-        return error.Unexpected;
-    }
-
-    pub fn getId(self: AudioDevice, allocator: std.mem.Allocator) ![]u8 {
-        _ = self;
-        _ = allocator;
-        return error.Unexpected;
-    }
-
-    pub fn getName(self: AudioDevice, allocator: std.mem.Allocator) ![]u8 {
-        _ = self;
-        _ = allocator;
-        return error.Unexpected;
+    pub fn getName(_: AudioDevice, allocator: std.mem.Allocator) ![]u8 {
+        return allocator.dupe(u8, "WebAudio");
     }
 };
 
 pub const AudioOutput = struct {
+    id: u32,
+    buffer: []f32,
+
     pub fn close(self: *AudioOutput) void {
-        _ = self;
+        js.closeAudioContext(self.id);
+        internal.allocator.free(self.buffer);
     }
 };
 
 pub const AudioInput = struct {
+    id: u32,
+    buffer: []f32,
+
     pub fn close(self: *AudioInput) void {
-        _ = self;
+        js.closeAudioContext(self.id);
+        internal.allocator.free(self.buffer);
     }
 };
 
@@ -384,7 +393,12 @@ export fn wioEvent(data: ?*anyopaque, event: u32, int0: u32, int1: u32, float0: 
 }
 
 export fn wioJoystick(index: u32) void {
-    if (init_options.joystickConnectedFn) |callback| {
+    if (joystickConnectedFn) |callback| {
         callback(.{ .backend = .{ .index = index } });
     }
+}
+
+export fn wioAudioCallback(data: *const anyopaque, buffer: [*]f32, len: usize) void {
+    const callback: *const fn ([]f32) void = @ptrCast(data);
+    callback(buffer[0..len]);
 }

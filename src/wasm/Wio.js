@@ -1,13 +1,18 @@
 class Wio {
     constructor(canvases) {
+        /** @type {WebAssembly.Memory} */
+        this.memory = undefined;
+
+        /** @type {WebAssembly.Module} */
+        this.module = undefined;
+
         /** @type {WebAssembly.Instance} */
         this.instance = undefined;
 
         /** @type {HTMLCanvasElement[]} */
         this.canvases = canvases;
 
-        /** @type {{canvas: HTMLCanvasElement, input: HTMLInputElement, text: boolean, relative_mouse: boolean, cursor: string, drop_files: string[], drop_text: string}[]} */
-        this.windows = [];
+        this.objects = [,];
 
         this.modifiers = 0;
 
@@ -16,16 +21,12 @@ class Wio {
         this.buffer = "";
     }
 
-    run(instance) {
+    run(memory, module, instance) {
+        this.memory = memory;
+        this.module = module;
         this.instance = instance;
         this.instance.exports._start();
         this.loop();
-
-        addEventListener("pointerlockchange", () => {
-            for (const window of this.windows) {
-                window.canvas.style.cursor = (window.canvas === document.pointerLockElement) ? "none" : window.cursor;
-            }
-        });
 
         if (this.instance.exports.wioJoystick !== undefined) {
             addEventListener("gamepadconnected", (event) => {
@@ -42,7 +43,17 @@ class Wio {
     }
 
     getString(ptr, len) {
-        return new TextDecoder().decode(new Uint8Array(this.instance.exports.memory.buffer, ptr, len).slice());
+        return new TextDecoder().decode(new Uint8Array(this.memory.buffer, ptr, len).slice());
+    }
+
+    pushObject(object) {
+        const index = this.objects.indexOf(null);
+        if (index !== -1) {
+            this.objects[index] = object;
+            return index;
+        } else {
+            return this.objects.push(object) - 1;
+        }
     }
 
     updateModifiers(data, event) {
@@ -63,9 +74,13 @@ class Wio {
             this.buffer = "";
         },
 
-        messageBox: (ptr, len) => alert(this.getString(ptr, len)),
+        messageBox: (ptr, len) => {
+            alert(this.getString(ptr, len));
+        },
 
-        openUri: (ptr, len) => open(this.getString(ptr, len)),
+        openUri: (ptr, len) => {
+            open(this.getString(ptr, len));
+        },
 
         createWindow: (data) => {
             const canvas = this.canvases.shift();
@@ -197,55 +212,54 @@ class Wio {
                 wioEvent(data, 31);
             });
 
-            this.windows.push(window);
-            return this.windows.length - 1;
+            return this.pushObject(window);
         },
 
         enableTextInput: (id, x, y) => {
-            this.windows[id].text = true;
-            const rect = this.windows[id].canvas.getBoundingClientRect();
-            this.windows[id].input.style.left = `${rect.x + x}px`;
-            this.windows[id].input.style.top = `${rect.y + y}px`;
-            this.windows[id].input.style.display = "unset";
-            if (document.activeElement === this.windows[id].canvas) {
-                this.windows[id].input.focus();
+            this.objects[id].text = true;
+            const rect = this.objects[id].canvas.getBoundingClientRect();
+            this.objects[id].input.style.left = `${rect.x + x}px`;
+            this.objects[id].input.style.top = `${rect.y + y}px`;
+            this.objects[id].input.style.display = "unset";
+            if (document.activeElement === this.objects[id].canvas) {
+                this.objects[id].input.focus();
             }
         },
 
         disableTextInput: (id) => {
-            this.windows[id].text = false;
-            this.windows[id].input.style.display = "none";
-            if (document.activeElement === this.windows[id].input) {
-                this.windows[id].canvas.focus();
+            this.objects[id].text = false;
+            this.objects[id].input.style.display = "none";
+            if (document.activeElement === this.objects[id].input) {
+                this.objects[id].canvas.focus();
             }
         },
 
         enableRelativeMouse: (id, unadjusted) => {
-            this.windows[id].relative_mouse = true;
-            this.windows[id].relative_mouse_unadjusted = unadjusted;
-            this.windows[id].canvas.requestPointerLock({ unadjustedMovement: unadjusted });
+            this.objects[id].relative_mouse = true;
+            this.objects[id].relative_mouse_unadjusted = unadjusted;
+            this.objects[id].canvas.requestPointerLock({ unadjustedMovement: unadjusted });
         },
 
         disableRelativeMouse: (id) => {
-            this.windows[id].relative_mouse = false;
+            this.objects[id].relative_mouse = false;
             document.exitPointerLock();
         },
 
         setFullscreen: (id, fullscreen) => {
             if (fullscreen) {
-                this.windows[id].canvas.requestFullscreen().catch(() => { });
+                this.objects[id].canvas.requestFullscreen().catch(() => { });
             } else {
                 document.exitFullscreen().catch(() => { });
             }
         },
 
         setSize: (id, width, height) => {
-            this.windows[id].canvas.style.width = `${width}px`;
-            this.windows[id].canvas.style.height = `${height}px`;
+            this.objects[id].canvas.style.width = `${width}px`;
+            this.objects[id].canvas.style.height = `${height}px`;
         },
 
         setCursor: (id, cursor) => {
-            this.windows[id].cursor = {
+            this.objects[id].cursor = {
                 0: "default",
                 1: "none",
                 2: "context-menu",
@@ -283,7 +297,7 @@ class Wio {
                 34: "zoom-out",
             }[cursor];
 
-            this.windows[id].canvas.style.cursor = this.windows[id].cursor;
+            this.objects[id].canvas.style.cursor = this.objects[id].cursor;
         },
 
         setClipboardText: (ptr, len) => {
@@ -291,26 +305,26 @@ class Wio {
         },
 
         presentFramebuffer: (id, ptr, width, height) => {
-            const framebuffer = new Uint8ClampedArray(this.instance.exports.memory.buffer, ptr, width * height * 4);
+            const framebuffer = new Uint8ClampedArray(this.memory.buffer, ptr, width * height * 4);
             const image = new ImageData(framebuffer, width, height);
-            this.windows[id].canvas.getContext("2d").putImageData(image, 0, 0);
+            this.objects[id].canvas.getContext("2d").putImageData(image, 0, 0);
         },
 
-        getDropFileCount: (id) => this.windows[id].drop_files.length,
+        getDropFileCount: (id) => this.objects[id].drop_files.length,
 
-        getDropFileLen: (id, index) => new TextEncoder().encode(this.windows[id].drop_files[index]).length,
+        getDropFileLen: (id, index) => new TextEncoder().encode(this.objects[id].drop_files[index]).length,
 
         getDropFile: (id, index, ptr) => {
-            new TextEncoder().encodeInto(this.windows[id].drop_files[index], new Uint8Array(this.instance.exports.memory.buffer, ptr));
+            new Uint8Array(this.memory.buffer, ptr).set(new TextEncoder().encode(this.objects[id].drop_files[index]));
         },
 
         getDropTextLen: (id) => {
-            const text = this.windows[id].drop_text;
+            const text = this.objects[id].drop_text;
             return text !== null ? new TextEncoder().encode(text).length : 0;
         },
 
         getDropText: (id, ptr) => {
-            new TextEncoder().encodeInto(this.windows[id].drop_text, new Uint8Array(this.instance.exports.memory.buffer, ptr));
+            new Uint8Array(this.memory.buffer, ptr).set(new TextEncoder().encode(this.objects[id].drop_text));
         },
 
         getJoystickCount: () => this.gamepads.length,
@@ -320,12 +334,12 @@ class Wio {
         },
 
         getJoystickId: (i, ptr) => {
-            new TextEncoder().encodeInto(this.gamepads[i].id, new Uint8Array(this.instance.exports.memory.buffer, ptr));
+            new Uint8Array(this.memory.buffer, ptr).set(new TextEncoder().encode(this.gamepads[i].id));
         },
 
         openJoystick: (i, ptr) => {
             if (this.gamepads[i] === null || !this.gamepads[i].connected) return false;
-            const lengths = new Uint32Array(this.instance.exports.memory.buffer, ptr, 2);
+            const lengths = new Uint32Array(this.memory.buffer, ptr, 2);
             lengths[0] = this.gamepads[i].axes.length;
             lengths[1] = this.gamepads[i].buttons.length;
             return true;
@@ -333,8 +347,8 @@ class Wio {
 
         getJoystickState: (index, axes_ptr, axes_len, buttons_ptr, buttons_len) => {
             if (this.gamepads[index] === null || !this.gamepads[index].connected) return false;
-            const axes = new Uint16Array(this.instance.exports.memory.buffer, axes_ptr, axes_len);
-            const buttons = new Uint8Array(this.instance.exports.memory.buffer, buttons_ptr, buttons_len);
+            const axes = new Uint16Array(this.memory.buffer, axes_ptr, axes_len);
+            const buttons = new Uint8Array(this.memory.buffer, buttons_ptr, buttons_len);
             for (let i = 0; i < axes_len; i++) {
                 axes[i] = (this.gamepads[index].axes[i] + 1) * 32767.5;
             }
@@ -342,6 +356,51 @@ class Wio {
                 buttons[i] = this.gamepads[index].buttons[i].pressed;
             }
             return true;
+        },
+
+        openAudioOutput: (writeFn, buffer, sample_rate, channels) => {
+            const context = new AudioContext({ sampleRate: sample_rate });
+            context.audioWorklet.addModule(new URL("WioAudio.js", import.meta.url)).then(() => {
+                const node = new AudioWorkletNode(context, "wio", {
+                    numberOfInputs: 0,
+                    outputChannelCount: [channels],
+                });
+                node.port.postMessage({
+                    memory: this.memory,
+                    module: this.module,
+                    callback: writeFn,
+                    buffer: buffer,
+                    channels: channels,
+                });
+                node.connect(context.destination);
+                document.addEventListener("click", () => { if (context.state === "suspended") { context.resume(); } }, { once: true });
+                return node;
+            });
+            return this.pushObject(context);
+        },
+
+        openAudioInput: (readFn, buffer, sample_rate, channels) => {
+            const context = new AudioContext({ sampleRate: sample_rate });
+            navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+                context.audioWorklet.addModule(new URL("WioAudio.js", import.meta.url)).then(() => {
+                    const node = new AudioWorkletNode(context, "wio", { numberOfOutputs: 0 });
+                    node.port.postMessage({
+                        memory: this.memory,
+                        module: this.module,
+                        callback: readFn,
+                        buffer: buffer,
+                        channels: channels,
+                    });
+                    const source = context.createMediaStreamSource(stream);
+                    source.connect(node);
+                });
+            });
+            return this.pushObject(context);
+        },
+
+        closeAudioContext: (id) => {
+            this.objects[id].close();
+            this.objects[id] = null;
         },
     };
 

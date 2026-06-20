@@ -48,7 +48,8 @@ pub fn build(b: *std.Build) void {
         b.installArtifact(exe);
 
         if (target.result.cpu.arch.isWasm()) {
-            exe.max_memory = 2 * 1024 * 1024;
+            exe.import_memory = true;
+            exe.max_memory = std.math.maxInt(u32) + 1;
             exe.shared_memory = true;
         }
 
