@@ -1,57 +1,72 @@
 const std = @import("std");
 const wio = @import("wio");
 
+pub const std_options: std.Options = .{ .logFn = wio.logFn };
+
+var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
+var threaded: std.Io.Threaded = undefined;
+
+var size: wio.Size = .{ .width = 640, .height = 480 };
+var events: wio.EventQueue = .empty;
+var window: wio.Window = undefined;
+var fb: wio.Framebuffer = undefined;
+var t: u16 = 0;
+
 pub fn main() !void {
-    var debug_allocator = std.heap.DebugAllocator(.{}).init;
-    defer _ = debug_allocator.deinit();
-    const allocator = debug_allocator.allocator();
+    var allocator: std.mem.Allocator = undefined;
+    var io: std.Io = undefined;
 
-    var threaded = std.Io.Threaded.init(allocator, .{});
-    defer threaded.deinit();
+    if (@import("builtin").cpu.arch.isWasm()) {
+        allocator = std.heap.wasm_allocator;
+    } else {
+        allocator = debug_allocator.allocator();
+        threaded = .init(allocator, .{});
+        io = threaded.io();
+    }
 
-    try wio.init(allocator, threaded.io(), wio.EventQueue.eventFn, .{});
-    defer wio.deinit();
+    try wio.init(allocator, io, wio.EventQueue.eventFn, .{});
 
-    var events: wio.EventQueue = .empty;
-    defer events.deinit();
-
-    var size: wio.Size = .{ .width = 640, .height = 480 };
-    var window = try wio.Window.create(.{
+    window = try .create(.{
         .event_fn_data = &events,
         .title = "software",
         .size = size,
         .scale = 1,
     });
-    defer window.destroy();
 
-    var fb = try window.createFramebuffer(size);
-    defer fb.destroy();
+    fb = try window.createFramebuffer(size);
 
-    var t: u16 = 0;
-
-    while (true) {
-        wio.update();
-        while (events.pop()) |event| {
-            switch (event) {
-                .close => return,
-                .size_physical => |new_size| {
-                    if (!std.meta.eql(new_size, size)) {
-                        fb.destroy();
-                        fb = try window.createFramebuffer(new_size);
-                        size = new_size;
-                    }
-                },
-                else => {},
-            }
-        }
-        render(&fb, size, t);
-        window.presentFramebuffer(&fb);
-        t +%= 1;
-        wio.wait(.{ .timeout_ns = std.time.ns_per_s / 60 });
-    }
+    return wio.run(loop);
 }
 
-fn render(fb: *wio.Framebuffer, size: wio.Size, t: u16) void {
+fn loop() !bool {
+    while (events.pop()) |event| {
+        switch (event) {
+            .close => {
+                window.destroy();
+                events.deinit();
+                wio.deinit();
+                threaded.deinit();
+                _ = debug_allocator.deinit();
+                return false;
+            },
+            .size_physical => |new_size| {
+                if (!std.meta.eql(new_size, size)) {
+                    fb.destroy();
+                    fb = try window.createFramebuffer(new_size);
+                    size = new_size;
+                }
+            },
+            else => {},
+        }
+    }
+    render();
+    window.presentFramebuffer(&fb);
+    t +%= 1;
+    wio.wait(.{ .timeout_ns = std.time.ns_per_s / 60 });
+    return true;
+}
+
+fn render() void {
     var y: u32 = 0;
     while (y < size.height) : (y += 1) {
         var x: u32 = 0;

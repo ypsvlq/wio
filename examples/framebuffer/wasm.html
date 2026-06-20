@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width,initial-scale=1">
+        <title>wio</title>
+        <style>
+            #canvas {
+                width: 640px;
+                height: 480px;
+            }
+        </style>
+    </head>
+    <body>
+        <canvas id="canvas" tabindex="-1"></canvas>
+        <script type="module">
+            import Wio from "../../src/wasm/Wio.js";
+            const wio = new Wio([document.getElementById("canvas"), document.getElementById("canvas2")]);
+            WebAssembly.instantiateStreaming(fetch("zig-out/bin/framebuffer.wasm"), { wio: wio.imports }).then((result) => { wio.run(result.instance.exports.memory, result.module, result.instance); });
+        </script>
+    </body>
+</html>

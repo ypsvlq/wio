@@ -156,9 +156,14 @@ file should contain `comptime { _ = wio; }` at the top level.
 ### WebAssembly
 
 If OpenGL is enabled, wio imports `createContext` and `makeContextCurrent`
-from the `gl` module. WebGL 1 bindings are provided in [demo/wasm.js][8].
+from the `gl` module. `wio.glGetProcAddress` always returns null.
 
-`glGetProcAddress` always returns null.
+If audio is enabled, memory must be imported and shared.
+
+A basic WebAssembly example is provided in [examples/framebuffer][8], whilst
+the [demo][2] is more advanced and includes audio support.
+
+WebGL 1 bindings are provided in [demo/wasm.js][9].
 
 ## Platform-specific API
 
@@ -203,4 +208,5 @@ for a given platform:
 [5]: https://github.com/ypsvlq/wio/tree/master/demo/wio.app
 [6]: https://gitlab.freedesktop.org/xorg/lib/libxext/-/work_items/3
 [7]: https://github.com/ypsvlq/wio/blob/master/demo/build.zig
-[8]: https://github.com/ypsvlq/wio/blob/master/demo/wasm.js
+[8]: https://github.com/ypsvlq/wio/tree/master/examples/framebuffer
+[9]: https://github.com/ypsvlq/wio/blob/master/demo/wasm.js

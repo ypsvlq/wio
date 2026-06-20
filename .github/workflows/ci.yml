@@ -34,8 +34,7 @@ jobs:
     - name: Build demo
       working-directory: demo
       run: ${{ env.build }}
-    - if: ${{ matrix.target != 'wasm32-freestanding' }}
-      name: Build framebuffer example
+    - name: Build framebuffer example
       working-directory: examples/framebuffer
       run: ${{ env.build }}
     - if: ${{ matrix.target == 'native' }}
