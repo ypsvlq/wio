@@ -22,10 +22,13 @@ var egl_surface: c.EGLSurface = null;
 var egl_surface_mutex: std.Io.Mutex = .init;
 
 pub fn init(options: wio.InitOptions) !void {
-    _ = options;
-
     if (build_options.opengl) {
         try egl.init(c.EGL_DEFAULT_DISPLAY);
+    }
+
+    if (build_options.audio) {
+        if (options.audioDefaultOutputFn) |callback| callback(.{ .backend = .{} });
+        if (options.audioDefaultInputFn) |callback| callback(.{ .backend = .{} });
     }
 }
 
@@ -67,12 +70,9 @@ pub fn openUri(uri: []const u8) void {
 }
 
 pub const Window = struct {
-    var created = false;
+    var created_event: std.Io.Event = .unset;
 
     pub fn create(options: wio.CreateWindowOptions) !Window {
-        if (created) return error.AlreadyCreated;
-        created = true;
-
         event_fn_data = options.event_fn_data;
 
         internal.eventFn(event_fn_data, .{ .position = .{ .x = 0, .y = 0 } });
@@ -82,6 +82,8 @@ pub const Window = struct {
                 egl_config = try egl.chooseConfig(gl);
             }
         }
+
+        created_event.set(std.Io.Threaded.global_single_threaded.io());
 
         return .{};
     }
@@ -308,64 +310,98 @@ pub const Joystick = struct {
 };
 
 pub const AudioDeviceIterator = struct {
-    pub fn init(mode: wio.AudioDeviceType) AudioDeviceIterator {
-        _ = mode;
+    used: bool = false,
+
+    pub fn init(_: wio.AudioDeviceType) AudioDeviceIterator {
         return .{};
     }
 
-    pub fn deinit(self: *AudioDeviceIterator) void {
-        _ = self;
-    }
+    pub fn deinit(_: *AudioDeviceIterator) void {}
 
     pub fn next(self: *AudioDeviceIterator) ?AudioDevice {
-        _ = self;
-        return null;
+        if (self.used) return null;
+        self.used = true;
+        return .{};
     }
 };
 
 pub const AudioDevice = struct {
-    pub fn release(self: AudioDevice) void {
-        _ = self;
+    pub fn release(_: AudioDevice) void {}
+
+    pub fn openOutput(_: AudioDevice, writeFn: *const fn ([]f32) void, format: wio.AudioFormat) !AudioOutput {
+        var builder: ?*c.AAudioStreamBuilder = undefined;
+        try checkAAudioResult(c.AAudio_createStreamBuilder(&builder), "AAudio_createStreamBuilder");
+        defer _ = c.AAudioStreamBuilder_delete(builder);
+        c.AAudioStreamBuilder_setSampleRate(builder, @bitCast(format.sample_rate));
+        c.AAudioStreamBuilder_setChannelCount(builder, format.channels);
+        c.AAudioStreamBuilder_setFormat(builder, c.AAUDIO_FORMAT_PCM_FLOAT);
+        c.AAudioStreamBuilder_setPerformanceMode(builder, c.AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
+        c.AAudioStreamBuilder_setDataCallback(builder, AudioStream.outputCallback, @constCast(writeFn));
+
+        var stream: ?*c.AAudioStream = undefined;
+        try checkAAudioResult(c.AAudioStreamBuilder_openStream(builder, &stream), "AAudioStreamBuilder_openStream");
+        try checkAAudioResult(c.AAudioStream_requestStart(stream), "AAudioStream_requestStart");
+        return .{ .stream = stream.? };
     }
 
-    pub fn openOutput(self: AudioDevice, writeFn: *const fn ([]f32) void, format: wio.AudioFormat) !AudioOutput {
-        _ = self;
-        _ = writeFn;
-        _ = format;
+    pub fn openInput(_: AudioDevice, readFn: *const fn ([]const f32) void, format: wio.AudioFormat) !AudioInput {
+        var builder: ?*c.AAudioStreamBuilder = undefined;
+        try checkAAudioResult(c.AAudio_createStreamBuilder(&builder), "AAudio_createStreamBuilder");
+        defer _ = c.AAudioStreamBuilder_delete(builder);
+        c.AAudioStreamBuilder_setSampleRate(builder, @bitCast(format.sample_rate));
+        c.AAudioStreamBuilder_setChannelCount(builder, format.channels);
+        c.AAudioStreamBuilder_setFormat(builder, c.AAUDIO_FORMAT_PCM_FLOAT);
+        c.AAudioStreamBuilder_setDirection(builder, c.AAUDIO_DIRECTION_INPUT);
+        c.AAudioStreamBuilder_setDataCallback(builder, AudioStream.inputCallback, @constCast(readFn));
+
+        var stream: ?*c.AAudioStream = undefined;
+        try checkAAudioResult(c.AAudioStreamBuilder_openStream(builder, &stream), "AAudioStreamBuilder_openStream");
+        try checkAAudioResult(c.AAudioStream_requestStart(stream), "AAudioStream_requestStart");
+        return .{ .stream = stream.? };
+    }
+
+    pub fn getId(_: AudioDevice, _: std.mem.Allocator) ![]u8 {
         return error.Unexpected;
     }
 
-    pub fn openInput(self: AudioDevice, readFn: *const fn ([]const f32) void, format: wio.AudioFormat) !AudioInput {
-        _ = self;
-        _ = readFn;
-        _ = format;
-        return error.Unexpected;
-    }
-
-    pub fn getId(self: AudioDevice, allocator: std.mem.Allocator) ![]u8 {
-        _ = self;
-        _ = allocator;
-        return error.Unexpected;
-    }
-
-    pub fn getName(self: AudioDevice, allocator: std.mem.Allocator) ![]u8 {
-        _ = self;
-        _ = allocator;
-        return error.Unexpected;
+    pub fn getName(_: AudioDevice, allocator: std.mem.Allocator) ![]u8 {
+        return allocator.dupe(u8, "AAudio");
     }
 };
 
-pub const AudioOutput = struct {
-    pub fn close(self: *AudioOutput) void {
-        _ = self;
+const AudioStream = struct {
+    stream: *c.AAudioStream,
+
+    pub fn close(self: *AudioStream) void {
+        _ = c.AAudioStream_close(self.stream);
+    }
+
+    fn outputCallback(stream: ?*c.AAudioStream, user_data: ?*anyopaque, audio_data: ?*anyopaque, num_frames: i32) callconv(.c) c.aaudio_data_callback_result_t {
+        const writeFn: *const fn ([]f32) void = @ptrCast(@alignCast(user_data));
+        const buffer: [*]f32 = @ptrCast(@alignCast(audio_data));
+        const channels = c.AAudioStream_getChannelCount(stream);
+        writeFn(buffer[0..@as(u32, @bitCast(num_frames * channels))]);
+        return c.AAUDIO_CALLBACK_RESULT_CONTINUE;
+    }
+
+    fn inputCallback(stream: ?*c.AAudioStream, user_data: ?*anyopaque, audio_data: ?*anyopaque, num_frames: i32) callconv(.c) c.aaudio_data_callback_result_t {
+        const readFn: *const fn ([]const f32) void = @ptrCast(@alignCast(user_data));
+        const buffer: [*]f32 = @ptrCast(@alignCast(audio_data));
+        const channels = c.AAudioStream_getChannelCount(stream);
+        readFn(buffer[0..@as(u32, @bitCast(num_frames * channels))]);
+        return c.AAUDIO_CALLBACK_RESULT_CONTINUE;
     }
 };
 
-pub const AudioInput = struct {
-    pub fn close(self: *AudioInput) void {
-        _ = self;
+pub const AudioOutput = AudioStream;
+pub const AudioInput = AudioStream;
+
+fn checkAAudioResult(result: c.aaudio_result_t, name: []const u8) !void {
+    if (result < 0) {
+        log.err("{s} failed, error {}", .{ name, result });
+        return error.Unexpected;
     }
-};
+}
 
 export fn JNI_OnLoad(vm: *c.JavaVM, _: ?*anyopaque) c.jint {
     var env: *c.JNIEnv = undefined;
@@ -449,6 +485,8 @@ const native = struct {
             return;
         };
         thread.detach();
+
+        Window.created_event.waitUncancelable(std.Io.Threaded.global_single_threaded.io());
     }
 
     fn onDestroy(_: *c.JNIEnv, _: c.jobject) callconv(.c) void {

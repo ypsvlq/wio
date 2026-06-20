@@ -114,6 +114,8 @@ pub fn build(b: *std.Build) !void {
                         \\#include <EGL/egl.h>
                         \\#include <vulkan/vulkan.h>
                         \\#include <vulkan/vulkan_android.h>
+                        \\#define _Nullable
+                        \\#include <aaudio/AAudio.h>
                         \\
                     ),
                     .target = target,
@@ -127,6 +129,9 @@ pub fn build(b: *std.Build) !void {
                 }
                 if (enable_vulkan) {
                     module.linkSystemLibrary("vulkan", .{});
+                }
+                if (enable_audio) {
+                    module.linkSystemLibrary("aaudio", .{});
                 }
             } else {
                 var cimport: std.ArrayList(u8) = .empty;
