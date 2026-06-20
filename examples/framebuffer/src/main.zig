@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const wio = @import("wio");
 
 pub const std_options: std.Options = .{ .logFn = wio.logFn };
@@ -16,7 +17,7 @@ pub fn main() !void {
     var allocator: std.mem.Allocator = undefined;
     var io: std.Io = undefined;
 
-    if (@import("builtin").cpu.arch.isWasm()) {
+    if (builtin.cpu.arch.isWasm()) {
         allocator = std.heap.wasm_allocator;
     } else {
         allocator = debug_allocator.allocator();
@@ -45,8 +46,10 @@ fn loop() !bool {
                 window.destroy();
                 events.deinit();
                 wio.deinit();
-                threaded.deinit();
-                _ = debug_allocator.deinit();
+                if (!builtin.cpu.arch.isWasm()) {
+                    threaded.deinit();
+                    _ = debug_allocator.deinit();
+                }
                 return false;
             },
             .size_physical => |new_size| {
