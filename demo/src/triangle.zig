@@ -12,16 +12,20 @@ pub fn init() !void {
     gl.clearColor(0, 0, 0, 1);
 
     const vs = gl.createShader(gl.VERTEX_SHADER);
+    defer gl.deleteShader(vs);
     gl.shaderSource(vs, 1, &[_][*:0]const u8{@embedFile("shader.vert")}, null);
     gl.compileShader(vs);
 
     const fs = gl.createShader(gl.FRAGMENT_SHADER);
+    defer gl.deleteShader(fs);
     gl.shaderSource(fs, 1, &[_][*:0]const u8{@embedFile("shader.frag")}, null);
     gl.compileShader(fs);
 
     const program = gl.createProgram();
     gl.attachShader(program, vs);
+    defer gl.detachShader(program, vs);
     gl.attachShader(program, fs);
+    defer gl.detachShader(program, fs);
     gl.linkProgram(program);
 
     gl.useProgram(program);
