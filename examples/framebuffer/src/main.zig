@@ -2,6 +2,10 @@ const std = @import("std");
 const builtin = @import("builtin");
 const wio = @import("wio");
 
+comptime {
+    _ = wio; // for Android
+}
+
 pub const std_options: std.Options = .{ .logFn = wio.logFn };
 
 var debug_allocator: std.heap.DebugAllocator(.{}) = .init;

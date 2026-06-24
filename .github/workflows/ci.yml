@@ -74,3 +74,9 @@ jobs:
     - name: Build demo
       working-directory: demo
       run: zig build -Dandroid=true
+    - name: Build framebuffer example
+      working-directory: examples/framebuffer
+      run: zig build -Dandroid=true
+    - name: Build Vulkan example
+      working-directory: examples/vulkan
+      run: zig build -Dandroid=true

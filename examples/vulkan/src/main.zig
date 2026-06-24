@@ -2,9 +2,11 @@ const std = @import("std");
 const wio = @import("wio");
 const vk = @import("vulkan");
 
-pub const std_options: std.Options = .{
-    .logFn = wio.logFn,
-};
+comptime {
+    _ = wio; // for Android
+}
+
+pub const std_options: std.Options = .{ .logFn = wio.logFn };
 
 var debug_allocator = std.heap.DebugAllocator(.{}).init;
 const allocator = debug_allocator.allocator();
