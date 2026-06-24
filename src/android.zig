@@ -21,6 +21,9 @@ var egl_config: c.EGLConfig = null;
 var egl_surface: c.EGLSurface = null;
 var egl_surface_mutex: std.Io.Mutex = .init;
 
+var audioDefaultInputFn: ?*const fn (wio.AudioDevice) void = null;
+var audio_input_available = false;
+
 pub fn init(options: wio.InitOptions) !void {
     if (build_options.opengl) {
         try egl.init(c.EGL_DEFAULT_DISPLAY);
@@ -29,6 +32,7 @@ pub fn init(options: wio.InitOptions) !void {
     if (build_options.audio) {
         if (options.audioDefaultOutputFn) |callback| callback(.{ .backend = .{} });
         if (options.audioDefaultInputFn) |callback| callback(.{ .backend = .{} });
+        audioDefaultInputFn = options.audioDefaultInputFn;
     }
 }
 
@@ -44,7 +48,16 @@ pub fn run(func: fn () anyerror!bool) !void {
     }
 }
 
-pub fn update() void {}
+pub fn update() void {
+    if (build_options.audio) {
+        if (audio_input_available) {
+            if (audioDefaultInputFn) |callback| {
+                callback(.{ .backend = .{} });
+            }
+            audio_input_available = false;
+        }
+    }
+}
 
 pub fn wait(options: wio.WaitOptions) void {
     wait_event.reset();
@@ -345,6 +358,8 @@ pub const AudioDevice = struct {
     }
 
     pub fn openInput(_: AudioDevice, readFn: *const fn ([]const f32) void, format: wio.AudioFormat) !AudioInput {
+        java.env.*.*.CallVoidMethod.?(java.env, java.activity, java.requestRecordAudioPermission);
+
         var builder: ?*c.AAudioStreamBuilder = undefined;
         try checkAAudioResult(c.AAudio_createStreamBuilder(&builder), "AAudio_createStreamBuilder");
         defer _ = c.AAudioStreamBuilder_delete(builder);
@@ -418,6 +433,9 @@ export fn JNI_OnLoad(vm: *c.JavaVM, _: ?*anyopaque) c.jint {
     java.setCursor = env.*.*.GetMethodID.?(env, class, "setCursor", "(I)V") orelse return c.JNI_ERR;
     java.setClipboardText = env.*.*.GetMethodID.?(env, class, "setClipboardText", "(Ljava/lang/String;)V") orelse return c.JNI_ERR;
     java.getClipboardText = env.*.*.GetMethodID.?(env, class, "getClipboardText", "()Ljava/lang/String;") orelse return c.JNI_ERR;
+    if (build_options.audio) {
+        java.requestRecordAudioPermission = env.*.*.GetMethodID.?(env, class, "requestRecordAudioPermission", "()V") orelse return c.JNI_ERR;
+    }
 
     return c.JNI_VERSION_1_6;
 }
@@ -455,6 +473,7 @@ const java = struct {
     var setCursor: c.jmethodID = undefined;
     var setClipboardText: c.jmethodID = undefined;
     var getClipboardText: c.jmethodID = undefined;
+    var requestRecordAudioPermission: if (build_options.audio) c.jmethodID else void = undefined;
 };
 
 const native = struct {
@@ -475,7 +494,9 @@ const native = struct {
         .{ .name = "pushCharEventNative", .signature = "(I)V", .fnPtr = @ptrCast(@constCast(&pushCharEvent)) },
         .{ .name = "pushPreviewResetEventNative", .signature = "()V", .fnPtr = @ptrCast(@constCast(&pushPreviewResetEvent)) },
         .{ .name = "pushPreviewCharEventNative", .signature = "(I)V", .fnPtr = @ptrCast(@constCast(&pushPreviewCharEvent)) },
-    };
+    } ++ if (build_options.audio) [_]c.JNINativeMethod{
+        .{ .name = "onPermissionGrantedNative", .signature = "()V", .fnPtr = @ptrCast(@constCast(&onPermissionGranted)) },
+    } else .{};
 
     fn onCreate(env: *c.JNIEnv, instance: c.jobject) callconv(.c) void {
         java.activity = env.*.*.NewGlobalRef.?(env, instance);
@@ -626,6 +647,10 @@ const native = struct {
 
     fn pushPreviewCharEvent(_: *c.JNIEnv, _: c.jobject, codepoint: c.jint) callconv(.c) void {
         internal.eventFn(event_fn_data, .{ .preview_char = std.math.cast(u21, codepoint) orelse return });
+    }
+
+    fn onPermissionGranted(_: *c.JNIEnv, _: c.jobject) callconv(.c) void {
+        audio_input_available = true;
     }
 };
 

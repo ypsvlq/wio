@@ -1,8 +1,10 @@
 package net.tiredsleepy.wio;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.ClipData;
 import android.content.ClipboardManager;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.view.InputDevice;
 import android.view.KeyEvent;
@@ -36,6 +38,7 @@ public class WioActivity extends Activity implements SurfaceHolder.Callback, OnG
     static native void pushCharEventNative(int codepoint);
     static native void pushPreviewResetEventNative();
     static native void pushPreviewCharEventNative(int codepoint);
+    static native void onPermissionGrantedNative();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -146,6 +149,13 @@ public class WioActivity extends Activity implements SurfaceHolder.Callback, OnG
         onGlobalLayoutNative();
     }
 
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            onPermissionGrantedNative();
+        }
+    }
+
     public void enableTextInput() {
         InputMethodManager imm = (InputMethodManager)getSystemService(INPUT_METHOD_SERVICE);
         imm.showSoftInput(getCurrentFocus(), 0);
@@ -217,6 +227,13 @@ public class WioActivity extends Activity implements SurfaceHolder.Callback, OnG
             return clipboard.getPrimaryClip().getItemAt(0).getText().toString();
         } catch (NullPointerException e) {
             return null;
+        }
+    }
+
+    public void requestRecordAudioPermission() {
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            String[] permissions = {Manifest.permission.RECORD_AUDIO};
+            requestPermissions(permissions, 0);
         }
     }
 }
