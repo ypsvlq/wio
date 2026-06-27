@@ -11,6 +11,7 @@ pub const logFn = android.logFn;
 const egl = internal.egl(c, c);
 
 var window: ?*c.ANativeWindow = null;
+var window_mutex: std.Io.Mutex = .init;
 
 var wait_event: std.Io.Event = .unset;
 var event_fn_data: ?*anyopaque = undefined;
@@ -18,8 +19,7 @@ var modifiers: wio.Modifiers = .{};
 var relative_mouse: bool = false;
 
 var egl_config: c.EGLConfig = null;
-var egl_surface: c.EGLSurface = null;
-var egl_surface_mutex: std.Io.Mutex = .init;
+var egl_surface: c.EGLSurface = null; // protected by `window_mutex`
 
 var audioDefaultInputFn: ?*const fn (wio.AudioDevice) void = null;
 var audio_input_available = false;
@@ -177,6 +177,9 @@ pub const Window = struct {
     }
 
     pub fn presentFramebuffer(_: *Window, framebuffer: *Framebuffer) void {
+        window_mutex.lockUncancelable(internal.io);
+        defer window_mutex.unlock(internal.io);
+
         if (window == null) return;
 
         const width = framebuffer.size.width;
@@ -206,14 +209,14 @@ pub const Window = struct {
     }
 
     pub fn glMakeContextCurrent(_: *Window, context: GlContext) void {
-        egl_surface_mutex.lockUncancelable(internal.io);
-        defer egl_surface_mutex.unlock(internal.io);
+        window_mutex.lockUncancelable(internal.io);
+        defer window_mutex.unlock(internal.io);
         _ = c.eglMakeCurrent(egl.display, egl_surface, egl_surface, context.context);
     }
 
     pub fn glSwapBuffers(_: *Window) void {
-        egl_surface_mutex.lockUncancelable(internal.io);
-        defer egl_surface_mutex.unlock(internal.io);
+        window_mutex.lockUncancelable(internal.io);
+        defer window_mutex.unlock(internal.io);
         _ = c.eglSwapBuffers(egl.display, egl_surface);
     }
 
@@ -592,13 +595,14 @@ const native = struct {
     }
 
     fn surfaceCreated(env: *c.JNIEnv, _: c.jobject, surface: c.jobject) callconv(.c) void {
+        window_mutex.lockUncancelable(internal.io);
+        defer window_mutex.unlock(internal.io);
+
         window = c.ANativeWindow_fromSurface(env, surface);
         internal.eventFn(event_fn_data, .visible);
 
         if (build_options.opengl) {
             if (egl_config != null) {
-                egl_surface_mutex.lockUncancelable(internal.io);
-                defer egl_surface_mutex.unlock(internal.io);
                 egl_surface = c.eglCreateWindowSurface(egl.display, egl_config, window, null) orelse {
                     logEglError("eglCreateWindowSurface");
                     return;
@@ -615,14 +619,15 @@ const native = struct {
     }
 
     fn surfaceDestroyed(_: *c.JNIEnv, _: c.jobject) callconv(.c) void {
+        window_mutex.lockUncancelable(internal.io);
+        defer window_mutex.unlock(internal.io);
+
         c.ANativeWindow_release(window);
         window = null;
         internal.eventFn(event_fn_data, .hidden);
 
         if (build_options.opengl) {
             if (egl_surface) |_| {
-                egl_surface_mutex.lockUncancelable(internal.io);
-                defer egl_surface_mutex.unlock(internal.io);
                 _ = c.eglDestroySurface(egl.display, egl_surface);
                 egl_surface = null;
             }
