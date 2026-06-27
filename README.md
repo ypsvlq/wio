@@ -73,7 +73,7 @@ Actively tested:
 - Windows
 - macOS (10.13+)
 - Linux
-- Android
+- Android (API 26+ / Android 8 and up)
 - WebAssembly
 
 Not actively tested, but most code is shared with Linux:
@@ -152,8 +152,6 @@ To ensure the entry point is exported from the shared library, the root source
 file should contain `comptime { _ = wio; }` at the top level.
 
 [demo/build.zig][7] is an example of a build script supporting Android.
-
-Android API levels 26 (Android 8) to 36 (Android 16) are currently supported.
 
 ### WebAssembly
 
