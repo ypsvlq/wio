@@ -509,13 +509,15 @@ fn drawFrame() !void {
         in_flight_fence,
     );
 
-    _ = try device.queuePresentKHR(present_queue, &.{
+    if (try device.queuePresentKHR(present_queue, &.{
         .wait_semaphore_count = 1,
         .p_wait_semaphores = &.{render_finished_semaphores[image_index]},
         .swapchain_count = 1,
         .p_swapchains = &.{swapchain},
         .p_image_indices = &.{image_index},
-    });
+    }) == .suboptimal_khr) {
+        try recreateSwapchain();
+    }
 }
 
 var visible = false;
