@@ -15,7 +15,6 @@ var size: wio.Size = .{ .width = 640, .height = 480 };
 var events: wio.EventQueue = .empty;
 var window: wio.Window = undefined;
 var fb: wio.Framebuffer = undefined;
-var t: u16 = 0;
 
 pub fn main() !void {
     var allocator: std.mem.Allocator = undefined;
@@ -43,6 +42,9 @@ pub fn main() !void {
     return wio.run(loop);
 }
 
+var t: u16 = 0;
+var visible = false;
+
 fn loop() !bool {
     while (events.pop()) |event| {
         switch (event) {
@@ -63,12 +65,16 @@ fn loop() !bool {
                     size = new_size;
                 }
             },
+            .visible => visible = true,
+            .hidden => visible = false,
             else => {},
         }
     }
-    render();
-    window.presentFramebuffer(&fb);
-    t +%= 1;
+    if (visible) {
+        render();
+        window.presentFramebuffer(&fb);
+        t +%= 1;
+    }
     wio.wait(.{ .timeout_ns = std.time.ns_per_s / 60 });
     return true;
 }
