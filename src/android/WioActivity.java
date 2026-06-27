@@ -135,7 +135,12 @@ public class WioActivity extends Activity implements SurfaceHolder.Callback, OnG
 
     @Override
     public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-        float density = getWindowManager().getCurrentWindowMetrics().getDensity();
+        // In Android API level 34, `WindowMetrics.getDensity` was added.
+        // The documentation says that UI layout should use `WindowMetrics`,
+        // not `DisplayMetrics`, and that only the DPI of `DisplayMetrics` should
+        // be used. As of 0d5e37e, `WindowMetrics.getDensity` and
+        // `DisplayMetrics.density` result in identical values.
+        float density = getResources().getDisplayMetrics().density;
         surfaceChangedNative(density, width, height);
     }
 
