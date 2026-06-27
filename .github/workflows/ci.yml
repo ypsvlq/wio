@@ -71,12 +71,12 @@ jobs:
       uses: android-actions/setup-android@v4
       with:
         packages: "build-tools;37.0.0 ndk;29.0.14206865 platforms;android-26"
-    - name: Build demo for API level 26
+    - name: Build demo
       working-directory: demo
       run: zig build -Dandroid=true -Dandroid_api_level=android8
-    - name: Build framebuffer example for API level 26
+    - name: Build framebuffer example
       working-directory: examples/framebuffer
       run: zig build -Dandroid=true -Dandroid_api_level=android8
-    - name: Build Vulkan example for API level 26
+    - name: Build Vulkan example
       working-directory: examples/vulkan
       run: zig build -Dandroid=true -Dandroid_api_level=android8
