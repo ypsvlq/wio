@@ -73,7 +73,7 @@ Actively tested:
 - Windows
 - macOS (10.13+)
 - Linux
-- Android
+- Android (API 26+ / Android 8 and up)
 - WebAssembly
 
 Not actively tested, but most code is shared with Linux:
