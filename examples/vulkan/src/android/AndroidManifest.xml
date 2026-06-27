@@ -2,6 +2,7 @@
 <manifest
     xmlns:android="http://schemas.android.com/apk/res/android"
     package="net.tiredsleepy.wio.vulkan">
+    <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="36" />
     <application
         android:label="@string/app_name">
         <activity
@@ -14,5 +15,4 @@
             </intent-filter>
         </activity>
     </application>
-    <uses-sdk android:minSdkVersion="26" />
 </manifest>
