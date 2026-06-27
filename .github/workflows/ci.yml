@@ -70,7 +70,7 @@ jobs:
     - name: Set up Android SDK
       uses: android-actions/setup-android@v4
       with:
-        packages: "build-tools;37.0.0 ndk;29.0.14206865 platforms;android-35"
+        packages: "build-tools;37.0.0 ndk;29.0.14206865 platforms;android-35 platforms;android-26"
     - name: Build demo
       working-directory: demo
       run: zig build -Dandroid=true
@@ -80,3 +80,12 @@ jobs:
     - name: Build Vulkan example
       working-directory: examples/vulkan
       run: zig build -Dandroid=true
+    - name: Build demo for API level 26
+      working-directory: demo
+      run: zig build -Dandroid=true -Dandroid_api_level=android8
+    - name: Build framebuffer example for API level 26
+      working-directory: examples/framebuffer
+      run: zig build -Dandroid=true -Dandroid_api_level=android8
+    - name: Build Vulkan example for API level 26
+      working-directory: examples/vulkan
+      run: zig build -Dandroid=true -Dandroid_api_level=android8
