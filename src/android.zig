@@ -518,13 +518,16 @@ const native = struct {
     }
 
     fn onWindowFocusChanged(env: *c.JNIEnv, instance: c.jobject, focused: c.jboolean) callconv(.c) void {
-        internal.eventFn(event_fn_data, if (focused == c.JNI_TRUE) .focused else .unfocused);
-
-        if (focused == c.JNI_TRUE and relative_mouse) {
-            env.*.*.CallVoidMethod.?(env, instance, java.enableRelativeMouse);
+        if (focused == c.JNI_FALSE) {
+            internal.eventFn(event_fn_data, .unfocused);
+            modifiers = .{};
+        } else {
+            internal.eventFn(event_fn_data, .focused);
+            internal.eventFn(event_fn_data, .draw);
+            if (relative_mouse) {
+                env.*.*.CallVoidMethod.?(env, instance, java.enableRelativeMouse);
+            }
         }
-
-        modifiers = .{};
     }
 
     fn onTouchEvent(_: *c.JNIEnv, _: c.jobject, action: c.jint, id_j: c.jint, x: c.jint, y: c.jint) callconv(.c) void {
