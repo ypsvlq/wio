@@ -44,7 +44,10 @@ pub fn main(init: std.process.Init.Minimal) !void {
         io = threaded.io();
     }
 
-    try wio.init(allocator, io, eventFn, .{
+    try wio.init(.{
+        .allocator = allocator,
+        .io = io,
+        .eventFn = eventFn,
         .joystickConnectedFn = joystick.connected,
         .audioDefaultOutputFn = audio.defaultOutput,
         .audioDefaultInputFn = audio.defaultInput,

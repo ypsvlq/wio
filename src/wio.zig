@@ -18,6 +18,9 @@ comptime {
 pub const logFn = if (@hasDecl(backend, "logFn")) backend.logFn else std.log.defaultLog;
 
 pub const InitOptions = struct {
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    eventFn: *const fn (?*anyopaque, Event) void,
     /// Free with `JoystickDevice.release()`.
     joystickConnectedFn: ?*const fn (JoystickDevice) void = null,
     /// Free with `AudioDevice.release()`.
@@ -32,16 +35,15 @@ pub const InitOptions = struct {
 ///
 /// `eventFn` is the low-level window event callback which may run on other threads,
 /// using `EventQueue.eventFn` is recommended.
-pub fn init(
-    allocator: std.mem.Allocator,
-    io: std.Io,
-    eventFn: fn (?*anyopaque, Event) void,
-    options: InitOptions,
-) !void {
-    internal.allocator = allocator;
-    internal.io = io;
-    internal.eventFn = eventFn;
-    try backend.init(options);
+pub fn init(options: InitOptions) !void {
+    internal.allocator = options.allocator;
+    internal.io = options.io;
+    internal.eventFn = options.eventFn;
+    try backend.init(.{
+        .joystickConnectedFn = options.joystickConnectedFn,
+        .audioDefaultOutputFn = options.audioDefaultOutputFn,
+        .audioDefaultInputFn = options.audioDefaultInputFn,
+    });
 }
 
 /// All windows and devices must be closed before calling.

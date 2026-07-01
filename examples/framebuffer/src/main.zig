@@ -28,7 +28,11 @@ pub fn main() !void {
         io = threaded.io();
     }
 
-    try wio.init(allocator, io, wio.EventQueue.eventFn, .{});
+    try wio.init(.{
+        .allocator = allocator,
+        .io = io,
+        .eventFn = wio.EventQueue.eventFn,
+    });
 
     window = try .create(.{
         .event_fn_data = &events,

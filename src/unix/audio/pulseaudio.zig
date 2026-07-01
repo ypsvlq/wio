@@ -56,7 +56,7 @@ var context: *h.pa_context = undefined;
 var defaultOutputFn: ?*const fn (wio.AudioDevice) void = null;
 var defaultInputFn: ?*const fn (wio.AudioDevice) void = null;
 
-pub fn init(options: wio.InitOptions) !void {
+pub fn init(options: internal.BackendInitOptions) !void {
     defaultOutputFn = options.audioDefaultOutputFn;
     defaultInputFn = options.audioDefaultInputFn;
 

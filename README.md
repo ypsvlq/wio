@@ -18,7 +18,11 @@ const std = @import("std");
 const wio = @import("wio");
 
 pub fn main(init: std.process.Init) !void {
-    try wio.init(init.gpa, init.io, wio.EventQueue.eventFn, .{});
+    try wio.init(.{
+        .allocator = init.gpa,
+        .io = init.io,
+        .eventFn = wio.EventQueue.eventFn,
+    });
     defer wio.deinit();
 
     var events: wio.EventQueue = .empty;

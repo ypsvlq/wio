@@ -7,7 +7,7 @@ const log = std.log.scoped(.wio);
 
 const class_name = w.L("wio");
 
-var init_options: wio.InitOptions = undefined;
+var init_options: internal.BackendInitOptions = undefined;
 var helper_window: w.HWND = undefined;
 
 var wgl: struct {
@@ -29,7 +29,7 @@ var helper_input: []u8 = &.{};
 var mm_device_enumerator: *w.IMMDeviceEnumerator = undefined;
 var mm_notification_client = MMNotificationClient{};
 
-pub fn init(options: wio.InitOptions) !void {
+pub fn init(options: internal.BackendInitOptions) !void {
     init_options = options;
 
     const instance = w.GetModuleHandleW(null);

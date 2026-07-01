@@ -20,7 +20,7 @@ const c = if (build_options.system_integration) h else &imports;
 
 var libsndio: DynLib = undefined;
 
-pub fn init(options: wio.InitOptions) !void {
+pub fn init(options: internal.BackendInitOptions) !void {
     try DynLib.load(&imports, &.{.{ .handle = &libsndio, .name = "libsndio.so.7" }});
 
     if (options.audioDefaultOutputFn) |callback| callback(.{ .backend = .{} });

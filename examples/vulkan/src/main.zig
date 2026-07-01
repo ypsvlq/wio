@@ -22,7 +22,11 @@ var vkb: vk.BaseWrapper = undefined;
 pub fn main() !void {
     threaded = .init(allocator, .{});
 
-    try wio.init(allocator, threaded.io(), wio.EventQueue.eventFn, .{});
+    try wio.init(.{
+        .allocator = allocator,
+        .io = threaded.io(),
+        .eventFn = wio.EventQueue.eventFn,
+    });
     window = try .create(.{
         .event_fn_data = &events,
         .title = "Vulkan",
