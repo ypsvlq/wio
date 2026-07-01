@@ -39,11 +39,7 @@ pub fn init(options: InitOptions) !void {
     internal.allocator = options.allocator;
     internal.io = options.io;
     internal.eventFn = options.eventFn;
-    try backend.init(.{
-        .joystickConnectedFn = options.joystickConnectedFn,
-        .audioDefaultOutputFn = options.audioDefaultOutputFn,
-        .audioDefaultInputFn = options.audioDefaultInputFn,
-    });
+    try backend.init(options);
 }
 
 /// All windows and devices must be closed before calling.

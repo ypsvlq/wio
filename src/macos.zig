@@ -50,7 +50,7 @@ var libvulkan: std.DynLib = undefined;
 var hid: c.IOHIDManagerRef = undefined;
 var removed_joysticks: std.AutoHashMapUnmanaged(c.IOHIDDeviceRef, bool) = undefined;
 
-pub fn init(options: internal.BackendInitOptions) !void {
+pub fn init(options: wio.InitOptions) !void {
     wioInit();
 
     if (build_options.vulkan) {

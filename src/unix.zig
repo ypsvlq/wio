@@ -27,7 +27,7 @@ var pipe: [2]std.c.fd_t = undefined;
 
 pub var libvulkan: DynLib = undefined;
 
-pub fn init(options: internal.BackendInitOptions) !void {
+pub fn init(options: wio.InitOptions) !void {
     if (!build_options.system_integration and builtin.os.tag == .linux and builtin.output_mode == .Exe and builtin.link_mode == .static) @compileError("dynamic link required");
 
     pollfds = .empty;

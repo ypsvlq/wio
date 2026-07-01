@@ -8,12 +8,6 @@ pub var eventFn: *const fn (?*anyopaque, wio.Event) void = undefined;
 
 pub var wait = false;
 
-pub const BackendInitOptions = struct {
-    joystickConnectedFn: ?*const fn (wio.JoystickDevice) void,
-    audioDefaultOutputFn: ?*const fn (wio.AudioDevice) void,
-    audioDefaultInputFn: ?*const fn (wio.AudioDevice) void,
-};
-
 pub fn logUnexpected(name: []const u8) error{Unexpected} {
     log.err("{s} failed", .{name});
     return error.Unexpected;

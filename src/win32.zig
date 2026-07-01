@@ -7,7 +7,6 @@ const log = std.log.scoped(.wio);
 
 const class_name = w.L("wio");
 
-var init_options: internal.BackendInitOptions = undefined;
 var helper_window: w.HWND = undefined;
 
 var wgl: struct {
@@ -25,13 +24,15 @@ const JoystickInfo = struct {
 var joysticks: std.AutoHashMapUnmanaged(w.HANDLE, JoystickInfo) = undefined;
 var xinput: std.StaticBitSet(4) = .empty;
 var helper_input: []u8 = &.{};
+var joystickConnectedFn: ?*const fn (wio.JoystickDevice) void = null;
 
 var mm_device_enumerator: *w.IMMDeviceEnumerator = undefined;
 var mm_notification_client = MMNotificationClient{};
+var init_options: wio.InitOptions = undefined;
+var audioDefaultOutputFn: ?*const fn (wio.AudioDevice) void = null;
+var audioDefaultInputFn: ?*const fn (wio.AudioDevice) void = null;
 
-pub fn init(options: internal.BackendInitOptions) !void {
-    init_options = options;
-
+pub fn init(options: wio.InitOptions) !void {
     const instance = w.GetModuleHandleW(null);
 
     const class = std.mem.zeroInit(w.WNDCLASSW, .{
@@ -96,6 +97,8 @@ pub fn init(options: internal.BackendInitOptions) !void {
     }
 
     if (build_options.joystick) {
+        joystickConnectedFn = options.joystickConnectedFn;
+
         _ = w.SetWindowLongPtrW(helper_window, w.GWLP_WNDPROC, @bitCast(@intFromPtr(&helperWindowProc)));
 
         joysticks = .empty;
@@ -122,6 +125,9 @@ pub fn init(options: internal.BackendInitOptions) !void {
     }
 
     if (build_options.audio) {
+        audioDefaultOutputFn = options.audioDefaultOutputFn;
+        audioDefaultInputFn = options.audioDefaultInputFn;
+
         try SUCCEED(w.CoCreateInstance(&w.CLSID_MMDeviceEnumerator, null, w.CLSCTX_ALL, &w.IID_IMMDeviceEnumerator, @ptrCast(&mm_device_enumerator)), "CoCreateInstance");
 
         var device: *w.IMMDevice = undefined;

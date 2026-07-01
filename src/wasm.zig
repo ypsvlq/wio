@@ -57,7 +57,7 @@ const gl = struct {
 
 var joystickConnectedFn: ?*const fn (wio.JoystickDevice) void = null;
 
-pub fn init(options: internal.BackendInitOptions) !void {
+pub fn init(options: wio.InitOptions) !void {
     if (build_options.joystick) {
         joystickConnectedFn = options.joystickConnectedFn;
     }

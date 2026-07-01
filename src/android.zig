@@ -24,7 +24,7 @@ var egl_surface: c.EGLSurface = null; // protected by `window_mutex`
 var audioDefaultInputFn: ?*const fn (wio.AudioDevice) void = null;
 var audio_input_available = false;
 
-pub fn init(options: internal.BackendInitOptions) !void {
+pub fn init(options: wio.InitOptions) !void {
     if (build_options.opengl) {
         try egl.init(c.EGL_DEFAULT_DISPLAY);
     }

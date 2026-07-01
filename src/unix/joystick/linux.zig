@@ -36,7 +36,7 @@ var monitor: *h.udev_monitor = undefined;
 
 var joystickConnectedFn: ?*const fn (wio.JoystickDevice) void = null;
 
-pub fn init(options: internal.BackendInitOptions) !void {
+pub fn init(options: wio.InitOptions) !void {
     joystickConnectedFn = options.joystickConnectedFn;
 
     try DynLib.load(&imports, &.{.{ .handle = &libudev, .name = "libudev.so.1" }});

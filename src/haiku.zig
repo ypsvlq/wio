@@ -44,7 +44,7 @@ threadlocal var gl_state: struct {
     framebuffer: Framebuffer = undefined,
 } = .{};
 
-pub fn init(options: internal.BackendInitOptions) !void {
+pub fn init(options: wio.InitOptions) !void {
     wioInit();
 
     if (build_options.joystick) {
