@@ -28,7 +28,6 @@ var joystickConnectedFn: ?*const fn (wio.JoystickDevice) void = null;
 
 var mm_device_enumerator: *w.IMMDeviceEnumerator = undefined;
 var mm_notification_client = MMNotificationClient{};
-var init_options: wio.InitOptions = undefined;
 var audioDefaultOutputFn: ?*const fn (wio.AudioDevice) void = null;
 var audioDefaultInputFn: ?*const fn (wio.AudioDevice) void = null;
 
@@ -185,14 +184,14 @@ pub fn update() void {
 
     if (build_options.audio) {
         var maybe_device: ?*w.IMMDevice = undefined;
-        if (init_options.audioDefaultOutputFn) |callback| {
+        if (audioDefaultOutputFn) |callback| {
             mm_notification_client.mutex.lockUncancelable(internal.io);
             maybe_device = mm_notification_client.default_output;
             mm_notification_client.default_output = null;
             mm_notification_client.mutex.unlock(internal.io);
             if (maybe_device) |device| callback(.{ .backend = .{ .device = device } });
         }
-        if (init_options.audioDefaultInputFn) |callback| {
+        if (audioDefaultInputFn) |callback| {
             mm_notification_client.mutex.lockUncancelable(internal.io);
             maybe_device = mm_notification_client.default_input;
             mm_notification_client.default_input = null;
@@ -1173,9 +1172,9 @@ const MMNotificationClient = struct {
 
     fn OnDefaultDeviceChanged(_: *w.IMMNotificationClient, flow: i32, role: i32, id: [*c]const u16) callconv(.winapi) w.HRESULT {
         if (role == w.eConsole) {
-            const maybe_device = if (flow == w.eRender and init_options.audioDefaultOutputFn != null)
+            const maybe_device = if (flow == w.eRender and audioDefaultOutputFn != null)
                 &mm_notification_client.default_output
-            else if (flow == w.eCapture and init_options.audioDefaultInputFn != null)
+            else if (flow == w.eCapture and audioDefaultInputFn != null)
                 &mm_notification_client.default_input
             else
                 null;
@@ -1438,7 +1437,7 @@ fn helperWindowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM
                             var state: w.XINPUT_STATE = undefined;
                             if (w.XInputGetState(@intCast(i), &state) == w.ERROR_SUCCESS) {
                                 xinput.set(i);
-                                if (init_options.joystickConnectedFn) |callback| callback(.{ .backend = .{ .xinput = @intCast(i) } });
+                                if (joystickConnectedFn) |callback| callback(.{ .backend = .{ .xinput = @intCast(i) } });
                             }
                         }
                         internal.allocator.free(interface);
@@ -1450,7 +1449,7 @@ fn helperWindowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM
                         return 0;
                     };
 
-                    if (init_options.joystickConnectedFn) |callback| callback(.{ .backend = .{ .rawinput = device } });
+                    if (joystickConnectedFn) |callback| callback(.{ .backend = .{ .rawinput = device } });
                 },
                 w.GIDC_REMOVAL => {
                     var iter = xinput.iterator(.{});
