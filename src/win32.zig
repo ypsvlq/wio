@@ -148,8 +148,8 @@ pub fn init(options: wio.InitOptions) !void {
 }
 
 pub fn deinit() void {
-    if (build_options.vulkan) {
-        _ = w.FreeLibrary(vulkan);
+    if (build_options.audio) {
+        _ = mm_device_enumerator.Release();
     }
 
     if (build_options.joystick) {
@@ -160,12 +160,15 @@ pub fn deinit() void {
         joysticks.deinit(internal.allocator);
     }
 
-    if (build_options.audio) {
-        _ = mm_device_enumerator.Release();
+    if (build_options.vulkan) {
+        _ = w.FreeLibrary(vulkan);
+    }
+
+    if (build_options.drop or build_options.audio) {
+        w.OleUninitialize();
     }
 
     _ = w.DestroyWindow(helper_window);
-    w.OleUninitialize();
 }
 
 pub fn run(func: fn () anyerror!bool) !void {
