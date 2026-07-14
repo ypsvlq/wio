@@ -22,7 +22,7 @@ pub fn build(b: *std.Build) void {
             apk.addResourceDirectory(b.path("src/android/res"));
             @import("wio").setupApk(b.dependency("wio", .{}), apk);
 
-            for (android.resolveTargets(b, .{ .default_target = target, .all_targets = android_all_targets })) |android_target| {
+            for (android.resolveTargets(b, .{ .default_target = target, .all_targets = android_all_targets, .api_level = apk.api_level })) |android_target| {
                 apk.addArtifact(b.addLibrary(.{
                     .linkage = .dynamic,
                     .name = "main",

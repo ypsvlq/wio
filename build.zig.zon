@@ -20,8 +20,8 @@
             .lazy = true,
         },
         .android = .{
-            .url = "https://github.com/silbinarywolf/zig-android-sdk/archive/1a6e3f34d4eeaeb8df4741d670a8d58ba256c0cd.tar.gz",
-            .hash = "android-0.3.0-7iz7QicYAgCURX17qlaWt_3cGZijZDozjrhLJm3kxZM3",
+            .url = "https://github.com/silbinarywolf/zig-android-sdk/archive/0e8dfe60ec5120e99d6705ab4606079bc3160a53.tar.gz",
+            .hash = "android-0.3.0-7iz7Qp9IAgBlbdmEnCTne54Rn_lfHtiN3Er6HFkhn5y8",
             .lazy = true,
         },
     },

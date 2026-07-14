@@ -7,8 +7,8 @@
             .path = "../..",
         },
         .android = .{
-            .url = "https://github.com/silbinarywolf/zig-android-sdk/archive/e72f0bb19b0b770fe65b74515594fea62ee369cf.tar.gz",
-            .hash = "android-0.3.0-7iz7QkgyAgCCCsGXARq_j2DYLmIZoVlDh5ugZUUhKxAQ",
+            .url = "https://github.com/silbinarywolf/zig-android-sdk/archive/0e8dfe60ec5120e99d6705ab4606079bc3160a53.tar.gz",
+            .hash = "android-0.3.0-7iz7Qp9IAgBlbdmEnCTne54Rn_lfHtiN3Er6HFkhn5y8",
             .lazy = true,
         },
     },
