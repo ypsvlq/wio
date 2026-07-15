@@ -102,13 +102,10 @@ pub fn build(b: *std.Build) !void {
         },
         .linux, .openbsd, .netbsd, .freebsd, .dragonfly, .illumos => |tag| {
             if (target.result.abi.isAndroid()) {
-                if (b.lazyDependency("android", .{})) |android| {
-                    module.addImport("android", android.module("android"));
-                }
-
                 const translate_c = b.addTranslateC(.{
                     .root_source_file = b.addWriteFiles().add("cimport.c",
                         \\#include <jni.h>
+                        \\#include <android/log.h>
                         \\#include <android/input.h>
                         \\#include <android/native_window_jni.h>
                         \\#include <EGL/egl.h>
@@ -124,6 +121,7 @@ pub fn build(b: *std.Build) !void {
                 module.addImport("c", translate_c.createModule());
 
                 module.linkSystemLibrary("android", .{});
+                module.linkSystemLibrary("log", .{});
                 if (enable_opengl) {
                     module.linkSystemLibrary("EGL", .{});
                 }

@@ -1,12 +1,61 @@
 const std = @import("std");
 const build_options = @import("build_options");
-const android = @import("android");
 const c = @import("c");
 const wio = @import("wio.zig");
 const internal = @import("wio.internal.zig");
 const log = std.log.scoped(.wio);
 
-pub const logFn = android.logFn;
+const LogWriter = struct {
+    prio: c_int,
+    interface: std.Io.Writer,
+
+    pub fn init(prio: c_int, buffer: *[1023]u8) LogWriter {
+        return .{
+            .prio = prio,
+            .interface = .{
+                .vtable = &.{
+                    .drain = drain,
+                    .flush = flush,
+                },
+                .buffer = buffer,
+            },
+        };
+    }
+
+    fn drain(writer: *std.Io.Writer, data: []const []const u8, _: usize) !usize {
+        const empty = writer.unusedCapacitySlice();
+        const n = @min(empty.len, data[0].len);
+        @memcpy(empty[0..n], data[0][0..n]);
+        writer.end += n;
+        if (n == empty.len) {
+            try writer.flush();
+        }
+        return n;
+    }
+
+    fn flush(writer: *std.Io.Writer) !void {
+        const self: *LogWriter = @fieldParentPtr("interface", writer);
+        const text = writer.buffered();
+        _ = c.__android_log_print(self.prio, null, "%.*s", text.len, text.ptr);
+        writer.end = 0;
+    }
+};
+
+pub fn logFn(comptime level: std.log.Level, comptime scope: @EnumLiteral(), comptime format: []const u8, args: anytype) void {
+    const prio = switch (level) {
+        .err => c.ANDROID_LOG_ERROR,
+        .warn => c.ANDROID_LOG_WARN,
+        .info => c.ANDROID_LOG_INFO,
+        .debug => c.ANDROID_LOG_DEBUG,
+    };
+
+    const prefix = if (scope == .default) "" else @tagName(scope) ++ ": ";
+
+    var buffer: [1023]u8 = undefined;
+    var writer: LogWriter = .init(prio, &buffer);
+    writer.interface.print(prefix ++ format, args) catch return;
+    writer.interface.flush() catch return;
+}
 
 const egl = internal.egl(c, c);
 
