@@ -249,7 +249,15 @@ pub const Window = struct {
     /// Not available for WebAssembly or Haiku.
     pub fn vkCreateSurface(self: *Window, instance: usize, allocation_callbacks: ?*const anyopaque, surface: *u64) !void {
         assertFeature(.vulkan);
-        return self.backend.vkCreateSurface(instance, allocation_callbacks, surface);
+        return switch (self.backend.vkCreateSurface(instance, allocation_callbacks, surface)) {
+            0 => void{},
+            -1 => error.OutOfHostMemory,
+            -2 => error.OutOfDeviceMemory,
+            -13 => error.Unknown,
+            -1000011001 => error.ValidationFailure,
+            -1000000001 => error.NativeWindowInUse,
+            else => error.Unexpected,
+        };
     }
 };
 

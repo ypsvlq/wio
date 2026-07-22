@@ -663,7 +663,7 @@ pub const Window = struct {
         }
     }
 
-    pub fn vkCreateSurface(self: Window, instance: usize, allocation_callbacks: ?*const anyopaque, surface: *u64) !void {
+    pub fn vkCreateSurface(self: Window, instance: usize, allocation_callbacks: ?*const anyopaque, surface: *u64) i32 {
         const VkXlibSurfaceCreateInfoKHR = extern struct {
             sType: i32 = 1000004000,
             pNext: ?*const anyopaque = null,
@@ -675,7 +675,7 @@ pub const Window = struct {
         const vkCreateXlibSurfaceKHR: *const fn (usize, *const VkXlibSurfaceCreateInfoKHR, ?*const anyopaque, *u64) callconv(.c) i32 =
             @ptrCast(unix.vkGetInstanceProcAddr(instance, "vkCreateXlibSurfaceKHR"));
 
-        return switch(vkCreateXlibSurfaceKHR(
+        return vkCreateXlibSurfaceKHR(
             instance,
             &.{
                 .dpy = display,
@@ -683,15 +683,7 @@ pub const Window = struct {
             },
             allocation_callbacks,
             surface,
-        )) {
-            0 => void{},
-            -1 => error.OutOfHostMemory,
-            -2 => error.OutOfDeviceMemory,
-            -13 => error.Unknown,
-            // validation failure
-            -1000011001 => unreachable,
-            else => unreachable,
-        };
+        );
     }
 
     fn createBlankCursor(self: *Window) h.Cursor {

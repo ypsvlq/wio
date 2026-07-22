@@ -603,7 +603,7 @@ pub const Window = struct {
         }
     }
 
-    pub fn vkCreateSurface(self: Window, instance: usize, allocation_callbacks: ?*const anyopaque, surface: *u64) !void {
+    pub fn vkCreateSurface(self: Window, instance: usize, allocation_callbacks: ?*const anyopaque, surface: *u64) i32 {
         const VkWin32SurfaceCreateInfoKHR = extern struct {
             sType: i32 = 1000009000,
             pNext: ?*const anyopaque = null,
@@ -615,7 +615,7 @@ pub const Window = struct {
         const vkCreateWin32SurfaceKHR: *const fn (usize, *const VkWin32SurfaceCreateInfoKHR, ?*const anyopaque, *u64) callconv(.winapi) i32 =
             @ptrCast(vkGetInstanceProcAddr(instance, "vkCreateWin32SurfaceKHR"));
 
-        return switch(vkCreateWin32SurfaceKHR(
+        return vkCreateWin32SurfaceKHR(
             instance,
             &.{
                 .hinstance = w.GetModuleHandleW(null),
@@ -623,15 +623,7 @@ pub const Window = struct {
             },
             allocation_callbacks,
             surface,
-        )) {
-            0 => void{},
-            -1 => error.OutOfHostMemory,
-            -2 => error.OutOfDeviceMemory,
-            -13 => error.Unknown,
-            // validation failure
-            -1000011001 => unreachable,
-            else => unreachable,
-        };
+        );
     }
 
     fn isFullscreen(self: *Window) bool {

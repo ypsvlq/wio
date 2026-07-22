@@ -665,7 +665,7 @@ pub const Window = struct {
         _ = c.eglSwapInterval(egl.display, interval);
     }
 
-    pub fn vkCreateSurface(self: Window, instance: usize, allocation_callbacks: ?*const anyopaque, surface: *u64) !void {
+    pub fn vkCreateSurface(self: Window, instance: usize, allocation_callbacks: ?*const anyopaque, surface: *u64) i32 {
         const VkWaylandSurfaceCreateInfoKHR = extern struct {
             sType: i32 = 1000006000,
             pNext: ?*const anyopaque = null,
@@ -677,7 +677,7 @@ pub const Window = struct {
         const vkCreateWaylandSurfaceKHR: *const fn (usize, *const VkWaylandSurfaceCreateInfoKHR, ?*const anyopaque, *u64) callconv(.c) i32 =
             @ptrCast(unix.vkGetInstanceProcAddr(instance, "vkCreateWaylandSurfaceKHR"));
 
-        return switch(vkCreateWaylandSurfaceKHR(
+        return vkCreateWaylandSurfaceKHR(
             instance,
             &.{
                 .display = display,
@@ -685,15 +685,7 @@ pub const Window = struct {
             },
             allocation_callbacks,
             surface,
-        )) {
-            0 => void{},
-            -1 => error.OutOfHostMemory,
-            -2 => error.OutOfDeviceMemory,
-            -13 => error.Unknown,
-            // validation failure
-            -1000011001 => unreachable,
-            else => unreachable,
-        };
+        );
     }
 
     fn resize(self: *Window, size: wio.Size, configuration: ?*h.libdecor_configuration) void {
