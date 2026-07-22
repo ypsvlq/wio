@@ -358,7 +358,7 @@ pub const Window = struct {
         wioGlSwapInterval(interval);
     }
 
-    pub fn vkCreateSurface(self: Window, instance: usize, allocation_callbacks: ?*const anyopaque, surface: *u64) i32 {
+    pub fn vkCreateSurface(self: Window, instance: usize, allocation_callbacks: ?*const anyopaque, surface: *u64) !void {
         const VkMetalSurfaceCreateInfoEXT = extern struct {
             sType: i32 = 1000217000,
             pNext: ?*const anyopaque = null,
@@ -369,12 +369,21 @@ pub const Window = struct {
         const vkCreateMetalSurfaceEXT: *const fn (usize, *const VkMetalSurfaceCreateInfoEXT, ?*const anyopaque, *u64) callconv(.c) i32 =
             @ptrCast(vkGetInstanceProcAddr(instance, "vkCreateMetalSurfaceEXT"));
 
-        return vkCreateMetalSurfaceEXT(
+        return switch(vkCreateMetalSurfaceEXT(
             instance,
             &.{ .pLayer = wioCreateMetalLayer(self.window) },
             allocation_callbacks,
             surface,
-        );
+        )) {
+            0 => void{},
+            -1 => error.OutOfHostMemory,
+            -2 => error.OutOfDeviceMemory,
+            -13 => error.Unknown,
+            -1000000001 => error.NativeWindowInUse,
+            // validation failure
+            -1000011001 => unreachable,
+            else => unreachable,
+        };
     }
 };
 

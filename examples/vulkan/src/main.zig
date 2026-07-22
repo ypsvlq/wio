@@ -91,8 +91,7 @@ fn createInstance() !void {
 var surface: vk.SurfaceKHR = .null_handle;
 
 fn createSurface() !void {
-    const result: vk.Result = @enumFromInt(window.vkCreateSurface(@intFromEnum(instance.handle), null, @ptrCast(&surface)));
-    if (result != .success) return error.Unknown;
+    return window.vkCreateSurface(@intFromEnum(instance.handle), null, @ptrCast(&surface));
 }
 
 var physical_device: vk.PhysicalDevice = undefined;

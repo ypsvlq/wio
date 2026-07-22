@@ -273,8 +273,8 @@ pub const Window = struct {
         _ = c.eglSwapInterval(egl.display, interval);
     }
 
-    pub fn vkCreateSurface(_: *Window, instance: usize, allocation_callbacks: ?*const anyopaque, surface: *u64) i32 {
-        return c.vkCreateAndroidSurfaceKHR(
+    pub fn vkCreateSurface(_: *Window, instance: usize, allocation_callbacks: ?*const anyopaque, surface: *u64) !void {
+        return switch(c.vkCreateAndroidSurfaceKHR(
             @ptrFromInt(instance),
             &.{
                 .sType = c.VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR,
@@ -284,7 +284,16 @@ pub const Window = struct {
             },
             @ptrCast(@alignCast(allocation_callbacks)),
             @ptrCast(surface),
-        );
+        )) {
+            0 => void{},
+            -1 => error.OutOfHostMemory,
+            -2 => error.OutOfDeviceMemory,
+            -13 => error.Unknown,
+            -1000000001 => error.NativeWindowInUse,
+            // validation failure
+            -1000011001 => unreachable,
+            else => unreachable,
+        };
     }
 };
 

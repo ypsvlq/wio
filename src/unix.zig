@@ -379,7 +379,7 @@ pub const Window = union {
         }
     }
 
-    pub fn vkCreateSurface(self: Window, instance: usize, allocation_callbacks: ?*const anyopaque, surface: *u64) i32 {
+    pub fn vkCreateSurface(self: Window, instance: usize, allocation_callbacks: ?*const anyopaque, surface: *u64) !void {
         switch (active) {
             .x11 => return self.x11.vkCreateSurface(instance, allocation_callbacks, surface),
             .wayland => return self.wayland.vkCreateSurface(instance, allocation_callbacks, surface),

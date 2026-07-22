@@ -247,7 +247,7 @@ pub const Window = struct {
     }
 
     /// Not available for WebAssembly or Haiku.
-    pub fn vkCreateSurface(self: *Window, instance: usize, allocation_callbacks: ?*const anyopaque, surface: *u64) i32 {
+    pub fn vkCreateSurface(self: *Window, instance: usize, allocation_callbacks: ?*const anyopaque, surface: *u64) !void {
         assertFeature(.vulkan);
         return self.backend.vkCreateSurface(instance, allocation_callbacks, surface);
     }
