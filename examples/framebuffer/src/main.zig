@@ -53,6 +53,7 @@ fn loop() !bool {
     while (events.pop()) |event| {
         switch (event) {
             .close => {
+                fb.destroy();
                 window.destroy();
                 events.deinit();
                 wio.deinit();
