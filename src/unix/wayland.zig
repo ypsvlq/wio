@@ -380,7 +380,10 @@ pub const Window = struct {
     pub fn destroy(self: *Window) void {
         if (gesture_focus == self) gesture_focus = null;
         if (pointer_focus == self) pointer_focus = null;
-        if (keyboard_focus == self) keyboard_focus = null;
+        if (keyboard_focus == self) {
+            keyboard_focus = null;
+            repeat_key = 0;
+        }
         _ = windows.remove(self);
 
         while (true) {
