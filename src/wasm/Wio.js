@@ -14,6 +14,8 @@ class Wio {
 
         this.objects = [,];
 
+        this.draw_available_windows = [];
+
         this.modifiers = 0;
 
         this.gamepads = navigator.getGamepads();
@@ -37,6 +39,9 @@ class Wio {
     }
 
     loop() {
+        for (const id of this.draw_available_windows) {
+            this.instance.exports.wioEvent(this.objects[id].data, 5);
+        }
         if (this.instance.exports.wioLoop()) {
             requestAnimationFrame(() => this.loop());
         }
@@ -124,6 +129,7 @@ class Wio {
             const window = {
                 canvas: canvas,
                 input: input,
+                data: data,
                 text: false,
                 relative_mouse: false,
                 relative_mouse_unadjusted: false,
@@ -243,6 +249,19 @@ class Wio {
         disableRelativeMouse: (id) => {
             this.objects[id].relative_mouse = false;
             document.exitPointerLock();
+        },
+
+        enableDrawAvailableEvents: (id) => {
+            if (this.draw_available_windows.indexOf(id) == -1) {
+                this.draw_available_windows.push(id);
+            }
+        },
+
+        disableDrawAvailableEvents: (id) => {
+            const index = this.draw_available_windows.indexOf(id);
+            if (index != -1) {
+                this.draw_available_windows.splice(index, 1);
+            }
         },
 
         setFullscreen: (id, fullscreen) => {

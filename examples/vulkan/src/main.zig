@@ -33,6 +33,7 @@ pub fn main() !void {
         .size = size,
         .scale = 1,
     });
+    window.enableDrawAvailableEvents();
 
     vkb = .load(@as(*const fn (vk.Instance, [*:0]const u8) ?*const fn () void, @ptrCast(&wio.vkGetInstanceProcAddr)));
     try createInstance();
@@ -555,19 +556,20 @@ fn loop() !bool {
                 }
             },
             .hidden => visible = false,
+            .draw => {
+                if (visible and surface != .null_handle) {
+                    drawFrame() catch |err| switch (err) {
+                        error.OutOfDateKHR => try recreateSwapchain(),
+                        error.SurfaceLostKHR => {
+                            try device.deviceWaitIdle();
+                            destroySurfaceAndSwapchain();
+                        },
+                        else => return err,
+                    };
+                }
+            },
             else => {},
         }
-    }
-
-    if (visible and surface != .null_handle and window.shouldPresent()) {
-        drawFrame() catch |err| switch (err) {
-            error.OutOfDateKHR => try recreateSwapchain(),
-            error.SurfaceLostKHR => {
-                try device.deviceWaitIdle();
-                destroySurfaceAndSwapchain();
-            },
-            else => return err,
-        };
     }
 
     return true;

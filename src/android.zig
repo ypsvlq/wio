@@ -150,10 +150,8 @@ pub const Window = struct {
         return .{};
     }
 
-    pub fn destroy(_: *Window) void {}
-
-    pub fn shouldPresent(_: *Window) bool {
-        return true;
+    pub fn destroy(self: *Window) void {
+        self.disableDrawAvailableEvents();
     }
 
     pub fn enableTextInput(_: *Window, _: wio.TextInputOptions) void {
@@ -172,6 +170,27 @@ pub const Window = struct {
     pub fn disableRelativeMouse(_: *Window) void {
         java.env.*.*.CallVoidMethod.?(java.env, java.activity, java.disableRelativeMouse);
         relative_mouse = false;
+    }
+
+    var draw_available_ns: u32 = 0;
+    var draw_available_thread: std.Thread = undefined;
+
+    pub fn enableDrawAvailableEvents(_: *Window) void {
+        if (draw_available_ns == 0) {
+            log.warn("enableDrawAvailableEvents unimplemented for android, falling back to 60 Hz", .{});
+            draw_available_ns = std.time.ns_per_s / 60;
+            draw_available_thread = std.Thread.spawn(.{}, drawAvailableThread, .{}) catch {
+                draw_available_ns = 0;
+                return;
+            };
+        }
+    }
+
+    pub fn disableDrawAvailableEvents(_: *Window) void {
+        if (draw_available_ns != 0) {
+            draw_available_ns = 0;
+            draw_available_thread.join();
+        }
     }
 
     pub fn setTitle(self: *Window, title: []const u8) void {
@@ -467,6 +486,13 @@ fn checkAAudioResult(result: c.aaudio_result_t, name: []const u8) !void {
     if (result < 0) {
         log.err("{s} failed, error {}", .{ name, result });
         return error.Unexpected;
+    }
+}
+
+fn drawAvailableThread() void {
+    while (Window.draw_available_ns > 0) {
+        internal.eventFn(event_fn_data, .draw);
+        std.Io.sleep(internal.io, .{ .nanoseconds = Window.draw_available_ns }, .awake) catch {};
     }
 }
 

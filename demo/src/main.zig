@@ -225,6 +225,7 @@ fn actionEvent(event: wio.Event) !void {
 
 var text_input = false;
 var relative_mouse = false;
+var draw_available_events = false;
 var cursor: u8 = 0;
 
 fn action(button: wio.Button) !void {
@@ -263,6 +264,14 @@ fn action(button: wio.Button) !void {
                 window.disableRelativeMouse();
             }
             relative_mouse = !relative_mouse;
+        },
+        .s => {
+            if (!draw_available_events) {
+                window.enableDrawAvailableEvents();
+            } else {
+                window.disableDrawAvailableEvents();
+            }
+            draw_available_events = !draw_available_events;
         },
         .t => window.setTitle("retitled wio example 😀"),
         .n => window.setMode(.normal),

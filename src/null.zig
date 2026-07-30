@@ -42,11 +42,6 @@ pub const Window = struct {
         internal.allocator.destroy(self);
     }
 
-    pub fn shouldPresent(self: *Window) bool {
-        _ = self;
-        return true;
-    }
-
     pub fn enableTextInput(self: *Window, options: wio.TextInputOptions) void {
         _ = self;
         _ = options;
@@ -61,6 +56,14 @@ pub const Window = struct {
     }
 
     pub fn disableRelativeMouse(self: *Window) void {
+        _ = self;
+    }
+
+    pub fn enableDrawAvailableEvents(self: *Window) void {
+        _ = self;
+    }
+
+    pub fn disableDrawAvailableEvents(self: *Window) void {
         _ = self;
     }
 

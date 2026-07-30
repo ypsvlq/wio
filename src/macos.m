@@ -7,6 +7,7 @@ extern void wioFocused(void *);
 extern void wioUnfocused(void *);
 extern void wioVisible(void *);
 extern void wioHidden(void *);
+extern void wioDraw(void *);
 extern void wioPosition(void *, SInt16, SInt16);
 extern void wioSizeLogical(void *, UInt8, UInt16, UInt16);
 extern void wioSizePhysical(void *, UInt16, UInt16);
@@ -108,6 +109,10 @@ static void warpCursor(NSWindow *window) {
     } else {
         wioHidden(zig);
     }
+}
+
+- (void)windowDidExpose:(NSNotification *)notification {
+    wioDraw(zig);
 }
 
 - (void)windowDidMove:(NSNotification *)notification {
@@ -606,6 +611,10 @@ char *wioGetClipboardText(const void *ptr, size_t *len) {
     NSString *string = [[NSPasteboard generalPasteboard] stringForType:NSPasteboardTypeString];
     if (!string) return NULL;
     return wioDupeClipboardText(ptr, [string UTF8String], len);
+}
+
+void wioDrawAvailable(NSWindow *window) {
+    [[NSNotificationCenter defaultCenter] postNotificationName:NSWindowDidExposeNotification object:window];
 }
 
 #ifdef WIO_FRAMEBUFFER

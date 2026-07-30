@@ -137,10 +137,6 @@ pub const Window = struct {
         self.backend.destroy();
     }
 
-    pub fn shouldPresent(self: *Window) bool {
-        return self.backend.shouldPresent();
-    }
-
     /// When enabled, character keys will send `.char` events instead of `.button_press`.
     ///
     /// Text input is disabled by default.
@@ -166,6 +162,17 @@ pub const Window = struct {
 
     pub fn disableRelativeMouse(self: *Window) void {
         self.backend.disableRelativeMouse();
+    }
+
+    /// When enabled, `.draw` events will be sent whenever a new frame can be rendered.
+    ///
+    /// Draw available events are disabled by default.
+    pub fn enableDrawAvailableEvents(self: *Window) void {
+        self.backend.enableDrawAvailableEvents();
+    }
+
+    pub fn disableDrawAvailableEvents(self: *Window) void {
+        self.backend.disableDrawAvailableEvents();
     }
 
     pub fn setTitle(self: *Window, title: []const u8) void {

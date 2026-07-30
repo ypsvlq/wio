@@ -232,13 +232,6 @@ pub const Window = union {
         }
     }
 
-    pub fn shouldPresent(self: *Window) bool {
-        switch (active) {
-            .x11 => return self.x11.shouldPresent(),
-            .wayland => return self.wayland.shouldPresent(),
-        }
-    }
-
     pub fn enableTextInput(self: *Window, options: wio.TextInputOptions) void {
         switch (active) {
             .x11 => self.x11.enableTextInput(options),
@@ -264,6 +257,20 @@ pub const Window = union {
         switch (active) {
             .x11 => self.x11.disableRelativeMouse(),
             .wayland => self.wayland.disableRelativeMouse(),
+        }
+    }
+
+    pub fn enableDrawAvailableEvents(self: *Window) void {
+        switch (active) {
+            .x11 => self.x11.enableDrawAvailableEvents(),
+            .wayland => self.wayland.enableDrawAvailableEvents(),
+        }
+    }
+
+    pub fn disableDrawAvailableEvents(self: *Window) void {
+        switch (active) {
+            .x11 => self.x11.disableDrawAvailableEvents(),
+            .wayland => self.wayland.disableDrawAvailableEvents(),
         }
     }
 

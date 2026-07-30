@@ -296,9 +296,10 @@ pub const Window = struct {
     viewport: ?*h.wp_viewport = null,
     fractional_scale: ?*h.wp_fractional_scale_v1 = null,
     locked_pointer: ?*h.zwp_locked_pointer_v1 = null,
-    should_present_callback: ?*h.wl_callback = null,
-    resize_frame_callback: ?*h.wl_callback = null,
     text_options: ?wio.TextInputOptions = null,
+    frame_callback: ?*h.wl_callback = null,
+    draw_available_events: bool = false,
+    inhibit_draw: bool = false,
     size: wio.Size,
     scale: f32 = 1,
     cursor: u32 = h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_DEFAULT,
@@ -404,8 +405,7 @@ pub const Window = struct {
             if (self.drop.text) |text| internal.allocator.free(text);
         }
 
-        if (self.resize_frame_callback) |_| h.wl_callback_destroy(self.resize_frame_callback);
-        if (self.should_present_callback) |_| h.wl_callback_destroy(self.should_present_callback);
+        if (self.frame_callback) |_| h.wl_callback_destroy(self.frame_callback);
         if (self.fractional_scale) |_| h.wp_fractional_scale_v1_destroy(self.fractional_scale);
         if (self.viewport) |_| h.wp_viewport_destroy(self.viewport);
         c.libdecor_frame_unref(self.frame);
@@ -413,15 +413,6 @@ pub const Window = struct {
         _ = c.wl_display_roundtrip(display);
 
         internal.allocator.destroy(self);
-    }
-
-    pub fn shouldPresent(self: *Window) bool {
-        if (self.should_present_callback == null) {
-            self.should_present_callback = h.wl_surface_frame(self.surface);
-            _ = h.wl_callback_add_listener(self.should_present_callback, &should_present_callback_listener, self);
-            return true;
-        }
-        return false;
     }
 
     pub fn enableTextInput(self: *Window, options: wio.TextInputOptions) void {
@@ -455,6 +446,18 @@ pub const Window = struct {
     pub fn disableRelativeMouse(self: *Window) void {
         self.relative_mouse = null;
         if (pointer_focus == self) self.applyCursor();
+    }
+
+    pub fn enableDrawAvailableEvents(self: *Window) void {
+        self.draw_available_events = true;
+        if (self.frame_callback == null) {
+            self.frame_callback = h.wl_surface_frame(self.surface);
+            _ = h.wl_callback_add_listener(self.frame_callback, &frame_callback_listener, self);
+        }
+    }
+
+    pub fn disableDrawAvailableEvents(self: *Window) void {
+        self.draw_available_events = false;
     }
 
     pub fn setTitle(self: *Window, title: []const u8) void {
@@ -704,10 +707,16 @@ pub const Window = struct {
         internal.eventFn(self.event_fn_data, .{ .size_logical = size });
         internal.eventFn(self.event_fn_data, .{ .size_physical = framebuffer });
 
-        if (self.resize_frame_callback == null) {
-            internal.eventFn(self.event_fn_data, .draw);
-            self.resize_frame_callback = h.wl_surface_frame(self.surface);
-            _ = h.wl_callback_add_listener(self.resize_frame_callback, &resize_frame_callback_listener, self);
+        if (!self.draw_available_events) {
+            if (!self.inhibit_draw) {
+                internal.eventFn(self.event_fn_data, .draw);
+                self.inhibit_draw = true;
+            }
+
+            if (self.frame_callback == null) {
+                self.frame_callback = h.wl_surface_frame(self.surface);
+                _ = h.wl_callback_add_listener(self.frame_callback, &frame_callback_listener, self);
+            }
         }
     }
 
@@ -805,26 +814,21 @@ fn fixedToFloat(value: h.wl_fixed_t) f32 {
     return @as(f32, @floatFromInt(value)) / 256;
 }
 
-const should_present_callback_listener: h.wl_callback_listener = .{
-    .done = shouldPresentCallback,
+const frame_callback_listener: h.wl_callback_listener = .{
+    .done = frameCallback,
 };
 
-fn shouldPresentCallback(data: ?*anyopaque, callback: ?*h.wl_callback, _: u32) callconv(.c) void {
+fn frameCallback(data: ?*anyopaque, callback: ?*h.wl_callback, _: u32) callconv(.c) void {
     h.wl_callback_destroy(callback);
 
     const self: *Window = @ptrCast(@alignCast(data));
-    self.should_present_callback = null;
-}
-
-const resize_frame_callback_listener: h.wl_callback_listener = .{
-    .done = resizeFrameCallback,
-};
-
-fn resizeFrameCallback(data: ?*anyopaque, callback: ?*h.wl_callback, _: u32) callconv(.c) void {
-    h.wl_callback_destroy(callback);
-
-    const self: *Window = @ptrCast(@alignCast(data));
-    self.resize_frame_callback = null;
+    if (self.draw_available_events) {
+        self.frame_callback = h.wl_surface_frame(self.surface);
+        _ = h.wl_callback_add_listener(self.frame_callback, &frame_callback_listener, self);
+    } else {
+        self.frame_callback = null;
+        self.inhibit_draw = false;
+    }
     internal.eventFn(self.event_fn_data, .draw);
 }
 

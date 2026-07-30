@@ -40,6 +40,7 @@ pub fn main() !void {
         .size = size,
         .scale = 1,
     });
+    window.enableDrawAvailableEvents();
 
     fb = try window.createFramebuffer(size);
 
@@ -72,15 +73,17 @@ fn loop() !bool {
             },
             .visible => visible = true,
             .hidden => visible = false,
+            .draw => {
+                if (visible) {
+                    render();
+                    window.presentFramebuffer(&fb);
+                    t +%= 1;
+                }
+            },
             else => {},
         }
     }
-    if (visible) {
-        render();
-        window.presentFramebuffer(&fb);
-        t +%= 1;
-    }
-    wio.wait(.{ .timeout_ns = std.time.ns_per_s / 60 });
+    wio.wait(.{});
     return true;
 }
 

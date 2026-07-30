@@ -104,6 +104,8 @@ pub const Window = struct {
     window: *BWindow,
     buttons: std.StaticBitSet(5) = .empty,
     text: bool = false,
+    draw_available_ns: u32 = 0,
+    draw_available_thread: std.Thread = undefined,
     cursor: wio.Cursor = .default,
     drop: if (build_options.drop) struct {
         files: std.ArrayList([]const u8) = .empty,
@@ -152,6 +154,7 @@ pub const Window = struct {
     }
 
     pub fn destroy(self: *Window) void {
+        self.disableDrawAvailableEvents();
         if (build_options.drop) {
             for (self.drop.files.items) |file| internal.allocator.free(file);
             self.drop.files.deinit(internal.allocator);
@@ -159,10 +162,6 @@ pub const Window = struct {
         }
         wioDestroyWindow(self.window);
         internal.allocator.destroy(self);
-    }
-
-    pub fn shouldPresent(_: *Window) bool {
-        return true;
     }
 
     pub fn enableTextInput(self: *Window, _: wio.TextInputOptions) void {
@@ -179,6 +178,24 @@ pub const Window = struct {
 
     pub fn disableRelativeMouse(self: *Window) void {
         wioDisableRelativeMouse(self.window);
+    }
+
+    pub fn enableDrawAvailableEvents(self: *Window) void {
+        if (self.draw_available_ns == 0) {
+            log.warn("enableDrawAvailableEvents unimplemented for haiku, falling back to 60 Hz", .{});
+            self.draw_available_ns = std.time.ns_per_s / 60;
+            self.draw_available_thread = std.Thread.spawn(.{}, drawAvailableThread, .{self}) catch {
+                self.draw_available_ns = 0;
+                return;
+            };
+        }
+    }
+
+    pub fn disableDrawAvailableEvents(self: *Window) void {
+        if (self.draw_available_ns != 0) {
+            self.draw_available_ns = 0;
+            self.draw_available_thread.join();
+        }
     }
 
     pub fn setTitle(self: *Window, title: []const u8) void {
@@ -597,6 +614,13 @@ comptime {
     }
     if (build_options.audio) {
         @export(&wioAudioOutputWrite, .{ .name = "wioAudioOutputWrite" });
+    }
+}
+
+fn drawAvailableThread(window: *Window) void {
+    while (window.draw_available_ns > 0) {
+        internal.eventFn(window.event_fn_data, .draw);
+        std.Io.sleep(internal.io, .{ .nanoseconds = window.draw_available_ns }, .awake) catch {};
     }
 }
 

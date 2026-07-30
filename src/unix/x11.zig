@@ -8,7 +8,7 @@ const DynLib = @import("DynLib.zig");
 const log = std.log.scoped(.wio);
 
 var imports: extern struct {
-    XkbOpenDisplay: *const fn ([*c]const u8, [*c]c_int, [*c]c_int, [*c]c_int, [*c]c_int, [*c]c_int) callconv(.c) ?*h.Display,
+    XOpenDisplay: *const fn ([*c]const u8) callconv(.c) ?*h.Display,
     XCloseDisplay: *const fn (?*h.Display) callconv(.c) c_int,
     XInternAtoms: *const fn (?*h.Display, [*c][*c]u8, c_int, c_int, [*c]h.Atom) callconv(.c) c_int,
     XSetLocaleModifiers: *const fn ([*c]const u8) callconv(.c) [*c]u8,
@@ -16,10 +16,12 @@ var imports: extern struct {
     XCloseIM: *const fn (h.XIM) callconv(.c) c_int,
     XGetIMValues: *const fn (h.XIM, ...) callconv(.c) [*c]u8,
     XFree: *const fn (?*anyopaque) callconv(.c) c_int,
+    XkbLibraryVersion: *const fn ([*c]c_int, [*c]c_int) callconv(.c) c_int,
+    XkbQueryExtension: *const fn (?*h.Display, [*c]c_int, [*c]c_int, [*c]c_int, [*c]c_int, [*c]c_int) callconv(.c) c_int,
+    XkbSelectEvents: *const fn (?*h.Display, c_uint, c_uint, c_uint) callconv(.c) c_int,
     XkbGetMap: *const fn (?*h.Display, c_uint, c_uint) callconv(.c) h.XkbDescPtr,
     XkbFreeKeyboard: *const fn (h.XkbDescPtr, c_uint, c_int) callconv(.c) void,
     XkbGetNames: *const fn (?*h.Display, c_uint, h.XkbDescPtr) callconv(.c) c_int,
-    XkbSelectEvents: *const fn (?*h.Display, c_uint, c_uint, c_uint) callconv(.c) c_int,
     XGetDefault: *const fn (?*h.Display, [*c]const u8, [*c]const u8) callconv(.c) [*c]u8,
     XFlush: *const fn (?*h.Display) callconv(.c) c_int,
     XCreateWindow: *const fn (?*h.Display, h.Window, c_int, c_int, c_uint, c_uint, c_uint, c_int, c_uint, [*c]h.Visual, c_ulong, [*c]h.XSetWindowAttributes) callconv(.c) h.Window,
@@ -60,6 +62,12 @@ var imports: extern struct {
     XFreeColormap: *const fn (?*h.Display, h.Colormap) callconv(.c) c_int,
     XCreateImage: *const fn (?*h.Display, [*c]h.Visual, c_uint, c_int, c_int, [*c]u8, c_uint, c_uint, c_int, c_int) callconv(.c) [*c]h.XImage,
     XPutImage: *const fn (?*h.Display, h.Drawable, h.GC, [*c]h.XImage, c_int, c_int, c_int, c_int, c_uint, c_uint) callconv(.c) c_int,
+    XRRQueryExtension: *const fn (dpy: ?*h.Display, event_base_return: [*c]c_int, error_base_return: [*c]c_int) callconv(.c) c_int,
+    XRRSelectInput: *const fn (dpy: ?*h.Display, window: h.Window, mask: c_int) callconv(.c) void,
+    XRRGetScreenResources: *const fn (dpy: ?*h.Display, window: h.Window) callconv(.c) [*c]h.XRRScreenResources,
+    XRRFreeScreenResources: *const fn (resources: [*c]h.XRRScreenResources) callconv(.c) void,
+    XRRGetCrtcInfo: *const fn (dpy: ?*h.Display, resources: [*c]h.XRRScreenResources, crtc: h.RRCrtc) callconv(.c) [*c]h.XRRCrtcInfo,
+    XRRFreeCrtcInfo: *const fn (crtcInfo: [*c]h.XRRCrtcInfo) callconv(.c) void,
     glXQueryExtensionsString: *const fn (dpy: ?*h.Display, screen: c_int) callconv(.c) [*c]const u8,
     glXGetProcAddress: *const fn (procname: [*c]const h.GLubyte) callconv(.c) ?*const fn () callconv(.c) void,
     glXChooseFBConfig: *const fn (dpy: ?*h.Display, screen: c_int, attribList: [*c]const c_int, nitems: [*c]c_int) callconv(.c) [*c]h.GLXFBConfig,
@@ -111,25 +119,29 @@ var atoms: blk: {
 } = undefined;
 
 var libX11: DynLib = undefined;
+var libXrandr: DynLib = undefined;
 var libXcursor: DynLib = undefined;
 var libGL: DynLib = undefined;
 var libXext: DynLib = undefined;
 var windows: std.AutoHashMapUnmanaged(h.Window, *Window) = undefined;
 pub var display: *h.Display = undefined;
-var xkb_event_code: c_int = undefined;
 var im: h.XIM = undefined;
 var im_style: h.XIMStyle = 0;
+var xkb_event_code: c_int = undefined;
 var keycodes: [248]wio.Button = undefined;
+var xrr_event_base: c_int = undefined;
 var scale: f32 = 1;
 var xkb_mods: c_uint = 0;
 var clipboard_text: []const u8 = "";
 
 pub fn init() !bool {
     DynLib.load(&imports, &.{
+        .{ .handle = &libXrandr, .name = "libXrandr.so.2", .prefix = "XRR" },
         .{ .handle = &libXcursor, .name = "libXcursor.so.1", .prefix = "Xcursor" },
         .{ .handle = &libX11, .name = "libX11.so.6", .prefix = "X" },
     }) catch return false;
     errdefer libX11.close();
+    errdefer libXrandr.close();
     errdefer libXcursor.close();
 
     if (build_options.opengl) {
@@ -143,7 +155,7 @@ pub fn init() !bool {
     }
     errdefer if (build_options.vulkan) libXext.close();
 
-    display = c.XkbOpenDisplay(null, &xkb_event_code, null, null, null, null) orelse return false;
+    display = c.XOpenDisplay(null) orelse return false;
     errdefer _ = c.XCloseDisplay(display);
     try unix.pollfds.append(internal.allocator, .{ .fd = h.ConnectionNumber(display), .events = std.c.POLL.IN, .revents = undefined });
 
@@ -182,6 +194,12 @@ pub fn init() !bool {
         }
     }
 
+    var xkb_major_version: c_int = h.XkbMajorVersion;
+    var xkb_minor_version: c_int = h.XkbMinorVersion;
+    if (c.XkbLibraryVersion(&xkb_major_version, &xkb_minor_version) == h.False) return internal.logUnexpected("XkbLibraryVersion");
+    if (c.XkbQueryExtension(display, null, &xkb_event_code, null, &xkb_major_version, &xkb_minor_version) == h.False) return internal.logUnexpected("XkbQueryExtension");
+    _ = c.XkbSelectEvents(display, h.XkbUseCoreKbd, h.XkbStateNotifyMask, h.XkbStateNotifyMask);
+
     const xkb: *h.XkbDescRec = c.XkbGetMap(display, h.XkbNamesMask, h.XkbUseCoreKbd) orelse return error.Unexpected;
     defer _ = c.XkbFreeKeyboard(xkb, 0, h.True);
     _ = c.XkbGetNames(display, h.XkbKeyNamesMask | h.XkbKeyAliasesMask, xkb);
@@ -199,7 +217,8 @@ pub fn init() !bool {
         keycode.* = nameToButton(key.name) orelse aliases.get(key.name) orelse .mouse_left;
     }
 
-    _ = c.XkbSelectEvents(display, h.XkbUseCoreKbd, h.XkbStateNotifyMask, h.XkbStateNotifyMask);
+    var xrr_error_base: c_int = undefined;
+    if (c.XRRQueryExtension(display, &xrr_event_base, &xrr_error_base) == h.False) return internal.logUnexpected("XRRQueryExtension");
 
     if (c.XGetDefault(display, "Xft", "dpi")) |string| {
         if (std.fmt.parseFloat(f32, std.mem.sliceTo(string, 0))) |dpi| {
@@ -230,6 +249,7 @@ pub fn deinit() void {
     if (build_options.vulkan) libXext.close();
     if (build_options.opengl) libGL.close();
     libXcursor.close();
+    libXrandr.close();
     libX11.close();
     windows.deinit(internal.allocator);
 }
@@ -250,6 +270,9 @@ pub const Window = struct {
     text: bool = false,
     preedit_string: std.ArrayList(u21) = .empty,
     relative_mouse: bool = false,
+    draw_available_ns: u32 = 0,
+    draw_available_thread: std.Thread = undefined,
+    position: wio.RelativePosition,
     size: wio.Size,
     warped: bool = false,
     drop: if (build_options.drop) struct {
@@ -329,6 +352,8 @@ pub const Window = struct {
         const protocols = [_]h.Atom{atoms.WM_DELETE_WINDOW};
         _ = c.XChangeProperty(display, window, atoms.WM_PROTOCOLS, h.XA_ATOM, 32, h.PropModeReplace, @ptrCast(&protocols), protocols.len);
 
+        c.XRRSelectInput(display, window, h.RROutputChangeNotifyMask);
+
         if (build_options.drop) {
             const xdnd_version: c_long = 5;
             _ = c.XChangeProperty(display, window, atoms.XdndAware, h.XA_ATOM, 32, h.PropModeReplace, @ptrCast(&xdnd_version), 1);
@@ -365,6 +390,7 @@ pub const Window = struct {
             .event_fn_data = options.event_fn_data,
             .window = window,
             .ic = ic,
+            .position = position,
             .size = options.size,
             .opengl = if (build_options.opengl) .{ .config = config, .colormap = attributes.colormap } else .{},
         };
@@ -390,6 +416,8 @@ pub const Window = struct {
     }
 
     pub fn destroy(self: *Window) void {
+        self.disableDrawAvailableEvents();
+
         _ = windows.remove(self.window);
 
         if (build_options.opengl) {
@@ -409,10 +437,6 @@ pub const Window = struct {
         self.preedit_string.deinit(internal.allocator);
 
         internal.allocator.destroy(self);
-    }
-
-    pub fn shouldPresent(_: *Window) bool {
-        return true;
     }
 
     pub fn enableTextInput(self: *Window, options: wio.TextInputOptions) void {
@@ -439,6 +463,23 @@ pub const Window = struct {
     pub fn disableRelativeMouse(self: *Window) void {
         self.relative_mouse = false;
         _ = c.XUngrabPointer(display, h.CurrentTime);
+    }
+
+    pub fn enableDrawAvailableEvents(self: *Window) void {
+        if (self.draw_available_ns == 0) {
+            self.updateRefreshRate();
+            self.draw_available_thread = std.Thread.spawn(.{}, drawAvailableThread, .{self}) catch {
+                self.draw_available_ns = 0;
+                return;
+            };
+        }
+    }
+
+    pub fn disableDrawAvailableEvents(self: *Window) void {
+        if (self.draw_available_ns > 0) {
+            self.draw_available_ns = 0;
+            self.draw_available_thread.join();
+        }
     }
 
     pub fn setTitle(self: *Window, title: []const u8) void {
@@ -686,6 +727,53 @@ pub const Window = struct {
         );
     }
 
+    fn updateRefreshRate(self: *Window) void {
+        const rate = self.getRefreshRate() orelse 60;
+        self.draw_available_ns = @round(std.time.ns_per_s / rate);
+    }
+
+    fn getRefreshRate(self: *Window) ?f32 {
+        const resources: *h.XRRScreenResources = c.XRRGetScreenResources(display, self.window) orelse return null;
+        defer c.XRRFreeScreenResources(resources);
+        var mode_id: ?c_ulong = null;
+        var minimum_distance: c_uint = std.math.maxInt(c_uint);
+        var i: usize = 0;
+        while (i < resources.ncrtc) : (i += 1) {
+            const crtc: *h.XRRCrtcInfo = c.XRRGetCrtcInfo(display, resources, resources.crtcs[i]) orelse continue;
+            defer c.XRRFreeCrtcInfo(crtc);
+
+            const width = std.math.cast(c_int, crtc.width) orelse continue;
+            const height = std.math.cast(c_int, crtc.height) orelse continue;
+
+            const inside_x = (self.position.x >= crtc.x and self.position.x < crtc.x + width);
+            const inside_y = (self.position.y >= crtc.y and self.position.y < crtc.y + height);
+
+            if (inside_x and inside_y) {
+                mode_id = crtc.mode;
+                break;
+            } else if (inside_x or inside_y) {
+                mode_id = crtc.mode;
+                minimum_distance = 0;
+            }
+
+            const dx = crtc.x - self.position.x;
+            const dy = crtc.y - self.position.y;
+            const distance: c_uint = @intCast(dx * dx + dy * dy);
+            if (distance < minimum_distance) {
+                mode_id = crtc.mode;
+                minimum_distance = distance;
+            }
+        }
+        if (mode_id) |id| {
+            for (resources.modes[0..std.math.lossyCast(usize, resources.nmode)]) |mode| {
+                if (mode.id == id) {
+                    return @as(f32, @floatFromInt(mode.dotClock)) / @as(f32, @floatFromInt(mode.hTotal * mode.vTotal));
+                }
+            }
+        }
+        return null;
+    }
+
     fn createBlankCursor(self: *Window) h.Cursor {
         const pixmap = c.XCreatePixmap(display, self.window, 1, 1, 1);
         const gc = c.XCreateGC(display, pixmap, 0, null);
@@ -788,6 +876,27 @@ fn preeditDraw(_: h.XIC, window: *Window, data: *h.XIMPreeditDrawCallbackStruct)
     }
 }
 
+fn drawAvailableThread(window: *Window) void {
+    const thread_display = c.XOpenDisplay(null);
+    defer _ = c.XCloseDisplay(thread_display);
+    while (window.draw_available_ns > 0) {
+        var event: h.XEvent = .{
+            .xexpose = .{
+                .type = h.Expose,
+                .window = window.window,
+                .x = 0,
+                .y = 0,
+                .width = 1,
+                .height = 1,
+                .count = 0,
+            },
+        };
+        _ = c.XSendEvent(thread_display, window.window, h.False, h.NoEventMask, &event);
+        _ = c.XFlush(thread_display);
+        std.Io.sleep(internal.io, .{ .nanoseconds = window.draw_available_ns }, .awake) catch {};
+    }
+}
+
 fn handle(event: *h.XEvent) void {
     if (event.type == xkb_event_code) {
         const xkb_event: *h.XkbEvent = @ptrCast(event);
@@ -859,6 +968,12 @@ fn handle(event: *h.XEvent) void {
 
     if (window.text and c.XFilterEvent(event, h.None) == h.True) {
         return;
+    }
+
+    if (event.type == xrr_event_base + h.RRNotify) {
+        if (window.draw_available_ns != 0) {
+            window.updateRefreshRate();
+        }
     }
 
     switch (event.type) {
@@ -993,7 +1108,12 @@ fn handle(event: *h.XEvent) void {
             if (mode == .normal and maximized_horz and maximized_vert) mode = .maximized;
             internal.eventFn(window.event_fn_data, .{ .mode = mode });
 
-            internal.eventFn(window.event_fn_data, .{ .position = .{ .x = std.math.lossyCast(i16, event.xconfigure.x), .y = std.math.lossyCast(i16, event.xconfigure.y) } });
+            window.position = .{ .x = std.math.lossyCast(i16, event.xconfigure.x), .y = std.math.lossyCast(i16, event.xconfigure.y) };
+            internal.eventFn(window.event_fn_data, .{ .position = window.position });
+
+            if (window.draw_available_ns != 0) {
+                window.updateRefreshRate();
+            }
 
             window.size = wio.Size{ .width = std.math.lossyCast(u16, event.xconfigure.width), .height = std.math.lossyCast(u16, event.xconfigure.height) };
             internal.eventFn(window.event_fn_data, .{ .size_logical = window.size });

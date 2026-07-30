@@ -30,6 +30,8 @@ const js = struct {
     extern "wio" fn disableTextInput(u32) void;
     extern "wio" fn enableRelativeMouse(u32, bool) void;
     extern "wio" fn disableRelativeMouse(u32) void;
+    extern "wio" fn enableDrawAvailableEvents(u32) void;
+    extern "wio" fn disableDrawAvailableEvents(u32) void;
     extern "wio" fn setFullscreen(u32, bool) void;
     extern "wio" fn setCursor(u32, u8) void;
     extern "wio" fn setSize(u32, u16, u16) void;
@@ -104,10 +106,6 @@ pub const Window = struct {
 
     pub fn destroy(_: *Window) void {}
 
-    pub fn shouldPresent(_: *Window) bool {
-        return true;
-    }
-
     pub fn enableTextInput(self: *Window, options: wio.TextInputOptions) void {
         const x, const y = if (options.cursor) |cursor| .{ cursor.x, cursor.y } else .{ 0, 0 };
         js.enableTextInput(self.id, x, y);
@@ -123,6 +121,14 @@ pub const Window = struct {
 
     pub fn disableRelativeMouse(self: *Window) void {
         js.disableRelativeMouse(self.id);
+    }
+
+    pub fn enableDrawAvailableEvents(self: *Window) void {
+        js.enableDrawAvailableEvents(self.id);
+    }
+
+    pub fn disableDrawAvailableEvents(self: *Window) void {
+        js.disableDrawAvailableEvents(self.id);
     }
 
     pub fn setTitle(_: *Window, _: []const u8) void {}

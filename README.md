@@ -133,6 +133,7 @@ To assist with packaging your project, it is recommended to expose
 The following libraries are loaded for the X11 backend:
 
 - `libX11.so.6`
+- `libXrandr.so.2`
 - `libXcursor.so.1`
 - `libGL.so.1` (if OpenGL is enabled)
 - `libXext.so.6` (if Vulkan is enabled, as a workaround for [this issue][6])

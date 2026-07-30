@@ -260,6 +260,8 @@ pub const Window = struct {
     cursor: w.HCURSOR,
     text: bool = false,
     relative_mouse: bool = false,
+    draw_available_ns: u32 = 0,
+    draw_available_thread: std.Thread = undefined,
     tracking: bool = false,
     rect: w.RECT = .{ .left = 0, .top = 0, .right = 0, .bottom = 0 },
     surrogate: u16 = 0,
@@ -380,6 +382,7 @@ pub const Window = struct {
     }
 
     pub fn destroy(self: *Window) void {
+        self.disableDrawAvailableEvents();
         if (build_options.opengl) {
             _ = w.ReleaseDC(self.window, self.opengl.dc);
         }
@@ -393,10 +396,6 @@ pub const Window = struct {
         self.touch_ids.deinit(internal.allocator);
         internal.allocator.free(self.input);
         internal.allocator.destroy(self);
-    }
-
-    pub fn shouldPresent(_: *Window) bool {
-        return true;
     }
 
     pub fn enableTextInput(self: *Window, _: wio.TextInputOptions) void {
@@ -426,6 +425,24 @@ pub const Window = struct {
         var pos: w.POINT = undefined;
         _ = w.GetCursorPos(&pos);
         _ = w.SetCursorPos(pos.x, pos.y);
+    }
+
+    pub fn enableDrawAvailableEvents(self: *Window) void {
+        if (self.draw_available_ns == 0) {
+            log.warn("enableDrawAvailableEvents unimplemented for win32, falling back to 60 Hz", .{});
+            self.draw_available_ns = std.time.ns_per_s / 60;
+            self.draw_available_thread = std.Thread.spawn(.{}, drawAvailableThread, .{self}) catch {
+                self.draw_available_ns = 0;
+                return;
+            };
+        }
+    }
+
+    pub fn disableDrawAvailableEvents(self: *Window) void {
+        if (self.draw_available_ns != 0) {
+            self.draw_available_ns = 0;
+            self.draw_available_thread.join();
+        }
     }
 
     pub fn setTitle(self: *Window, title: []const u8) void {
@@ -1251,6 +1268,13 @@ fn enableRawMouse() void {
     }
 }
 
+fn drawAvailableThread(window: *Window) void {
+    while (window.draw_available_ns > 0) {
+        _ = w.PostMessageW(window.window, w.WM_PAINT, 0, 0);
+        std.Io.sleep(internal.io, .{ .nanoseconds = window.draw_available_ns }, .awake) catch {};
+    }
+}
+
 const DropTarget = struct {
     interface: w.IDropTarget = .{ .lpVtbl = &vtable },
     window: *Window = undefined,
@@ -1605,7 +1629,9 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
                     internal.eventFn(self.event_fn_data, .{ .mode = if (fullscreen) .fullscreen else if (wParam == w.SIZE_MAXIMIZED) .maximized else .normal });
                     internal.eventFn(self.event_fn_data, .{ .size_logical = size });
                     internal.eventFn(self.event_fn_data, .{ .size_physical = size });
-                    internal.eventFn(self.event_fn_data, .draw);
+                    if (self.draw_available_ns == 0) {
+                        internal.eventFn(self.event_fn_data, .draw);
+                    }
                 },
                 w.SIZE_MINIMIZED => internal.eventFn(self.event_fn_data, .hidden),
                 else => {},

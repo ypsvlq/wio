@@ -138,6 +138,7 @@ pub fn build(b: *std.Build) !void {
                         \\#include <X11/Xlib.h>
                         \\#include <X11/Xatom.h>
                         \\#include <X11/XKBlib.h>
+                        \\#include <X11/extensions/Xrandr.h>
                         \\#include <X11/Xcursor/Xcursor.h>
                         \\#include <GL/glx.h>
                         \\
@@ -224,6 +225,7 @@ pub fn build(b: *std.Build) !void {
                 if (system_integration) {
                     if (enable_x11) {
                         module.linkSystemLibrary("x11", .{});
+                        module.linkSystemLibrary("xrandr", .{});
                         module.linkSystemLibrary("xcursor", .{});
                         if (enable_opengl) {
                             module.linkSystemLibrary("gl", .{});
