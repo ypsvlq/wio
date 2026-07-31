@@ -6,6 +6,7 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.view.Choreographer;
 import android.view.InputDevice;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
@@ -17,7 +18,7 @@ import android.view.ViewTreeObserver.OnGlobalLayoutListener;
 import android.view.Window;
 import android.view.inputmethod.InputMethodManager;
 
-public class WioActivity extends Activity implements SurfaceHolder.Callback, OnGlobalLayoutListener {
+public class WioActivity extends Activity implements SurfaceHolder.Callback, OnGlobalLayoutListener, Choreographer.FrameCallback {
     static {
         System.loadLibrary("main");
     }
@@ -33,12 +34,15 @@ public class WioActivity extends Activity implements SurfaceHolder.Callback, OnG
     static native void surfaceCreatedNative(Surface surface);
     static native void surfaceChangedNative(float density, int width, int height);
     static native void surfaceDestroyedNative();
-    static native void onGlobalLayoutNative();
+    static native void pushDrawEventNative();
     static native void onCapturedPointerEventNative(int x, int y);
     static native void pushCharEventNative(int codepoint);
     static native void pushPreviewResetEventNative();
     static native void pushPreviewCharEventNative(int codepoint);
     static native void onPermissionGrantedNative();
+
+    Choreographer choreographer = Choreographer.getInstance();
+    boolean drawAvailableEvents = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -151,7 +155,15 @@ public class WioActivity extends Activity implements SurfaceHolder.Callback, OnG
 
     @Override
     public void onGlobalLayout() {
-        onGlobalLayoutNative();
+        pushDrawEventNative();
+    }
+
+    @Override
+    public void doFrame(long frameTimeNanos) {
+        pushDrawEventNative();
+        if (drawAvailableEvents) {
+            choreographer.postFrameCallback(this);
+        }
     }
 
     @Override
@@ -177,6 +189,17 @@ public class WioActivity extends Activity implements SurfaceHolder.Callback, OnG
 
     public void disableRelativeMouse() {
         getCurrentFocus().releasePointerCapture();
+    }
+
+    public void enableDrawAvailableEvents() {
+        if (!drawAvailableEvents) {
+            drawAvailableEvents = true;
+            choreographer.postFrameCallback(this);
+        }
+    }
+
+    public void disableDrawAvailableEvents() {
+        drawAvailableEvents = false;
     }
 
     static int cursors[] = {

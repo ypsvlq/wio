@@ -172,25 +172,12 @@ pub const Window = struct {
         relative_mouse = false;
     }
 
-    var draw_available_ns: u32 = 0;
-    var draw_available_thread: std.Thread = undefined;
-
     pub fn enableDrawAvailableEvents(_: *Window) void {
-        if (draw_available_ns == 0) {
-            log.warn("enableDrawAvailableEvents unimplemented for android, falling back to 60 Hz", .{});
-            draw_available_ns = std.time.ns_per_s / 60;
-            draw_available_thread = std.Thread.spawn(.{}, drawAvailableThread, .{}) catch {
-                draw_available_ns = 0;
-                return;
-            };
-        }
+        java.env.*.*.CallVoidMethod.?(java.env, java.activity, java.enableDrawAvailableEvents);
     }
 
     pub fn disableDrawAvailableEvents(_: *Window) void {
-        if (draw_available_ns != 0) {
-            draw_available_ns = 0;
-            draw_available_thread.join();
-        }
+        java.env.*.*.CallVoidMethod.?(java.env, java.activity, java.disbleDrawAvailableEvents);
     }
 
     pub fn setTitle(self: *Window, title: []const u8) void {
@@ -489,13 +476,6 @@ fn checkAAudioResult(result: c.aaudio_result_t, name: []const u8) !void {
     }
 }
 
-fn drawAvailableThread() void {
-    while (Window.draw_available_ns > 0) {
-        internal.eventFn(event_fn_data, .draw);
-        std.Io.sleep(internal.io, .{ .nanoseconds = Window.draw_available_ns }, .awake) catch {};
-    }
-}
-
 export fn JNI_OnLoad(vm: *c.JavaVM, _: ?*anyopaque) c.jint {
     var env: *c.JNIEnv = undefined;
     if (vm.*.*.GetEnv.?(vm, @ptrCast(&env), c.JNI_VERSION_1_6) != c.JNI_OK) return c.JNI_ERR;
@@ -508,6 +488,8 @@ export fn JNI_OnLoad(vm: *c.JavaVM, _: ?*anyopaque) c.jint {
     java.disableTextInput = env.*.*.GetMethodID.?(env, class, "disableTextInput", "()V") orelse return c.JNI_ERR;
     java.enableRelativeMouse = env.*.*.GetMethodID.?(env, class, "enableRelativeMouse", "()V") orelse return c.JNI_ERR;
     java.disableRelativeMouse = env.*.*.GetMethodID.?(env, class, "disableRelativeMouse", "()V") orelse return c.JNI_ERR;
+    java.enableDrawAvailableEvents = env.*.*.GetMethodID.?(env, class, "enableDrawAvailableEvents", "()V") orelse return c.JNI_ERR;
+    java.disbleDrawAvailableEvents = env.*.*.GetMethodID.?(env, class, "disableDrawAvailableEvents", "()V") orelse return c.JNI_ERR;
     java.setCursor = env.*.*.GetMethodID.?(env, class, "setCursor", "(I)V") orelse return c.JNI_ERR;
     java.setClipboardText = env.*.*.GetMethodID.?(env, class, "setClipboardText", "(Ljava/lang/String;)V") orelse return c.JNI_ERR;
     java.getClipboardText = env.*.*.GetMethodID.?(env, class, "getClipboardText", "()Ljava/lang/String;") orelse return c.JNI_ERR;
@@ -548,6 +530,8 @@ const java = struct {
     var disableTextInput: c.jmethodID = undefined;
     var enableRelativeMouse: c.jmethodID = undefined;
     var disableRelativeMouse: c.jmethodID = undefined;
+    var enableDrawAvailableEvents: c.jmethodID = undefined;
+    var disbleDrawAvailableEvents: c.jmethodID = undefined;
     var setCursor: c.jmethodID = undefined;
     var setClipboardText: c.jmethodID = undefined;
     var getClipboardText: c.jmethodID = undefined;
@@ -567,7 +551,7 @@ const native = struct {
         .{ .name = "surfaceCreatedNative", .signature = "(Landroid/view/Surface;)V", .fnPtr = @ptrCast(@constCast(&surfaceCreated)) },
         .{ .name = "surfaceChangedNative", .signature = "(FII)V", .fnPtr = @ptrCast(@constCast(&surfaceChanged)) },
         .{ .name = "surfaceDestroyedNative", .signature = "()V", .fnPtr = @ptrCast(@constCast(&surfaceDestroyed)) },
-        .{ .name = "onGlobalLayoutNative", .signature = "()V", .fnPtr = @ptrCast(@constCast(&onGlobalLayout)) },
+        .{ .name = "pushDrawEventNative", .signature = "()V", .fnPtr = @ptrCast(@constCast(&pushDrawEvent)) },
         .{ .name = "onCapturedPointerEventNative", .signature = "(II)V", .fnPtr = @ptrCast(@constCast(&onCapturedPointerEvent)) },
         .{ .name = "pushCharEventNative", .signature = "(I)V", .fnPtr = @ptrCast(@constCast(&pushCharEvent)) },
         .{ .name = "pushPreviewResetEventNative", .signature = "()V", .fnPtr = @ptrCast(@constCast(&pushPreviewResetEvent)) },
@@ -712,7 +696,7 @@ const native = struct {
         }
     }
 
-    fn onGlobalLayout(_: *c.JNIEnv, _: c.jobject) callconv(.c) void {
+    fn pushDrawEvent(_: *c.JNIEnv, _: c.jobject) callconv(.c) void {
         internal.eventFn(event_fn_data, .draw);
     }
 
