@@ -247,7 +247,7 @@ public class WioActivity extends Activity implements SurfaceHolder.Callback, OnG
         drawAvailableEvents = false;
     }
 
-    static int cursors[] = {
+    static short cursors[] = {
         PointerIcon.TYPE_ARROW,
         PointerIcon.TYPE_NULL,
         PointerIcon.TYPE_CONTEXT_MENU,
