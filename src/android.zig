@@ -658,13 +658,13 @@ const native = struct {
         .{ .name = "pushCharEventNative", .signature = "(I)V", .fnPtr = @ptrCast(@constCast(&pushCharEvent)) },
         .{ .name = "pushPreviewResetEventNative", .signature = "()V", .fnPtr = @ptrCast(@constCast(&pushPreviewResetEvent)) },
         .{ .name = "pushPreviewCharEventNative", .signature = "(I)V", .fnPtr = @ptrCast(@constCast(&pushPreviewCharEvent)) },
-    } ++ if (build_options.joystick) [_]c.JNINativeMethod{
+    } ++ (if (build_options.joystick) [_]c.JNINativeMethod{
         .{ .name = "onInputDeviceAddedNative", .signature = "(ILjava/lang/String;Ljava/lang/String;[I[I)V", .fnPtr = @ptrCast(@constCast(&onInputDeviceAdded)) },
         .{ .name = "onInputDeviceRemovedNative", .signature = "(I)V", .fnPtr = @ptrCast(@constCast(&onInputDeviceRemoved)) },
         .{ .name = "onJoystickMotionEventNative", .signature = "(IIFFF)V", .fnPtr = @ptrCast(@constCast(&onJoystickMotionEvent)) },
-    } else .{} ++ if (build_options.audio) [_]c.JNINativeMethod{
+    } else .{}) ++ (if (build_options.audio) [_]c.JNINativeMethod{
         .{ .name = "onPermissionGrantedNative", .signature = "()V", .fnPtr = @ptrCast(@constCast(&onPermissionGranted)) },
-    } else .{};
+    } else .{});
 
     fn onCreate(env: *c.JNIEnv, instance: c.jobject) callconv(.c) void {
         java.activity = env.*.*.NewGlobalRef.?(env, instance);
