@@ -419,7 +419,18 @@ pub const JoystickDevice = struct {
         errdefer internal.allocator.free(buttons);
         @memset(buttons, false);
 
-        joystick.* = .{ .axes = axes, .buttons = buttons };
+        const axes_copy = try internal.allocator.alloc(u16, axes.len);
+        errdefer internal.allocator.free(axes_copy);
+
+        const buttons_copy = try internal.allocator.alloc(bool, buttons.len);
+        errdefer internal.allocator.free(buttons_copy);
+
+        joystick.* = .{
+            .axes = axes,
+            .buttons = buttons,
+            .axes_copy = axes_copy,
+            .buttons_copy = buttons_copy,
+        };
         info.joystick = joystick;
         return joystick;
     }
@@ -444,6 +455,9 @@ pub const JoystickDevice = struct {
 pub const Joystick = struct {
     axes: []u16,
     buttons: []bool,
+    axes_copy: []u16,
+    buttons_copy: []bool,
+    mutex: std.Io.Mutex = .init,
     removed: bool = false,
 
     pub fn close(self: *Joystick) void {
@@ -453,7 +467,14 @@ pub const Joystick = struct {
 
     pub fn poll(self: *Joystick) ?wio.JoystickState {
         if (self.removed) return null;
-        return .{ .axes = self.axes, .hats = &.{}, .buttons = self.buttons };
+
+        self.mutex.lockUncancelable(internal.io);
+        defer self.mutex.unlock(internal.io);
+
+        @memcpy(self.axes_copy, self.axes);
+        @memcpy(self.buttons_copy, self.buttons);
+
+        return .{ .axes = self.axes_copy, .hats = &.{}, .buttons = self.buttons_copy };
     }
 };
 
@@ -856,6 +877,9 @@ const native = struct {
 
         if (joystick_map.fetchRemove(id)) |entry| {
             if (entry.value.joystick) |joystick| {
+                joystick.mutex.lockUncancelable(internal.io);
+                defer joystick.mutex.unlock(internal.io);
+
                 joystick.removed = true;
             }
             entry.value.deinit();
@@ -869,9 +893,13 @@ const native = struct {
 
         if (joystick_map.get(id)) |info| {
             if (info.joystick) |joystick| {
+                joystick.mutex.lockUncancelable(internal.io);
+                defer joystick.mutex.unlock(internal.io);
+
                 if (std.sort.binarySearch(c.jint, info.axes, axis, compareInt)) |index| {
                     joystick.axes[index] = @trunc((value - min) / (max - min) * 0xFFFF);
                 }
+
                 wio.cancelWait();
             }
         }
