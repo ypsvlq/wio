@@ -411,8 +411,7 @@ pub const JoystickDevice = struct {
         const joystick = try internal.allocator.create(Joystick);
         errdefer internal.allocator.destroy(joystick);
 
-        if (info.axes < 0) return error.Unexpected;
-        const axes = try internal.allocator.alloc(u16, @intCast(info.axes));
+        const axes = try internal.allocator.alloc(u16, info.axes.len);
         errdefer internal.allocator.free(axes);
         @memset(axes, 0xFFFF / 2);
 
@@ -639,9 +638,9 @@ const native = struct {
         .{ .name = "pushPreviewResetEventNative", .signature = "()V", .fnPtr = @ptrCast(@constCast(&pushPreviewResetEvent)) },
         .{ .name = "pushPreviewCharEventNative", .signature = "(I)V", .fnPtr = @ptrCast(@constCast(&pushPreviewCharEvent)) },
     } ++ if (build_options.joystick) [_]c.JNINativeMethod{
-        .{ .name = "onInputDeviceAddedNative", .signature = "(ILjava/lang/String;Ljava/lang/String;I[I)V", .fnPtr = @ptrCast(@constCast(&onInputDeviceAdded)) },
+        .{ .name = "onInputDeviceAddedNative", .signature = "(ILjava/lang/String;Ljava/lang/String;[I[I)V", .fnPtr = @ptrCast(@constCast(&onInputDeviceAdded)) },
         .{ .name = "onInputDeviceRemovedNative", .signature = "(I)V", .fnPtr = @ptrCast(@constCast(&onInputDeviceRemoved)) },
-        .{ .name = "onJoystickMotionEventNative", .signature = "(I[S)V", .fnPtr = @ptrCast(@constCast(&onJoystickMotionEvent)) },
+        .{ .name = "onJoystickMotionEventNative", .signature = "(IIFFF)V", .fnPtr = @ptrCast(@constCast(&onJoystickMotionEvent)) },
     } else .{} ++ if (build_options.audio) [_]c.JNINativeMethod{
         .{ .name = "onPermissionGrantedNative", .signature = "()V", .fnPtr = @ptrCast(@constCast(&onPermissionGranted)) },
     } else .{};
@@ -836,7 +835,7 @@ const native = struct {
         internal.eventFn(event_fn_data, .{ .preview_char = std.math.cast(u21, codepoint) orelse return });
     }
 
-    fn onInputDeviceAdded(env: *c.JNIEnv, _: c.jobject, id: c.jint, descriptor: c.jstring, name: c.jstring, axes: c.jint, buttons: c.jintArray) callconv(.c) void {
+    fn onInputDeviceAdded(env: *c.JNIEnv, _: c.jobject, id: c.jint, descriptor: c.jstring, name: c.jstring, axes: c.jintArray, buttons: c.jintArray) callconv(.c) void {
         const info = JoystickInfo.init(env, descriptor, name, axes, buttons) catch return;
 
         joystick_map_mutex.lockUncancelable(internal.io);
@@ -864,23 +863,15 @@ const native = struct {
         }
     }
 
-    fn onJoystickMotionEvent(env: *c.JNIEnv, _: c.jobject, id: c.jint, axes_j: c.jshortArray) callconv(.c) void {
+    fn onJoystickMotionEvent(_: *c.JNIEnv, _: c.jobject, id: c.jint, axis: c.jint, value: c.jfloat, min: c.jfloat, max: c.jfloat) callconv(.c) void {
         joystick_map_mutex.lockUncancelable(internal.io);
         defer joystick_map_mutex.unlock(internal.io);
 
         if (joystick_map.get(id)) |info| {
             if (info.joystick) |joystick| {
-                const axes_len = env.*.*.GetArrayLength.?(env, axes_j);
-                if (axes_len < 0) return;
-                const axes_ptr = env.*.*.GetShortArrayElements.?(env, axes_j, null) orelse return;
-                defer env.*.*.ReleaseShortArrayElements.?(env, axes_j, axes_ptr, c.JNI_ABORT);
-                const axes = axes_ptr[0..@intCast(axes_len)];
-
-                var i: usize = 0;
-                while (i < @min(joystick.axes.len, axes.len)) : (i += 1) {
-                    joystick.axes[i] = @bitCast(axes[i]);
+                if (std.sort.binarySearch(c.jint, info.axes, axis, compareInt)) |index| {
+                    joystick.axes[index] = @trunc((value - min) / (max - min) * 0xFFFF);
                 }
-
                 wio.cancelWait();
             }
         }
@@ -916,16 +907,21 @@ fn logEglError(name: []const u8) void {
 const JoystickInfo = struct {
     descriptor: []const u8,
     name: []const u8,
-    axes: c.jint,
+    axes: []const c.jint,
     buttons: []const c.jint,
     joystick: ?*Joystick = null,
 
-    fn init(env: *c.JNIEnv, descriptor_j: c.jstring, name_j: c.jstring, axes: c.jint, buttons_j: c.jintArray) !JoystickInfo {
+    fn init(env: *c.JNIEnv, descriptor_j: c.jstring, name_j: c.jstring, axes_j: c.jintArray, buttons_j: c.jintArray) !JoystickInfo {
         const descriptor_z = env.*.*.GetStringUTFChars.?(env, descriptor_j, null) orelse return error.Unexpected;
         defer env.*.*.ReleaseStringUTFChars.?(env, descriptor_j, descriptor_z);
 
         const name_z = env.*.*.GetStringUTFChars.?(env, name_j, null) orelse return error.Unexpected;
         defer env.*.*.ReleaseStringUTFChars.?(env, name_j, name_z);
+
+        const axes_len = env.*.*.GetArrayLength.?(env, axes_j);
+        if (axes_len < 0) return error.Unexpected;
+        const axes_ptr = env.*.*.GetIntArrayElements.?(env, axes_j, null) orelse return error.Unexpected;
+        defer env.*.*.ReleaseIntArrayElements.?(env, axes_j, axes_ptr, c.JNI_ABORT);
 
         var buttons_len = env.*.*.GetArrayLength.?(env, buttons_j);
         if (buttons_len < 0) return error.Unexpected;
@@ -941,6 +937,10 @@ const JoystickInfo = struct {
         const name = try internal.allocator.dupe(u8, std.mem.sliceTo(name_z, 0));
         errdefer internal.allocator.free(name);
 
+        const axes = try internal.allocator.dupe(c.jint, axes_ptr[0..@intCast(axes_len)]);
+        errdefer internal.allocator.free(axes);
+        std.mem.sortUnstable(c.jint, axes, {}, lessThanInt);
+
         const buttons = try internal.allocator.dupe(c.jint, buttons_ptr[0..@intCast(buttons_len)]);
         errdefer internal.allocator.free(buttons);
 
@@ -954,14 +954,19 @@ const JoystickInfo = struct {
 
     fn deinit(self: JoystickInfo) void {
         internal.allocator.free(self.buttons);
+        internal.allocator.free(self.axes);
         internal.allocator.free(self.name);
         internal.allocator.free(self.descriptor);
     }
 };
 
-fn compareInt(a: c.jint, b: c.jint) std.math.Order {
-    if (a > b) return .gt;
-    if (a < b) return .lt;
+fn lessThanInt(_: void, lhs: c.jint, rhs: c.jint) bool {
+    return lhs < rhs;
+}
+
+fn compareInt(lhs: c.jint, rhs: c.jint) std.math.Order {
+    if (lhs > rhs) return .gt;
+    if (lhs < rhs) return .lt;
     return .eq;
 }
 

@@ -41,9 +41,9 @@ public class WioActivity extends Activity implements SurfaceHolder.Callback, OnG
     static native void pushCharEventNative(int codepoint);
     static native void pushPreviewResetEventNative();
     static native void pushPreviewCharEventNative(int codepoint);
-    static native void onInputDeviceAddedNative(int id, String descriptor, String name, int axes, int[] buttons);
+    static native void onInputDeviceAddedNative(int id, String descriptor, String name, int[] axes, int[] buttons);
     static native void onInputDeviceRemovedNative(int id);
-    static native void onJoystickMotionEventNative(int id, short[] axes);
+    static native void onJoystickMotionEventNative(int id, int axis, float value, float min, float max);
     static native void onPermissionGrantedNative();
 
     Choreographer choreographer = Choreographer.getInstance();
@@ -122,15 +122,12 @@ public class WioActivity extends Activity implements SurfaceHolder.Callback, OnG
                 if (inputManager != null) {
                     int id = event.getDeviceId();
                     List<InputDevice.MotionRange> ranges = inputManager.getInputDevice(id).getMotionRanges();
-                    short axes[] = new short[ranges.size()];
-                    for (int i = 0; i < axes.length; i++) {
+                    int size = ranges.size();
+                    for (int i = 0; i < size; i++) {
                         InputDevice.MotionRange range = ranges.get(i);
-                        float min = range.getMin();
-                        float max = range.getMax();
-                        float value = event.getAxisValue(range.getAxis());
-                        axes[i] = (short)(0xFFFF * (value - min) / (max - min));
+                        int axis = range.getAxis();
+                        onJoystickMotionEventNative(id, axis, event.getAxisValue(axis), range.getMin(), range.getMax());
                     }
-                    onJoystickMotionEventNative(id, axes);
                 }
                 break;
         }
@@ -192,6 +189,11 @@ public class WioActivity extends Activity implements SurfaceHolder.Callback, OnG
         InputDevice device = inputManager.getInputDevice(deviceId);
         int sources = device.getSources();
         if ((sources & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD || (sources & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK) {
+            List<InputDevice.MotionRange> ranges = device.getMotionRanges();
+            int axes[] = new int[ranges.size()];
+            for (int i = 0; i < axes.length; i++) {
+                axes[i] = ranges.get(i).getAxis();
+            }
             int keys[] = new int[KeyEvent.KEYCODE_BUTTON_16 - KeyEvent.KEYCODE_BUTTON_A + 1];
             int count = 0;
             for (int key = KeyEvent.KEYCODE_BUTTON_A; key <= KeyEvent.KEYCODE_BUTTON_16; key++) {
@@ -199,7 +201,7 @@ public class WioActivity extends Activity implements SurfaceHolder.Callback, OnG
                     keys[count++] = key;
                 }
             }
-            onInputDeviceAddedNative(deviceId, device.getDescriptor(), device.getName(), device.getMotionRanges().size(), keys);
+            onInputDeviceAddedNative(deviceId, device.getDescriptor(), device.getName(), axes, keys);
         }
     }
 
