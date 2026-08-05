@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.pm.PackageManager;
+import android.hardware.input.InputManager;
 import android.os.Bundle;
 import android.view.Choreographer;
 import android.view.InputDevice;
@@ -17,8 +18,9 @@ import android.view.SurfaceView;
 import android.view.ViewTreeObserver.OnGlobalLayoutListener;
 import android.view.Window;
 import android.view.inputmethod.InputMethodManager;
+import java.util.List;
 
-public class WioActivity extends Activity implements SurfaceHolder.Callback, OnGlobalLayoutListener, Choreographer.FrameCallback {
+public class WioActivity extends Activity implements SurfaceHolder.Callback, OnGlobalLayoutListener, Choreographer.FrameCallback, InputManager.InputDeviceListener {
     static {
         System.loadLibrary("main");
     }
@@ -29,8 +31,8 @@ public class WioActivity extends Activity implements SurfaceHolder.Callback, OnG
     static native void onTouchEventNative(int action, int id, int x, int y);
     static native void pushMouseEventNative(int x, int y, int buttons);
     static native void pushScrollEventNative(float vertical, float horizontal);
-    static native boolean onKeyDownNative(int keycode, int repeat);
-    static native boolean onKeyUpNative(int keycode);
+    static native boolean onKeyDownNative(int id, int keycode, int repeat);
+    static native boolean onKeyUpNative(int id, int keycode);
     static native void surfaceCreatedNative(Surface surface);
     static native void surfaceChangedNative(float density, int width, int height);
     static native void surfaceDestroyedNative();
@@ -39,10 +41,14 @@ public class WioActivity extends Activity implements SurfaceHolder.Callback, OnG
     static native void pushCharEventNative(int codepoint);
     static native void pushPreviewResetEventNative();
     static native void pushPreviewCharEventNative(int codepoint);
+    static native void onInputDeviceAddedNative(int id, String descriptor, String name, int axes, int[] buttons);
+    static native void onInputDeviceRemovedNative(int id);
+    static native void onJoystickMotionEventNative(int id, short[] axes);
     static native void onPermissionGrantedNative();
 
     Choreographer choreographer = Choreographer.getInstance();
     boolean drawAvailableEvents = false;
+    InputManager inputManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -112,13 +118,28 @@ public class WioActivity extends Activity implements SurfaceHolder.Callback, OnG
                         break;
                 }
                 break;
+            case InputDevice.SOURCE_JOYSTICK:
+                if (inputManager != null) {
+                    int id = event.getDeviceId();
+                    List<InputDevice.MotionRange> ranges = inputManager.getInputDevice(id).getMotionRanges();
+                    short axes[] = new short[ranges.size()];
+                    for (int i = 0; i < axes.length; i++) {
+                        InputDevice.MotionRange range = ranges.get(i);
+                        float min = range.getMin();
+                        float max = range.getMax();
+                        float value = event.getAxisValue(range.getAxis());
+                        axes[i] = (short)(0xFFFF * (value - min) / (max - min));
+                    }
+                    onJoystickMotionEventNative(id, axes);
+                }
+                break;
         }
         return true;
     }
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
-        if (onKeyDownNative(keyCode, event.getRepeatCount())) {
+        if (onKeyDownNative(event.getDeviceId(), keyCode, event.getRepeatCount())) {
             return true;
         }
         return super.onKeyDown(keyCode, event);
@@ -126,7 +147,7 @@ public class WioActivity extends Activity implements SurfaceHolder.Callback, OnG
 
     @Override
     public boolean onKeyUp(int keyCode, KeyEvent event) {
-        if (onKeyUpNative(keyCode)) {
+        if (onKeyUpNative(event.getDeviceId(), keyCode)) {
             return true;
         }
         return super.onKeyUp(keyCode, event);
@@ -165,6 +186,30 @@ public class WioActivity extends Activity implements SurfaceHolder.Callback, OnG
             choreographer.postFrameCallback(this);
         }
     }
+
+    @Override
+    public void onInputDeviceAdded(int deviceId) {
+        InputDevice device = inputManager.getInputDevice(deviceId);
+        int sources = device.getSources();
+        if ((sources & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD || (sources & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK) {
+            int keys[] = new int[KeyEvent.KEYCODE_BUTTON_16 - KeyEvent.KEYCODE_BUTTON_A + 1];
+            int count = 0;
+            for (int key = KeyEvent.KEYCODE_BUTTON_A; key <= KeyEvent.KEYCODE_BUTTON_16; key++) {
+                if (device.hasKeys(key)[0]) {
+                    keys[count++] = key;
+                }
+            }
+            onInputDeviceAddedNative(deviceId, device.getDescriptor(), device.getName(), device.getMotionRanges().size(), keys);
+        }
+    }
+
+    @Override
+    public void onInputDeviceRemoved(int deviceId) {
+        onInputDeviceRemovedNative(deviceId);
+    }
+
+    @Override
+    public void onInputDeviceChanged(int deviceId) {}
 
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
@@ -255,6 +300,14 @@ public class WioActivity extends Activity implements SurfaceHolder.Callback, OnG
             return clipboard.getPrimaryClip().getItemAt(0).getText().toString();
         } catch (NullPointerException e) {
             return null;
+        }
+    }
+
+    public void initJoystick() {
+        inputManager = (InputManager)getSystemService(INPUT_SERVICE);
+        inputManager.registerInputDeviceListener(this, null);
+        for (int id : inputManager.getInputDeviceIds()) {
+            onInputDeviceAdded(id);
         }
     }
 

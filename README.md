@@ -94,8 +94,8 @@ Not actively tested:
 
 ### API support
 
-The joystick API is not currently implemented for Android, OpenBSD, NetBSD,
-FreeBSD, DragonFlyBSD, or illumos.
+The joystick API is not currently implemented for OpenBSD, NetBSD, FreeBSD, 
+DragonFlyBSD, or illumos.
 
 The audio API is not currently implemented for NetBSD, FreeBSD, DragonFlyBSD,
 or illumos.

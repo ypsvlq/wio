@@ -70,12 +70,22 @@ var relative_mouse: bool = false;
 var egl_config: c.EGLConfig = null;
 var egl_surface: c.EGLSurface = null; // protected by `window_mutex`
 
+var joystickConnectedFn: ?*const fn (wio.JoystickDevice) void = null;
+var joystick_map: std.AutoHashMapUnmanaged(c.jint, JoystickInfo) = .empty;
+var joystick_map_mutex: std.Io.Mutex = .init;
+var new_joysticks: std.ArrayList(c.jint) = .empty;
+var new_joysticks_mutex: std.Io.Mutex = .init;
+
 var audioDefaultInputFn: ?*const fn (wio.AudioDevice) void = null;
 var audio_input_available = false;
 
 pub fn init(options: wio.InitOptions) !void {
     if (build_options.opengl) {
         try egl.init(c.EGL_DEFAULT_DISPLAY);
+    }
+
+    if (build_options.joystick) {
+        joystickConnectedFn = options.joystickConnectedFn;
     }
 
     if (build_options.audio) {
@@ -86,6 +96,22 @@ pub fn init(options: wio.InitOptions) !void {
 }
 
 pub fn deinit() void {
+    if (build_options.joystick) {
+        new_joysticks_mutex.lockUncancelable(internal.io);
+        defer new_joysticks_mutex.unlock(internal.io);
+
+        new_joysticks.clearAndFree(internal.allocator);
+
+        joystick_map_mutex.lockUncancelable(internal.io);
+        defer joystick_map_mutex.unlock(internal.io);
+
+        var iter = joystick_map.valueIterator();
+        while (iter.next()) |info| {
+            info.deinit();
+        }
+        joystick_map.clearAndFree(internal.allocator);
+    }
+
     if (build_options.opengl) {
         _ = c.eglTerminate(egl.display);
     }
@@ -98,6 +124,17 @@ pub fn run(func: fn () anyerror!bool) !void {
 }
 
 pub fn update() void {
+    if (build_options.joystick) {
+        if (joystickConnectedFn) |callback| {
+            new_joysticks_mutex.lockUncancelable(internal.io);
+            defer new_joysticks_mutex.unlock(internal.io);
+
+            while (new_joysticks.pop()) |id| {
+                callback(.{ .backend = .{ .id = id } });
+            }
+        }
+    }
+
     if (build_options.audio) {
         if (audio_input_available) {
             if (audioDefaultInputFn) |callback| {
@@ -332,51 +369,92 @@ pub fn getRequiredVulkanInstanceExtensions() []const [*:0]const u8 {
 }
 
 pub const JoystickDeviceIterator = struct {
+    list: []JoystickDevice,
+    index: usize = 0,
+
     pub fn init() JoystickDeviceIterator {
-        return .{};
+        joystick_map_mutex.lockUncancelable(internal.io);
+        defer joystick_map_mutex.unlock(internal.io);
+
+        const list = internal.allocator.alloc(JoystickDevice, joystick_map.count()) catch return .{ .list = &.{} };
+        var iter = joystick_map.keyIterator();
+        var i: usize = 0;
+        while (iter.next()) |key_ptr| : (i += 1) {
+            list[i] = .{ .id = key_ptr.* };
+        }
+        return .{ .list = list };
     }
 
     pub fn deinit(self: *JoystickDeviceIterator) void {
-        _ = self;
+        internal.allocator.free(self.list);
     }
 
     pub fn next(self: *JoystickDeviceIterator) ?JoystickDevice {
-        _ = self;
-        return null;
+        if (self.index == self.list.len) return null;
+        defer self.index += 1;
+        return self.list[self.index];
     }
 };
 
 pub const JoystickDevice = struct {
-    pub fn release(self: JoystickDevice) void {
-        _ = self;
-    }
+    id: c.jint,
 
-    pub fn open(self: JoystickDevice) !Joystick {
-        _ = self;
-        return error.Unexpected;
+    pub fn release(_: JoystickDevice) void {}
+
+    pub fn open(self: JoystickDevice) !*Joystick {
+        joystick_map_mutex.lockUncancelable(internal.io);
+        defer joystick_map_mutex.unlock(internal.io);
+
+        const info = joystick_map.getPtr(self.id) orelse return error.Unexpected;
+        if (info.joystick != null) return error.Unexpected;
+
+        const joystick = try internal.allocator.create(Joystick);
+        errdefer internal.allocator.destroy(joystick);
+
+        if (info.axes < 0) return error.Unexpected;
+        const axes = try internal.allocator.alloc(u16, @intCast(info.axes));
+        errdefer internal.allocator.free(axes);
+        @memset(axes, 0xFFFF / 2);
+
+        const buttons = try internal.allocator.alloc(bool, info.buttons.len);
+        errdefer internal.allocator.free(buttons);
+        @memset(buttons, false);
+
+        joystick.* = .{ .axes = axes, .buttons = buttons };
+        info.joystick = joystick;
+        return joystick;
     }
 
     pub fn getId(self: JoystickDevice, allocator: std.mem.Allocator) ![]u8 {
-        _ = self;
-        _ = allocator;
-        return error.Unexpected;
+        joystick_map_mutex.lockUncancelable(internal.io);
+        defer joystick_map_mutex.unlock(internal.io);
+
+        const info = joystick_map.get(self.id) orelse return error.Unexpected;
+        return allocator.dupe(u8, info.descriptor);
     }
 
     pub fn getName(self: JoystickDevice, allocator: std.mem.Allocator) ![]u8 {
-        _ = self;
-        _ = allocator;
-        return error.Unexpected;
+        joystick_map_mutex.lockUncancelable(internal.io);
+        defer joystick_map_mutex.unlock(internal.io);
+
+        const info = joystick_map.get(self.id) orelse return error.Unexpected;
+        return allocator.dupe(u8, info.name);
     }
 };
 
 pub const Joystick = struct {
+    axes: []u16,
+    buttons: []bool,
+    removed: bool = false,
+
     pub fn close(self: *Joystick) void {
-        _ = self;
+        internal.allocator.free(self.buttons);
+        internal.allocator.destroy(self);
     }
 
     pub fn poll(self: *Joystick) ?wio.JoystickState {
-        _ = self;
-        return null;
+        if (self.removed) return null;
+        return .{ .axes = self.axes, .hats = &.{}, .buttons = self.buttons };
     }
 };
 
@@ -493,6 +571,9 @@ export fn JNI_OnLoad(vm: *c.JavaVM, _: ?*anyopaque) c.jint {
     java.setCursor = env.*.*.GetMethodID.?(env, class, "setCursor", "(I)V") orelse return c.JNI_ERR;
     java.setClipboardText = env.*.*.GetMethodID.?(env, class, "setClipboardText", "(Ljava/lang/String;)V") orelse return c.JNI_ERR;
     java.getClipboardText = env.*.*.GetMethodID.?(env, class, "getClipboardText", "()Ljava/lang/String;") orelse return c.JNI_ERR;
+    if (build_options.joystick) {
+        java.initJoystick = env.*.*.GetMethodID.?(env, class, "initJoystick", "()V") orelse return c.JNI_ERR;
+    }
     if (build_options.audio) {
         java.requestRecordAudioPermission = env.*.*.GetMethodID.?(env, class, "requestRecordAudioPermission", "()V") orelse return c.JNI_ERR;
     }
@@ -535,7 +616,8 @@ const java = struct {
     var setCursor: c.jmethodID = undefined;
     var setClipboardText: c.jmethodID = undefined;
     var getClipboardText: c.jmethodID = undefined;
-    var requestRecordAudioPermission: if (build_options.audio) c.jmethodID else void = undefined;
+    var initJoystick: c.jmethodID = undefined;
+    var requestRecordAudioPermission: c.jmethodID = undefined;
 };
 
 const native = struct {
@@ -546,8 +628,8 @@ const native = struct {
         .{ .name = "onTouchEventNative", .signature = "(IIII)V", .fnPtr = @ptrCast(@constCast(&onTouchEvent)) },
         .{ .name = "pushMouseEventNative", .signature = "(III)V", .fnPtr = @ptrCast(@constCast(&pushMouseEvent)) },
         .{ .name = "pushScrollEventNative", .signature = "(FF)V", .fnPtr = @ptrCast(@constCast(&pushScrollEvent)) },
-        .{ .name = "onKeyDownNative", .signature = "(II)Z", .fnPtr = @ptrCast(@constCast(&onKeyDown)) },
-        .{ .name = "onKeyUpNative", .signature = "(I)Z", .fnPtr = @ptrCast(@constCast(&onKeyUp)) },
+        .{ .name = "onKeyDownNative", .signature = "(III)Z", .fnPtr = @ptrCast(@constCast(&onKeyDown)) },
+        .{ .name = "onKeyUpNative", .signature = "(II)Z", .fnPtr = @ptrCast(@constCast(&onKeyUp)) },
         .{ .name = "surfaceCreatedNative", .signature = "(Landroid/view/Surface;)V", .fnPtr = @ptrCast(@constCast(&surfaceCreated)) },
         .{ .name = "surfaceChangedNative", .signature = "(FII)V", .fnPtr = @ptrCast(@constCast(&surfaceChanged)) },
         .{ .name = "surfaceDestroyedNative", .signature = "()V", .fnPtr = @ptrCast(@constCast(&surfaceDestroyed)) },
@@ -556,7 +638,11 @@ const native = struct {
         .{ .name = "pushCharEventNative", .signature = "(I)V", .fnPtr = @ptrCast(@constCast(&pushCharEvent)) },
         .{ .name = "pushPreviewResetEventNative", .signature = "()V", .fnPtr = @ptrCast(@constCast(&pushPreviewResetEvent)) },
         .{ .name = "pushPreviewCharEventNative", .signature = "(I)V", .fnPtr = @ptrCast(@constCast(&pushPreviewCharEvent)) },
-    } ++ if (build_options.audio) [_]c.JNINativeMethod{
+    } ++ if (build_options.joystick) [_]c.JNINativeMethod{
+        .{ .name = "onInputDeviceAddedNative", .signature = "(ILjava/lang/String;Ljava/lang/String;I[I)V", .fnPtr = @ptrCast(@constCast(&onInputDeviceAdded)) },
+        .{ .name = "onInputDeviceRemovedNative", .signature = "(I)V", .fnPtr = @ptrCast(@constCast(&onInputDeviceRemoved)) },
+        .{ .name = "onJoystickMotionEventNative", .signature = "(I[S)V", .fnPtr = @ptrCast(@constCast(&onJoystickMotionEvent)) },
+    } else .{} ++ if (build_options.audio) [_]c.JNINativeMethod{
         .{ .name = "onPermissionGrantedNative", .signature = "()V", .fnPtr = @ptrCast(@constCast(&onPermissionGranted)) },
     } else .{};
 
@@ -570,6 +656,10 @@ const native = struct {
         thread.detach();
 
         Window.created_event.waitUncancelable(std.Io.Threaded.global_single_threaded.io());
+
+        if (build_options.joystick) {
+            env.*.*.CallVoidMethod.?(env, instance, java.initJoystick);
+        }
     }
 
     fn onDestroy(_: *c.JNIEnv, _: c.jobject) callconv(.c) void {
@@ -642,14 +732,44 @@ const native = struct {
         if (horizontal != 0) internal.eventFn(event_fn_data, .{ .scroll_horizontal = -horizontal });
     }
 
-    fn onKeyDown(_: *c.JNIEnv, _: c.jobject, keycode: c.jint, repeat: c.jint) callconv(.c) c.jboolean {
+    fn onKeyDown(_: *c.JNIEnv, _: c.jobject, id: c.jint, keycode: c.jint, repeat: c.jint) callconv(.c) c.jboolean {
+        if (build_options.joystick) {
+            joystick_map_mutex.lockUncancelable(internal.io);
+            defer joystick_map_mutex.unlock(internal.io);
+
+            if (joystick_map.getPtr(id)) |info| {
+                if (info.joystick) |joystick| {
+                    if (std.sort.binarySearch(c.jint, info.buttons, keycode, compareInt)) |index| {
+                        joystick.buttons[index] = true;
+                        wio.cancelWait();
+                    }
+                }
+                return c.JNI_TRUE;
+            }
+        }
+
         const button = keycodeToButton(keycode) orelse return c.JNI_FALSE;
         internal.eventFn(event_fn_data, if (repeat == 0) .{ .button_press = button } else .{ .button_repeat = button });
         updateModifiers(button, true);
         return c.JNI_TRUE;
     }
 
-    fn onKeyUp(_: *c.JNIEnv, _: c.jobject, keycode: c.jint) callconv(.c) c.jboolean {
+    fn onKeyUp(_: *c.JNIEnv, _: c.jobject, id: c.jint, keycode: c.jint) callconv(.c) c.jboolean {
+        if (build_options.joystick) {
+            joystick_map_mutex.lockUncancelable(internal.io);
+            defer joystick_map_mutex.unlock(internal.io);
+
+            if (joystick_map.getPtr(id)) |info| {
+                if (info.joystick) |joystick| {
+                    if (std.sort.binarySearch(c.jint, info.buttons, keycode, compareInt)) |index| {
+                        joystick.buttons[index] = false;
+                        wio.cancelWait();
+                    }
+                }
+                return c.JNI_TRUE;
+            }
+        }
+
         const button = keycodeToButton(keycode) orelse return c.JNI_FALSE;
         internal.eventFn(event_fn_data, .{ .button_release = button });
         updateModifiers(button, false);
@@ -716,6 +836,56 @@ const native = struct {
         internal.eventFn(event_fn_data, .{ .preview_char = std.math.cast(u21, codepoint) orelse return });
     }
 
+    fn onInputDeviceAdded(env: *c.JNIEnv, _: c.jobject, id: c.jint, descriptor: c.jstring, name: c.jstring, axes: c.jint, buttons: c.jintArray) callconv(.c) void {
+        const info = JoystickInfo.init(env, descriptor, name, axes, buttons) catch return;
+
+        joystick_map_mutex.lockUncancelable(internal.io);
+        defer joystick_map_mutex.unlock(internal.io);
+        joystick_map.put(internal.allocator, id, info) catch {
+            info.deinit();
+            return;
+        };
+
+        new_joysticks_mutex.lockUncancelable(internal.io);
+        defer new_joysticks_mutex.unlock(internal.io);
+        new_joysticks.append(internal.allocator, id) catch {};
+    }
+
+    fn onInputDeviceRemoved(_: *c.JNIEnv, _: c.jobject, id: c.jint) callconv(.c) void {
+        joystick_map_mutex.lockUncancelable(internal.io);
+        defer joystick_map_mutex.unlock(internal.io);
+
+        if (joystick_map.fetchRemove(id)) |entry| {
+            if (entry.value.joystick) |joystick| {
+                joystick.removed = true;
+            }
+            entry.value.deinit();
+            wio.cancelWait();
+        }
+    }
+
+    fn onJoystickMotionEvent(env: *c.JNIEnv, _: c.jobject, id: c.jint, axes_j: c.jshortArray) callconv(.c) void {
+        joystick_map_mutex.lockUncancelable(internal.io);
+        defer joystick_map_mutex.unlock(internal.io);
+
+        if (joystick_map.get(id)) |info| {
+            if (info.joystick) |joystick| {
+                const axes_len = env.*.*.GetArrayLength.?(env, axes_j);
+                if (axes_len < 0) return;
+                const axes_ptr = env.*.*.GetShortArrayElements.?(env, axes_j, null) orelse return;
+                defer env.*.*.ReleaseShortArrayElements.?(env, axes_j, axes_ptr, c.JNI_ABORT);
+                const axes = axes_ptr[0..@intCast(axes_len)];
+
+                var i: usize = 0;
+                while (i < @min(joystick.axes.len, axes.len)) : (i += 1) {
+                    joystick.axes[i] = @bitCast(axes[i]);
+                }
+
+                wio.cancelWait();
+            }
+        }
+    }
+
     fn onPermissionGranted(_: *c.JNIEnv, _: c.jobject) callconv(.c) void {
         audio_input_available = true;
     }
@@ -741,6 +911,58 @@ fn logUnexpectedEgl(name: []const u8) error{Unexpected} {
 
 fn logEglError(name: []const u8) void {
     log.err("{s} failed, error 0x{X}", .{ name, c.eglGetError() });
+}
+
+const JoystickInfo = struct {
+    descriptor: []const u8,
+    name: []const u8,
+    axes: c.jint,
+    buttons: []const c.jint,
+    joystick: ?*Joystick = null,
+
+    fn init(env: *c.JNIEnv, descriptor_j: c.jstring, name_j: c.jstring, axes: c.jint, buttons_j: c.jintArray) !JoystickInfo {
+        const descriptor_z = env.*.*.GetStringUTFChars.?(env, descriptor_j, null) orelse return error.Unexpected;
+        defer env.*.*.ReleaseStringUTFChars.?(env, descriptor_j, descriptor_z);
+
+        const name_z = env.*.*.GetStringUTFChars.?(env, name_j, null) orelse return error.Unexpected;
+        defer env.*.*.ReleaseStringUTFChars.?(env, name_j, name_z);
+
+        var buttons_len = env.*.*.GetArrayLength.?(env, buttons_j);
+        if (buttons_len < 0) return error.Unexpected;
+        const buttons_ptr = env.*.*.GetIntArrayElements.?(env, buttons_j, null) orelse return error.Unexpected;
+        defer env.*.*.ReleaseIntArrayElements.?(env, buttons_j, buttons_ptr, c.JNI_ABORT);
+        if (std.mem.findScalar(c.jint, buttons_ptr[0..@intCast(buttons_len)], 0)) |index| {
+            buttons_len = @intCast(index);
+        }
+
+        const descriptor = try internal.allocator.dupe(u8, std.mem.sliceTo(descriptor_z, 0));
+        errdefer internal.allocator.free(descriptor);
+
+        const name = try internal.allocator.dupe(u8, std.mem.sliceTo(name_z, 0));
+        errdefer internal.allocator.free(name);
+
+        const buttons = try internal.allocator.dupe(c.jint, buttons_ptr[0..@intCast(buttons_len)]);
+        errdefer internal.allocator.free(buttons);
+
+        return .{
+            .descriptor = descriptor,
+            .name = name,
+            .axes = axes,
+            .buttons = buttons,
+        };
+    }
+
+    fn deinit(self: JoystickInfo) void {
+        internal.allocator.free(self.buttons);
+        internal.allocator.free(self.name);
+        internal.allocator.free(self.descriptor);
+    }
+};
+
+fn compareInt(a: c.jint, b: c.jint) std.math.Order {
+    if (a > b) return .gt;
+    if (a < b) return .lt;
+    return .eq;
 }
 
 fn keycodeToButton(keycode: i32) ?wio.Button {
