@@ -536,13 +536,15 @@ pub const Window = struct {
         }
     }
 
-    pub fn getClipboardText(_: *Window, allocator: std.mem.Allocator) ?[]u8 {
-        if (w.OpenClipboard(null) == 0) return null;
+    pub fn getClipboardText(_: *Window, clipboardTextFn: *const fn (?*anyopaque, []const u8) void, clipboard_text_fn_data: ?*anyopaque) void {
+        if (w.OpenClipboard(null) == 0) return;
         defer _ = w.CloseClipboard();
-        const mem = w.GetClipboardData(w.CF_UNICODETEXT) orelse return null;
-        const text: [*:0]const u16 = @ptrCast(@alignCast(w.GlobalLock(mem) orelse return null));
+        const mem = w.GetClipboardData(w.CF_UNICODETEXT) orelse return;
+        const text_w: [*:0]const u16 = @ptrCast(@alignCast(w.GlobalLock(mem) orelse return));
         defer _ = w.GlobalUnlock(mem);
-        return std.unicode.utf16LeToUtf8Alloc(allocator, std.mem.sliceTo(text, 0)) catch null;
+        const text = std.unicode.utf16LeToUtf8Alloc(internal.allocator, std.mem.sliceTo(text_w, 0)) catch return;
+        defer internal.allocator.free(text);
+        clipboardTextFn(clipboard_text_fn_data, text);
     }
 
     pub fn getDropData(self: *Window, allocator: std.mem.Allocator) wio.DropData {

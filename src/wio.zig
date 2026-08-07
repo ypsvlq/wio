@@ -207,8 +207,8 @@ pub const Window = struct {
         self.backend.setClipboardText(text);
     }
 
-    pub fn getClipboardText(self: *Window, allocator: std.mem.Allocator) ?[]u8 {
-        return self.backend.getClipboardText(allocator);
+    pub fn getClipboardText(self: *Window, clipboardTextFn: *const fn (?*anyopaque, []const u8) void, clipboard_text_fn_data: ?*anyopaque) void {
+        self.backend.getClipboardText(clipboardTextFn, clipboard_text_fn_data);
     }
 
     pub fn getDropData(self: *Window, allocator: std.mem.Allocator) DropData {

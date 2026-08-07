@@ -229,10 +229,11 @@ pub const Window = struct {
         wioSetClipboardText(text.ptr, text.len);
     }
 
-    pub fn getClipboardText(_: *Window, allocator: std.mem.Allocator) ?[]u8 {
+    pub fn getClipboardText(_: *Window, clipboardTextFn: *const fn (?*anyopaque, []const u8) void, clipboard_text_fn_data: ?*anyopaque) void {
         var len: usize = undefined;
-        const ptr = wioGetClipboardText(&len) orelse return null;
-        return allocator.dupe(u8, ptr[0..len]) catch return null;
+        if (wioGetClipboardText(&len)) |ptr| {
+            clipboardTextFn(clipboard_text_fn_data, ptr[0..len]);
+        }
     }
 
     pub fn getDropData(self: *Window, allocator: std.mem.Allocator) wio.DropData {

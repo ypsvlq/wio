@@ -25,7 +25,7 @@ extern void wioMouseLeave(void *);
 extern void wioScroll(void *, Float32, Float32);
 extern void wioGestureZoom(void *, Float32);
 extern void wioGestureRotate(void *, Float32);
-extern char *wioDupeClipboardText(const void *, const char *, size_t *);
+extern char *wioDupeClipboardText(const char *, size_t *);
 
 static NSString *string(const char *ptr, size_t len) {
     return [[NSString alloc] initWithBytes:ptr length:len encoding:NSUTF8StringEncoding];
@@ -606,10 +606,10 @@ void wioSetClipboardText(const char *ptr, size_t len) {
     [pasteboard setString:string(ptr, len) forType:NSPasteboardTypeString];
 }
 
-char *wioGetClipboardText(const void *ptr, size_t *len) {
+char *wioGetClipboardText(size_t *len) {
     NSString *string = [[NSPasteboard generalPasteboard] stringForType:NSPasteboardTypeString];
     if (!string) return NULL;
-    return wioDupeClipboardText(ptr, [string UTF8String], len);
+    return wioDupeClipboardText([string UTF8String], len);
 }
 
 void wioDrawAvailable(NSWindow *window) {

@@ -106,10 +106,10 @@ pub const Window = struct {
         _ = text;
     }
 
-    pub fn getClipboardText(self: *Window, allocator: std.mem.Allocator) ?[]u8 {
+    pub fn getClipboardText(self: *Window, clipboardTextFn: *const fn (?*anyopaque, []const u8) void, clipboard_text_fn_data: ?*anyopaque) void {
         _ = self;
-        _ = allocator;
-        return null;
+        _ = clipboardTextFn;
+        _ = clipboard_text_fn_data;
     }
 
     pub fn getDropData(self: *Window, allocator: std.mem.Allocator) wio.DropData {

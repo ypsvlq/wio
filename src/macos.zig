@@ -27,7 +27,7 @@ extern fn wioSetSize(*NSWindow, u16, u16) void;
 extern fn wioSetCursor(*NSWindow, u8) void;
 extern fn wioRequestAttention() void;
 extern fn wioSetClipboardText([*]const u8, usize) void;
-extern fn wioGetClipboardText(*const std.mem.Allocator, *usize) ?[*]u8;
+extern fn wioGetClipboardText(*usize) ?[*]u8;
 extern fn wioDrawAvailable(*NSWindow) void;
 extern fn wioPresentFramebuffer(*NSWindow, c.CGContextRef) void;
 extern fn wioRelease(?*const anyopaque) void;
@@ -315,10 +315,13 @@ pub const Window = struct {
         wioSetClipboardText(text.ptr, text.len);
     }
 
-    pub fn getClipboardText(_: *Window, allocator: std.mem.Allocator) ?[]u8 {
+    pub fn getClipboardText(_: *Window, clipboardTextFn: *const fn (?*anyopaque, []const u8) void, clipboard_text_fn_data: ?*anyopaque) void {
         var len: usize = undefined;
-        const text = wioGetClipboardText(&allocator, &len) orelse return null;
-        return text[0..len];
+        if (wioGetClipboardText(&len)) |ptr| {
+            const text = ptr[0..len];
+            defer internal.allocator.free(text);
+            clipboardTextFn(clipboard_text_fn_data, text);
+        }
     }
 
     pub fn getDropData(_: *Window, _: std.mem.Allocator) wio.DropData {
@@ -954,9 +957,9 @@ export fn wioGestureRotate(self: *Window, value: f32) void {
     internal.eventFn(self.event_fn_data, .{ .gesture_rotate = -value });
 }
 
-export fn wioDupeClipboardText(allocator: *const std.mem.Allocator, bytes: [*:0]const u8, len: *usize) ?[*]u8 {
+export fn wioDupeClipboardText(bytes: [*:0]const u8, len: *usize) ?[*]u8 {
     const slice = std.mem.sliceTo(bytes, 0);
-    if (allocator.dupe(u8, slice)) |dupe| {
+    if (internal.allocator.dupe(u8, slice)) |dupe| {
         len.* = dupe.len;
         return dupe.ptr;
     } else |_| {

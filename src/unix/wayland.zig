@@ -553,35 +553,33 @@ pub const Window = struct {
         h.wl_data_device_set_selection(data_device, data_source, last_serial);
     }
 
-    pub fn getClipboardText(_: *Window, allocator: std.mem.Allocator) ?[]u8 {
-        if (data_offer == null) return null;
+    pub fn getClipboardText(_: *Window, clipboardTextFn: *const fn (?*anyopaque, []const u8) void, clipboard_text_fn_data: ?*anyopaque) void {
+        if (data_offer == null) return;
         var pipe: [2]i32 = undefined;
-        if (std.c.pipe(&pipe) == -1) return null;
+        if (std.c.pipe(&pipe) == -1) return;
         defer _ = std.c.close(pipe[0]);
         h.wl_data_offer_receive(data_offer, "text/plain;charset=utf-8", pipe[1]);
         _ = c.wl_display_roundtrip(display);
         _ = std.c.close(pipe[1]);
-        return readClipboardText(allocator, pipe[0]) catch null;
+
+        var buffer: [1024]u8 = undefined;
+        var text: std.ArrayList(u8) = .empty;
+        defer text.deinit(internal.allocator);
+        while (true) {
+            const count = std.c.read(pipe[0], &buffer, buffer.len);
+            if (std.c.errno(count) != .SUCCESS) {
+                return;
+            } else if (count == 0) {
+                clipboardTextFn(clipboard_text_fn_data, text.items);
+                break;
+            } else {
+                text.appendSlice(internal.allocator, buffer[0..@intCast(count)]) catch return;
+            }
+        }
     }
 
     pub fn getDropData(self: *Window, allocator: std.mem.Allocator) wio.DropData {
         return wio.DropData.dupe(allocator, self.drop.files.items, self.drop.text) catch .{ .files = &.{}, .text = null };
-    }
-
-    fn readClipboardText(allocator: std.mem.Allocator, fd: i32) ![]u8 {
-        var buffer: [1024]u8 = undefined;
-        var text: std.ArrayList(u8) = .empty;
-        errdefer text.deinit(allocator);
-        while (true) {
-            const count = std.c.read(fd, &buffer, buffer.len);
-            if (std.c.errno(count) != .SUCCESS) {
-                return error.Unexpected;
-            } else if (count == 0) {
-                return text.toOwnedSlice(allocator);
-            } else {
-                try text.appendSlice(allocator, buffer[0..@intCast(count)]);
-            }
-        }
     }
 
     pub fn createFramebuffer(_: *Window, size: wio.Size) !Framebuffer {

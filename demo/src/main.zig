@@ -287,12 +287,7 @@ fn action(button: wio.Button) !void {
         },
         .a => request_attention = true,
         .c => window.setClipboardText("wio example"),
-        .v => {
-            if (window.getClipboardText(allocator)) |text| {
-                defer allocator.free(text);
-                std.log.scoped(.clipboard).info("{s}", .{text});
-            }
-        },
+        .v => window.getClipboardText(clipboardText, null),
         .o => audio.play = !audio.play,
         .i => audio.record = !audio.record,
         .e => {
@@ -321,6 +316,10 @@ fn action(button: wio.Button) !void {
         },
         else => {},
     }
+}
+
+fn clipboardText(_: ?*anyopaque, text: []const u8) void {
+    std.log.scoped(.clipboard).info("{s}", .{text});
 }
 
 fn cancelWait() void {

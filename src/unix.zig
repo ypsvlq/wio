@@ -330,10 +330,10 @@ pub const Window = union {
         }
     }
 
-    pub fn getClipboardText(self: *Window, allocator: std.mem.Allocator) ?[]u8 {
+    pub fn getClipboardText(self: *Window, clipboardTextFn: *const fn (?*anyopaque, []const u8) void, clipboard_text_fn_data: ?*anyopaque) void {
         switch (active) {
-            .x11 => return self.x11.getClipboardText(allocator),
-            .wayland => return self.wayland.getClipboardText(allocator),
+            .x11 => self.x11.getClipboardText(clipboardTextFn, clipboard_text_fn_data),
+            .wayland => self.wayland.getClipboardText(clipboardTextFn, clipboard_text_fn_data),
         }
     }
 

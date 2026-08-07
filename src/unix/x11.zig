@@ -275,6 +275,10 @@ pub const Window = struct {
     position: wio.Position,
     size: wio.Size,
     warped: bool = false,
+    clipboardTextFn: ?*const fn (?*anyopaque, []const u8) void = null,
+    clipboard_text_fn_data: ?*anyopaque = null,
+    clipboard_incr: bool = false,
+    clipboard_incr_text: std.ArrayList(u8) = .empty,
     drop: if (build_options.drop) struct {
         xdnd_source: h.Window = 0,
         xdnd_req: h.Atom = h.None,
@@ -435,6 +439,7 @@ pub const Window = struct {
         _ = c.XFlush(display);
 
         self.preedit_string.deinit(internal.allocator);
+        self.clipboard_incr_text.deinit(internal.allocator);
 
         internal.allocator.destroy(self);
     }
@@ -591,40 +596,11 @@ pub const Window = struct {
         _ = c.XSetSelectionOwner(display, h.XA_PRIMARY, self.window, h.CurrentTime);
     }
 
-    pub fn getClipboardText(self: *Window, allocator: std.mem.Allocator) ?[]u8 {
+    pub fn getClipboardText(self: *Window, clipboardTextFn: *const fn (?*anyopaque, []const u8) void, clipboard_text_fn_data: ?*anyopaque) void {
+        self.clipboardTextFn = clipboardTextFn;
+        self.clipboard_text_fn_data = clipboard_text_fn_data;
         _ = c.XConvertSelection(display, atoms.CLIPBOARD, atoms.UTF8_STRING, atoms.SELECTION, self.window, h.CurrentTime);
-        var event: h.XEvent = undefined;
-        while (c.XCheckTypedWindowEvent(display, self.window, h.SelectionNotify, &event) == h.False) {
-            if (c.XCheckTypedWindowEvent(display, self.window, h.SelectionRequest, &event) == h.True) handle(&event);
-        }
-        if (event.xselection.property == h.None) return null;
-
-        var actual_type: h.Atom = undefined;
-        var actual_format: c_int = undefined;
-        var nitems: c_ulong = undefined;
-        var bytes_after: c_ulong = undefined;
-        var property: [*]u8 = undefined;
-        _ = c.XGetWindowProperty(display, self.window, atoms.SELECTION, 0, std.math.maxInt(c_long), h.True, h.AnyPropertyType, &actual_type, &actual_format, &nitems, &bytes_after, @ptrCast(&property));
-        defer _ = c.XFree(property);
-
-        if (actual_type == atoms.INCR) {
-            var result = allocator.alloc(u8, 0) catch unreachable;
-            while (true) {
-                while (c.XCheckTypedWindowEvent(display, self.window, h.PropertyNotify, &event) == h.False) {}
-                if (event.xproperty.atom != atoms.SELECTION or event.xproperty.state != h.PropertyNewValue) continue;
-
-                var chunk: [*]u8 = undefined;
-                _ = c.XGetWindowProperty(display, self.window, atoms.SELECTION, 0, std.math.maxInt(c_long), h.True, h.AnyPropertyType, &actual_type, &actual_format, &nitems, &bytes_after, @ptrCast(&chunk));
-                defer _ = c.XFree(chunk);
-
-                if (result.len > 0 and nitems == 0) break;
-                result = allocator.realloc(result, result.len + nitems) catch return null;
-                @memcpy(result[result.len - nitems ..], chunk);
-            }
-            return result;
-        } else {
-            return allocator.dupe(u8, property[0..nitems]) catch null;
-        }
+        _ = c.XFlush(display);
     }
 
     pub fn getDropData(self: *Window, allocator: std.mem.Allocator) wio.DropData {
@@ -1226,8 +1202,50 @@ fn handle(event: *h.XEvent) void {
 
                 window.drop.xdnd_source = 0;
                 window.drop.xdnd_req = h.None;
-            } else {
-                // clipboard SelectionNotify is handled in getClipboardText via XCheckTypedWindowEvent
+            } else if (event.xselection.property != h.None) {
+                if (window.clipboardTextFn) |clipboardTextFn| {
+                    var actual_type: h.Atom = undefined;
+                    var actual_format: c_int = undefined;
+                    var nitems: c_ulong = undefined;
+                    var bytes_after: c_ulong = undefined;
+                    var property: [*]u8 = undefined;
+                    _ = c.XGetWindowProperty(display, window.window, atoms.SELECTION, 0, std.math.maxInt(c_long), h.True, h.AnyPropertyType, &actual_type, &actual_format, &nitems, &bytes_after, @ptrCast(&property));
+                    defer _ = c.XFree(property);
+
+                    if (actual_type == atoms.INCR) {
+                        window.clipboard_incr = true;
+                        window.clipboard_incr_text.clearRetainingCapacity();
+                    } else {
+                        window.clipboard_incr = false;
+                        clipboardTextFn(window.clipboard_text_fn_data, property[0..nitems]);
+                        window.clipboardTextFn = null;
+                    }
+                }
+            }
+        },
+        h.PropertyNotify => {
+            if (window.clipboard_incr and event.xproperty.atom == atoms.SELECTION and event.xproperty.state == h.PropertyNewValue) {
+                if (window.clipboardTextFn) |clipboardTextFn| {
+                    var actual_type: h.Atom = undefined;
+                    var actual_format: c_int = undefined;
+                    var nitems: c_ulong = undefined;
+                    var bytes_after: c_ulong = undefined;
+                    var property: [*]u8 = undefined;
+                    _ = c.XGetWindowProperty(display, window.window, atoms.SELECTION, 0, std.math.maxInt(c_long), h.True, h.AnyPropertyType, &actual_type, &actual_format, &nitems, &bytes_after, @ptrCast(&property));
+                    defer _ = c.XFree(property);
+
+                    if (nitems == 0) {
+                        clipboardTextFn(window.clipboard_text_fn_data, window.clipboard_incr_text.items);
+                        window.clipboardTextFn = null;
+                        window.clipboard_incr = false;
+                        window.clipboard_incr_text.clearRetainingCapacity();
+                    } else {
+                        window.clipboard_incr_text.appendSlice(internal.allocator, property[0..nitems]) catch {
+                            window.clipboard_incr = false;
+                            window.clipboard_incr_text.clearRetainingCapacity();
+                        };
+                    }
+                }
             }
         },
         else => {},

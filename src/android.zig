@@ -246,14 +246,14 @@ pub const Window = struct {
         java.env.*.*.CallVoidMethod.?(java.env, java.activity, java.setClipboardText, text_j);
     }
 
-    pub fn getClipboardText(_: *Window, allocator: std.mem.Allocator) ?[]u8 {
-        const text_j = java.env.*.*.CallObjectMethod.?(java.env, java.activity, java.getClipboardText) orelse return null;
+    pub fn getClipboardText(_: *Window, clipboardTextFn: *const fn (?*anyopaque, []const u8) void, clipboard_text_fn_data: ?*anyopaque) void {
+        const text_j = java.env.*.*.CallObjectMethod.?(java.env, java.activity, java.getClipboardText) orelse return;
         defer java.env.*.*.DeleteLocalRef.?(java.env, text_j);
 
-        const text_z = java.env.*.*.GetStringUTFChars.?(java.env, text_j, null) orelse return null;
+        const text_z = java.env.*.*.GetStringUTFChars.?(java.env, text_j, null) orelse return;
         defer java.env.*.*.ReleaseStringUTFChars.?(java.env, text_j, text_z);
 
-        return allocator.dupe(u8, std.mem.sliceTo(text_z, 0)) catch null;
+        clipboardTextFn(clipboard_text_fn_data, std.mem.sliceTo(text_z, 0));
     }
 
     pub fn getDropData(_: *Window, _: std.mem.Allocator) wio.DropData {

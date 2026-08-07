@@ -155,8 +155,9 @@ pub const Window = struct {
         js.setClipboardText(text.ptr, text.len);
     }
 
-    pub fn getClipboardText(_: *Window, _: std.mem.Allocator) ?[]u8 {
-        return null;
+    pub fn getClipboardText(_: *Window, clipboardTextFn: *const fn (?*anyopaque, []const u8) void, clipboard_text_fn_data: ?*anyopaque) void {
+        _ = clipboardTextFn;
+        _ = clipboard_text_fn_data;
     }
 
     pub fn getDropData(self: *Window, allocator: std.mem.Allocator) wio.DropData {
