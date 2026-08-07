@@ -123,7 +123,7 @@ pub const Window = struct {
             .window = undefined,
         };
 
-        const position: wio.Position = options.position orelse .{ .x = 370, .y = 70 };
+        const position: wio.Position = options.position orelse .{ .x = 50, .y = 50 };
         const size = if (options.scale) |base| options.size.multiply(wio_scale / base) else options.size;
 
         internal.eventFn(self.event_fn_data, .visible);
