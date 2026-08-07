@@ -36,6 +36,7 @@ const js = struct {
     extern "wio" fn setCursor(u32, u8) void;
     extern "wio" fn setSize(u32, u16, u16) void;
     extern "wio" fn setClipboardText([*]const u8, usize) void;
+    extern "wio" fn getClipboardText(*const anyopaque, ?*anyopaque) void;
     extern "wio" fn presentFramebuffer(u32, [*]const u32, u16, u16) void;
     extern "wio" fn getDropFileCount(u32) u32;
     extern "wio" fn getDropFileLen(u32, u32) u32;
@@ -57,6 +58,8 @@ const gl = struct {
     extern "gl" fn makeContextCurrent(u32) void;
 };
 
+var clipboard_text: std.ArrayList(u8) = .empty;
+
 var joystickConnectedFn: ?*const fn (wio.JoystickDevice) void = null;
 
 pub fn init(options: wio.InitOptions) !void {
@@ -69,7 +72,9 @@ pub fn init(options: wio.InitOptions) !void {
     }
 }
 
-pub fn deinit() void {}
+pub fn deinit() void {
+    clipboard_text.deinit(internal.allocator);
+}
 
 var loop: *const fn () anyerror!bool = undefined;
 
@@ -156,8 +161,7 @@ pub const Window = struct {
     }
 
     pub fn getClipboardText(_: *Window, clipboardTextFn: *const fn (?*anyopaque, []const u8) void, clipboard_text_fn_data: ?*anyopaque) void {
-        _ = clipboardTextFn;
-        _ = clipboard_text_fn_data;
+        js.getClipboardText(clipboardTextFn, clipboard_text_fn_data);
     }
 
     pub fn getDropData(self: *Window, allocator: std.mem.Allocator) wio.DropData {
@@ -397,6 +401,16 @@ export fn wioEvent(data: ?*anyopaque, event: u32, int0: u32, int1: u32, float0: 
         .drop_complete => .drop_complete,
         else => unreachable,
     });
+}
+
+export fn wioClipboardResize(size: usize) ?[*]const u8 {
+    clipboard_text.resize(internal.allocator, size) catch return null;
+    return clipboard_text.items.ptr;
+}
+
+export fn wioClipboardText(clipboardTextFnPtr: *const anyopaque, clipboard_text_fn_data: ?*anyopaque) void {
+    const clipboardTextFn: *const fn (?*anyopaque, []const u8) void = @ptrCast(clipboardTextFnPtr);
+    clipboardTextFn(clipboard_text_fn_data, clipboard_text.items);
 }
 
 export fn wioJoystick(index: u32) void {

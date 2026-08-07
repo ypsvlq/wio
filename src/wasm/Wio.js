@@ -323,6 +323,17 @@ class Wio {
             navigator.clipboard.writeText(this.getString(ptr, len)).catch(() => { })
         },
 
+        getClipboardText: (clipboardTextFn, clipboard_text_fn_data) => {
+            navigator.clipboard.readText().then((text) => {
+                const utf8 = new TextEncoder().encode(text);
+                const ptr = this.instance.exports.wioClipboardResize(utf8.length);
+                if (ptr !== 0) {
+                    new Uint8Array(this.memory.buffer, ptr).set(utf8);
+                    this.instance.exports.wioClipboardText(clipboardTextFn, clipboard_text_fn_data);
+                }
+            });
+        },
+
         presentFramebuffer: (id, ptr, width, height) => {
             const framebuffer = new Uint8ClampedArray(this.memory.buffer, ptr, width * height * 4);
             const image = new ImageData(framebuffer, width, height);
