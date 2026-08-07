@@ -288,10 +288,12 @@ pub fn build(b: *std.Build) !void {
         else => {
             if (target.result.cpu.arch.isWasm()) {
                 var exports: std.ArrayList([]const u8) = .empty;
-                try exports.append(b.allocator, "wioLoop");
-                try exports.append(b.allocator, "wioEvent");
-                try exports.append(b.allocator, "wioClipboardResize");
-                try exports.append(b.allocator, "wioClipboardText");
+                try exports.appendSlice(b.allocator, &.{
+                    "wioLoop",
+                    "wioEvent",
+                    "wioClipboardResize",
+                    "wioClipboardText",
+                });
                 if (enable_joystick) {
                     try exports.append(b.allocator, "wioJoystick");
                 }
