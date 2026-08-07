@@ -169,6 +169,8 @@ pub fn deinit() void {
     }
 
     _ = w.DestroyWindow(helper_window);
+
+    _ = w.UnregisterClassW(class_name, w.GetModuleHandleW(null));
 }
 
 pub fn run(func: fn () anyerror!bool) !void {
