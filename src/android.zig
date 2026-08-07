@@ -224,7 +224,7 @@ pub const Window = struct {
 
     pub fn setMode(_: *Window, _: wio.WindowMode) void {}
 
-    pub fn setPosition(_: *Window, _: wio.RelativePosition) void {}
+    pub fn setPosition(_: *Window, _: wio.Position) void {}
 
     pub fn setSize(_: *Window, _: wio.Size) void {}
 
@@ -705,7 +705,7 @@ const native = struct {
             c.AMOTION_EVENT_ACTION_DOWN,
             c.AMOTION_EVENT_ACTION_MOVE,
             c.AMOTION_EVENT_ACTION_POINTER_DOWN,
-            => internal.eventFn(event_fn_data, .{ .touch = .{ .id = id, .x = std.math.cast(u16, x) orelse return, .y = std.math.cast(u16, y) orelse return } }),
+            => internal.eventFn(event_fn_data, .{ .touch = .{ .id = id, .x = std.math.cast(i16, x) orelse return, .y = std.math.cast(i16, y) orelse return } }),
 
             c.AMOTION_EVENT_ACTION_UP,
             c.AMOTION_EVENT_ACTION_POINTER_UP,
@@ -721,7 +721,7 @@ const native = struct {
     var last_buttons: c.jint = 0;
 
     fn pushMouseEvent(_: *c.JNIEnv, _: c.jobject, x: c.jint, y: c.jint, buttons: c.jint) callconv(.c) void {
-        internal.eventFn(event_fn_data, .{ .mouse = .{ .x = std.math.cast(u16, x) orelse return, .y = std.math.cast(u16, y) orelse return } });
+        internal.eventFn(event_fn_data, .{ .mouse = .{ .x = std.math.cast(i16, x) orelse return, .y = std.math.cast(i16, y) orelse return } });
 
         const changes = last_buttons ^ buttons;
         if (changes != 0) {

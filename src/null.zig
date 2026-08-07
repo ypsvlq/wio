@@ -77,7 +77,7 @@ pub const Window = struct {
         _ = mode;
     }
 
-    pub fn setPosition(self: *Window, position: wio.RelativePosition) void {
+    pub fn setPosition(self: *Window, position: wio.Position) void {
         _ = self;
         _ = position;
     }

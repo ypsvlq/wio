@@ -123,7 +123,7 @@ pub const Window = struct {
             .window = undefined,
         };
 
-        const position: wio.RelativePosition = options.position orelse .{ .x = 370, .y = 70 };
+        const position: wio.Position = options.position orelse .{ .x = 370, .y = 70 };
         const size = if (options.scale) |base| options.size.multiply(wio_scale / base) else options.size;
 
         internal.eventFn(self.event_fn_data, .visible);
@@ -208,7 +208,7 @@ pub const Window = struct {
         wioSetMode(self.window, @intFromEnum(mode));
     }
 
-    pub fn setPosition(self: *Window, position: wio.RelativePosition) void {
+    pub fn setPosition(self: *Window, position: wio.Position) void {
         wioSetPosition(self.window, @floatFromInt(position.x), @floatFromInt(position.y));
     }
 
@@ -558,7 +558,7 @@ export fn wioButtons(self: *Window, buttons: u8) void {
     self.buttons = self.buttons.xorWith(changes);
 }
 
-export fn wioMouse(self: *Window, x: u16, y: u16) void {
+export fn wioMouse(self: *Window, x: i16, y: i16) void {
     internal.eventFn(self.event_fn_data, .{ .mouse = .{ .x = x, .y = y } });
 }
 
@@ -579,7 +579,7 @@ fn wioDropBegin(self: *Window) callconv(.c) void {
     internal.eventFn(self.event_fn_data, .drop_begin);
 }
 
-fn wioDropPosition(self: *Window, x: u16, y: u16) callconv(.c) void {
+fn wioDropPosition(self: *Window, x: i16, y: i16) callconv(.c) void {
     internal.eventFn(self.event_fn_data, .{ .drop_position = .{ .x = x, .y = y } });
 }
 

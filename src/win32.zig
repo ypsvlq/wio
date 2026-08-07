@@ -491,7 +491,7 @@ pub const Window = struct {
         }
     }
 
-    pub fn setPosition(self: *Window, position: wio.RelativePosition) void {
+    pub fn setPosition(self: *Window, position: wio.Position) void {
         _ = w.SetWindowPos(self.window, null, position.x, position.y, 0, 0, w.SWP_NOSIZE | w.SWP_NOZORDER);
     }
 
@@ -1328,8 +1328,8 @@ const DropTarget = struct {
     fn pushPosition(window: *Window, pt: w.POINTL) void {
         var point = w.POINT{ .x = pt.x, .y = pt.y };
         _ = w.ScreenToClient(window.window, &point);
-        const x = std.math.cast(u16, point.x) orelse return;
-        const y = std.math.cast(u16, point.y) orelse return;
+        const x = std.math.cast(i16, point.x) orelse return;
+        const y = std.math.cast(i16, point.y) orelse return;
         internal.eventFn(window.event_fn_data, .{ .drop_position = .{ .x = x, .y = y } });
     }
 
@@ -1755,11 +1755,7 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
         },
         w.WM_MOUSEMOVE => {
             if (!self.relative_mouse) {
-                const x = LOSHORT(lParam);
-                const y = HISHORT(lParam);
-                if (x >= 0 and y >= 0) {
-                    internal.eventFn(self.event_fn_data, .{ .mouse = .{ .x = @intCast(x), .y = @intCast(y) } });
-                }
+                internal.eventFn(self.event_fn_data, .{ .mouse = .{ .x = LOSHORT(lParam), .y = HISHORT(lParam) } });
             }
 
             if (!self.tracking) {
@@ -1822,7 +1818,9 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
             if (flags & w.POINTER_FLAG_INCONTACT == 0) return 0;
             var point = w.POINT{ .x = LOSHORT(lParam), .y = HISHORT(lParam) };
             _ = w.ScreenToClient(self.window, &point);
-            internal.eventFn(self.event_fn_data, .{ .touch = .{ .id = id, .x = std.math.cast(u16, point.x) orelse return 0, .y = std.math.cast(u16, point.y) orelse return 0 } });
+            const x = std.math.cast(i16, point.x) orelse return 0;
+            const y = std.math.cast(i16, point.y) orelse return 0;
+            internal.eventFn(self.event_fn_data, .{ .touch = .{ .id = id, .x = x, .y = y } });
             return 0;
         },
         w.WM_POINTERUP, w.WM_POINTERCAPTURECHANGED => {

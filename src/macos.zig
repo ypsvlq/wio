@@ -16,7 +16,7 @@ extern fn wioMessageBox(u8, [*]const u8, usize) void;
 extern fn wioOpenUri([*]const u8, usize) void;
 extern fn wioCreateWindow(*Window, u16, u16) *NSWindow;
 extern fn wioDestroyWindow(*NSWindow) void;
-extern fn wioEnableTextInput(*NSWindow, u16, u16) void;
+extern fn wioEnableTextInput(*NSWindow, i16, i16) void;
 extern fn wioDisableTextInput(*NSWindow) void;
 extern fn wioEnableRelativeMouse(*NSWindow) void;
 extern fn wioDisableRelativeMouse(*NSWindow) void;
@@ -290,7 +290,7 @@ pub const Window = struct {
         wioSetMode(self.window, @intFromEnum(mode));
     }
 
-    pub fn setPosition(self: *Window, position: wio.RelativePosition) void {
+    pub fn setPosition(self: *Window, position: wio.Position) void {
         wioSetPosition(self.window, position.x, position.y);
     }
 
@@ -929,7 +929,7 @@ export fn wioButtonRelease(self: *Window, button: u8) void {
     internal.eventFn(self.event_fn_data, .{ .button_release = @enumFromInt(button) });
 }
 
-export fn wioMouse(self: *Window, x: u16, y: u16) void {
+export fn wioMouse(self: *Window, x: i16, y: i16) void {
     internal.eventFn(self.event_fn_data, .{ .mouse = .{ .x = x, .y = y } });
 }
 

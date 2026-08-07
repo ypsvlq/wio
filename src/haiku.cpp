@@ -25,11 +25,11 @@ extern "C" {
     void wioChars(void *, const char *);
     void wioKey(void *, int32, uint8);
     void wioButtons(void *, uint8);
-    void wioMouse(void *, uint16, uint16);
+    void wioMouse(void *, int16, int16);
     void wioMouseRelative(void *, int16, int16);
     void wioScroll(void *, float, float);
     void wioDropBegin(void *);
-    void wioDropPosition(void *, uint16, uint16);
+    void wioDropPosition(void *, int16, int16);
     void wioDropFile(void *, const char *);
     void wioDropText(void *, const char *, size_t);
     void wioDropComplete(void *);
@@ -143,9 +143,7 @@ public:
                             WarpCursor();
                         }
                     } else {
-                        if (where.x > 0 && where.y > 0) {
-                            wioMouse(zig, where.x, where.y);
-                        }
+                        wioMouse(zig, where.x, where.y);
                     }
                 }
 
@@ -157,9 +155,7 @@ public:
                         dropping = true;
                         wioDropBegin(zig);
                     }
-                    if (where.x > 0 && where.y > 0) {
-                        wioDropPosition(zig, (uint16)where.x, (uint16)where.y);
-                    }
+                    wioDropPosition(zig, where.x, where.y);
                 }
 
 #endif

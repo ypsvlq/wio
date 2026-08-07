@@ -19,7 +19,7 @@ extern void wioPreviewReset(void *);
 extern void wioKey(void *, UInt16, UInt8);
 extern void wioButtonPress(void *, UInt8);
 extern void wioButtonRelease(void *, UInt8);
-extern void wioMouse(void *, UInt16, UInt16);
+extern void wioMouse(void *, SInt16, SInt16);
 extern void wioMouseRelative(void *, SInt16, SInt16);
 extern void wioMouseLeave(void *);
 extern void wioScroll(void *, Float32, Float32);
@@ -170,7 +170,7 @@ static void warpCursor(NSWindow *window) {
     NSString *marked;
     NSTrackingArea *area;
     NSCursor *cursor;
-    uint16_t textX, textY;
+    int16_t textX, textY;
     BOOL textInput;
     BOOL relativeMouse;
     BOOL cursorInside;
@@ -186,7 +186,7 @@ static void warpCursor(NSWindow *window) {
     return self;
 }
 
-- (void)setTextInput:(BOOL)value x:(uint16_t)x y:(uint16_t)y {
+- (void)setTextInput:(BOOL)value x:(int16_t)x y:(int16_t)y {
     textInput = value;
     textX = x;
     textY = y;
@@ -366,7 +366,6 @@ static void warpCursor(NSWindow *window) {
         NSPoint location = [event locationInWindow];
         NSRect frame = [self frame];
         location.y = frame.size.height - location.y - 1;
-        if (location.x < 0 || location.y < 0 || location.x > frame.size.width || location.y > frame.size.height) return;
         wioMouse(zig, location.x, location.y);
     }
 }
@@ -516,7 +515,7 @@ void wioDestroyWindow(void *ptr) {
     [window close];
 }
 
-void wioEnableTextInput(NSWindow *window, uint16_t x, uint16_t y) {
+void wioEnableTextInput(NSWindow *window, int16_t x, int16_t y) {
     [[window contentView] setTextInput:YES x:x y:y];
 }
 

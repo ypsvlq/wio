@@ -478,7 +478,7 @@ pub const Window = struct {
         }
     }
 
-    pub fn setPosition(self: *Window, position: wio.RelativePosition) void {
+    pub fn setPosition(self: *Window, position: wio.Position) void {
         _ = self;
         _ = position;
     }
@@ -1036,7 +1036,12 @@ fn pointerLeave(_: ?*anyopaque, _: ?*h.wl_pointer, _: u32, _: ?*h.wl_surface) ca
 
 fn pointerMotion(_: ?*anyopaque, _: ?*h.wl_pointer, _: u32, surface_x: h.wl_fixed_t, surface_y: h.wl_fixed_t) callconv(.c) void {
     if (pointer_focus) |window| {
-        internal.eventFn(window.event_fn_data, .{ .mouse = .{ .x = std.math.cast(u16, surface_x >> 8) orelse return, .y = std.math.cast(u16, surface_y >> 8) orelse return } });
+        internal.eventFn(window.event_fn_data, .{
+            .mouse = .{
+                .x = std.math.cast(i16, surface_x >> 8) orelse return,
+                .y = std.math.cast(i16, surface_y >> 8) orelse return,
+            },
+        });
     }
 }
 
@@ -1073,9 +1078,12 @@ const relative_pointer_listener: h.zwp_relative_pointer_v1_listener = .{
 fn relativePointerMotion(_: ?*anyopaque, _: ?*h.zwp_relative_pointer_v1, _: u32, _: u32, dx: h.wl_fixed_t, dy: h.wl_fixed_t, dx_unaccel: h.wl_fixed_t, dy_unaccel: h.wl_fixed_t) callconv(.c) void {
     if (pointer_focus) |window| {
         if (window.relative_mouse) |options| {
-            const x = std.math.cast(i16, (if (options.unaccelerated) dx_unaccel else dx) >> 8) orelse return;
-            const y = std.math.cast(i16, (if (options.unaccelerated) dy_unaccel else dy) >> 8) orelse return;
-            internal.eventFn(window.event_fn_data, .{ .mouse_relative = .{ .x = x, .y = y } });
+            internal.eventFn(window.event_fn_data, .{
+                .mouse_relative = .{
+                    .x = std.math.cast(i16, (if (options.unaccelerated) dx_unaccel else dx) >> 8) orelse return,
+                    .y = std.math.cast(i16, (if (options.unaccelerated) dy_unaccel else dy) >> 8) orelse return,
+                },
+            });
         }
     }
 }
@@ -1132,7 +1140,13 @@ fn touchDown(_: ?*anyopaque, _: ?*h.wl_touch, serial: u32, _: u32, surface: ?*h.
         const public_id: u8 = @intCast(iter.next() orelse return);
         touch_info.put(internal.allocator, id, .{ .public_id = public_id, .window = window }) catch return;
         touch_ids.set(public_id);
-        internal.eventFn(window.event_fn_data, .{ .touch = .{ .id = public_id, .x = std.math.cast(u16, x >> 8) orelse return, .y = std.math.cast(u16, y >> 8) orelse return } });
+        internal.eventFn(window.event_fn_data, .{
+            .touch = .{
+                .id = public_id,
+                .x = std.math.cast(i16, x >> 8) orelse return,
+                .y = std.math.cast(i16, y >> 8) orelse return,
+            },
+        });
     }
 }
 
@@ -1146,7 +1160,13 @@ fn touchUp(_: ?*anyopaque, _: ?*h.wl_touch, serial: u32, _: u32, id: i32) callco
 
 fn touchMotion(_: ?*anyopaque, _: ?*h.wl_touch, _: u32, id: i32, x: h.wl_fixed_t, y: h.wl_fixed_t) callconv(.c) void {
     if (touch_info.get(id)) |info| {
-        internal.eventFn(info.window.event_fn_data, .{ .touch = .{ .id = info.public_id, .x = std.math.cast(u16, x >> 8) orelse return, .y = std.math.cast(u16, y >> 8) orelse return } });
+        internal.eventFn(info.window.event_fn_data, .{
+            .touch = .{
+                .id = info.public_id,
+                .x = std.math.cast(i16, x >> 8) orelse return,
+                .y = std.math.cast(i16, y >> 8) orelse return,
+            },
+        });
     }
 }
 
@@ -1324,9 +1344,12 @@ fn dataDeviceLeave(_: ?*anyopaque, _: ?*h.wl_data_device) callconv(.c) void {
 fn dataDeviceMotion(_: ?*anyopaque, _: ?*h.wl_data_device, _: u32, x: h.wl_fixed_t, y: h.wl_fixed_t) callconv(.c) void {
     if (build_options.drop) {
         if (drag_window) |window| {
-            const wx = std.math.cast(u16, x >> 8) orelse return;
-            const wy = std.math.cast(u16, y >> 8) orelse return;
-            internal.eventFn(window.event_fn_data, .{ .drop_position = .{ .x = wx, .y = wy } });
+            internal.eventFn(window.event_fn_data, .{
+                .drop_position = .{
+                    .x = std.math.cast(i16, x >> 8) orelse return,
+                    .y = std.math.cast(i16, y >> 8) orelse return,
+                },
+            });
         }
     }
 }

@@ -272,7 +272,7 @@ pub const Window = struct {
     relative_mouse: bool = false,
     draw_available_ns: u32 = 0,
     draw_available_thread: std.Thread = undefined,
-    position: wio.RelativePosition,
+    position: wio.Position,
     size: wio.Size,
     warped: bool = false,
     drop: if (build_options.drop) struct {
@@ -330,7 +330,7 @@ pub const Window = struct {
             }
         };
 
-        const position: wio.RelativePosition = options.position orelse .{ .x = 0, .y = 0 };
+        const position: wio.Position = options.position orelse .{ .x = 0, .y = 0 };
         const size = if (options.scale) |base| options.size.multiply(scale / base) else options.size;
         const window = c.XCreateWindow(
             display,
@@ -503,7 +503,7 @@ pub const Window = struct {
         _ = c.XSendEvent(display, h.DefaultRootWindow(display), h.False, h.SubstructureRedirectMask | h.SubstructureNotifyMask, &event);
     }
 
-    pub fn setPosition(self: *Window, position: wio.RelativePosition) void {
+    pub fn setPosition(self: *Window, position: wio.Position) void {
         var changes: h.XWindowChanges = undefined;
         changes.x = position.x;
         changes.y = position.y;
@@ -1032,8 +1032,8 @@ fn handle(event: *h.XEvent) void {
                     var win_y: c_int = undefined;
                     var child: h.Window = undefined;
                     _ = c.XTranslateCoordinates(display, h.DefaultRootWindow(display), window.window, root_x, root_y, &win_x, &win_y, &child);
-                    if (std.math.cast(u16, win_x)) |x| {
-                        if (std.math.cast(u16, win_y)) |y| {
+                    if (std.math.cast(i16, win_x)) |x| {
+                        if (std.math.cast(i16, win_y)) |y| {
                             internal.eventFn(window.event_fn_data, .{ .drop_position = .{ .x = x, .y = y } });
                         }
                     }
@@ -1166,13 +1166,17 @@ fn handle(event: *h.XEvent) void {
                 const dx = event.xmotion.x - (window.size.width / 2);
                 const dy = event.xmotion.y - (window.size.height / 2);
                 if (dx != 0 or dy != 0) {
-                    if (window.warped) internal.eventFn(window.event_fn_data, .{ .mouse_relative = .{ .x = std.math.cast(i16, dx) orelse return, .y = std.math.cast(i16, dy) orelse return } });
+                    if (window.warped) {
+                        const x = std.math.cast(i16, dx) orelse return;
+                        const y = std.math.cast(i16, dy) orelse return;
+                        internal.eventFn(window.event_fn_data, .{ .mouse_relative = .{ .x = x, .y = y } });
+                    }
                     _ = c.XWarpPointer(display, h.None, window.window, 0, 0, 0, 0, window.size.width / 2, window.size.height / 2);
                     window.warped = true;
                 }
             } else {
-                const x = std.math.cast(u16, event.xmotion.x) orelse return;
-                const y = std.math.cast(u16, event.xmotion.y) orelse return;
+                const x = std.math.cast(i16, event.xmotion.x) orelse return;
+                const y = std.math.cast(i16, event.xmotion.y) orelse return;
                 internal.eventFn(window.event_fn_data, .{ .mouse = .{ .x = x, .y = y } });
             }
         },

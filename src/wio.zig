@@ -100,8 +100,7 @@ pub const Size = struct {
     }
 };
 
-pub const Position = struct { x: u16, y: u16 };
-pub const RelativePosition = struct { x: i16, y: i16 };
+pub const Position = struct { x: i16, y: i16 };
 
 pub const CreateWindowOptions = struct {
     event_fn_data: ?*anyopaque,
@@ -111,7 +110,7 @@ pub const CreateWindowOptions = struct {
     app_id: ?[]const u8 = null,
 
     mode: WindowMode = .normal,
-    position: ?RelativePosition = null,
+    position: ?Position = null,
     size: Size = .{ .width = 640, .height = 480 },
     /// Base scale factor for `size`. If set, adjusts for high-DPI on relevant platforms.
     ///
@@ -183,7 +182,7 @@ pub const Window = struct {
         self.backend.setMode(mode);
     }
 
-    pub fn setPosition(self: *Window, position: RelativePosition) void {
+    pub fn setPosition(self: *Window, position: Position) void {
         self.backend.setPosition(position);
     }
 
@@ -580,7 +579,7 @@ pub const Event = union(enum) {
     /// On change, sent before `position` or `size_logical`.
     mode: WindowMode,
     /// Relative to an unspecified origin.
-    position: RelativePosition,
+    position: Position,
     /// Window size as used by mouse and touch events.
     size_logical: Size,
     /// Window size in pixels.
@@ -605,9 +604,12 @@ pub const Event = union(enum) {
     button_repeat: Button,
     button_release: Button,
 
+    /// Relative to the top-left corner of the window.
     mouse: Position,
+    /// Relative to the last mouse position.
+    ///
     /// Only sent when `Window.enableRelativeMouse` has been called.
-    mouse_relative: RelativePosition,
+    mouse_relative: Position,
     mouse_leave: void,
     scroll_vertical: f32,
     scroll_horizontal: f32,
@@ -627,8 +629,8 @@ pub const Event = union(enum) {
 
     pub const Touch = struct {
         id: u8,
-        x: u16,
-        y: u16,
+        x: i16,
+        y: i16,
     };
 
     pub const TouchEnd = struct {

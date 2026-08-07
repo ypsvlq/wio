@@ -26,7 +26,7 @@ const js = struct {
     extern "wio" fn messageBox([*]const u8, usize) void;
     extern "wio" fn openUri([*]const u8, usize) void;
     extern "wio" fn createWindow(?*anyopaque) u32;
-    extern "wio" fn enableTextInput(u32, u16, u16) void;
+    extern "wio" fn enableTextInput(u32, i16, i16) void;
     extern "wio" fn disableTextInput(u32) void;
     extern "wio" fn enableRelativeMouse(u32, bool) void;
     extern "wio" fn disableRelativeMouse(u32) void;
@@ -137,7 +137,7 @@ pub const Window = struct {
         js.setFullscreen(self.id, mode == .fullscreen);
     }
 
-    pub fn setPosition(_: *Window, _: wio.RelativePosition) void {}
+    pub fn setPosition(_: *Window, _: wio.Position) void {}
 
     pub fn setSize(self: *Window, size: wio.Size) void {
         js.setSize(self.id, size.width, size.height);
@@ -386,13 +386,13 @@ export fn wioEvent(data: ?*anyopaque, event: u32, int0: u32, int1: u32, float0: 
         .button_press => .{ .button_press = @enumFromInt(int0) },
         .button_repeat => .{ .button_repeat = @enumFromInt(int0) },
         .button_release => .{ .button_release = @enumFromInt(int0) },
-        .mouse => .{ .mouse = .{ .x = @truncate(int0), .y = @truncate(int1) } },
+        .mouse => .{ .mouse = .{ .x = @truncate(@as(i32, @bitCast(int0))), .y = @truncate(@as(i32, @bitCast(int1))) } },
         .mouse_relative => .{ .mouse_relative = .{ .x = @truncate(@as(i32, @bitCast(int0))), .y = @truncate(@as(i32, @bitCast(int1))) } },
         .mouse_leave => .mouse_leave,
         .scroll_vertical => .{ .scroll_vertical = float0 },
         .scroll_horizontal => .{ .scroll_horizontal = float0 },
         .drop_begin => .drop_begin,
-        .drop_position => .{ .drop_position = .{ .x = @truncate(int0), .y = @truncate(int1) } },
+        .drop_position => .{ .drop_position = .{ .x = @truncate(@as(i32, @bitCast(int0))), .y = @truncate(@as(i32, @bitCast(int1))) } },
         .drop_complete => .drop_complete,
         else => unreachable,
     });
