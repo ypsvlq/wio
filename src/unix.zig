@@ -128,10 +128,10 @@ pub fn wait(options: wio.WaitOptions) void {
     if (options.timeout_ns) |timeout_ns| {
         timeout = std.math.lossyCast(c_int, timeout_ns / std.time.ns_per_ms);
     }
-    if (build_options.wayland and active == .wayland and wayland.repeat_period > 0) {
-        if (timeout == -1 or wayland.repeat_period < timeout) {
-            if (wayland.repeat_key != 0) {
-                timeout = wayland.repeat_period;
+    if (build_options.wayland and active == .wayland and wayland.globals.repeat_period > 0) {
+        if (timeout == -1 or wayland.globals.repeat_period < timeout) {
+            if (wayland.globals.repeat_key != 0) {
+                timeout = wayland.globals.repeat_period;
             }
         }
     }

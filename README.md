@@ -189,12 +189,12 @@ for a given platform:
 
 #### `.x11`
 
-- `wio.backend.x11.display` is the Xlib display
+- `wio.backend.x11.globals.display` is the Xlib display
 - `Window.backend.x11.window` is the Xlib window
 
 #### `.wayland`
 
-- `wio.backend.wayland.display` is the Wayland `wl_display`
+- `wio.backend.wayland.globals.display` is the Wayland `wl_display`
 - `Window.backend.wayland.surface` is the Wayland `wl_surface`
 
 ### WebAssembly

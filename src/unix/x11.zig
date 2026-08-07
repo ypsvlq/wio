@@ -118,46 +118,48 @@ var atoms: blk: {
     break :blk @Struct(.@"extern", null, &names, &types, &attrs);
 } = undefined;
 
-var libX11: DynLib = undefined;
-var libXrandr: DynLib = undefined;
-var libXcursor: DynLib = undefined;
-var libGL: DynLib = undefined;
-var libXext: DynLib = undefined;
-var windows: std.AutoHashMapUnmanaged(h.Window, *Window) = undefined;
-pub var display: *h.Display = undefined;
-var im: h.XIM = undefined;
-var im_style: h.XIMStyle = 0;
-var xkb_event_code: c_int = undefined;
-var keycodes: [248]wio.Button = undefined;
-var xrr_event_base: c_int = undefined;
-var scale: f32 = 1;
-var xkb_mods: c_uint = 0;
-var clipboard_text: []const u8 = "";
+pub var globals: struct {
+    libX11: DynLib = undefined,
+    libXrandr: DynLib = undefined,
+    libXcursor: DynLib = undefined,
+    libGL: if (build_options.opengl) DynLib else void = undefined,
+    libXext: if (build_options.vulkan) DynLib else void = undefined,
+    windows: std.AutoHashMapUnmanaged(h.Window, *Window) = undefined,
+    display: *h.Display = undefined,
+    im: h.XIM = undefined,
+    im_style: h.XIMStyle = 0,
+    xkb_event_code: c_int = undefined,
+    keycodes: [248]wio.Button = undefined,
+    xrr_event_base: c_int = undefined,
+    scale: f32 = 1,
+    xkb_mods: c_uint = 0,
+    clipboard_text: []const u8 = "",
+} = .{};
 
 pub fn init() !bool {
     DynLib.load(&imports, &.{
-        .{ .handle = &libXrandr, .name = "libXrandr.so.2", .prefix = "XRR" },
-        .{ .handle = &libXcursor, .name = "libXcursor.so.1", .prefix = "Xcursor" },
-        .{ .handle = &libX11, .name = "libX11.so.6", .prefix = "X" },
+        .{ .handle = &globals.libXrandr, .name = "libXrandr.so.2", .prefix = "XRR" },
+        .{ .handle = &globals.libXcursor, .name = "libXcursor.so.1", .prefix = "Xcursor" },
+        .{ .handle = &globals.libX11, .name = "libX11.so.6", .prefix = "X" },
     }) catch return false;
-    errdefer libX11.close();
-    errdefer libXrandr.close();
-    errdefer libXcursor.close();
+    errdefer globals.libX11.close();
+    errdefer globals.libXrandr.close();
+    errdefer globals.libXcursor.close();
 
     if (build_options.opengl) {
-        DynLib.load(&imports, &.{.{ .handle = &libGL, .name = "libGL.so.1", .prefix = "glX" }}) catch return false;
+        DynLib.load(&imports, &.{.{ .handle = &globals.libGL, .name = "libGL.so.1", .prefix = "glX" }}) catch return false;
     }
-    errdefer if (build_options.opengl) libGL.close();
+    errdefer if (build_options.opengl) globals.libGL.close();
 
     if (build_options.vulkan) {
         // https://gitlab.freedesktop.org/xorg/lib/libxext/-/work_items/3
-        libXext = DynLib.open("libXext.so.6") catch return false;
+        globals.libXext = DynLib.open("libXext.so.6") catch return false;
     }
-    errdefer if (build_options.vulkan) libXext.close();
+    errdefer if (build_options.vulkan) globals.libXext.close();
 
-    display = c.XOpenDisplay(null) orelse return false;
-    errdefer _ = c.XCloseDisplay(display);
-    try unix.pollfds.append(internal.allocator, .{ .fd = h.ConnectionNumber(display), .events = std.c.POLL.IN, .revents = undefined });
+    globals.display = c.XOpenDisplay(null) orelse return false;
+    errdefer _ = c.XCloseDisplay(globals.display);
+    try unix.pollfds.append(internal.allocator, .{ .fd = h.ConnectionNumber(globals.display), .events = std.c.POLL.IN, .revents = undefined });
 
     var atom_names = comptime blk: {
         const fields = @typeInfo(@TypeOf(atoms)).@"struct".fields;
@@ -165,21 +167,21 @@ pub fn init() !bool {
         for (&atom_names, fields) |*name, field| name.* = field.name;
         break :blk atom_names;
     };
-    _ = c.XInternAtoms(display, @ptrCast(&atom_names), atom_names.len, h.False, @ptrCast(&atoms));
+    _ = c.XInternAtoms(globals.display, @ptrCast(&atom_names), atom_names.len, h.False, @ptrCast(&atoms));
 
-    windows = .empty;
-    errdefer windows.deinit(internal.allocator);
+    globals.windows = .empty;
+    errdefer globals.windows.deinit(internal.allocator);
 
     _ = std.c.setlocale(.CTYPE, "");
     _ = c.XSetLocaleModifiers("");
-    im = c.XOpenIM(display, null, null, null) orelse blk: {
+    globals.im = c.XOpenIM(globals.display, null, null, null) orelse blk: {
         _ = c.XSetLocaleModifiers("@im=");
-        break :blk c.XOpenIM(display, null, null, null) orelse return error.Unexpected;
+        break :blk c.XOpenIM(globals.display, null, null, null) orelse return error.Unexpected;
     };
-    errdefer _ = c.XCloseIM(im);
+    errdefer _ = c.XCloseIM(globals.im);
 
     var im_styles: *h.XIMStyles = undefined;
-    if (c.XGetIMValues(im, h.XNQueryInputStyle, &im_styles, @as(usize, 0)) != null) return error.Unexpected;
+    if (c.XGetIMValues(globals.im, h.XNQueryInputStyle, &im_styles, @as(usize, 0)) != null) return error.Unexpected;
     defer _ = c.XFree(im_styles);
 
     const supported_styles = im_styles.supported_styles[0..im_styles.count_styles];
@@ -189,7 +191,7 @@ pub fn init() !bool {
     };
     for (preferred_styles) |style| {
         if (std.mem.findScalar(h.XIMStyle, supported_styles, style) != null) {
-            im_style = style;
+            globals.im_style = style;
             break;
         }
     }
@@ -197,12 +199,12 @@ pub fn init() !bool {
     var xkb_major_version: c_int = h.XkbMajorVersion;
     var xkb_minor_version: c_int = h.XkbMinorVersion;
     if (c.XkbLibraryVersion(&xkb_major_version, &xkb_minor_version) == h.False) return internal.logUnexpected("XkbLibraryVersion");
-    if (c.XkbQueryExtension(display, null, &xkb_event_code, null, &xkb_major_version, &xkb_minor_version) == h.False) return internal.logUnexpected("XkbQueryExtension");
-    _ = c.XkbSelectEvents(display, h.XkbUseCoreKbd, h.XkbStateNotifyMask, h.XkbStateNotifyMask);
+    if (c.XkbQueryExtension(globals.display, null, &globals.xkb_event_code, null, &xkb_major_version, &xkb_minor_version) == h.False) return internal.logUnexpected("XkbQueryExtension");
+    _ = c.XkbSelectEvents(globals.display, h.XkbUseCoreKbd, h.XkbStateNotifyMask, h.XkbStateNotifyMask);
 
-    const xkb: *h.XkbDescRec = c.XkbGetMap(display, h.XkbNamesMask, h.XkbUseCoreKbd) orelse return error.Unexpected;
+    const xkb: *h.XkbDescRec = c.XkbGetMap(globals.display, h.XkbNamesMask, h.XkbUseCoreKbd) orelse return error.Unexpected;
     defer _ = c.XkbFreeKeyboard(xkb, 0, h.True);
-    _ = c.XkbGetNames(display, h.XkbKeyNamesMask | h.XkbKeyAliasesMask, xkb);
+    _ = c.XkbGetNames(globals.display, h.XkbKeyNamesMask | h.XkbKeyAliasesMask, xkb);
     const names: *h.XkbNamesRec = xkb.names;
 
     var aliases: std.AutoHashMapUnmanaged([4]u8, wio.Button) = .empty;
@@ -213,21 +215,21 @@ pub fn init() !bool {
         }
     }
 
-    for (&keycodes, names.keys[8..256]) |*keycode, key| {
+    for (&globals.keycodes, names.keys[8..256]) |*keycode, key| {
         keycode.* = nameToButton(key.name) orelse aliases.get(key.name) orelse .mouse_left;
     }
 
     var xrr_error_base: c_int = undefined;
-    if (c.XRRQueryExtension(display, &xrr_event_base, &xrr_error_base) == h.False) return internal.logUnexpected("XRRQueryExtension");
+    if (c.XRRQueryExtension(globals.display, &globals.xrr_event_base, &xrr_error_base) == h.False) return internal.logUnexpected("XRRQueryExtension");
 
-    if (c.XGetDefault(display, "Xft", "dpi")) |string| {
+    if (c.XGetDefault(globals.display, "Xft", "dpi")) |string| {
         if (std.fmt.parseFloat(f32, std.mem.sliceTo(string, 0))) |dpi| {
-            scale = dpi / 96;
+            globals.scale = dpi / 96;
         } else |_| {}
     }
 
     if (build_options.opengl) {
-        if (c.glXQueryExtensionsString(display, h.DefaultScreen(display))) |extensions| {
+        if (c.glXQueryExtensionsString(globals.display, h.DefaultScreen(globals.display))) |extensions| {
             var iter = std.mem.tokenizeScalar(u8, std.mem.sliceTo(extensions, 0), ' ');
             while (iter.next()) |name| {
                 if (std.mem.eql(u8, name, "GLX_ARB_create_context_profile")) {
@@ -243,21 +245,22 @@ pub fn init() !bool {
 }
 
 pub fn deinit() void {
-    internal.allocator.free(clipboard_text);
-    _ = c.XCloseIM(im);
-    _ = c.XCloseDisplay(display);
-    if (build_options.vulkan) libXext.close();
-    if (build_options.opengl) libGL.close();
-    libXcursor.close();
-    libXrandr.close();
-    libX11.close();
-    windows.deinit(internal.allocator);
+    internal.allocator.free(globals.clipboard_text);
+    _ = c.XCloseIM(globals.im);
+    _ = c.XCloseDisplay(globals.display);
+    if (build_options.vulkan) globals.libXext.close();
+    if (build_options.opengl) globals.libGL.close();
+    globals.libXcursor.close();
+    globals.libXrandr.close();
+    globals.libX11.close();
+    globals.windows.deinit(internal.allocator);
+    globals = .{};
 }
 
 pub fn update() void {
     var event: h.XEvent = undefined;
-    while (c.XPending(display) > 0) {
-        _ = c.XNextEvent(display, &event);
+    while (c.XPending(globals.display) > 0) {
+        _ = c.XNextEvent(globals.display, &event);
         handle(&event);
     }
 }
@@ -303,7 +306,7 @@ pub const Window = struct {
         if (build_options.opengl) {
             if (options.gl_options) |gl| {
                 var count: c_int = undefined;
-                const configs = c.glXChooseFBConfig(display, h.DefaultScreen(display), &[_]c_int{
+                const configs = c.glXChooseFBConfig(globals.display, h.DefaultScreen(globals.display), &[_]c_int{
                     h.GLX_DOUBLEBUFFER,   if (gl.doublebuffer) h.True else h.False,
                     h.GLX_RED_SIZE,       gl.red_bits,
                     h.GLX_GREEN_SIZE,     gl.green_bits,
@@ -319,26 +322,26 @@ pub const Window = struct {
 
                 config = configs[0];
 
-                const info: *h.XVisualInfo = c.glXGetVisualFromFBConfig(display, config) orelse return internal.logUnexpected("glXGetVisualFromFBConfig");
+                const info: *h.XVisualInfo = c.glXGetVisualFromFBConfig(globals.display, config) orelse return internal.logUnexpected("glXGetVisualFromFBConfig");
                 defer _ = c.XFree(info);
                 visual = info.visual;
                 depth = info.depth;
 
-                attributes.colormap = c.XCreateColormap(display, h.DefaultRootWindow(display), visual, h.AllocNone);
-                errdefer _ = c.XFreeColormap(display, attributes.colormap);
+                attributes.colormap = c.XCreateColormap(globals.display, h.DefaultRootWindow(globals.display), visual, h.AllocNone);
+                errdefer _ = c.XFreeColormap(globals.display, attributes.colormap);
             }
         }
         errdefer if (build_options.opengl) {
             if (options.gl_options != null) {
-                _ = c.XFreeColormap(display, attributes.colormap);
+                _ = c.XFreeColormap(globals.display, attributes.colormap);
             }
         };
 
         const position: wio.Position = options.position orelse .{ .x = 0, .y = 0 };
-        const size = if (options.scale) |base| options.size.multiply(scale / base) else options.size;
+        const size = if (options.scale) |base| options.size.multiply(globals.scale / base) else options.size;
         const window = c.XCreateWindow(
-            display,
-            if (options.parent != 0) options.parent else h.DefaultRootWindow(display),
+            globals.display,
+            if (options.parent != 0) options.parent else h.DefaultRootWindow(globals.display),
             position.x,
             position.y,
             size.width,
@@ -350,17 +353,17 @@ pub const Window = struct {
             h.CWEventMask | h.CWColormap,
             &attributes,
         );
-        errdefer _ = c.XDestroyWindow(display, window);
-        _ = c.XMapWindow(display, window);
+        errdefer _ = c.XDestroyWindow(globals.display, window);
+        _ = c.XMapWindow(globals.display, window);
 
         const protocols = [_]h.Atom{atoms.WM_DELETE_WINDOW};
-        _ = c.XChangeProperty(display, window, atoms.WM_PROTOCOLS, h.XA_ATOM, 32, h.PropModeReplace, @ptrCast(&protocols), protocols.len);
+        _ = c.XChangeProperty(globals.display, window, atoms.WM_PROTOCOLS, h.XA_ATOM, 32, h.PropModeReplace, @ptrCast(&protocols), protocols.len);
 
-        c.XRRSelectInput(display, window, h.RROutputChangeNotifyMask);
+        c.XRRSelectInput(globals.display, window, h.RROutputChangeNotifyMask);
 
         if (build_options.drop) {
             const xdnd_version: c_long = 5;
-            _ = c.XChangeProperty(display, window, atoms.XdndAware, h.XA_ATOM, 32, h.PropModeReplace, @ptrCast(&xdnd_version), 1);
+            _ = c.XChangeProperty(globals.display, window, atoms.XdndAware, h.XA_ATOM, 32, h.PropModeReplace, @ptrCast(&xdnd_version), 1);
         }
 
         const self = try internal.allocator.create(Window);
@@ -379,9 +382,9 @@ pub const Window = struct {
         defer _ = c.XFree(preedit_attributes);
 
         const ic = c.XCreateIC(
-            im,
+            globals.im,
             h.XNInputStyle,
-            im_style,
+            globals.im_style,
             h.XNClientWindow,
             window,
             h.XNPreeditAttributes,
@@ -406,26 +409,26 @@ pub const Window = struct {
             const id = try internal.allocator.dupeSentinel(u8, app_id, 0);
             defer internal.allocator.free(id);
             var class_hint = h.XClassHint{ .res_name = @constCast(id.ptr), .res_class = @constCast(id.ptr) };
-            _ = c.XSetClassHint(display, window, &class_hint);
+            _ = c.XSetClassHint(globals.display, window, &class_hint);
         }
 
         internal.eventFn(self.event_fn_data, .visible);
-        internal.eventFn(self.event_fn_data, .{ .scale = scale });
+        internal.eventFn(self.event_fn_data, .{ .scale = globals.scale });
         internal.eventFn(self.event_fn_data, .{ .size_logical = size });
         internal.eventFn(self.event_fn_data, .{ .size_physical = size });
         internal.eventFn(self.event_fn_data, .draw);
 
-        try windows.put(internal.allocator, window, self);
+        try globals.windows.put(internal.allocator, window, self);
         return self;
     }
 
     pub fn destroy(self: *Window) void {
         self.disableDrawAvailableEvents();
 
-        _ = windows.remove(self.window);
+        _ = globals.windows.remove(self.window);
 
         if (build_options.opengl) {
-            if (self.opengl.colormap != h.CopyFromParent) _ = c.XFreeColormap(display, self.opengl.colormap);
+            if (self.opengl.colormap != h.CopyFromParent) _ = c.XFreeColormap(globals.display, self.opengl.colormap);
         }
 
         if (build_options.drop) {
@@ -435,8 +438,8 @@ pub const Window = struct {
         }
 
         _ = c.XDestroyIC(self.ic);
-        _ = c.XDestroyWindow(display, self.window);
-        _ = c.XFlush(display);
+        _ = c.XDestroyWindow(globals.display, self.window);
+        _ = c.XFlush(globals.display);
 
         self.preedit_string.deinit(internal.allocator);
         self.clipboard_incr_text.deinit(internal.allocator);
@@ -461,13 +464,13 @@ pub const Window = struct {
         self.relative_mouse = true;
         self.warped = false;
         const cursor = self.createBlankCursor();
-        defer _ = c.XFreeCursor(display, cursor);
-        _ = c.XGrabPointer(display, self.window, h.True, 0, h.GrabModeAsync, h.GrabModeAsync, self.window, cursor, h.CurrentTime);
+        defer _ = c.XFreeCursor(globals.display, cursor);
+        _ = c.XGrabPointer(globals.display, self.window, h.True, 0, h.GrabModeAsync, h.GrabModeAsync, self.window, cursor, h.CurrentTime);
     }
 
     pub fn disableRelativeMouse(self: *Window) void {
         self.relative_mouse = false;
-        _ = c.XUngrabPointer(display, h.CurrentTime);
+        _ = c.XUngrabPointer(globals.display, h.CurrentTime);
     }
 
     pub fn enableDrawAvailableEvents(self: *Window) void {
@@ -488,7 +491,7 @@ pub const Window = struct {
     }
 
     pub fn setTitle(self: *Window, title: []const u8) void {
-        _ = c.XChangeProperty(display, self.window, atoms._NET_WM_NAME, atoms.UTF8_STRING, 8, h.PropModeReplace, title.ptr, std.math.cast(c_int, title.len) orelse return);
+        _ = c.XChangeProperty(globals.display, self.window, atoms._NET_WM_NAME, atoms.UTF8_STRING, 8, h.PropModeReplace, title.ptr, std.math.cast(c_int, title.len) orelse return);
     }
 
     pub fn setMode(self: *Window, mode: wio.WindowMode) void {
@@ -502,28 +505,28 @@ pub const Window = struct {
         };
 
         event.xclient.data.l = .{ if (mode == .fullscreen) 1 else 0, @bitCast(atoms._NET_WM_STATE_FULLSCREEN), 0, 1, 0 };
-        _ = c.XSendEvent(display, h.DefaultRootWindow(display), h.False, h.SubstructureRedirectMask | h.SubstructureNotifyMask, &event);
+        _ = c.XSendEvent(globals.display, h.DefaultRootWindow(globals.display), h.False, h.SubstructureRedirectMask | h.SubstructureNotifyMask, &event);
 
         event.xclient.data.l = .{ if (mode == .maximized) 1 else 0, @bitCast(atoms._NET_WM_STATE_MAXIMIZED_VERT), @bitCast(atoms._NET_WM_STATE_MAXIMIZED_HORZ), 1, 0 };
-        _ = c.XSendEvent(display, h.DefaultRootWindow(display), h.False, h.SubstructureRedirectMask | h.SubstructureNotifyMask, &event);
+        _ = c.XSendEvent(globals.display, h.DefaultRootWindow(globals.display), h.False, h.SubstructureRedirectMask | h.SubstructureNotifyMask, &event);
     }
 
     pub fn setPosition(self: *Window, position: wio.Position) void {
         var changes: h.XWindowChanges = undefined;
         changes.x = position.x;
         changes.y = position.y;
-        _ = c.XConfigureWindow(display, self.window, h.CWX | h.CWY, &changes);
+        _ = c.XConfigureWindow(globals.display, self.window, h.CWX | h.CWY, &changes);
     }
 
     pub fn setSize(self: *Window, size: wio.Size) void {
         var changes: h.XWindowChanges = undefined;
         changes.width = size.width;
         changes.height = size.height;
-        _ = c.XConfigureWindow(display, self.window, h.CWWidth | h.CWHeight, &changes);
+        _ = c.XConfigureWindow(globals.display, self.window, h.CWWidth | h.CWHeight, &changes);
     }
 
     pub fn setParent(self: *Window, parent: usize) void {
-        _ = c.XReparentWindow(display, self.window, parent, 0, 0);
+        _ = c.XReparentWindow(globals.display, self.window, parent, 0, 0);
     }
 
     pub fn setCursor(self: *Window, shape: wio.Cursor) void {
@@ -565,10 +568,10 @@ pub const Window = struct {
             .zoom_out => "zoom-out",
         };
 
-        const cursor = if (maybe_name) |name| c.XcursorLibraryLoadCursor(display, name) else self.createBlankCursor();
-        defer _ = c.XFreeCursor(display, cursor);
+        const cursor = if (maybe_name) |name| c.XcursorLibraryLoadCursor(globals.display, name) else self.createBlankCursor();
+        defer _ = c.XFreeCursor(globals.display, cursor);
 
-        _ = c.XDefineCursor(display, self.window, cursor);
+        _ = c.XDefineCursor(globals.display, self.window, cursor);
     }
 
     pub fn requestAttention(self: *Window) void {
@@ -586,21 +589,21 @@ pub const Window = struct {
                 },
             },
         };
-        _ = c.XSendEvent(display, h.DefaultRootWindow(display), h.False, h.SubstructureRedirectMask | h.SubstructureNotifyMask, &event);
+        _ = c.XSendEvent(globals.display, h.DefaultRootWindow(globals.display), h.False, h.SubstructureRedirectMask | h.SubstructureNotifyMask, &event);
     }
 
     pub fn setClipboardText(self: *Window, text: []const u8) void {
-        internal.allocator.free(clipboard_text);
-        clipboard_text = internal.allocator.dupe(u8, text) catch "";
-        _ = c.XSetSelectionOwner(display, atoms.CLIPBOARD, self.window, h.CurrentTime);
-        _ = c.XSetSelectionOwner(display, h.XA_PRIMARY, self.window, h.CurrentTime);
+        internal.allocator.free(globals.clipboard_text);
+        globals.clipboard_text = internal.allocator.dupe(u8, text) catch "";
+        _ = c.XSetSelectionOwner(globals.display, atoms.CLIPBOARD, self.window, h.CurrentTime);
+        _ = c.XSetSelectionOwner(globals.display, h.XA_PRIMARY, self.window, h.CurrentTime);
     }
 
     pub fn getClipboardText(self: *Window, clipboardTextFn: *const fn (?*anyopaque, []const u8) void, clipboard_text_fn_data: ?*anyopaque) void {
         self.clipboardTextFn = clipboardTextFn;
         self.clipboard_text_fn_data = clipboard_text_fn_data;
-        _ = c.XConvertSelection(display, atoms.CLIPBOARD, atoms.UTF8_STRING, atoms.SELECTION, self.window, h.CurrentTime);
-        _ = c.XFlush(display);
+        _ = c.XConvertSelection(globals.display, atoms.CLIPBOARD, atoms.UTF8_STRING, atoms.SELECTION, self.window, h.CurrentTime);
+        _ = c.XFlush(globals.display);
     }
 
     pub fn getDropData(self: *Window, allocator: std.mem.Allocator) wio.DropData {
@@ -612,8 +615,8 @@ pub const Window = struct {
         errdefer internal.allocator.free(pixels);
 
         const image = c.XCreateImage(
-            display,
-            h.DefaultVisual(display, h.DefaultScreen(display)),
+            globals.display,
+            h.DefaultVisual(globals.display, h.DefaultScreen(globals.display)),
             24,
             h.ZPixmap,
             0,
@@ -624,7 +627,7 @@ pub const Window = struct {
             0,
         ) orelse return internal.logUnexpected("XCreateImage");
 
-        const gc = c.XCreateGC(display, self.window, 0, null);
+        const gc = c.XCreateGC(globals.display, self.window, 0, null);
 
         return .{
             .image = image,
@@ -635,15 +638,15 @@ pub const Window = struct {
     }
 
     pub fn presentFramebuffer(self: *Window, framebuffer: *Framebuffer) void {
-        _ = c.XPutImage(display, self.window, framebuffer.gc, framebuffer.image, 0, 0, 0, 0, framebuffer.size.width, framebuffer.size.height);
-        _ = c.XFlush(display);
+        _ = c.XPutImage(globals.display, self.window, framebuffer.gc, framebuffer.image, 0, 0, 0, 0, framebuffer.size.width, framebuffer.size.height);
+        _ = c.XFlush(globals.display);
     }
 
     pub fn glCreateContext(self: *Window, options: wio.GlCreateContextOptions) !GlContext {
         return .{
             .context = if (glx.createContextAttribsARB) |createContextAttribsARB|
                 createContextAttribsARB(
-                    display,
+                    globals.display,
                     self.opengl.config,
                     if (options.share) |share| share.backend.x11.context else null,
                     h.True,
@@ -657,7 +660,7 @@ pub const Window = struct {
                 ) orelse return internal.logUnexpected("glXCreateContextAttribsARB")
             else
                 c.glXCreateNewContext(
-                    display,
+                    globals.display,
                     self.opengl.config,
                     h.GLX_RGBA_TYPE,
                     if (options.share) |share| share.backend.x11.context else null,
@@ -667,16 +670,16 @@ pub const Window = struct {
     }
 
     pub fn glMakeContextCurrent(self: *Window, context: GlContext) void {
-        _ = c.glXMakeCurrent(display, self.window, context.context);
+        _ = c.glXMakeCurrent(globals.display, self.window, context.context);
     }
 
     pub fn glSwapBuffers(self: *Window) void {
-        c.glXSwapBuffers(display, self.window);
+        c.glXSwapBuffers(globals.display, self.window);
     }
 
     pub fn glSwapInterval(self: *Window, interval: i32) void {
         if (glx.swapIntervalEXT) |swapIntervalEXT| {
-            swapIntervalEXT(display, self.window, interval);
+            swapIntervalEXT(globals.display, self.window, interval);
         }
     }
 
@@ -695,7 +698,7 @@ pub const Window = struct {
         return vkCreateXlibSurfaceKHR(
             instance,
             &.{
-                .dpy = display,
+                .dpy = globals.display,
                 .window = self.window,
             },
             allocation_callbacks,
@@ -709,13 +712,13 @@ pub const Window = struct {
     }
 
     fn getRefreshRate(self: *Window) ?f32 {
-        const resources: *h.XRRScreenResources = c.XRRGetScreenResources(display, self.window) orelse return null;
+        const resources: *h.XRRScreenResources = c.XRRGetScreenResources(globals.display, self.window) orelse return null;
         defer c.XRRFreeScreenResources(resources);
         var mode_id: ?c_ulong = null;
         var minimum_distance: c_uint = std.math.maxInt(c_uint);
         var i: usize = 0;
         while (i < resources.ncrtc) : (i += 1) {
-            const crtc: *h.XRRCrtcInfo = c.XRRGetCrtcInfo(display, resources, resources.crtcs[i]) orelse continue;
+            const crtc: *h.XRRCrtcInfo = c.XRRGetCrtcInfo(globals.display, resources, resources.crtcs[i]) orelse continue;
             defer c.XRRFreeCrtcInfo(crtc);
 
             const width = std.math.cast(c_int, crtc.width) orelse continue;
@@ -751,12 +754,12 @@ pub const Window = struct {
     }
 
     fn createBlankCursor(self: *Window) h.Cursor {
-        const pixmap = c.XCreatePixmap(display, self.window, 1, 1, 1);
-        const gc = c.XCreateGC(display, pixmap, 0, null);
-        defer _ = c.XFreeGC(display, gc);
-        _ = c.XDrawPoint(display, pixmap, gc, 0, 0);
+        const pixmap = c.XCreatePixmap(globals.display, self.window, 1, 1, 1);
+        const gc = c.XCreateGC(globals.display, pixmap, 0, null);
+        defer _ = c.XFreeGC(globals.display, gc);
+        _ = c.XDrawPoint(globals.display, pixmap, gc, 0, 0);
         var color = std.mem.zeroes(h.XColor);
-        return c.XCreatePixmapCursor(display, pixmap, pixmap, &color, &color, 0, 0);
+        return c.XCreatePixmapCursor(globals.display, pixmap, pixmap, &color, &color, 0, 0);
     }
 };
 
@@ -769,7 +772,7 @@ pub const Framebuffer = struct {
     pub fn destroy(self: *Framebuffer) void {
         self.image.data = null;
         _ = c.XFree(self.image);
-        _ = c.XFreeGC(display, self.gc);
+        _ = c.XFreeGC(globals.display, self.gc);
         internal.allocator.free(self.pixels);
     }
 
@@ -782,7 +785,7 @@ pub const GlContext = struct {
     context: h.GLXContext,
 
     pub fn destroy(self: GlContext) void {
-        c.glXDestroyContext(display, self.context);
+        c.glXDestroyContext(globals.display, self.context);
     }
 };
 
@@ -791,7 +794,7 @@ pub fn glGetProcAddress(name: [*:0]const u8) ?*const anyopaque {
 }
 
 pub fn glReleaseCurrentContext() void {
-    _ = c.glXMakeCurrent(display, h.None, null);
+    _ = c.glXMakeCurrent(globals.display, h.None, null);
 }
 
 pub fn getRequiredVulkanInstanceExtensions() []const [*:0]const u8 {
@@ -874,21 +877,21 @@ fn drawAvailableThread(window: *Window) void {
 }
 
 fn handle(event: *h.XEvent) void {
-    if (event.type == xkb_event_code) {
+    if (event.type == globals.xkb_event_code) {
         const xkb_event: *h.XkbEvent = @ptrCast(event);
         switch (xkb_event.any.xkb_type) {
             h.XkbStateNotify => {
-                xkb_mods = xkb_event.state.mods;
+                globals.xkb_mods = xkb_event.state.mods;
 
                 var focus: h.Window = undefined;
                 var revert_to: c_int = undefined;
-                _ = c.XGetInputFocus(display, &focus, &revert_to);
+                _ = c.XGetInputFocus(globals.display, &focus, &revert_to);
                 var message: h.XEvent = .{ .xclient = .{
                     .type = h.ClientMessage,
                     .window = focus,
                     .format = 8,
                 } };
-                _ = c.XSendEvent(display, focus, h.True, h.NoEventMask, &message);
+                _ = c.XSendEvent(globals.display, focus, h.True, h.NoEventMask, &message);
             },
             else => {},
         }
@@ -903,9 +906,9 @@ fn handle(event: *h.XEvent) void {
 
         if (target == atoms.TARGETS) {
             const targets = [_]h.Atom{ atoms.TARGETS, atoms.UTF8_STRING };
-            _ = c.XChangeProperty(display, requestor, property, h.XA_ATOM, 32, h.PropModeReplace, @ptrCast(&targets), targets.len);
+            _ = c.XChangeProperty(globals.display, requestor, property, h.XA_ATOM, 32, h.PropModeReplace, @ptrCast(&targets), targets.len);
         } else if (target == atoms.UTF8_STRING) {
-            _ = c.XChangeProperty(display, requestor, property, atoms.UTF8_STRING, 8, h.PropModeReplace, clipboard_text.ptr, std.math.lossyCast(c_int, clipboard_text.len));
+            _ = c.XChangeProperty(globals.display, requestor, property, atoms.UTF8_STRING, 8, h.PropModeReplace, globals.clipboard_text.ptr, std.math.lossyCast(c_int, globals.clipboard_text.len));
         } else {
             property = h.None;
         }
@@ -920,33 +923,33 @@ fn handle(event: *h.XEvent) void {
                 .time = h.CurrentTime,
             },
         };
-        _ = c.XSendEvent(display, requestor, h.True, h.NoEventMask, &reply);
+        _ = c.XSendEvent(globals.display, requestor, h.True, h.NoEventMask, &reply);
 
         return;
     }
 
-    const window = windows.get(event.xany.window) orelse {
+    const window = globals.windows.get(event.xany.window) orelse {
         _ = c.XFilterEvent(event, h.None);
         return;
     };
 
-    if (window.xkb_mods != xkb_mods) {
+    if (window.xkb_mods != globals.xkb_mods) {
         internal.eventFn(window.event_fn_data, .{
             .modifiers = .{
-                .control = (xkb_mods & h.ControlMask != 0),
-                .shift = (xkb_mods & h.ShiftMask != 0),
-                .alt = (xkb_mods & h.Mod1Mask != 0),
-                .gui = (xkb_mods & h.Mod4Mask != 0),
+                .control = (globals.xkb_mods & h.ControlMask != 0),
+                .shift = (globals.xkb_mods & h.ShiftMask != 0),
+                .alt = (globals.xkb_mods & h.Mod1Mask != 0),
+                .gui = (globals.xkb_mods & h.Mod4Mask != 0),
             },
         });
-        window.xkb_mods = xkb_mods;
+        window.xkb_mods = globals.xkb_mods;
     }
 
     if (window.text and c.XFilterEvent(event, h.None) == h.True) {
         return;
     }
 
-    if (event.type == xrr_event_base + h.RRNotify) {
+    if (event.type == globals.xrr_event_base + h.RRNotify) {
         if (window.draw_available_ns != 0) {
             window.updateRefreshRate();
         }
@@ -971,7 +974,7 @@ fn handle(event: *h.XEvent) void {
                         var nitems: c_ulong = undefined;
                         var bytes_after: c_ulong = undefined;
                         var data: [*]u8 = undefined;
-                        _ = c.XGetWindowProperty(display, window.drop.xdnd_source, atoms.XdndTypeList, 0, std.math.maxInt(c_long), h.False, h.XA_ATOM, &actual_type, &actual_format, &nitems, &bytes_after, @ptrCast(&data));
+                        _ = c.XGetWindowProperty(globals.display, window.drop.xdnd_source, atoms.XdndTypeList, 0, std.math.maxInt(c_long), h.False, h.XA_ATOM, &actual_type, &actual_format, &nitems, &bytes_after, @ptrCast(&data));
                         defer _ = c.XFree(data);
                         for (@as([*]h.Atom, @ptrCast(@alignCast(data)))[0..nitems]) |atom| {
                             if (atom == atoms.@"text/uri-list") {
@@ -1007,7 +1010,7 @@ fn handle(event: *h.XEvent) void {
                     var win_x: c_int = undefined;
                     var win_y: c_int = undefined;
                     var child: h.Window = undefined;
-                    _ = c.XTranslateCoordinates(display, h.DefaultRootWindow(display), window.window, root_x, root_y, &win_x, &win_y, &child);
+                    _ = c.XTranslateCoordinates(globals.display, h.DefaultRootWindow(globals.display), window.window, root_x, root_y, &win_x, &win_y, &child);
                     if (std.math.cast(i16, win_x)) |x| {
                         if (std.math.cast(i16, win_y)) |y| {
                             internal.eventFn(window.event_fn_data, .{ .drop_position = .{ .x = x, .y = y } });
@@ -1016,7 +1019,7 @@ fn handle(event: *h.XEvent) void {
 
                     var reply = h.XEvent{ .xclient = std.mem.zeroInit(h.XClientMessageEvent, .{
                         .type = h.ClientMessage,
-                        .display = display,
+                        .display = globals.display,
                         .window = window.drop.xdnd_source,
                         .message_type = atoms.XdndStatus,
                         .format = 32,
@@ -1024,8 +1027,8 @@ fn handle(event: *h.XEvent) void {
                     reply.xclient.data.l[0] = @bitCast(@as(c_ulong, window.window));
                     reply.xclient.data.l[1] = if (window.drop.xdnd_req != h.None) 1 else 0;
                     reply.xclient.data.l[4] = @bitCast(atoms.XdndActionCopy);
-                    _ = c.XSendEvent(display, window.drop.xdnd_source, h.False, h.NoEventMask, &reply);
-                    _ = c.XFlush(display);
+                    _ = c.XSendEvent(globals.display, window.drop.xdnd_source, h.False, h.NoEventMask, &reply);
+                    _ = c.XFlush(globals.display);
                 } else if (event.xclient.message_type == atoms.XdndLeave) {
                     internal.eventFn(window.event_fn_data, .drop_complete);
                     window.drop.xdnd_source = 0;
@@ -1034,16 +1037,16 @@ fn handle(event: *h.XEvent) void {
                     if (window.drop.xdnd_req == h.None) {
                         var reply = h.XEvent{ .xclient = std.mem.zeroInit(h.XClientMessageEvent, .{
                             .type = h.ClientMessage,
-                            .display = display,
+                            .display = globals.display,
                             .window = window.drop.xdnd_source,
                             .message_type = atoms.XdndFinished,
                             .format = 32,
                         }) };
                         reply.xclient.data.l[0] = @bitCast(@as(c_ulong, window.window));
-                        _ = c.XSendEvent(display, window.drop.xdnd_source, h.False, h.NoEventMask, &reply);
+                        _ = c.XSendEvent(globals.display, window.drop.xdnd_source, h.False, h.NoEventMask, &reply);
                     } else {
                         const time: h.Time = if (window.drop.xdnd_version >= 1) @intCast(event.xclient.data.l[2]) else h.CurrentTime;
-                        _ = c.XConvertSelection(display, atoms.XdndSelection, window.drop.xdnd_req, atoms.SELECTION, window.window, time);
+                        _ = c.XConvertSelection(globals.display, atoms.XdndSelection, window.drop.xdnd_req, atoms.SELECTION, window.window, time);
                     }
                 }
             }
@@ -1064,7 +1067,7 @@ fn handle(event: *h.XEvent) void {
             var actual_format: c_int = undefined;
             var count: c_ulong = undefined;
             var bytes_after: c_ulong = undefined;
-            _ = c.XGetWindowProperty(display, window.window, atoms._NET_WM_STATE, 0, std.math.maxInt(c_long), h.False, h.XA_ATOM, &actual_type, &actual_format, &count, &bytes_after, @ptrCast(&states));
+            _ = c.XGetWindowProperty(globals.display, window.window, atoms._NET_WM_STATE, 0, std.math.maxInt(c_long), h.False, h.XA_ATOM, &actual_type, &actual_format, &count, &bytes_after, @ptrCast(&states));
             defer _ = c.XFree(states);
 
             var mode = wio.WindowMode.normal;
@@ -1098,17 +1101,17 @@ fn handle(event: *h.XEvent) void {
         },
         h.KeyPress => handleKeyPress(window, event, false),
         h.KeyRelease => {
-            if (c.XPending(display) > 0) {
+            if (c.XPending(globals.display) > 0) {
                 // key repeats are sent as a consecutive release and press
                 var next: h.XEvent = undefined;
-                _ = c.XPeekEvent(display, &next);
+                _ = c.XPeekEvent(globals.display, &next);
                 if (next.type == h.KeyPress and next.xkey.time == event.xkey.time) {
-                    _ = c.XNextEvent(display, &next);
+                    _ = c.XNextEvent(globals.display, &next);
                     handleKeyPress(window, &next, true);
                     return;
                 }
             }
-            const button = keycodes[event.xkey.keycode - 8];
+            const button = globals.keycodes[event.xkey.keycode - 8];
             if (button != .mouse_left) internal.eventFn(window.event_fn_data, .{ .button_release = button });
         },
         h.ButtonPress => {
@@ -1147,7 +1150,7 @@ fn handle(event: *h.XEvent) void {
                         const y = std.math.cast(i16, dy) orelse return;
                         internal.eventFn(window.event_fn_data, .{ .mouse_relative = .{ .x = x, .y = y } });
                     }
-                    _ = c.XWarpPointer(display, h.None, window.window, 0, 0, 0, 0, window.size.width / 2, window.size.height / 2);
+                    _ = c.XWarpPointer(globals.display, h.None, window.window, 0, 0, 0, 0, window.size.width / 2, window.size.height / 2);
                     window.warped = true;
                 }
             } else {
@@ -1166,7 +1169,7 @@ fn handle(event: *h.XEvent) void {
                 var nitems: c_ulong = undefined;
                 var bytes_after: c_ulong = undefined;
                 var data: [*]u8 = undefined;
-                _ = c.XGetWindowProperty(display, window.window, atoms.SELECTION, 0, std.math.maxInt(c_long), h.True, h.AnyPropertyType, &actual_type, &actual_format, &nitems, &bytes_after, @ptrCast(&data));
+                _ = c.XGetWindowProperty(globals.display, window.window, atoms.SELECTION, 0, std.math.maxInt(c_long), h.True, h.AnyPropertyType, &actual_type, &actual_format, &nitems, &bytes_after, @ptrCast(&data));
                 defer _ = c.XFree(data);
 
                 if (actual_format == 8) {
@@ -1189,7 +1192,7 @@ fn handle(event: *h.XEvent) void {
 
                 var reply = h.XEvent{ .xclient = std.mem.zeroInit(h.XClientMessageEvent, .{
                     .type = h.ClientMessage,
-                    .display = display,
+                    .display = globals.display,
                     .window = window.drop.xdnd_source,
                     .message_type = atoms.XdndFinished,
                     .format = 32,
@@ -1197,8 +1200,8 @@ fn handle(event: *h.XEvent) void {
                 reply.xclient.data.l[0] = @bitCast(@as(c_ulong, window.window));
                 reply.xclient.data.l[1] = 1;
                 reply.xclient.data.l[2] = @bitCast(atoms.XdndActionCopy);
-                _ = c.XSendEvent(display, window.drop.xdnd_source, h.False, h.NoEventMask, &reply);
-                _ = c.XFlush(display);
+                _ = c.XSendEvent(globals.display, window.drop.xdnd_source, h.False, h.NoEventMask, &reply);
+                _ = c.XFlush(globals.display);
 
                 window.drop.xdnd_source = 0;
                 window.drop.xdnd_req = h.None;
@@ -1209,7 +1212,7 @@ fn handle(event: *h.XEvent) void {
                     var nitems: c_ulong = undefined;
                     var bytes_after: c_ulong = undefined;
                     var property: [*]u8 = undefined;
-                    _ = c.XGetWindowProperty(display, window.window, atoms.SELECTION, 0, std.math.maxInt(c_long), h.True, h.AnyPropertyType, &actual_type, &actual_format, &nitems, &bytes_after, @ptrCast(&property));
+                    _ = c.XGetWindowProperty(globals.display, window.window, atoms.SELECTION, 0, std.math.maxInt(c_long), h.True, h.AnyPropertyType, &actual_type, &actual_format, &nitems, &bytes_after, @ptrCast(&property));
                     defer _ = c.XFree(property);
 
                     if (actual_type == atoms.INCR) {
@@ -1231,7 +1234,7 @@ fn handle(event: *h.XEvent) void {
                     var nitems: c_ulong = undefined;
                     var bytes_after: c_ulong = undefined;
                     var property: [*]u8 = undefined;
-                    _ = c.XGetWindowProperty(display, window.window, atoms.SELECTION, 0, std.math.maxInt(c_long), h.True, h.AnyPropertyType, &actual_type, &actual_format, &nitems, &bytes_after, @ptrCast(&property));
+                    _ = c.XGetWindowProperty(globals.display, window.window, atoms.SELECTION, 0, std.math.maxInt(c_long), h.True, h.AnyPropertyType, &actual_type, &actual_format, &nitems, &bytes_after, @ptrCast(&property));
                     defer _ = c.XFree(property);
 
                     if (nitems == 0) {
@@ -1254,7 +1257,7 @@ fn handle(event: *h.XEvent) void {
 
 fn handleKeyPress(window: *Window, event: *h.XEvent, repeat: bool) void {
     if (event.xkey.keycode != 0) {
-        const button = keycodes[event.xkey.keycode - 8];
+        const button = globals.keycodes[event.xkey.keycode - 8];
         if (button != .mouse_left) {
             internal.eventFn(window.event_fn_data, if (repeat) .{ .button_repeat = button } else .{ .button_press = button });
         }
