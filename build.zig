@@ -292,7 +292,6 @@ pub fn build(b: *std.Build) !void {
                 try exports.append(b.allocator, "wioEvent");
                 try exports.append(b.allocator, "wioClipboardResize");
                 try exports.append(b.allocator, "wioClipboardText");
-                try exports.append(b.allocator, "wioEvent");
                 if (enable_joystick) {
                     try exports.append(b.allocator, "wioJoystick");
                 }
