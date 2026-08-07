@@ -844,33 +844,33 @@ const registry_listener: h.wl_registry_listener = .{
     .global_remove = registryGlobalRemove,
 };
 
-fn registryGlobal(_: ?*anyopaque, _: ?*h.wl_registry, name: u32, interface_ptr: [*c]const u8, version: u32) callconv(.c) void {
+fn registryGlobal(_: ?*anyopaque, registry: ?*h.wl_registry, name: u32, interface_ptr: [*c]const u8, version: u32) callconv(.c) void {
     const interface = std.mem.sliceTo(interface_ptr, 0);
     if (std.mem.eql(u8, interface, "wl_compositor")) {
-        globals.compositor = @ptrCast(h.wl_registry_bind(globals.registry, name, &h.wl_compositor_interface, @min(version, 3)));
+        globals.compositor = @ptrCast(h.wl_registry_bind(registry, name, &h.wl_compositor_interface, @min(version, 3)));
     } else if (build_options.framebuffer and std.mem.eql(u8, interface, "wl_shm")) {
-        globals.shm = @ptrCast(h.wl_registry_bind(globals.registry, name, &h.wl_shm_interface, @min(version, 1)));
+        globals.shm = @ptrCast(h.wl_registry_bind(registry, name, &h.wl_shm_interface, @min(version, 1)));
     } else if (std.mem.eql(u8, interface, "wl_seat")) {
-        globals.seat = @ptrCast(h.wl_registry_bind(globals.registry, name, &h.wl_seat_interface, @min(version, 4)));
+        globals.seat = @ptrCast(h.wl_registry_bind(registry, name, &h.wl_seat_interface, @min(version, 4)));
         _ = h.wl_seat_add_listener(globals.seat, &seat_listener, null);
     } else if (std.mem.eql(u8, interface, "wp_viewporter")) {
-        globals.viewporter = @ptrCast(h.wl_registry_bind(globals.registry, name, &h.wp_viewporter_interface, @min(version, 1)));
+        globals.viewporter = @ptrCast(h.wl_registry_bind(registry, name, &h.wp_viewporter_interface, @min(version, 1)));
     } else if (std.mem.eql(u8, interface, "wp_fractional_scale_manager_v1")) {
-        globals.fractional_scale_manager = @ptrCast(h.wl_registry_bind(globals.registry, name, &h.wp_fractional_scale_manager_v1_interface, @min(version, 1)));
+        globals.fractional_scale_manager = @ptrCast(h.wl_registry_bind(registry, name, &h.wp_fractional_scale_manager_v1_interface, @min(version, 1)));
     } else if (std.mem.eql(u8, interface, "zwp_text_input_manager_v3")) {
-        globals.text_input_manager = @ptrCast(h.wl_registry_bind(globals.registry, name, &h.zwp_text_input_manager_v3_interface, @min(version, 1)));
+        globals.text_input_manager = @ptrCast(h.wl_registry_bind(registry, name, &h.zwp_text_input_manager_v3_interface, @min(version, 1)));
     } else if (std.mem.eql(u8, interface, "wp_cursor_shape_manager_v1")) {
-        globals.cursor_shape_manager = @ptrCast(h.wl_registry_bind(globals.registry, name, &h.wp_cursor_shape_manager_v1_interface, @min(version, 1)));
+        globals.cursor_shape_manager = @ptrCast(h.wl_registry_bind(registry, name, &h.wp_cursor_shape_manager_v1_interface, @min(version, 1)));
     } else if (std.mem.eql(u8, interface, "zwp_pointer_constraints_v1")) {
-        globals.pointer_constraints = @ptrCast(h.wl_registry_bind(globals.registry, name, &h.zwp_pointer_constraints_v1_interface, @min(version, 1)));
+        globals.pointer_constraints = @ptrCast(h.wl_registry_bind(registry, name, &h.zwp_pointer_constraints_v1_interface, @min(version, 1)));
     } else if (std.mem.eql(u8, interface, "zwp_relative_pointer_manager_v1")) {
-        globals.relative_pointer_manager = @ptrCast(h.wl_registry_bind(globals.registry, name, &h.zwp_relative_pointer_manager_v1_interface, @min(version, 1)));
+        globals.relative_pointer_manager = @ptrCast(h.wl_registry_bind(registry, name, &h.zwp_relative_pointer_manager_v1_interface, @min(version, 1)));
     } else if (std.mem.eql(u8, interface, "zwp_pointer_gestures_v1")) {
-        globals.pointer_gestures = @ptrCast(h.wl_registry_bind(globals.registry, name, &h.zwp_pointer_gestures_v1_interface, @min(version, 3)));
+        globals.pointer_gestures = @ptrCast(h.wl_registry_bind(registry, name, &h.zwp_pointer_gestures_v1_interface, @min(version, 3)));
     } else if (std.mem.eql(u8, interface, "wl_data_device_manager")) {
-        globals.data_device_manager = @ptrCast(h.wl_registry_bind(globals.registry, name, &h.wl_data_device_manager_interface, @min(version, 1)));
+        globals.data_device_manager = @ptrCast(h.wl_registry_bind(registry, name, &h.wl_data_device_manager_interface, @min(version, 1)));
     } else if (std.mem.eql(u8, interface, "xdg_activation_v1")) {
-        globals.activation = @ptrCast(h.wl_registry_bind(globals.registry, name, &h.xdg_activation_v1_interface, @min(version, 1)));
+        globals.activation = @ptrCast(h.wl_registry_bind(registry, name, &h.xdg_activation_v1_interface, @min(version, 1)));
     }
 }
 
@@ -881,7 +881,7 @@ const seat_listener: h.wl_seat_listener = .{
     .name = seatName,
 };
 
-fn seatCapabilities(_: ?*anyopaque, _: ?*h.wl_seat, capabilities: h.wl_seat_capability) callconv(.c) void {
+fn seatCapabilities(_: ?*anyopaque, seat: ?*h.wl_seat, capabilities: h.wl_seat_capability) callconv(.c) void {
     if (globals.touch) |_| {
         h.wl_touch_destroy(globals.touch);
         globals.touch = null;
@@ -910,11 +910,11 @@ fn seatCapabilities(_: ?*anyopaque, _: ?*h.wl_seat, capabilities: h.wl_seat_capa
     }
 
     if (capabilities & h.WL_SEAT_CAPABILITY_KEYBOARD != 0) {
-        globals.keyboard = h.wl_seat_get_keyboard(globals.seat);
+        globals.keyboard = h.wl_seat_get_keyboard(seat);
         _ = h.wl_keyboard_add_listener(globals.keyboard, &keyboard_listener, null);
     }
     if (capabilities & h.WL_SEAT_CAPABILITY_POINTER != 0) {
-        globals.pointer = h.wl_seat_get_pointer(globals.seat);
+        globals.pointer = h.wl_seat_get_pointer(seat);
         _ = h.wl_pointer_add_listener(globals.pointer, &pointer_listener, null);
         if (globals.cursor_shape_manager) |_| {
             globals.cursor_shape_device = h.wp_cursor_shape_manager_v1_get_pointer(globals.cursor_shape_manager, globals.pointer);
@@ -929,7 +929,7 @@ fn seatCapabilities(_: ?*anyopaque, _: ?*h.wl_seat, capabilities: h.wl_seat_capa
         }
     }
     if (capabilities & h.WL_SEAT_CAPABILITY_TOUCH != 0) {
-        globals.touch = h.wl_seat_get_touch(globals.seat);
+        globals.touch = h.wl_seat_get_touch(seat);
         _ = h.wl_touch_add_listener(globals.touch, &touch_listener, null);
     }
 }
@@ -1205,23 +1205,23 @@ const text_input_listener: h.zwp_text_input_v3_listener = .{
     .done = textInputDone,
 };
 
-fn textInputEnter(_: ?*anyopaque, _: ?*h.zwp_text_input_v3, surface: ?*h.wl_surface) callconv(.c) void {
+fn textInputEnter(_: ?*anyopaque, text_input: ?*h.zwp_text_input_v3, surface: ?*h.wl_surface) callconv(.c) void {
     if (getWindow(surface)) |window| {
         if (window.text_options) |options| {
-            h.zwp_text_input_v3_enable(globals.text_input);
+            h.zwp_text_input_v3_enable(text_input);
             if (options.cursor) |cursor| {
-                h.zwp_text_input_v3_set_cursor_rectangle(globals.text_input, cursor.x, cursor.y, 0, 0);
+                h.zwp_text_input_v3_set_cursor_rectangle(text_input, cursor.x, cursor.y, 0, 0);
             }
-            h.zwp_text_input_v3_commit(globals.text_input);
+            h.zwp_text_input_v3_commit(text_input);
         }
     }
 }
 
-fn textInputLeave(_: ?*anyopaque, _: ?*h.zwp_text_input_v3, surface: ?*h.wl_surface) callconv(.c) void {
+fn textInputLeave(_: ?*anyopaque, text_input: ?*h.zwp_text_input_v3, surface: ?*h.wl_surface) callconv(.c) void {
     if (getWindow(surface)) |window| {
         if (window.text_options) |_| {
-            h.zwp_text_input_v3_disable(globals.text_input);
-            h.zwp_text_input_v3_commit(globals.text_input);
+            h.zwp_text_input_v3_disable(text_input);
+            h.zwp_text_input_v3_commit(text_input);
         }
     }
 }
