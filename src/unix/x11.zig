@@ -114,7 +114,7 @@ var atoms: blk: {
         "text/plain;charset=utf-8",
     } else .{};
     const types: [names.len]type = @splat(h.Atom);
-    const attrs: [names.len]std.builtin.Type.StructField.Attributes = @splat(.{});
+    const attrs: [names.len]std.builtin.Type.Struct.FieldAttributes = @splat(.{});
     break :blk @Struct(.@"extern", null, &names, &types, &attrs);
 } = undefined;
 
@@ -162,9 +162,9 @@ pub fn init() !bool {
     try unix.pollfds.append(internal.allocator, .{ .fd = h.ConnectionNumber(globals.display), .events = std.c.POLL.IN, .revents = undefined });
 
     var atom_names = comptime blk: {
-        const fields = @typeInfo(@TypeOf(atoms)).@"struct".fields;
+        const fields = @typeInfo(@TypeOf(atoms)).@"struct".field_names;
         var atom_names: [fields.len][*:0]const u8 = undefined;
-        for (&atom_names, fields) |*name, field| name.* = field.name;
+        for (&atom_names, fields) |*name, field| name.* = field;
         break :blk atom_names;
     };
     _ = c.XInternAtoms(globals.display, @ptrCast(&atom_names), atom_names.len, h.False, @ptrCast(&atoms));
