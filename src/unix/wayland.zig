@@ -305,7 +305,6 @@ pub const Window = struct {
     text_options: ?wio.TextInputOptions = null,
     frame_callback: ?*h.wl_callback = null,
     draw_available_events: bool = false,
-    inhibit_draw: bool = false,
     size: wio.Size,
     scale: f32 = 1,
     cursor: u32 = h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_DEFAULT,
@@ -714,16 +713,10 @@ pub const Window = struct {
         internal.eventFn(self.event_fn_data, .{ .size_logical = size });
         internal.eventFn(self.event_fn_data, .{ .size_physical = framebuffer });
 
-        if (!self.draw_available_events) {
-            if (!self.inhibit_draw) {
-                internal.eventFn(self.event_fn_data, .draw);
-                self.inhibit_draw = true;
-            }
-
-            if (self.frame_callback == null) {
-                self.frame_callback = h.wl_surface_frame(self.surface);
-                _ = h.wl_callback_add_listener(self.frame_callback, &frame_callback_listener, self);
-            }
+        if (!self.draw_available_events and self.frame_callback == null) {
+            internal.eventFn(self.event_fn_data, .draw);
+            self.frame_callback = h.wl_surface_frame(self.surface);
+            _ = h.wl_callback_add_listener(self.frame_callback, &frame_callback_listener, self);
         }
     }
 
@@ -834,7 +827,6 @@ fn frameCallback(data: ?*anyopaque, callback: ?*h.wl_callback, _: u32) callconv(
         _ = h.wl_callback_add_listener(self.frame_callback, &frame_callback_listener, self);
     } else {
         self.frame_callback = null;
-        self.inhibit_draw = false;
     }
     internal.eventFn(self.event_fn_data, .draw);
 }
