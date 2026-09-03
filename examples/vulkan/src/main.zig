@@ -1,5 +1,4 @@
 const std = @import("std");
-const builtin = @import("builtin");
 const wio = @import("wio");
 const vk = @import("vulkan");
 
@@ -34,7 +33,11 @@ pub fn main() !void {
         .size = size,
         .scale = 1,
     });
-    window.enableDrawAvailableEvents();
+
+    if (wio.backend_name == .unix and wio.backend.active == .wayland) {
+        // normal vsync makes window resizing slow on wayland
+        window.enableDrawAvailableEvents();
+    }
 
     vkb = .load(@as(*const fn (vk.Instance, [*:0]const u8) ?*const fn () void, @ptrCast(&wio.vkGetInstanceProcAddr)));
     try createInstance();
@@ -528,6 +531,8 @@ fn drawFrame() !void {
 var visible = false;
 
 fn loop() !bool {
+    var draw = if (wio.backend_name == .unix and wio.backend.active == .wayland) false else true;
+
     while (events.pop()) |event| {
         switch (event) {
             .close => {
@@ -558,24 +563,28 @@ fn loop() !bool {
             },
             .hidden => {
                 visible = false;
-                if (builtin.abi.isAndroid()) {
+                if (wio.backend_name == .android) {
                     destroySurfaceAndSwapchain();
                 }
             },
             .draw => {
-                if (visible and surface != .null_handle) {
-                    drawFrame() catch |err| switch (err) {
-                        error.OutOfDateKHR => try recreateSwapchain(),
-                        error.SurfaceLostKHR => {
-                            try device.deviceWaitIdle();
-                            destroySurfaceAndSwapchain();
-                        },
-                        else => return err,
-                    };
+                if (wio.backend_name == .unix and wio.backend.active == .wayland) {
+                    draw = true;
                 }
             },
             else => {},
         }
+    }
+
+    if (draw and visible and surface != .null_handle) {
+        drawFrame() catch |err| switch (err) {
+            error.OutOfDateKHR => try recreateSwapchain(),
+            error.SurfaceLostKHR => {
+                try device.deviceWaitIdle();
+                destroySurfaceAndSwapchain();
+            },
+            else => return err,
+        };
     }
 
     return true;
