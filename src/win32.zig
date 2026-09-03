@@ -431,8 +431,7 @@ pub const Window = struct {
 
     pub fn enableDrawAvailableEvents(self: *Window) void {
         if (self.draw_available_ns == 0) {
-            log.warn("enableDrawAvailableEvents unimplemented for win32, falling back to 60 Hz", .{});
-            self.draw_available_ns = std.time.ns_per_s / 60;
+            self.draw_available_ns = self.getDrawAvailableNs();
             self.draw_available_thread = std.Thread.spawn(.{}, drawAvailableThread, .{self}) catch {
                 self.draw_available_ns = 0;
                 return;
@@ -645,6 +644,20 @@ pub const Window = struct {
             allocation_callbacks,
             surface,
         );
+    }
+
+    fn getDrawAvailableNs(self: *Window) u32 {
+        var hz: u32 = 60;
+        var info: w.MONITORINFOEXW = undefined;
+        info.monitorInfo.cbSize = @sizeOf(w.MONITORINFOEXW);
+        if (w.GetMonitorInfoW(w.MonitorFromWindow(self.window, w.MONITOR_DEFAULTTONEAREST), &info.monitorInfo) != 0) {
+            var mode: w.DEVMODEW = undefined;
+            mode.dmSize = @sizeOf(w.DEVMODEW);
+            if (w.EnumDisplaySettingsW(&info.szDevice, w.ENUM_CURRENT_SETTINGS, &mode) != 0) {
+                hz = mode.dmDisplayFrequency;
+            }
+        }
+        return std.time.ns_per_s / hz;
     }
 
     fn isFullscreen(self: *Window) bool {
@@ -1639,6 +1652,9 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
                 },
                 w.SIZE_MINIMIZED => internal.eventFn(self.event_fn_data, .hidden),
                 else => {},
+            }
+            if (self.draw_available_ns != 0) {
+                self.draw_available_ns = self.getDrawAvailableNs();
             }
             return 0;
         },
