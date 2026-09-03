@@ -2,13 +2,30 @@ const std = @import("std");
 const builtin = @import("builtin");
 pub const build_options = @import("build_options");
 const internal = @import("wio.internal.zig");
-pub const backend = switch (builtin.os.tag) {
-    .windows => @import("win32.zig"),
+
+pub const backend_name: enum {
+    win32,
+    macos,
+    unix,
+    wasm,
+    haiku,
+    android,
+} = switch (builtin.os.tag) {
+    .windows => .win32,
+    .macos => .macos,
+    .linux => if (builtin.target.abi.isAndroid()) .android else .unix,
+    .openbsd, .netbsd, .freebsd, .dragonfly, .illumos => .unix,
+    .haiku => .haiku,
+    else => if (builtin.target.cpu.arch.isWasm()) .wasm else @compileError("unsupported platform"),
+};
+
+pub const backend = switch (backend_name) {
+    .win32 => @import("win32.zig"),
     .macos => @import("macos.zig"),
-    .linux => if (builtin.target.abi.isAndroid()) @import("android.zig") else @import("unix.zig"),
-    .openbsd, .netbsd, .freebsd, .dragonfly, .illumos => @import("unix.zig"),
+    .unix => @import("unix.zig"),
+    .wasm => @import("wasm.zig"),
     .haiku => @import("haiku.zig"),
-    else => if (builtin.target.cpu.arch.isWasm()) @import("wasm.zig") else @compileError("unsupported platform"),
+    .android => @import("android.zig"),
 };
 
 comptime {
