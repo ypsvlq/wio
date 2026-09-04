@@ -81,6 +81,11 @@ pub fn build(b: *std.Build) !void {
         .macos => {
             module.addCSourceFile(.{ .file = b.path("src/macos.m"), .flags = &.{ "-fobjc-arc", "-Wno-deprecated-declarations" } });
 
+            if (b.sysroot) |sysroot| {
+                module.addSystemFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ sysroot, "System/Library/Frameworks" }) });
+                module.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ sysroot, "usr/include" }) });
+            }
+
             module.linkFramework("Cocoa", .{});
             if (enable_vulkan) {
                 module.linkFramework("QuartzCore", .{});

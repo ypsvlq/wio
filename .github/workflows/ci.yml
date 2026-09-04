@@ -56,6 +56,28 @@ jobs:
       name: Build Metal example
       working-directory: examples/metal
       run: ${{ env.build }}
+  build_macos_sysroot:
+    runs-on: ubuntu-latest
+    env:
+      build: zig build -Dtarget=aarch64-macos --sysroot "$SYSROOT"
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v6
+    - name: Set up Zig
+      uses: mlugg/setup-zig@v2
+    - name: Download macOS SDK
+      run: |
+        curl -sL https://github.com/ypsvlq/wio-macos-sdk/archive/1014fff9b544bf80200a2a9a92af257451286913.tar.gz | tar xz
+        echo "SYSROOT=$PWD/wio-macos-sdk-1014fff9b544bf80200a2a9a92af257451286913" >>"$GITHUB_ENV"
+    - name: Build demo
+      working-directory: demo
+      run: ${{ env.build }}
+    - name: Build framebuffer example
+      working-directory: examples/framebuffer
+      run: ${{ env.build }}
+    - name: Build Vulkan example
+      working-directory: examples/vulkan
+      run: ${{ env.build }}
   build_android:
     runs-on: ubuntu-latest
     steps:
