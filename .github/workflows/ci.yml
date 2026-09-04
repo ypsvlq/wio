@@ -16,7 +16,7 @@ jobs:
         - powerpc64-openbsd
         - riscv64-freebsd
         - wasm32-freestanding
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     env:
       build: zig build -Dtarget=${{ matrix.target }} ${{ matrix.target == 'wasm32-freestanding' && '-Dcpu=bleeding_edge' || '' }} ${{ matrix.target == 'native' && '-fsys=wio' || '' }}
     steps:
