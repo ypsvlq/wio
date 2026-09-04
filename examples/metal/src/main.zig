@@ -9,15 +9,14 @@ pub fn main(init: std.process.Init) !void {
     try wio.init(.{
         .allocator = init.gpa,
         .io = init.io,
-        .eventFn = wio.EventQueue.eventFn,
+        .eventFn = eventFn,
     });
     defer wio.deinit();
 
-    var events: wio.EventQueue = .empty;
-    defer events.deinit();
+    var close = false;
 
     var window = try wio.Window.create(.{
-        .event_fn_data = &events,
+        .event_fn_data = &close,
         .title = "Metal",
         .scale = 1,
     });
@@ -25,17 +24,20 @@ pub fn main(init: std.process.Init) !void {
 
     const shaders = @embedFile("shaders.metal");
     metalInit(window.backend.window, shaders, shaders.len);
+    metalDraw();
 
-    while (true) {
+    while (!close) {
         wio.update();
-        while (events.pop()) |event| {
-            switch (event) {
-                .close => return,
-                .size_physical => |size| metalResize(size.width, size.height),
-                .draw => metalDraw(),
-                else => {},
-            }
-        }
         wio.wait(.{});
+    }
+}
+
+fn eventFn(data: ?*anyopaque, event: wio.Event) void {
+    const close: *bool = @ptrCast(data);
+    switch (event) {
+        .close => close.* = true,
+        .size_physical => |size| metalResize(size.width, size.height),
+        .draw => metalDraw(),
+        else => {},
     }
 }
