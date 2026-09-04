@@ -9,8 +9,6 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    const macos_sdk = b.dependency("wio_macos_sdk", .{});
-
     const exe_mod = b.createModule(.{
         .root_source_file = b.path("src/main.zig"),
         .imports = &.{
@@ -20,7 +18,6 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     exe_mod.addCSourceFile(.{ .file = b.path("src/metal.m") });
-    exe_mod.addIncludePath(macos_sdk.path("usr/include"));
     exe_mod.linkFramework("Metal", .{});
     exe_mod.linkFramework("QuartzCore", .{});
 
