@@ -351,9 +351,9 @@ pub const Window = struct {
         }
         errdefer if (self.fractional_scale) |_| h.wp_fractional_scale_v1_destroy(self.fractional_scale);
 
-        internal.eventFn(self.event_fn_data, .{ .position = .{ .x = 0, .y = 0 } });
-        internal.eventFn(self.event_fn_data, .visible);
-        if (self.fractional_scale == null) internal.eventFn(self.event_fn_data, .{ .scale = 1 });
+        internal.sendEvent(self.event_fn_data, .{ .position = .{ .x = 0, .y = 0 } });
+        internal.sendEvent(self.event_fn_data, .visible);
+        if (self.fractional_scale == null) internal.sendEvent(self.event_fn_data, .{ .scale = 1 });
 
         h.wl_surface_commit(surface);
         c.libdecor_frame_map(frame);
@@ -710,11 +710,11 @@ pub const Window = struct {
         defer c.libdecor_state_free(state);
         c.libdecor_frame_commit(self.frame, state, configuration);
 
-        internal.eventFn(self.event_fn_data, .{ .size_logical = size });
-        internal.eventFn(self.event_fn_data, .{ .size_physical = framebuffer });
+        internal.sendEvent(self.event_fn_data, .{ .size_logical = size });
+        internal.sendEvent(self.event_fn_data, .{ .size_physical = framebuffer });
 
         if (!self.draw_available_events and self.frame_callback == null) {
-            internal.eventFn(self.event_fn_data, .draw);
+            internal.sendEvent(self.event_fn_data, .draw);
             self.frame_callback = h.wl_surface_frame(self.surface);
             _ = h.wl_callback_add_listener(self.frame_callback, &frame_callback_listener, self);
         }
@@ -722,7 +722,7 @@ pub const Window = struct {
 
     fn pushKeyEvent(self: *Window, key: u32, comptime event: wio.EventType) void {
         if (keyToButton(key)) |button| {
-            internal.eventFn(self.event_fn_data, @unionInit(wio.Event, @tagName(event), button));
+            internal.sendEvent(self.event_fn_data, @unionInit(wio.Event, @tagName(event), button));
         }
 
         if (self.text_options) |_| {
@@ -739,7 +739,7 @@ pub const Window = struct {
                 }
                 if (std.math.cast(u21, c.xkb_keysym_to_utf32(sym))) |char| {
                     if (char >= ' ' and char != 0x7F) {
-                        internal.eventFn(self.event_fn_data, .{ .char = char });
+                        internal.sendEvent(self.event_fn_data, .{ .char = char });
                     }
                 }
             }
@@ -828,7 +828,7 @@ fn frameCallback(data: ?*anyopaque, callback: ?*h.wl_callback, _: u32) callconv(
     } else {
         self.frame_callback = null;
     }
-    internal.eventFn(self.event_fn_data, .draw);
+    internal.sendEvent(self.event_fn_data, .draw);
 }
 
 const registry_listener: h.wl_registry_listener = .{
@@ -951,7 +951,7 @@ fn keyboardKeymap(_: ?*anyopaque, _: ?*h.wl_keyboard, _: h.wl_keyboard_keymap_fo
 
 fn keyboardEnter(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, surface: ?*h.wl_surface, _: ?*h.wl_array) callconv(.c) void {
     globals.keyboard_focus = getWindow(surface);
-    if (globals.keyboard_focus) |window| internal.eventFn(window.event_fn_data, .focused);
+    if (globals.keyboard_focus) |window| internal.sendEvent(window.event_fn_data, .focused);
 }
 
 fn keyboardLeave(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, surface: ?*h.wl_surface) callconv(.c) void {
@@ -959,7 +959,7 @@ fn keyboardLeave(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, surface: ?*h.wl_sur
         if (window.surface == surface) {
             globals.keyboard_focus = null;
             globals.repeat_key = 0;
-            internal.eventFn(window.event_fn_data, .unfocused);
+            internal.sendEvent(window.event_fn_data, .unfocused);
         }
     }
     if (globals.compose_state) |_| c.xkb_compose_state_reset(globals.compose_state);
@@ -976,7 +976,7 @@ fn keyboardKey(_: ?*anyopaque, _: ?*h.wl_keyboard, serial: u32, _: u32, key: u32
             }
         } else {
             if (keyToButton(key)) |button| {
-                internal.eventFn(window.event_fn_data, .{ .button_release = button });
+                internal.sendEvent(window.event_fn_data, .{ .button_release = button });
             }
             if (key == globals.repeat_key) {
                 globals.repeat_key = 0;
@@ -994,7 +994,7 @@ fn keyboardModifiers(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, mods_depressed:
             .alt = (mods & (1 << 3) != 0),
             .gui = (mods & (1 << 6) != 0),
         };
-        internal.eventFn(window.event_fn_data, .{ .modifiers = globals.modifiers });
+        internal.sendEvent(window.event_fn_data, .{ .modifiers = globals.modifiers });
     }
 
     _ = c.xkb_state_update_mask(globals.xkb_state, mods_depressed, mods_latched, mods_locked, 0, 0, 0);
@@ -1025,14 +1025,14 @@ fn pointerEnter(_: ?*anyopaque, _: ?*h.wl_pointer, serial: u32, surface: ?*h.wl_
 
 fn pointerLeave(_: ?*anyopaque, _: ?*h.wl_pointer, _: u32, _: ?*h.wl_surface) callconv(.c) void {
     if (globals.pointer_focus) |window| {
-        internal.eventFn(window.event_fn_data, .mouse_leave);
+        internal.sendEvent(window.event_fn_data, .mouse_leave);
     }
     globals.pointer_focus = null;
 }
 
 fn pointerMotion(_: ?*anyopaque, _: ?*h.wl_pointer, _: u32, surface_x: h.wl_fixed_t, surface_y: h.wl_fixed_t) callconv(.c) void {
     if (globals.pointer_focus) |window| {
-        internal.eventFn(window.event_fn_data, .{
+        internal.sendEvent(window.event_fn_data, .{
             .mouse = .{
                 .x = std.math.cast(i16, surface_x >> 8) orelse return,
                 .y = std.math.cast(i16, surface_y >> 8) orelse return,
@@ -1052,7 +1052,7 @@ fn pointerButton(_: ?*anyopaque, _: ?*h.wl_pointer, serial: u32, _: u32, button:
             0x114 => .mouse_forward,
             else => return,
         };
-        internal.eventFn(window.event_fn_data, if (state == h.WL_POINTER_BUTTON_STATE_PRESSED) .{ .button_press = wio_button } else .{ .button_release = wio_button });
+        internal.sendEvent(window.event_fn_data, if (state == h.WL_POINTER_BUTTON_STATE_PRESSED) .{ .button_press = wio_button } else .{ .button_release = wio_button });
     }
 }
 
@@ -1060,8 +1060,8 @@ fn pointerAxis(_: ?*anyopaque, _: ?*h.wl_pointer, _: u32, axis: h.wl_pointer_axi
     if (globals.pointer_focus) |window| {
         const float = fixedToFloat(value);
         switch (axis) {
-            h.WL_POINTER_AXIS_VERTICAL_SCROLL => internal.eventFn(window.event_fn_data, .{ .scroll_vertical = float }),
-            h.WL_POINTER_AXIS_HORIZONTAL_SCROLL => internal.eventFn(window.event_fn_data, .{ .scroll_horizontal = float }),
+            h.WL_POINTER_AXIS_VERTICAL_SCROLL => internal.sendEvent(window.event_fn_data, .{ .scroll_vertical = float }),
+            h.WL_POINTER_AXIS_HORIZONTAL_SCROLL => internal.sendEvent(window.event_fn_data, .{ .scroll_horizontal = float }),
             else => {},
         }
     }
@@ -1074,7 +1074,7 @@ const relative_pointer_listener: h.zwp_relative_pointer_v1_listener = .{
 fn relativePointerMotion(_: ?*anyopaque, _: ?*h.zwp_relative_pointer_v1, _: u32, _: u32, dx: h.wl_fixed_t, dy: h.wl_fixed_t, dx_unaccel: h.wl_fixed_t, dy_unaccel: h.wl_fixed_t) callconv(.c) void {
     if (globals.pointer_focus) |window| {
         if (window.relative_mouse) |options| {
-            internal.eventFn(window.event_fn_data, .{
+            internal.sendEvent(window.event_fn_data, .{
                 .mouse_relative = .{
                     .x = std.math.cast(i16, (if (options.unaccelerated) dx_unaccel else dx) >> 8) orelse return,
                     .y = std.math.cast(i16, (if (options.unaccelerated) dy_unaccel else dy) >> 8) orelse return,
@@ -1101,23 +1101,23 @@ fn gesturePinchBegin(_: ?*anyopaque, _: ?*h.zwp_pointer_gesture_pinch_v1, _: u32
 fn gesturePinchUpdate(_: ?*anyopaque, _: ?*h.zwp_pointer_gesture_pinch_v1, _: u32, dx: h.wl_fixed_t, dy: h.wl_fixed_t, scale: h.wl_fixed_t, rotation: h.wl_fixed_t) callconv(.c) void {
     if (globals.gesture_focus) |window| {
         if (dx != 0) {
-            internal.eventFn(window.event_fn_data, .{ .scroll_horizontal = -fixedToFloat(dx) });
+            internal.sendEvent(window.event_fn_data, .{ .scroll_horizontal = -fixedToFloat(dx) });
         }
         if (dy != 0) {
-            internal.eventFn(window.event_fn_data, .{ .scroll_vertical = -fixedToFloat(dy) });
+            internal.sendEvent(window.event_fn_data, .{ .scroll_vertical = -fixedToFloat(dy) });
         }
         if (scale != 0) {
-            internal.eventFn(window.event_fn_data, .{ .gesture_zoom = fixedToFloat(scale) });
+            internal.sendEvent(window.event_fn_data, .{ .gesture_zoom = fixedToFloat(scale) });
         }
         if (rotation != 0) {
-            internal.eventFn(window.event_fn_data, .{ .gesture_rotate = fixedToFloat(rotation) });
+            internal.sendEvent(window.event_fn_data, .{ .gesture_rotate = fixedToFloat(rotation) });
         }
     }
 }
 
 fn gesturePinchEnd(_: ?*anyopaque, _: ?*h.zwp_pointer_gesture_pinch_v1, _: u32, _: u32, cancelled: i32) callconv(.c) void {
     if (globals.gesture_focus) |window| {
-        internal.eventFn(window.event_fn_data, .{ .gesture_ignore = (cancelled == 1) });
+        internal.sendEvent(window.event_fn_data, .{ .gesture_ignore = (cancelled == 1) });
     }
 }
 
@@ -1136,7 +1136,7 @@ fn touchDown(_: ?*anyopaque, _: ?*h.wl_touch, serial: u32, _: u32, surface: ?*h.
         const public_id: u8 = @intCast(iter.next() orelse return);
         globals.touch_info.put(internal.allocator, id, .{ .public_id = public_id, .window = window }) catch return;
         globals.touch_ids.set(public_id);
-        internal.eventFn(window.event_fn_data, .{
+        internal.sendEvent(window.event_fn_data, .{
             .touch = .{
                 .id = public_id,
                 .x = std.math.cast(i16, x >> 8) orelse return,
@@ -1149,14 +1149,14 @@ fn touchDown(_: ?*anyopaque, _: ?*h.wl_touch, serial: u32, _: u32, surface: ?*h.
 fn touchUp(_: ?*anyopaque, _: ?*h.wl_touch, serial: u32, _: u32, id: i32) callconv(.c) void {
     globals.last_serial = serial;
     if (globals.touch_info.get(id)) |info| {
-        internal.eventFn(info.window.event_fn_data, .{ .touch_end = .{ .id = info.public_id, .ignore = false } });
+        internal.sendEvent(info.window.event_fn_data, .{ .touch_end = .{ .id = info.public_id, .ignore = false } });
         globals.touch_ids.unset(info.public_id);
     }
 }
 
 fn touchMotion(_: ?*anyopaque, _: ?*h.wl_touch, _: u32, id: i32, x: h.wl_fixed_t, y: h.wl_fixed_t) callconv(.c) void {
     if (globals.touch_info.get(id)) |info| {
-        internal.eventFn(info.window.event_fn_data, .{
+        internal.sendEvent(info.window.event_fn_data, .{
             .touch = .{
                 .id = info.public_id,
                 .x = std.math.cast(i16, x >> 8) orelse return,
@@ -1171,7 +1171,7 @@ fn touchFrame(_: ?*anyopaque, _: ?*h.wl_touch) callconv(.c) void {}
 fn touchCancel(_: ?*anyopaque, _: ?*h.wl_touch) callconv(.c) void {
     var iter = globals.touch_info.valueIterator();
     while (iter.next()) |info| {
-        internal.eventFn(info.window.event_fn_data, .{ .touch_end = .{ .id = info.public_id, .ignore = true } });
+        internal.sendEvent(info.window.event_fn_data, .{ .touch_end = .{ .id = info.public_id, .ignore = true } });
     }
     globals.touch_ids = .empty;
     globals.touch_info.clearRetainingCapacity();
@@ -1185,7 +1185,7 @@ fn fractionalScalePreferredScale(data: ?*anyopaque, _: ?*h.wp_fractional_scale_v
     const self: *Window = @ptrCast(@alignCast(data orelse return));
     self.scale = @floatFromInt(scale);
     self.scale /= 120;
-    internal.eventFn(self.event_fn_data, .{ .scale = self.scale });
+    internal.sendEvent(self.event_fn_data, .{ .scale = self.scale });
 }
 
 const text_input_listener: h.zwp_text_input_v3_listener = .{
@@ -1246,7 +1246,7 @@ fn textInputDone(_: ?*anyopaque, _: ?*h.zwp_text_input_v3, _: u32) callconv(.c) 
 
     if (globals.keyboard_focus) |window| {
         if (globals.preedit_active) {
-            internal.eventFn(window.event_fn_data, .preview_reset);
+            internal.sendEvent(window.event_fn_data, .preview_reset);
             if (globals.preedit_string.items.len == 0) {
                 globals.preedit_active = false;
             }
@@ -1255,7 +1255,7 @@ fn textInputDone(_: ?*anyopaque, _: ?*h.zwp_text_input_v3, _: u32) callconv(.c) 
             const view = std.unicode.Utf8View.init(globals.commit_string.items) catch return;
             var iter = view.iterator();
             while (iter.nextCodepoint()) |char| {
-                internal.eventFn(window.event_fn_data, .{ .char = char });
+                internal.sendEvent(window.event_fn_data, .{ .char = char });
             }
         }
         if (globals.preedit_string.items.len > 0) {
@@ -1263,7 +1263,7 @@ fn textInputDone(_: ?*anyopaque, _: ?*h.zwp_text_input_v3, _: u32) callconv(.c) 
             var iter = view.iterator();
             var count: usize = 1;
             while (iter.nextCodepoint()) |char| : (count += 1) {
-                internal.eventFn(window.event_fn_data, .{ .preview_char = char });
+                internal.sendEvent(window.event_fn_data, .{ .preview_char = char });
                 // convert byte offset to codepoint offset
                 for (&globals.preedit_cursors) |*cursor| {
                     if (cursor.* == iter.i) {
@@ -1272,7 +1272,7 @@ fn textInputDone(_: ?*anyopaque, _: ?*h.zwp_text_input_v3, _: u32) callconv(.c) 
                 }
             }
             if (globals.preedit_cursors[0] != -1 and globals.preedit_cursors[1] != -1) {
-                internal.eventFn(window.event_fn_data, .{ .preview_cursor = .{ std.math.cast(u16, globals.preedit_cursors[0]) orelse return, std.math.cast(u16, globals.preedit_cursors[1]) orelse return } });
+                internal.sendEvent(window.event_fn_data, .{ .preview_cursor = .{ std.math.cast(u16, globals.preedit_cursors[0]) orelse return, std.math.cast(u16, globals.preedit_cursors[1]) orelse return } });
             }
         }
     }
@@ -1319,7 +1319,7 @@ fn dataDeviceEnter(_: ?*anyopaque, _: ?*h.wl_data_device, serial: u32, surface: 
             window.drop.files.clearRetainingCapacity();
             if (window.drop.text) |t| internal.allocator.free(t);
             window.drop.text = null;
-            internal.eventFn(window.event_fn_data, .drop_begin);
+            internal.sendEvent(window.event_fn_data, .drop_begin);
         }
     }
 }
@@ -1327,7 +1327,7 @@ fn dataDeviceEnter(_: ?*anyopaque, _: ?*h.wl_data_device, serial: u32, surface: 
 fn dataDeviceLeave(_: ?*anyopaque, _: ?*h.wl_data_device) callconv(.c) void {
     if (build_options.drop) {
         if (!globals.drop.drag_dropped) {
-            if (globals.drop.drag_window) |window| internal.eventFn(window.event_fn_data, .drop_complete);
+            if (globals.drop.drag_window) |window| internal.sendEvent(window.event_fn_data, .drop_complete);
         }
         if (globals.drop.drag_offer) |o| {
             h.wl_data_offer_destroy(o);
@@ -1340,7 +1340,7 @@ fn dataDeviceLeave(_: ?*anyopaque, _: ?*h.wl_data_device) callconv(.c) void {
 fn dataDeviceMotion(_: ?*anyopaque, _: ?*h.wl_data_device, _: u32, x: h.wl_fixed_t, y: h.wl_fixed_t) callconv(.c) void {
     if (build_options.drop) {
         if (globals.drop.drag_window) |window| {
-            internal.eventFn(window.event_fn_data, .{
+            internal.sendEvent(window.event_fn_data, .{
                 .drop_position = .{
                     .x = std.math.cast(i16, x >> 8) orelse return,
                     .y = std.math.cast(i16, y >> 8) orelse return,
@@ -1360,7 +1360,7 @@ fn dataDeviceDrop(_: ?*anyopaque, _: ?*h.wl_data_device) callconv(.c) void {
 
         var pipe: [2]i32 = undefined;
         if (std.c.pipe(&pipe) == -1) {
-            internal.eventFn(window.event_fn_data, .drop_complete);
+            internal.sendEvent(window.event_fn_data, .drop_complete);
             globals.drop.drag_dropped = true;
             return;
         }
@@ -1392,7 +1392,7 @@ fn dataDeviceDrop(_: ?*anyopaque, _: ?*h.wl_data_device) callconv(.c) void {
                 window.drop.text = copy;
             } else |_| {}
         }
-        internal.eventFn(window.event_fn_data, .drop_complete);
+        internal.sendEvent(window.event_fn_data, .drop_complete);
     }
 }
 
@@ -1468,7 +1468,7 @@ fn frameConfigure(frame: ?*h.libdecor_frame, configuration: ?*h.libdecor_configu
         if (window_state & h.LIBDECOR_WINDOW_STATE_MAXIMIZED != 0) mode = .maximized;
         if (window_state & h.LIBDECOR_WINDOW_STATE_FULLSCREEN != 0) mode = .fullscreen;
     }
-    internal.eventFn(self.event_fn_data, .{ .mode = mode });
+    internal.sendEvent(self.event_fn_data, .{ .mode = mode });
 
     var width: c_int = undefined;
     var height: c_int = undefined;
@@ -1481,12 +1481,12 @@ fn frameConfigure(frame: ?*h.libdecor_frame, configuration: ?*h.libdecor_configu
 
 fn frameClose(_: ?*h.libdecor_frame, data: ?*anyopaque) callconv(.c) void {
     const self: *Window = @ptrCast(@alignCast(data));
-    internal.eventFn(self.event_fn_data, .close);
+    internal.sendEvent(self.event_fn_data, .close);
 }
 
 fn frameCommit(_: ?*h.libdecor_frame, data: ?*anyopaque) callconv(.c) void {
     const self: *Window = @ptrCast(@alignCast(data));
-    internal.eventFn(self.event_fn_data, .draw);
+    internal.sendEvent(self.event_fn_data, .draw);
 }
 
 fn frameDismissPopup(_: ?*h.libdecor_frame, _: [*c]const u8, _: ?*anyopaque) callconv(.c) void {}

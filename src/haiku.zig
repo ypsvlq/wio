@@ -126,15 +126,15 @@ pub const Window = struct {
         const position: wio.Position = options.position orelse .{ .x = 50, .y = 50 };
         const size = if (options.scale) |base| options.size.multiply(wio_scale / base) else options.size;
 
-        internal.eventFn(self.event_fn_data, .visible);
-        internal.eventFn(self.event_fn_data, .{ .scale = wio_scale });
+        internal.sendEvent(self.event_fn_data, .visible);
+        internal.sendEvent(self.event_fn_data, .{ .scale = wio_scale });
         if (options.mode == .normal) {
-            internal.eventFn(self.event_fn_data, .{ .mode = .normal });
-            internal.eventFn(self.event_fn_data, .{ .position = position });
-            internal.eventFn(self.event_fn_data, .{ .size_logical = size });
-            internal.eventFn(self.event_fn_data, .{ .size_physical = size });
+            internal.sendEvent(self.event_fn_data, .{ .mode = .normal });
+            internal.sendEvent(self.event_fn_data, .{ .position = position });
+            internal.sendEvent(self.event_fn_data, .{ .size_logical = size });
+            internal.sendEvent(self.event_fn_data, .{ .size_physical = size });
         }
-        internal.eventFn(self.event_fn_data, .draw);
+        internal.sendEvent(self.event_fn_data, .draw);
 
         const title = try internal.allocator.dupeSentinel(u8, options.title, 0);
         defer internal.allocator.free(title);
@@ -287,7 +287,7 @@ pub const Window = struct {
         } else {
             glReleaseCurrentContext();
             self.glMakeContextCurrent(.{ .context = gl_state.context });
-            internal.eventFn(self.event_fn_data, .draw);
+            internal.sendEvent(self.event_fn_data, .draw);
         }
     }
 
@@ -483,40 +483,40 @@ pub const AudioInput = struct {
 };
 
 export fn wioClose(self: *Window) void {
-    internal.eventFn(self.event_fn_data, .close);
+    internal.sendEvent(self.event_fn_data, .close);
 }
 
 export fn wioFocused(self: *Window) void {
-    internal.eventFn(self.event_fn_data, .focused);
+    internal.sendEvent(self.event_fn_data, .focused);
     wioSetCursor(@intFromEnum(self.cursor));
 }
 
 export fn wioUnfocused(self: *Window) void {
-    internal.eventFn(self.event_fn_data, .unfocused);
+    internal.sendEvent(self.event_fn_data, .unfocused);
 }
 
 export fn wioVisible(self: *Window) void {
-    internal.eventFn(self.event_fn_data, .visible);
+    internal.sendEvent(self.event_fn_data, .visible);
 }
 
 export fn wioHidden(self: *Window) void {
-    internal.eventFn(self.event_fn_data, .hidden);
+    internal.sendEvent(self.event_fn_data, .hidden);
 }
 
 export fn wioMode(self: *Window, mode: u8) void {
-    internal.eventFn(self.event_fn_data, .{ .mode = @enumFromInt(mode) });
+    internal.sendEvent(self.event_fn_data, .{ .mode = @enumFromInt(mode) });
 }
 
 export fn wioPosition(self: *Window, x: i16, y: i16) void {
-    internal.eventFn(self.event_fn_data, .{ .position = .{ .x = x, .y = y } });
+    internal.sendEvent(self.event_fn_data, .{ .position = .{ .x = x, .y = y } });
 }
 
 export fn wioSize(self: *Window, width: u16, height: u16) void {
     const size: wio.Size = .{ .width = width, .height = height };
 
-    internal.eventFn(self.event_fn_data, .{ .size_logical = size });
-    internal.eventFn(self.event_fn_data, .{ .size_physical = size });
-    internal.eventFn(self.event_fn_data, .draw);
+    internal.sendEvent(self.event_fn_data, .{ .size_logical = size });
+    internal.sendEvent(self.event_fn_data, .{ .size_physical = size });
+    internal.sendEvent(self.event_fn_data, .draw);
 
     if (build_options.opengl) {
         self.opengl.size = size;
@@ -529,7 +529,7 @@ export fn wioChars(self: *Window, chars: [*:0]const u8) void {
         var iter = view.iterator();
         while (iter.nextCodepoint()) |char| {
             if (char >= ' ' and char != 0x7F) {
-                internal.eventFn(self.event_fn_data, .{ .char = char });
+                internal.sendEvent(self.event_fn_data, .{ .char = char });
             }
         }
     }
@@ -537,7 +537,7 @@ export fn wioChars(self: *Window, chars: [*:0]const u8) void {
 
 export fn wioKey(self: *Window, key: i32, event: u8) void {
     if (keyToButton(key)) |button| {
-        internal.eventFn(self.event_fn_data, switch (event) {
+        internal.sendEvent(self.event_fn_data, switch (event) {
             0 => .{ .button_press = button },
             1 => .{ .button_repeat = button },
             2 => .{ .button_release = button },
@@ -551,25 +551,25 @@ export fn wioButtons(self: *Window, buttons: u8) void {
     var iter = changes.iterator(.{});
     while (iter.next()) |i| {
         if (self.buttons.isSet(i)) {
-            internal.eventFn(self.event_fn_data, .{ .button_release = @enumFromInt(i) });
+            internal.sendEvent(self.event_fn_data, .{ .button_release = @enumFromInt(i) });
         } else {
-            internal.eventFn(self.event_fn_data, .{ .button_press = @enumFromInt(i) });
+            internal.sendEvent(self.event_fn_data, .{ .button_press = @enumFromInt(i) });
         }
     }
     self.buttons = self.buttons.xorWith(changes);
 }
 
 export fn wioMouse(self: *Window, x: i16, y: i16) void {
-    internal.eventFn(self.event_fn_data, .{ .mouse = .{ .x = x, .y = y } });
+    internal.sendEvent(self.event_fn_data, .{ .mouse = .{ .x = x, .y = y } });
 }
 
 export fn wioMouseRelative(self: *Window, x: i16, y: i16) void {
-    internal.eventFn(self.event_fn_data, .{ .mouse_relative = .{ .x = x, .y = y } });
+    internal.sendEvent(self.event_fn_data, .{ .mouse_relative = .{ .x = x, .y = y } });
 }
 
 export fn wioScroll(self: *Window, vertical: f32, horizontal: f32) void {
-    if (vertical != 0) internal.eventFn(self.event_fn_data, .{ .scroll_vertical = vertical });
-    if (horizontal != 0) internal.eventFn(self.event_fn_data, .{ .scroll_horizontal = horizontal });
+    if (vertical != 0) internal.sendEvent(self.event_fn_data, .{ .scroll_vertical = vertical });
+    if (horizontal != 0) internal.sendEvent(self.event_fn_data, .{ .scroll_horizontal = horizontal });
 }
 
 fn wioDropBegin(self: *Window) callconv(.c) void {
@@ -577,11 +577,11 @@ fn wioDropBegin(self: *Window) callconv(.c) void {
     self.drop.files.clearRetainingCapacity();
     if (self.drop.text) |t| internal.allocator.free(t);
     self.drop.text = null;
-    internal.eventFn(self.event_fn_data, .drop_begin);
+    internal.sendEvent(self.event_fn_data, .drop_begin);
 }
 
 fn wioDropPosition(self: *Window, x: i16, y: i16) callconv(.c) void {
-    internal.eventFn(self.event_fn_data, .{ .drop_position = .{ .x = x, .y = y } });
+    internal.sendEvent(self.event_fn_data, .{ .drop_position = .{ .x = x, .y = y } });
 }
 
 fn wioDropFile(self: *Window, ptr: [*:0]const u8) callconv(.c) void {
@@ -597,7 +597,7 @@ fn wioDropText(self: *Window, ptr: [*]const u8, len: usize) callconv(.c) void {
 }
 
 fn wioDropComplete(self: *Window) callconv(.c) void {
-    internal.eventFn(self.event_fn_data, .drop_complete);
+    internal.sendEvent(self.event_fn_data, .drop_complete);
 }
 
 fn wioAudioOutputWrite(data: *const anyopaque, buffer: [*]f32, size: usize) callconv(.c) void {
@@ -620,7 +620,7 @@ comptime {
 
 fn drawAvailableThread(window: *Window) void {
     while (window.draw_available_ns > 0) {
-        internal.eventFn(window.event_fn_data, .draw);
+        internal.sendEvent(window.event_fn_data, .draw);
         std.Io.sleep(internal.io, .{ .nanoseconds = window.draw_available_ns }, .awake) catch {};
     }
 }

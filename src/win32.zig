@@ -321,7 +321,7 @@ pub const Window = struct {
 
         const dpi: f32 = @floatFromInt(w.GetDpiForWindow(window));
         const scale = dpi / w.USER_DEFAULT_SCREEN_DPI;
-        internal.eventFn(self.event_fn_data, .{ .scale = scale });
+        internal.sendEvent(self.event_fn_data, .{ .scale = scale });
 
         if (options.scale) |base| {
             const scaled = clientToWindow(options.size.multiply(scale / base), style);
@@ -1347,7 +1347,7 @@ const DropTarget = struct {
         _ = w.ScreenToClient(window.window, &point);
         const x = std.math.cast(i16, point.x) orelse return;
         const y = std.math.cast(i16, point.y) orelse return;
-        internal.eventFn(window.event_fn_data, .{ .drop_position = .{ .x = x, .y = y } });
+        internal.sendEvent(window.event_fn_data, .{ .drop_position = .{ .x = x, .y = y } });
     }
 
     fn dragEnter(iface: *w.IDropTarget, data: [*c]w.IDataObject, _: u32, pt: w.POINTL, effect: [*c]u32) callconv(.winapi) w.HRESULT {
@@ -1363,7 +1363,7 @@ const DropTarget = struct {
             dt.window.drop.files.clearRetainingCapacity();
             if (dt.window.drop.text) |t| internal.allocator.free(t);
             dt.window.drop.text = null;
-            internal.eventFn(dt.window.event_fn_data, .drop_begin);
+            internal.sendEvent(dt.window.event_fn_data, .drop_begin);
             pushPosition(dt.window, pt);
         } else {
             effect.* = w.DROPEFFECT_NONE;
@@ -1397,7 +1397,7 @@ const DropTarget = struct {
         pushPosition(dt.window, pt);
         if (dt.has_files) extractFiles(dt.window, data_obj);
         if (dt.has_text) extractText(dt.window, data_obj);
-        internal.eventFn(dt.window.event_fn_data, .drop_complete);
+        internal.sendEvent(dt.window.event_fn_data, .drop_complete);
         return w.S_OK;
     }
 
@@ -1581,13 +1581,13 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
     if (self.left_shift) {
         if (w.GetAsyncKeyState(w.VK_LSHIFT) == 0) {
             self.left_shift = false;
-            internal.eventFn(self.event_fn_data, .{ .button_release = .left_shift });
+            internal.sendEvent(self.event_fn_data, .{ .button_release = .left_shift });
         }
     }
     if (self.right_shift) {
         if (w.GetAsyncKeyState(w.VK_RSHIFT) == 0) {
             self.right_shift = false;
-            internal.eventFn(self.event_fn_data, .{ .button_release = .right_shift });
+            internal.sendEvent(self.event_fn_data, .{ .button_release = .right_shift });
         }
     }
 
@@ -1608,27 +1608,27 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
             }
         },
         w.WM_CLOSE => {
-            internal.eventFn(self.event_fn_data, .close);
+            internal.sendEvent(self.event_fn_data, .close);
             return 0;
         },
         w.WM_SETFOCUS => {
-            internal.eventFn(self.event_fn_data, .focused);
+            internal.sendEvent(self.event_fn_data, .focused);
             if (self.relative_mouse) {
                 self.clipCursor();
             }
             return 0;
         },
         w.WM_KILLFOCUS => {
-            internal.eventFn(self.event_fn_data, .unfocused);
+            internal.sendEvent(self.event_fn_data, .unfocused);
             return 0;
         },
         w.WM_PAINT => {
-            internal.eventFn(self.event_fn_data, .draw);
+            internal.sendEvent(self.event_fn_data, .draw);
             _ = w.ValidateRgn(window, null);
             return 0;
         },
         w.WM_MOVE => {
-            internal.eventFn(self.event_fn_data, .{ .position = .{ .x = LOSHORT(lParam), .y = HISHORT(lParam) } });
+            internal.sendEvent(self.event_fn_data, .{ .position = .{ .x = LOSHORT(lParam), .y = HISHORT(lParam) } });
             return 0;
         },
         w.WM_SIZE => {
@@ -1642,15 +1642,15 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
                     if (wParam == w.SIZE_RESTORED and !fullscreen) {
                         _ = w.GetWindowRect(window, &self.rect);
                     }
-                    internal.eventFn(self.event_fn_data, .visible);
-                    internal.eventFn(self.event_fn_data, .{ .mode = if (fullscreen) .fullscreen else if (wParam == w.SIZE_MAXIMIZED) .maximized else .normal });
-                    internal.eventFn(self.event_fn_data, .{ .size_logical = size });
-                    internal.eventFn(self.event_fn_data, .{ .size_physical = size });
+                    internal.sendEvent(self.event_fn_data, .visible);
+                    internal.sendEvent(self.event_fn_data, .{ .mode = if (fullscreen) .fullscreen else if (wParam == w.SIZE_MAXIMIZED) .maximized else .normal });
+                    internal.sendEvent(self.event_fn_data, .{ .size_logical = size });
+                    internal.sendEvent(self.event_fn_data, .{ .size_physical = size });
                     if (self.draw_available_ns == 0) {
-                        internal.eventFn(self.event_fn_data, .draw);
+                        internal.sendEvent(self.event_fn_data, .draw);
                     }
                 },
-                w.SIZE_MINIMIZED => internal.eventFn(self.event_fn_data, .hidden),
+                w.SIZE_MINIMIZED => internal.sendEvent(self.event_fn_data, .hidden),
                 else => {},
             }
             if (self.draw_available_ns != 0) {
@@ -1661,7 +1661,7 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
         w.WM_DPICHANGED => {
             const dpi: f32 = @floatFromInt(LOWORD(wParam));
             const scale = dpi / w.USER_DEFAULT_SCREEN_DPI;
-            internal.eventFn(self.event_fn_data, .{ .scale = scale });
+            internal.sendEvent(self.event_fn_data, .{ .scale = scale });
             return 0;
         },
         w.WM_CHAR => {
@@ -1679,7 +1679,7 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
                     }
                 };
                 if (codepoint >= ' ') {
-                    internal.eventFn(self.event_fn_data, .{ .char = codepoint });
+                    internal.sendEvent(self.event_fn_data, .{ .char = codepoint });
                 }
             }
             return 0;
@@ -1690,7 +1690,7 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
             }
 
             if (msg == w.WM_SYSKEYDOWN and wParam == w.VK_F4) {
-                internal.eventFn(self.event_fn_data, .close);
+                internal.sendEvent(self.event_fn_data, .close);
             }
 
             const flags = HIWORD(lParam);
@@ -1727,14 +1727,14 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
                         repeat = ptr.*;
                         ptr.* = true;
                     }
-                    internal.eventFn(self.event_fn_data, if (repeat) .{ .button_repeat = button } else .{ .button_press = button });
+                    internal.sendEvent(self.event_fn_data, if (repeat) .{ .button_repeat = button } else .{ .button_press = button });
                 } else {
                     if (modifier) |ptr| ptr.* = false;
-                    internal.eventFn(self.event_fn_data, .{ .button_release = button });
+                    internal.sendEvent(self.event_fn_data, .{ .button_release = button });
                 }
 
                 if (modifier != null) {
-                    internal.eventFn(self.event_fn_data, .{
+                    internal.sendEvent(self.event_fn_data, .{
                         .modifiers = .{
                             .control = (w.GetAsyncKeyState(w.VK_CONTROL) < 0),
                             .shift = (w.GetAsyncKeyState(w.VK_SHIFT) < 0),
@@ -1767,15 +1767,15 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
                 w.WM_MBUTTONDOWN,
                 w.WM_RBUTTONDOWN,
                 w.WM_XBUTTONDOWN,
-                => internal.eventFn(self.event_fn_data, .{ .button_press = button }),
-                else => internal.eventFn(self.event_fn_data, .{ .button_release = button }),
+                => internal.sendEvent(self.event_fn_data, .{ .button_press = button }),
+                else => internal.sendEvent(self.event_fn_data, .{ .button_release = button }),
             }
 
             return if (msg == w.WM_XBUTTONDOWN or msg == w.WM_XBUTTONUP) w.TRUE else 0;
         },
         w.WM_MOUSEMOVE => {
             if (!self.relative_mouse) {
-                internal.eventFn(self.event_fn_data, .{ .mouse = .{ .x = LOSHORT(lParam), .y = HISHORT(lParam) } });
+                internal.sendEvent(self.event_fn_data, .{ .mouse = .{ .x = LOSHORT(lParam), .y = HISHORT(lParam) } });
             }
 
             if (!self.tracking) {
@@ -1803,26 +1803,26 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
                 if (raw.data.mouse.usFlags & w.MOUSE_MOVE_ABSOLUTE != 0) {
                     if (raw.data.mouse.lLastX != 0 or raw.data.mouse.lLastY != 0) { // prevent spurious (0,0)
                         if (raw.data.mouse.Anonymous.Anonymous.usButtonFlags == 0) { // prevent jumping on touch input
-                            internal.eventFn(self.event_fn_data, .{ .mouse_relative = .{ .x = @intCast(raw.data.mouse.lLastX - self.last_x), .y = @intCast(raw.data.mouse.lLastY - self.last_y) } });
+                            internal.sendEvent(self.event_fn_data, .{ .mouse_relative = .{ .x = @intCast(raw.data.mouse.lLastX - self.last_x), .y = @intCast(raw.data.mouse.lLastY - self.last_y) } });
                         }
                         self.last_x = @intCast(raw.data.mouse.lLastX);
                         self.last_y = @intCast(raw.data.mouse.lLastY);
                     }
                 } else {
-                    internal.eventFn(self.event_fn_data, .{ .mouse_relative = .{ .x = @intCast(raw.data.mouse.lLastX), .y = @intCast(raw.data.mouse.lLastY) } });
+                    internal.sendEvent(self.event_fn_data, .{ .mouse_relative = .{ .x = @intCast(raw.data.mouse.lLastX), .y = @intCast(raw.data.mouse.lLastY) } });
                 }
             }
             return 0;
         },
         w.WM_MOUSELEAVE => {
-            internal.eventFn(self.event_fn_data, .mouse_leave);
+            internal.sendEvent(self.event_fn_data, .mouse_leave);
             self.tracking = false;
             return 0;
         },
         w.WM_MOUSEWHEEL, w.WM_MOUSEHWHEEL => {
             const delta: f32 = @floatFromInt(HISHORT(wParam));
             const value = delta / w.WHEEL_DELTA;
-            internal.eventFn(self.event_fn_data, if (msg == w.WM_MOUSEWHEEL) .{ .scroll_vertical = -value } else .{ .scroll_horizontal = value });
+            internal.sendEvent(self.event_fn_data, if (msg == w.WM_MOUSEWHEEL) .{ .scroll_vertical = -value } else .{ .scroll_horizontal = value });
             return 0;
         },
         w.WM_POINTERDOWN, w.WM_POINTERUPDATE => {
@@ -1840,12 +1840,12 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
             _ = w.ScreenToClient(self.window, &point);
             const x = std.math.cast(i16, point.x) orelse return 0;
             const y = std.math.cast(i16, point.y) orelse return 0;
-            internal.eventFn(self.event_fn_data, .{ .touch = .{ .id = id, .x = x, .y = y } });
+            internal.sendEvent(self.event_fn_data, .{ .touch = .{ .id = id, .x = x, .y = y } });
             return 0;
         },
         w.WM_POINTERUP, w.WM_POINTERCAPTURECHANGED => {
             const id = self.touch_ids.get(LOWORD(wParam)) orelse return 0;
-            internal.eventFn(self.event_fn_data, .{ .touch_end = .{ .id = id, .ignore = if (msg == w.WM_POINTERUP) false else true } });
+            internal.sendEvent(self.event_fn_data, .{ .touch_end = .{ .id = id, .ignore = if (msg == w.WM_POINTERUP) false else true } });
             self.touch_bitmap.unset(id);
             return 0;
         },

@@ -100,9 +100,9 @@ pub const Window = struct {
     pub fn create(options: wio.CreateWindowOptions) !Window {
         const id = js.createWindow(options.event_fn_data);
 
-        internal.eventFn(options.event_fn_data, .visible);
-        internal.eventFn(options.event_fn_data, .{ .mode = .normal });
-        internal.eventFn(options.event_fn_data, .{ .position = .{ .x = 0, .y = 0 } });
+        internal.sendEvent(options.event_fn_data, .visible);
+        internal.sendEvent(options.event_fn_data, .{ .mode = .normal });
+        internal.sendEvent(options.event_fn_data, .{ .position = .{ .x = 0, .y = 0 } });
 
         if (options.mode == .fullscreen) js.setFullscreen(id, true);
 
@@ -371,7 +371,7 @@ export fn wioLoop() bool {
 }
 
 export fn wioEvent(data: ?*anyopaque, event: u32, int0: u32, int1: u32, float0: f32) void {
-    internal.eventFn(data, switch (@as(wio.EventType, @enumFromInt(event))) {
+    internal.sendEvent(data, switch (@as(wio.EventType, @enumFromInt(event))) {
         .focused => .focused,
         .unfocused => .unfocused,
         .draw => .draw,

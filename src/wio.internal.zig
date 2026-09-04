@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const wio = @import("wio.zig");
 const log = std.log.scoped(.wio);
 
@@ -7,6 +8,22 @@ pub var io: std.Io = undefined;
 pub var eventFn: *const fn (?*anyopaque, wio.Event) void = undefined;
 
 pub var wait = false;
+
+pub const event_thread = switch (builtin.target.os.tag) {
+    .linux => if (builtin.target.abi.isAndroid()) true else false,
+    .haiku => true,
+    else => false,
+};
+
+pub fn sendEvent(data: ?*anyopaque, event: wio.Event) void {
+    eventFn(data, event);
+
+    if (event_thread) {
+        wio.cancelWait();
+    } else {
+        wait = false;
+    }
+}
 
 pub fn logUnexpected(name: []const u8) error{Unexpected} {
     log.err("{s} failed", .{name});

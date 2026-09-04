@@ -840,49 +840,49 @@ pub const AudioInput = struct {
 };
 
 export fn wioClose(self: *Window) void {
-    internal.eventFn(self.event_fn_data, .close);
+    internal.sendEvent(self.event_fn_data, .close);
 }
 
 export fn wioFocused(self: *Window) void {
-    internal.eventFn(self.event_fn_data, .focused);
+    internal.sendEvent(self.event_fn_data, .focused);
 }
 
 export fn wioUnfocused(self: *Window) void {
-    internal.eventFn(self.event_fn_data, .unfocused);
+    internal.sendEvent(self.event_fn_data, .unfocused);
 }
 
 export fn wioVisible(self: *Window) void {
-    internal.eventFn(self.event_fn_data, .visible);
+    internal.sendEvent(self.event_fn_data, .visible);
 }
 
 export fn wioHidden(self: *Window) void {
-    internal.eventFn(self.event_fn_data, .hidden);
+    internal.sendEvent(self.event_fn_data, .hidden);
 }
 
 export fn wioDraw(self: *Window) void {
-    internal.eventFn(self.event_fn_data, .draw);
+    internal.sendEvent(self.event_fn_data, .draw);
 }
 
 export fn wioPosition(self: *Window, x: i16, y: i16) void {
-    internal.eventFn(self.event_fn_data, .{ .position = .{ .x = x, .y = y } });
+    internal.sendEvent(self.event_fn_data, .{ .position = .{ .x = x, .y = y } });
 }
 
 export fn wioSizeLogical(self: *Window, mode: u8, width: u16, height: u16) void {
-    internal.eventFn(self.event_fn_data, .{ .mode = @enumFromInt(mode) });
-    internal.eventFn(self.event_fn_data, .{ .size_logical = .{ .width = width, .height = height } });
+    internal.sendEvent(self.event_fn_data, .{ .mode = @enumFromInt(mode) });
+    internal.sendEvent(self.event_fn_data, .{ .size_logical = .{ .width = width, .height = height } });
 }
 
 export fn wioSizePhysical(self: *Window, width: u16, height: u16) void {
-    internal.eventFn(self.event_fn_data, .{ .size_physical = .{ .width = width, .height = height } });
-    internal.eventFn(self.event_fn_data, .draw);
+    internal.sendEvent(self.event_fn_data, .{ .size_physical = .{ .width = width, .height = height } });
+    internal.sendEvent(self.event_fn_data, .draw);
 }
 
 export fn wioScale(self: *Window, scale: f32) void {
-    internal.eventFn(self.event_fn_data, .{ .scale = scale });
+    internal.sendEvent(self.event_fn_data, .{ .scale = scale });
 }
 
 export fn wioModifiers(self: *Window, modifiers: u32) void {
-    internal.eventFn(self.event_fn_data, .{
+    internal.sendEvent(self.event_fn_data, .{
         .modifiers = .{
             .control = (modifiers & (1 << 18) != 0),
             .shift = (modifiers & (1 << 17) != 0),
@@ -896,7 +896,7 @@ export fn wioChars(self: *Window, buf: [*:0]const u8) void {
     const view = std.unicode.Utf8View.init(std.mem.sliceTo(buf, 0)) catch return;
     var iter = view.iterator();
     while (iter.nextCodepoint()) |char| {
-        internal.eventFn(self.event_fn_data, .{ .char = char });
+        internal.sendEvent(self.event_fn_data, .{ .char = char });
     }
 }
 
@@ -904,57 +904,57 @@ export fn wioPreviewChars(self: *Window, buf: [*:0]const u8, cursor_start: u16, 
     const view = std.unicode.Utf8View.init(std.mem.sliceTo(buf, 0)) catch return;
     var iter = view.iterator();
     while (iter.nextCodepoint()) |char| {
-        internal.eventFn(self.event_fn_data, .{ .preview_char = char });
+        internal.sendEvent(self.event_fn_data, .{ .preview_char = char });
     }
-    internal.eventFn(self.event_fn_data, .{ .preview_cursor = .{ cursor_start, cursor_start + cursor_length } });
+    internal.sendEvent(self.event_fn_data, .{ .preview_cursor = .{ cursor_start, cursor_start + cursor_length } });
 }
 
 export fn wioPreviewReset(self: *Window) void {
-    internal.eventFn(self.event_fn_data, .preview_reset);
+    internal.sendEvent(self.event_fn_data, .preview_reset);
 }
 
 export fn wioKey(self: *Window, key: u16, event: u8) void {
     if (keycodeToButton(key)) |button| {
         switch (event) {
-            0 => internal.eventFn(self.event_fn_data, .{ .button_press = button }),
-            1 => internal.eventFn(self.event_fn_data, .{ .button_repeat = button }),
-            2 => internal.eventFn(self.event_fn_data, .{ .button_release = button }),
+            0 => internal.sendEvent(self.event_fn_data, .{ .button_press = button }),
+            1 => internal.sendEvent(self.event_fn_data, .{ .button_repeat = button }),
+            2 => internal.sendEvent(self.event_fn_data, .{ .button_release = button }),
             else => unreachable,
         }
     }
 }
 
 export fn wioButtonPress(self: *Window, button: u8) void {
-    internal.eventFn(self.event_fn_data, .{ .button_press = @enumFromInt(button) });
+    internal.sendEvent(self.event_fn_data, .{ .button_press = @enumFromInt(button) });
 }
 
 export fn wioButtonRelease(self: *Window, button: u8) void {
-    internal.eventFn(self.event_fn_data, .{ .button_release = @enumFromInt(button) });
+    internal.sendEvent(self.event_fn_data, .{ .button_release = @enumFromInt(button) });
 }
 
 export fn wioMouse(self: *Window, x: i16, y: i16) void {
-    internal.eventFn(self.event_fn_data, .{ .mouse = .{ .x = x, .y = y } });
+    internal.sendEvent(self.event_fn_data, .{ .mouse = .{ .x = x, .y = y } });
 }
 
 export fn wioMouseRelative(self: *Window, x: i16, y: i16) void {
-    internal.eventFn(self.event_fn_data, .{ .mouse_relative = .{ .x = x, .y = y } });
+    internal.sendEvent(self.event_fn_data, .{ .mouse_relative = .{ .x = x, .y = y } });
 }
 
 export fn wioMouseLeave(self: *Window) void {
-    internal.eventFn(self.event_fn_data, .mouse_leave);
+    internal.sendEvent(self.event_fn_data, .mouse_leave);
 }
 
 export fn wioScroll(self: *Window, x: f32, y: f32) void {
-    if (x != 0) internal.eventFn(self.event_fn_data, .{ .scroll_horizontal = -x });
-    if (y != 0) internal.eventFn(self.event_fn_data, .{ .scroll_vertical = -y });
+    if (x != 0) internal.sendEvent(self.event_fn_data, .{ .scroll_horizontal = -x });
+    if (y != 0) internal.sendEvent(self.event_fn_data, .{ .scroll_vertical = -y });
 }
 
 export fn wioGestureZoom(self: *Window, value: f32) void {
-    internal.eventFn(self.event_fn_data, .{ .gesture_zoom = value + 1 });
+    internal.sendEvent(self.event_fn_data, .{ .gesture_zoom = value + 1 });
 }
 
 export fn wioGestureRotate(self: *Window, value: f32) void {
-    internal.eventFn(self.event_fn_data, .{ .gesture_rotate = -value });
+    internal.sendEvent(self.event_fn_data, .{ .gesture_rotate = -value });
 }
 
 export fn wioDupeClipboardText(bytes: [*:0]const u8, len: *usize) ?[*]u8 {

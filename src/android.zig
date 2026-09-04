@@ -174,7 +174,7 @@ pub const Window = struct {
     pub fn create(options: wio.CreateWindowOptions) !Window {
         event_fn_data = options.event_fn_data;
 
-        internal.eventFn(event_fn_data, .{ .position = .{ .x = 0, .y = 0 } });
+        internal.sendEvent(event_fn_data, .{ .position = .{ .x = 0, .y = 0 } });
 
         if (build_options.opengl) {
             if (options.gl_options) |gl| {
@@ -683,16 +683,16 @@ const native = struct {
     }
 
     fn onDestroy(_: *c.JNIEnv, _: c.jobject) callconv(.c) void {
-        internal.eventFn(event_fn_data, .close);
+        internal.sendEvent(event_fn_data, .close);
     }
 
     fn onWindowFocusChanged(env: *c.JNIEnv, instance: c.jobject, focused: c.jboolean) callconv(.c) void {
         if (focused == c.JNI_FALSE) {
-            internal.eventFn(event_fn_data, .unfocused);
+            internal.sendEvent(event_fn_data, .unfocused);
             modifiers = .{};
         } else {
-            internal.eventFn(event_fn_data, .focused);
-            internal.eventFn(event_fn_data, .draw);
+            internal.sendEvent(event_fn_data, .focused);
+            internal.sendEvent(event_fn_data, .draw);
             if (relative_mouse) {
                 env.*.*.CallVoidMethod.?(env, instance, java.enableRelativeMouse);
             }
@@ -705,14 +705,14 @@ const native = struct {
             c.AMOTION_EVENT_ACTION_DOWN,
             c.AMOTION_EVENT_ACTION_MOVE,
             c.AMOTION_EVENT_ACTION_POINTER_DOWN,
-            => internal.eventFn(event_fn_data, .{ .touch = .{ .id = id, .x = std.math.cast(i16, x) orelse return, .y = std.math.cast(i16, y) orelse return } }),
+            => internal.sendEvent(event_fn_data, .{ .touch = .{ .id = id, .x = std.math.cast(i16, x) orelse return, .y = std.math.cast(i16, y) orelse return } }),
 
             c.AMOTION_EVENT_ACTION_UP,
             c.AMOTION_EVENT_ACTION_POINTER_UP,
-            => internal.eventFn(event_fn_data, .{ .touch_end = .{ .id = id, .ignore = false } }),
+            => internal.sendEvent(event_fn_data, .{ .touch_end = .{ .id = id, .ignore = false } }),
 
             c.AMOTION_EVENT_ACTION_CANCEL,
-            => internal.eventFn(event_fn_data, .{ .touch_end = .{ .id = id, .ignore = true } }),
+            => internal.sendEvent(event_fn_data, .{ .touch_end = .{ .id = id, .ignore = true } }),
 
             else => {},
         }
@@ -721,7 +721,7 @@ const native = struct {
     var last_buttons: c.jint = 0;
 
     fn pushMouseEvent(_: *c.JNIEnv, _: c.jobject, x: c.jint, y: c.jint, buttons: c.jint) callconv(.c) void {
-        internal.eventFn(event_fn_data, .{ .mouse = .{ .x = std.math.cast(i16, x) orelse return, .y = std.math.cast(i16, y) orelse return } });
+        internal.sendEvent(event_fn_data, .{ .mouse = .{ .x = std.math.cast(i16, x) orelse return, .y = std.math.cast(i16, y) orelse return } });
 
         const changes = last_buttons ^ buttons;
         if (changes != 0) {
@@ -738,9 +738,9 @@ const native = struct {
                         else => unreachable,
                     };
                     if (buttons & i != 0) {
-                        internal.eventFn(event_fn_data, .{ .button_press = button });
+                        internal.sendEvent(event_fn_data, .{ .button_press = button });
                     } else {
-                        internal.eventFn(event_fn_data, .{ .button_release = button });
+                        internal.sendEvent(event_fn_data, .{ .button_release = button });
                     }
                 }
             }
@@ -748,8 +748,8 @@ const native = struct {
     }
 
     fn pushScrollEvent(_: *c.JNIEnv, _: c.jobject, vertical: c.jfloat, horizontal: c.jfloat) callconv(.c) void {
-        if (vertical != 0) internal.eventFn(event_fn_data, .{ .scroll_vertical = -vertical });
-        if (horizontal != 0) internal.eventFn(event_fn_data, .{ .scroll_horizontal = -horizontal });
+        if (vertical != 0) internal.sendEvent(event_fn_data, .{ .scroll_vertical = -vertical });
+        if (horizontal != 0) internal.sendEvent(event_fn_data, .{ .scroll_horizontal = -horizontal });
     }
 
     fn onKeyDown(_: *c.JNIEnv, _: c.jobject, id: c.jint, keycode: c.jint, repeat: c.jint) callconv(.c) c.jboolean {
@@ -769,7 +769,7 @@ const native = struct {
         }
 
         const button = keycodeToButton(keycode) orelse return c.JNI_FALSE;
-        internal.eventFn(event_fn_data, if (repeat == 0) .{ .button_press = button } else .{ .button_repeat = button });
+        internal.sendEvent(event_fn_data, if (repeat == 0) .{ .button_press = button } else .{ .button_repeat = button });
         updateModifiers(button, true);
         return c.JNI_TRUE;
     }
@@ -791,7 +791,7 @@ const native = struct {
         }
 
         const button = keycodeToButton(keycode) orelse return c.JNI_FALSE;
-        internal.eventFn(event_fn_data, .{ .button_release = button });
+        internal.sendEvent(event_fn_data, .{ .button_release = button });
         updateModifiers(button, false);
         return c.JNI_TRUE;
     }
@@ -801,7 +801,7 @@ const native = struct {
         defer window_mutex.unlock(internal.io);
 
         window = c.ANativeWindow_fromSurface(env, surface);
-        internal.eventFn(event_fn_data, .visible);
+        internal.sendEvent(event_fn_data, .visible);
 
         if (build_options.opengl) {
             if (egl_config != null) {
@@ -815,9 +815,9 @@ const native = struct {
 
     fn surfaceChanged(_: *c.JNIEnv, _: c.jobject, density: c.jfloat, width: c.jint, height: c.jint) callconv(.c) void {
         const size: wio.Size = .{ .width = std.math.lossyCast(u16, width), .height = std.math.lossyCast(u16, height) };
-        internal.eventFn(event_fn_data, .{ .scale = density });
-        internal.eventFn(event_fn_data, .{ .size_logical = size });
-        internal.eventFn(event_fn_data, .{ .size_physical = size });
+        internal.sendEvent(event_fn_data, .{ .scale = density });
+        internal.sendEvent(event_fn_data, .{ .size_logical = size });
+        internal.sendEvent(event_fn_data, .{ .size_physical = size });
     }
 
     fn surfaceDestroyed(_: *c.JNIEnv, _: c.jobject) callconv(.c) void {
@@ -826,7 +826,7 @@ const native = struct {
 
         c.ANativeWindow_release(window);
         window = null;
-        internal.eventFn(event_fn_data, .hidden);
+        internal.sendEvent(event_fn_data, .hidden);
 
         if (build_options.opengl) {
             if (egl_surface) |_| {
@@ -837,23 +837,23 @@ const native = struct {
     }
 
     fn pushDrawEvent(_: *c.JNIEnv, _: c.jobject) callconv(.c) void {
-        internal.eventFn(event_fn_data, .draw);
+        internal.sendEvent(event_fn_data, .draw);
     }
 
     fn onCapturedPointerEvent(_: *c.JNIEnv, _: c.jobject, x: c.jint, y: c.jint) callconv(.c) void {
-        internal.eventFn(event_fn_data, .{ .mouse_relative = .{ .x = std.math.cast(i16, x) orelse return, .y = std.math.cast(i16, y) orelse return } });
+        internal.sendEvent(event_fn_data, .{ .mouse_relative = .{ .x = std.math.cast(i16, x) orelse return, .y = std.math.cast(i16, y) orelse return } });
     }
 
     fn pushCharEvent(_: *c.JNIEnv, _: c.jobject, codepoint: c.jint) callconv(.c) void {
-        internal.eventFn(event_fn_data, .{ .char = std.math.cast(u21, codepoint) orelse return });
+        internal.sendEvent(event_fn_data, .{ .char = std.math.cast(u21, codepoint) orelse return });
     }
 
     fn pushPreviewResetEvent(_: *c.JNIEnv, _: c.jobject) callconv(.c) void {
-        internal.eventFn(event_fn_data, .preview_reset);
+        internal.sendEvent(event_fn_data, .preview_reset);
     }
 
     fn pushPreviewCharEvent(_: *c.JNIEnv, _: c.jobject, codepoint: c.jint) callconv(.c) void {
-        internal.eventFn(event_fn_data, .{ .preview_char = std.math.cast(u21, codepoint) orelse return });
+        internal.sendEvent(event_fn_data, .{ .preview_char = std.math.cast(u21, codepoint) orelse return });
     }
 
     fn onInputDeviceAdded(env: *c.JNIEnv, _: c.jobject, id: c.jint, descriptor: c.jstring, name: c.jstring, axes: c.jintArray, buttons: c.jintArray) callconv(.c) void {
@@ -919,7 +919,7 @@ fn updateModifiers(button: wio.Button, value: bool) void {
     };
     if (modifier.* != value) {
         modifier.* = value;
-        internal.eventFn(event_fn_data, .{ .modifiers = modifiers });
+        internal.sendEvent(event_fn_data, .{ .modifiers = modifiers });
     }
 }
 

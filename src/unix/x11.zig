@@ -412,11 +412,11 @@ pub const Window = struct {
             _ = c.XSetClassHint(globals.display, window, &class_hint);
         }
 
-        internal.eventFn(self.event_fn_data, .visible);
-        internal.eventFn(self.event_fn_data, .{ .scale = globals.scale });
-        internal.eventFn(self.event_fn_data, .{ .size_logical = size });
-        internal.eventFn(self.event_fn_data, .{ .size_physical = size });
-        internal.eventFn(self.event_fn_data, .draw);
+        internal.sendEvent(self.event_fn_data, .visible);
+        internal.sendEvent(self.event_fn_data, .{ .scale = globals.scale });
+        internal.sendEvent(self.event_fn_data, .{ .size_logical = size });
+        internal.sendEvent(self.event_fn_data, .{ .size_physical = size });
+        internal.sendEvent(self.event_fn_data, .draw);
 
         try globals.windows.put(internal.allocator, window, self);
         return self;
@@ -807,7 +807,7 @@ fn preeditStart(_: h.XIC, _: h.XPointer, _: h.XPointer) callconv(.c) c_int {
 
 fn preeditDone(_: h.XIC, window: *Window, _: h.XPointer) callconv(.c) void {
     window.preedit_string.clearRetainingCapacity();
-    internal.eventFn(window.event_fn_data, .preview_reset);
+    internal.sendEvent(window.event_fn_data, .preview_reset);
 }
 
 fn preeditDraw(_: h.XIC, window: *Window, data: *h.XIMPreeditDrawCallbackStruct) callconv(.c) void {
@@ -846,12 +846,12 @@ fn preeditDraw(_: h.XIC, window: *Window, data: *h.XIMPreeditDrawCallbackStruct)
         window.preedit_string.replaceRangeAssumeCapacity(chg_first, chg_length, &.{});
     }
 
-    internal.eventFn(window.event_fn_data, .preview_reset);
+    internal.sendEvent(window.event_fn_data, .preview_reset);
     for (window.preedit_string.items) |char| {
-        internal.eventFn(window.event_fn_data, .{ .preview_char = char });
+        internal.sendEvent(window.event_fn_data, .{ .preview_char = char });
     }
     if (window.preedit_string.items.len > 0) {
-        internal.eventFn(window.event_fn_data, .{ .preview_cursor = cursor });
+        internal.sendEvent(window.event_fn_data, .{ .preview_cursor = cursor });
     }
 }
 
@@ -934,7 +934,7 @@ fn handle(event: *h.XEvent) void {
     };
 
     if (window.xkb_mods != globals.xkb_mods) {
-        internal.eventFn(window.event_fn_data, .{
+        internal.sendEvent(window.event_fn_data, .{
             .modifiers = .{
                 .control = (globals.xkb_mods & h.ControlMask != 0),
                 .shift = (globals.xkb_mods & h.ShiftMask != 0),
@@ -959,7 +959,7 @@ fn handle(event: *h.XEvent) void {
         h.ClientMessage => {
             if (event.xclient.message_type == atoms.WM_PROTOCOLS) {
                 if (event.xclient.data.l[0] == atoms.WM_DELETE_WINDOW) {
-                    internal.eventFn(window.event_fn_data, .close);
+                    internal.sendEvent(window.event_fn_data, .close);
                 }
             } else if (build_options.drop) {
                 if (event.xclient.message_type == atoms.XdndEnter) {
@@ -1003,7 +1003,7 @@ fn handle(event: *h.XEvent) void {
                     window.drop.files.clearRetainingCapacity();
                     if (window.drop.text) |t| internal.allocator.free(t);
                     window.drop.text = null;
-                    internal.eventFn(window.event_fn_data, .drop_begin);
+                    internal.sendEvent(window.event_fn_data, .drop_begin);
                 } else if (event.xclient.message_type == atoms.XdndPosition) {
                     const root_x: c_int = @intCast(event.xclient.data.l[2] >> 16);
                     const root_y: c_int = @intCast(event.xclient.data.l[2] & 0xffff);
@@ -1013,7 +1013,7 @@ fn handle(event: *h.XEvent) void {
                     _ = c.XTranslateCoordinates(globals.display, h.DefaultRootWindow(globals.display), window.window, root_x, root_y, &win_x, &win_y, &child);
                     if (std.math.cast(i16, win_x)) |x| {
                         if (std.math.cast(i16, win_y)) |y| {
-                            internal.eventFn(window.event_fn_data, .{ .drop_position = .{ .x = x, .y = y } });
+                            internal.sendEvent(window.event_fn_data, .{ .drop_position = .{ .x = x, .y = y } });
                         }
                     }
 
@@ -1030,7 +1030,7 @@ fn handle(event: *h.XEvent) void {
                     _ = c.XSendEvent(globals.display, window.drop.xdnd_source, h.False, h.NoEventMask, &reply);
                     _ = c.XFlush(globals.display);
                 } else if (event.xclient.message_type == atoms.XdndLeave) {
-                    internal.eventFn(window.event_fn_data, .drop_complete);
+                    internal.sendEvent(window.event_fn_data, .drop_complete);
                     window.drop.xdnd_source = 0;
                     window.drop.xdnd_req = h.None;
                 } else if (event.xclient.message_type == atoms.XdndDrop) {
@@ -1052,13 +1052,13 @@ fn handle(event: *h.XEvent) void {
             }
         },
         h.FocusIn => {
-            internal.eventFn(window.event_fn_data, .focused);
+            internal.sendEvent(window.event_fn_data, .focused);
             window.warped = false;
         },
-        h.FocusOut => internal.eventFn(window.event_fn_data, .unfocused),
+        h.FocusOut => internal.sendEvent(window.event_fn_data, .unfocused),
         h.Expose => {
             if (event.xexpose.count == 0) {
-                internal.eventFn(window.event_fn_data, .draw);
+                internal.sendEvent(window.event_fn_data, .draw);
             }
         },
         h.ConfigureNotify => {
@@ -1085,19 +1085,19 @@ fn handle(event: *h.XEvent) void {
                 }
             }
             if (mode == .normal and maximized_horz and maximized_vert) mode = .maximized;
-            internal.eventFn(window.event_fn_data, .{ .mode = mode });
+            internal.sendEvent(window.event_fn_data, .{ .mode = mode });
 
             window.position = .{ .x = std.math.lossyCast(i16, event.xconfigure.x), .y = std.math.lossyCast(i16, event.xconfigure.y) };
-            internal.eventFn(window.event_fn_data, .{ .position = window.position });
+            internal.sendEvent(window.event_fn_data, .{ .position = window.position });
 
             if (window.draw_available_ns != 0) {
                 window.updateRefreshRate();
             }
 
             window.size = wio.Size{ .width = std.math.lossyCast(u16, event.xconfigure.width), .height = std.math.lossyCast(u16, event.xconfigure.height) };
-            internal.eventFn(window.event_fn_data, .{ .size_logical = window.size });
-            internal.eventFn(window.event_fn_data, .{ .size_physical = window.size });
-            internal.eventFn(window.event_fn_data, .draw);
+            internal.sendEvent(window.event_fn_data, .{ .size_logical = window.size });
+            internal.sendEvent(window.event_fn_data, .{ .size_physical = window.size });
+            internal.sendEvent(window.event_fn_data, .draw);
         },
         h.KeyPress => handleKeyPress(window, event, false),
         h.KeyRelease => {
@@ -1112,22 +1112,22 @@ fn handle(event: *h.XEvent) void {
                 }
             }
             const button = globals.keycodes[event.xkey.keycode - 8];
-            if (button != .mouse_left) internal.eventFn(window.event_fn_data, .{ .button_release = button });
+            if (button != .mouse_left) internal.sendEvent(window.event_fn_data, .{ .button_release = button });
         },
         h.ButtonPress => {
             const button: wio.Button = switch (event.xbutton.button) {
                 1 => .mouse_left,
                 2 => .mouse_middle,
                 3 => .mouse_right,
-                4 => return internal.eventFn(window.event_fn_data, .{ .scroll_vertical = -1 }),
-                5 => return internal.eventFn(window.event_fn_data, .{ .scroll_vertical = 1 }),
-                6 => return internal.eventFn(window.event_fn_data, .{ .scroll_horizontal = -1 }),
-                7 => return internal.eventFn(window.event_fn_data, .{ .scroll_horizontal = 1 }),
+                4 => return internal.sendEvent(window.event_fn_data, .{ .scroll_vertical = -1 }),
+                5 => return internal.sendEvent(window.event_fn_data, .{ .scroll_vertical = 1 }),
+                6 => return internal.sendEvent(window.event_fn_data, .{ .scroll_horizontal = -1 }),
+                7 => return internal.sendEvent(window.event_fn_data, .{ .scroll_horizontal = 1 }),
                 8 => .mouse_back,
                 9 => .mouse_forward,
                 else => return,
             };
-            internal.eventFn(window.event_fn_data, .{ .button_press = button });
+            internal.sendEvent(window.event_fn_data, .{ .button_press = button });
         },
         h.ButtonRelease => {
             const button: wio.Button = switch (event.xbutton.button) {
@@ -1138,7 +1138,7 @@ fn handle(event: *h.XEvent) void {
                 9 => .mouse_forward,
                 else => return,
             };
-            internal.eventFn(window.event_fn_data, .{ .button_release = button });
+            internal.sendEvent(window.event_fn_data, .{ .button_release = button });
         },
         h.MotionNotify => {
             if (window.relative_mouse) {
@@ -1148,7 +1148,7 @@ fn handle(event: *h.XEvent) void {
                     if (window.warped) {
                         const x = std.math.cast(i16, dx) orelse return;
                         const y = std.math.cast(i16, dy) orelse return;
-                        internal.eventFn(window.event_fn_data, .{ .mouse_relative = .{ .x = x, .y = y } });
+                        internal.sendEvent(window.event_fn_data, .{ .mouse_relative = .{ .x = x, .y = y } });
                     }
                     _ = c.XWarpPointer(globals.display, h.None, window.window, 0, 0, 0, 0, window.size.width / 2, window.size.height / 2);
                     window.warped = true;
@@ -1156,11 +1156,11 @@ fn handle(event: *h.XEvent) void {
             } else {
                 const x = std.math.cast(i16, event.xmotion.x) orelse return;
                 const y = std.math.cast(i16, event.xmotion.y) orelse return;
-                internal.eventFn(window.event_fn_data, .{ .mouse = .{ .x = x, .y = y } });
+                internal.sendEvent(window.event_fn_data, .{ .mouse = .{ .x = x, .y = y } });
             }
         },
         h.LeaveNotify => {
-            internal.eventFn(window.event_fn_data, .mouse_leave);
+            internal.sendEvent(window.event_fn_data, .mouse_leave);
         },
         h.SelectionNotify => {
             if (build_options.drop and window.drop.xdnd_req != h.None and event.xselection.property != h.None and event.xselection.selection == atoms.XdndSelection) {
@@ -1188,7 +1188,7 @@ fn handle(event: *h.XEvent) void {
                         }
                     }
                 }
-                internal.eventFn(window.event_fn_data, .drop_complete);
+                internal.sendEvent(window.event_fn_data, .drop_complete);
 
                 var reply = h.XEvent{ .xclient = std.mem.zeroInit(h.XClientMessageEvent, .{
                     .type = h.ClientMessage,
@@ -1259,7 +1259,7 @@ fn handleKeyPress(window: *Window, event: *h.XEvent, repeat: bool) void {
     if (event.xkey.keycode != 0) {
         const button = globals.keycodes[event.xkey.keycode - 8];
         if (button != .mouse_left) {
-            internal.eventFn(window.event_fn_data, if (repeat) .{ .button_repeat = button } else .{ .button_press = button });
+            internal.sendEvent(window.event_fn_data, if (repeat) .{ .button_repeat = button } else .{ .button_press = button });
         }
     }
 
@@ -1279,7 +1279,7 @@ fn handleKeyPress(window: *Window, event: *h.XEvent, repeat: bool) void {
         var iter = view.iterator();
         while (iter.nextCodepoint()) |codepoint| {
             if (codepoint >= ' ' and codepoint != 0x7F) {
-                internal.eventFn(window.event_fn_data, .{ .char = codepoint });
+                internal.sendEvent(window.event_fn_data, .{ .char = codepoint });
             }
         }
     }
