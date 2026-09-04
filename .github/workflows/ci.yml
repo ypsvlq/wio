@@ -69,6 +69,11 @@ jobs:
       run: |
         curl -sL https://github.com/ypsvlq/wio-macos-sdk/archive/1014fff9b544bf80200a2a9a92af257451286913.tar.gz | tar xz
         echo "SYSROOT=$PWD/wio-macos-sdk-1014fff9b544bf80200a2a9a92af257451286913" >>"$GITHUB_ENV"
+    - name: Build demo without --sysroot should fail with a clear error
+      working-directory: demo
+      run: |
+        output="$(zig build -Dtarget=aarch64-macos 2>&1)" && { echo "$output"; echo "expected build to fail"; exit 1; }
+        echo "$output" | grep -q "requires --sysroot" || { echo "$output"; echo "expected error message not found"; exit 1; }
     - name: Build demo
       working-directory: demo
       run: ${{ env.build }}

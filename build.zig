@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 
 pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
@@ -84,6 +85,9 @@ pub fn build(b: *std.Build) !void {
             if (b.sysroot) |sysroot| {
                 module.addSystemFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ sysroot, "System/Library/Frameworks" }) });
                 module.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ sysroot, "usr/include" }) });
+            } else if (builtin.target.os.tag != .macos) {
+                std.debug.print("error: cross-compiling to macOS requires --sysroot pointing at a macOS SDK\n", .{});
+                std.process.exit(1);
             }
 
             module.linkFramework("Cocoa", .{});
