@@ -544,6 +544,7 @@ fn loop() !bool {
                 window.destroy();
                 events.deinit();
                 wio.deinit();
+                threaded.deinit();
                 _ = debug_allocator.deinit();
                 return false;
             },
