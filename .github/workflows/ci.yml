@@ -83,6 +83,9 @@ jobs:
     - name: Build Vulkan example
       working-directory: examples/vulkan
       run: ${{ env.build }}
+    - name: Build Metal example
+      working-directory: examples/metal
+      run: ${{ env.build }}
   build_android:
     runs-on: ubuntu-latest
     steps:
