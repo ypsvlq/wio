@@ -23,11 +23,7 @@ pub fn build(b: *std.Build) void {
     if (b.sysroot) |sysroot| {
         exe_mod.addSystemFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ sysroot, "System/Library/Frameworks" }) });
         exe_mod.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ sysroot, "usr/include" }) });
-    } else if (builtin.target.os.tag != .macos) {
-        std.debug.print("error: cross-compiling to macOS requires --sysroot pointing at a macOS SDK\n", .{});
-        std.process.exit(1);
-    }
-
+    } 
     exe_mod.linkFramework("Metal", .{});
     exe_mod.linkFramework("QuartzCore", .{});
 
