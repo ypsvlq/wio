@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
@@ -18,6 +19,11 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     exe_mod.addCSourceFile(.{ .file = b.path("src/metal.m") });
+
+    if (b.sysroot) |sysroot| {
+        exe_mod.addSystemFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ sysroot, "System/Library/Frameworks" }) });
+        exe_mod.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ sysroot, "usr/include" }) });
+    } 
     exe_mod.linkFramework("Metal", .{});
     exe_mod.linkFramework("QuartzCore", .{});
 
