@@ -614,7 +614,8 @@ char *wioGetClipboardText(size_t *len) {
 }
 
 void wioDrawAvailable(NSWindow *window) {
-    [[NSNotificationCenter defaultCenter] postNotificationName:NSWindowDidExposeNotification object:window];
+    [[window delegate] windowDidExpose:nil];
+    wioCancelWait();
 }
 
 #ifdef WIO_FRAMEBUFFER
