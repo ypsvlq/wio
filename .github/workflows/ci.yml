@@ -8,7 +8,6 @@ jobs:
       fail-fast: false
       matrix:
         target:
-        - native
         - x86-windows
         - aarch64-windows
         - aarch64-macos
@@ -17,9 +16,10 @@ jobs:
         - powerpc64-openbsd
         - riscv64-freebsd
         - wasm32-freestanding
+        - native
     runs-on: ${{ endsWith(matrix.target, '-macos') && 'macos-latest' || 'ubuntu-latest' }}
     env:
-      build: zig build -Dtarget="$(echo ${{ matrix.target }} |sed -e s/-macos/-native/)" ${{ matrix.target == 'wasm32-freestanding' && '-Dcpu=bleeding_edge' || '' }} ${{ matrix.target == 'native' && '-fsys=wio' || '' }}
+      build: zig build -Dtarget=${{ matrix.target }} ${{ endsWith(matrix.target, '-macos') && '--sysroot "$(xcrun --sdk macosx --show-sdk-path)"' || '' }} ${{ matrix.target == 'wasm32-freestanding' && '-Dcpu=bleeding_edge' || '' }} ${{ matrix.target == 'native' && '-fsys=wio' || '' }}
     steps:
     - name: Checkout
       uses: actions/checkout@v6
