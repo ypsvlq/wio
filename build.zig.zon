@@ -10,8 +10,8 @@
             .lazy = true,
         },
         .wio_unix_headers = .{
-            .url = "https://github.com/ypsvlq/wio-unix-headers/archive/3bd227608c8fc7e4cd8547e43966b60f81c4caf3.tar.gz",
-            .hash = "wio_unix_headers-0.0.0-seffXF_FQQC9vaRGpzc1-w6M8YktDc2qzlOgItxv6kWO",
+            .url = "https://github.com/ypsvlq/wio-unix-headers/archive/779f0441362aa6e860dd182f658df9f271299ff5.tar.gz",
+            .hash = "wio_unix_headers-0.0.0-seffXMQzQgA4LzxSC2seoGVn7nfVwIIHqYhVsm_Kes-2",
             .lazy = true,
         },
     },

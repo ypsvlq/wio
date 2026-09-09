@@ -337,6 +337,20 @@ pub const Window = union {
         }
     }
 
+    pub fn setPrimaryText(self: *Window, text: []const u8) void {
+        switch (active) {
+            .x11 => self.x11.setPrimaryText(text),
+            .wayland => self.wayland.setPrimaryText(text),
+        }
+    }
+
+    pub fn getPrimaryText(self: *Window, clipboardTextFn: *const fn (?*anyopaque, []const u8) void, clipboard_text_fn_data: ?*anyopaque) void {
+        switch (active) {
+            .x11 => self.x11.getPrimaryText(clipboardTextFn, clipboard_text_fn_data),
+            .wayland => self.wayland.getPrimaryText(clipboardTextFn, clipboard_text_fn_data),
+        }
+    }
+
     pub fn getDropData(self: *Window, allocator: std.mem.Allocator) wio.DropData {
         switch (active) {
             .x11 => return self.x11.getDropData(allocator),

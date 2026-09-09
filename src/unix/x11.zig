@@ -134,6 +134,7 @@ pub var globals: struct {
     scale: f32 = 1,
     xkb_mods: c_uint = 0,
     clipboard_text: []const u8 = "",
+    primary_text: []const u8 = "",
 } = .{};
 
 pub fn init() !bool {
@@ -246,6 +247,7 @@ pub fn init() !bool {
 
 pub fn deinit() void {
     internal.allocator.free(globals.clipboard_text);
+    internal.allocator.free(globals.primary_text);
     _ = c.XCloseIM(globals.im);
     _ = c.XCloseDisplay(globals.display);
     if (build_options.vulkan) globals.libXext.close();
@@ -596,13 +598,27 @@ pub const Window = struct {
         internal.allocator.free(globals.clipboard_text);
         globals.clipboard_text = internal.allocator.dupe(u8, text) catch "";
         _ = c.XSetSelectionOwner(globals.display, atoms.CLIPBOARD, self.window, h.CurrentTime);
-        _ = c.XSetSelectionOwner(globals.display, h.XA_PRIMARY, self.window, h.CurrentTime);
+        _ = c.XFlush(globals.display);
     }
 
     pub fn getClipboardText(self: *Window, clipboardTextFn: *const fn (?*anyopaque, []const u8) void, clipboard_text_fn_data: ?*anyopaque) void {
         self.clipboardTextFn = clipboardTextFn;
         self.clipboard_text_fn_data = clipboard_text_fn_data;
         _ = c.XConvertSelection(globals.display, atoms.CLIPBOARD, atoms.UTF8_STRING, atoms.SELECTION, self.window, h.CurrentTime);
+        _ = c.XFlush(globals.display);
+    }
+
+    pub fn setPrimaryText(self: *Window, text: []const u8) void {
+        internal.allocator.free(globals.primary_text);
+        globals.primary_text = internal.allocator.dupe(u8, text) catch "";
+        _ = c.XSetSelectionOwner(globals.display, h.XA_PRIMARY, self.window, h.CurrentTime);
+        _ = c.XFlush(globals.display);
+    }
+
+    pub fn getPrimaryText(self: *Window, clipboardTextFn: *const fn (?*anyopaque, []const u8) void, clipboard_text_fn_data: ?*anyopaque) void {
+        self.clipboardTextFn = clipboardTextFn;
+        self.clipboard_text_fn_data = clipboard_text_fn_data;
+        _ = c.XConvertSelection(globals.display, h.XA_PRIMARY, atoms.UTF8_STRING, atoms.SELECTION, self.window, h.CurrentTime);
         _ = c.XFlush(globals.display);
     }
 
@@ -908,7 +924,8 @@ fn handle(event: *h.XEvent) void {
             const targets = [_]h.Atom{ atoms.TARGETS, atoms.UTF8_STRING };
             _ = c.XChangeProperty(globals.display, requestor, property, h.XA_ATOM, 32, h.PropModeReplace, @ptrCast(&targets), targets.len);
         } else if (target == atoms.UTF8_STRING) {
-            _ = c.XChangeProperty(globals.display, requestor, property, atoms.UTF8_STRING, 8, h.PropModeReplace, globals.clipboard_text.ptr, std.math.lossyCast(c_int, globals.clipboard_text.len));
+            const text = if (event.xselectionrequest.selection == h.XA_PRIMARY) globals.primary_text else globals.clipboard_text;
+            _ = c.XChangeProperty(globals.display, requestor, property, atoms.UTF8_STRING, 8, h.PropModeReplace, text.ptr, std.math.lossyCast(c_int, text.len));
         } else {
             property = h.None;
         }
@@ -920,10 +937,10 @@ fn handle(event: *h.XEvent) void {
                 .selection = event.xselectionrequest.selection,
                 .target = target,
                 .property = property,
-                .time = h.CurrentTime,
+                .time = event.xselectionrequest.time,
             },
         };
-        _ = c.XSendEvent(globals.display, requestor, h.True, h.NoEventMask, &reply);
+        _ = c.XSendEvent(globals.display, requestor, h.False, h.NoEventMask, &reply);
 
         return;
     }

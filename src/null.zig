@@ -106,6 +106,10 @@ pub const Window = struct {
         _ = text;
     }
 
+    pub fn setPrimaryText(_: *Window, _: []const u8) void {}
+
+    pub fn getPrimaryText(_: *Window, _: *const fn (?*anyopaque, []const u8) void, _: ?*anyopaque) void {}
+
     pub fn getClipboardText(self: *Window, clipboardTextFn: *const fn (?*anyopaque, []const u8) void, clipboard_text_fn_data: ?*anyopaque) void {
         _ = self;
         _ = clipboardTextFn;

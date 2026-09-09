@@ -229,6 +229,10 @@ pub const Window = struct {
         wioSetClipboardText(text.ptr, text.len);
     }
 
+    pub fn setPrimaryText(_: *Window, _: []const u8) void {}
+
+    pub fn getPrimaryText(_: *Window, _: *const fn (?*anyopaque, []const u8) void, _: ?*anyopaque) void {}
+
     pub fn getClipboardText(_: *Window, clipboardTextFn: *const fn (?*anyopaque, []const u8) void, clipboard_text_fn_data: ?*anyopaque) void {
         var len: usize = undefined;
         if (wioGetClipboardText(&len)) |ptr| {

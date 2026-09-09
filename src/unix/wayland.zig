@@ -106,6 +106,10 @@ pub var globals: struct {
     data_device: ?*h.wl_data_device = null,
     data_offer: ?*h.wl_data_offer = null,
     data_source: ?*h.wl_data_source = null,
+    primary_selection_device_manager: ?*h.zwp_primary_selection_device_manager_v1 = null,
+    primary_selection_device: ?*h.zwp_primary_selection_device_v1 = null,
+    primary_offer: ?*h.zwp_primary_selection_offer_v1 = null,
+    primary_source: ?*h.zwp_primary_selection_source_v1 = null,
 
     xkb: *h.xkb_context = undefined,
     keymap: ?*h.xkb_keymap = null,
@@ -132,6 +136,7 @@ pub var globals: struct {
     touch_ids: std.StaticBitSet(256) = .empty,
     touch_info: std.AutoHashMapUnmanaged(i32, struct { public_id: u8, window: *Window }) = .empty,
     clipboard_text: []const u8 = "",
+    primary_text: []const u8 = "",
 
     drop: if (build_options.drop) struct {
         pending_drag_has_uri: bool = false,
@@ -217,6 +222,13 @@ pub fn init() !bool {
                 _ = h.wl_data_device_add_listener(globals.data_device, &data_device_listener, null);
             }
         }
+
+        if (globals.primary_selection_device_manager) |_| {
+            globals.primary_selection_device = h.zwp_primary_selection_device_manager_v1_get_device(globals.primary_selection_device_manager, globals.seat);
+            if (globals.primary_selection_device) |_| {
+                _ = h.zwp_primary_selection_device_v1_add_listener(globals.primary_selection_device, &primary_device_listener, null);
+            }
+        }
     }
 
     if (build_options.opengl) {
@@ -234,6 +246,7 @@ pub fn deinit() void {
     }
 
     internal.allocator.free(globals.clipboard_text);
+    internal.allocator.free(globals.primary_text);
     globals.touch_info.deinit(internal.allocator);
     globals.commit_string.deinit(internal.allocator);
     globals.preedit_string.deinit(internal.allocator);
@@ -260,6 +273,10 @@ fn destroyProxies() void {
     if (globals.data_source) |_| h.wl_data_source_destroy(globals.data_source);
     if (globals.data_offer) |_| h.wl_data_offer_destroy(globals.data_offer);
     if (globals.data_device) |_| h.wl_data_device_destroy(globals.data_device);
+    if (globals.primary_source) |_| h.zwp_primary_selection_source_v1_destroy(globals.primary_source);
+    if (globals.primary_offer) |_| h.zwp_primary_selection_offer_v1_destroy(globals.primary_offer);
+    if (globals.primary_selection_device) |_| h.zwp_primary_selection_device_v1_destroy(globals.primary_selection_device);
+    if (globals.primary_selection_device_manager) |_| h.zwp_primary_selection_device_manager_v1_destroy(globals.primary_selection_device_manager);
     if (globals.gesture_pinch) |_| h.zwp_pointer_gesture_pinch_v1_destroy(globals.gesture_pinch);
     if (globals.relative_pointer) |_| h.zwp_relative_pointer_v1_destroy(globals.relative_pointer);
     if (globals.cursor_shape_device) |_| h.wp_cursor_shape_device_v1_destroy(globals.cursor_shape_device);
@@ -556,6 +573,44 @@ pub const Window = struct {
         _ = h.wl_data_source_add_listener(globals.data_source, &data_source_listener, null);
         h.wl_data_source_offer(globals.data_source, "text/plain;charset=utf-8");
         h.wl_data_device_set_selection(globals.data_device, globals.data_source, globals.last_serial);
+    }
+
+    pub fn setPrimaryText(_: *Window, text: []const u8) void {
+        if (globals.primary_selection_device_manager == null or globals.primary_selection_device == null) return;
+
+        internal.allocator.free(globals.primary_text);
+        globals.primary_text = internal.allocator.dupe(u8, text) catch "";
+
+        if (globals.primary_source) |_| h.zwp_primary_selection_source_v1_destroy(globals.primary_source);
+        globals.primary_source = h.zwp_primary_selection_device_manager_v1_create_source(globals.primary_selection_device_manager);
+        _ = h.zwp_primary_selection_source_v1_add_listener(globals.primary_source, &primary_source_listener, null);
+        h.zwp_primary_selection_source_v1_offer(globals.primary_source, "text/plain;charset=utf-8");
+        h.zwp_primary_selection_device_v1_set_selection(globals.primary_selection_device, globals.primary_source, globals.last_serial);
+    }
+
+    pub fn getPrimaryText(_: *Window, clipboardTextFn: *const fn (?*anyopaque, []const u8) void, clipboard_text_fn_data: ?*anyopaque) void {
+        if (globals.primary_offer == null) return;
+        var pipe: [2]i32 = undefined;
+        if (std.c.pipe(&pipe) == -1) return;
+        defer _ = std.c.close(pipe[0]);
+        h.zwp_primary_selection_offer_v1_receive(globals.primary_offer, "text/plain;charset=utf-8", pipe[1]);
+        _ = c.wl_display_roundtrip(globals.display);
+        _ = std.c.close(pipe[1]);
+
+        var buffer: [1024]u8 = undefined;
+        var text: std.ArrayList(u8) = .empty;
+        defer text.deinit(internal.allocator);
+        while (true) {
+            const count = std.c.read(pipe[0], &buffer, buffer.len);
+            if (std.c.errno(count) != .SUCCESS) {
+                return;
+            } else if (count == 0) {
+                clipboardTextFn(clipboard_text_fn_data, text.items);
+                break;
+            } else {
+                text.appendSlice(internal.allocator, buffer[0..@intCast(count)]) catch return;
+            }
+        }
     }
 
     pub fn getClipboardText(_: *Window, clipboardTextFn: *const fn (?*anyopaque, []const u8) void, clipboard_text_fn_data: ?*anyopaque) void {
@@ -861,6 +916,8 @@ fn registryGlobal(_: ?*anyopaque, registry: ?*h.wl_registry, name: u32, interfac
         globals.pointer_gestures = @ptrCast(h.wl_registry_bind(registry, name, &h.zwp_pointer_gestures_v1_interface, @min(version, 3)));
     } else if (std.mem.eql(u8, interface, "wl_data_device_manager")) {
         globals.data_device_manager = @ptrCast(h.wl_registry_bind(registry, name, &h.wl_data_device_manager_interface, @min(version, 1)));
+    } else if (std.mem.eql(u8, interface, "zwp_primary_selection_device_manager_v1")) {
+        globals.primary_selection_device_manager = @ptrCast(h.wl_registry_bind(registry, name, &h.zwp_primary_selection_device_manager_v1_interface, @min(version, 1)));
     } else if (std.mem.eql(u8, interface, "xdg_activation_v1")) {
         globals.activation = @ptrCast(h.wl_registry_bind(registry, name, &h.xdg_activation_v1_interface, @min(version, 1)));
     }
@@ -1433,6 +1490,38 @@ fn dataSourceSend(_: ?*anyopaque, _: ?*h.wl_data_source, _: [*c]const u8, fd: i3
 }
 
 fn dataSourceCancelled(_: ?*anyopaque, _: ?*h.wl_data_source) callconv(.c) void {}
+
+const primary_device_listener: h.zwp_primary_selection_device_v1_listener = .{
+    .data_offer = primaryDeviceDataOffer,
+    .selection = primaryDeviceSelection,
+};
+
+fn primaryDeviceDataOffer(_: ?*anyopaque, _: ?*h.zwp_primary_selection_device_v1, offer: ?*h.zwp_primary_selection_offer_v1) callconv(.c) void {
+    if (offer) |_| _ = h.zwp_primary_selection_offer_v1_add_listener(offer, &primary_offer_listener, null);
+}
+
+fn primaryDeviceSelection(_: ?*anyopaque, _: ?*h.zwp_primary_selection_device_v1, offer: ?*h.zwp_primary_selection_offer_v1) callconv(.c) void {
+    if (globals.primary_offer) |_| h.zwp_primary_selection_offer_v1_destroy(globals.primary_offer);
+    globals.primary_offer = offer;
+}
+
+const primary_offer_listener: h.zwp_primary_selection_offer_v1_listener = .{
+    .offer = primaryOfferMime,
+};
+
+fn primaryOfferMime(_: ?*anyopaque, _: ?*h.zwp_primary_selection_offer_v1, _: [*c]const u8) callconv(.c) void {}
+
+const primary_source_listener: h.zwp_primary_selection_source_v1_listener = .{
+    .send = primarySourceSend,
+    .cancelled = primarySourceCancelled,
+};
+
+fn primarySourceSend(_: ?*anyopaque, _: ?*h.zwp_primary_selection_source_v1, _: [*c]const u8, fd: i32) callconv(.c) void {
+    defer _ = std.c.close(fd);
+    _ = std.c.write(fd, globals.primary_text.ptr, globals.primary_text.len);
+}
+
+fn primarySourceCancelled(_: ?*anyopaque, _: ?*h.zwp_primary_selection_source_v1) callconv(.c) void {}
 
 const activation_token_listener: h.xdg_activation_token_v1_listener = .{
     .done = activationTokenDone,

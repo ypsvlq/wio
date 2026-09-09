@@ -246,6 +246,10 @@ pub const Window = struct {
         java.env.*.*.CallVoidMethod.?(java.env, java.activity, java.setClipboardText, text_j);
     }
 
+    pub fn setPrimaryText(_: *Window, _: []const u8) void {}
+
+    pub fn getPrimaryText(_: *Window, _: *const fn (?*anyopaque, []const u8) void, _: ?*anyopaque) void {}
+
     pub fn getClipboardText(_: *Window, clipboardTextFn: *const fn (?*anyopaque, []const u8) void, clipboard_text_fn_data: ?*anyopaque) void {
         const text_j = java.env.*.*.CallObjectMethod.?(java.env, java.activity, java.getClipboardText) orelse return;
         defer java.env.*.*.DeleteLocalRef.?(java.env, text_j);

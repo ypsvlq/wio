@@ -228,6 +228,14 @@ pub const Window = struct {
         self.backend.getClipboardText(clipboardTextFn, clipboard_text_fn_data);
     }
 
+    pub fn setPrimaryText(self: *Window, text: []const u8) void {
+        self.backend.setPrimaryText(text);
+    }
+
+    pub fn getPrimaryText(self: *Window, clipboardTextFn: *const fn (?*anyopaque, []const u8) void, clipboard_text_fn_data: ?*anyopaque) void {
+        self.backend.getPrimaryText(clipboardTextFn, clipboard_text_fn_data);
+    }
+
     pub fn getDropData(self: *Window, allocator: std.mem.Allocator) DropData {
         assertFeature(.drop);
         return self.backend.getDropData(allocator);
