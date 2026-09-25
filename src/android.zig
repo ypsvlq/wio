@@ -234,6 +234,8 @@ pub const Window = struct {
         java.env.*.*.CallVoidMethod.?(java.env, java.activity, java.setCursor, @as(c.jint, @intFromEnum(shape)));
     }
 
+    pub fn minimize(_: *Window) void {}
+
     pub fn requestAttention(_: *Window) void {}
 
     pub fn setClipboardText(_: *Window, text: []const u8) void {

@@ -285,6 +285,7 @@ fn action(button: wio.Button) !void {
             cursor +%= 1;
             window.setCursor(cursors[cursor % cursors.len]);
         },
+        .h => window.minimize(),
         .a => request_attention = true,
         .c => window.setClipboardText("wio example"),
         .v => window.getClipboardText(clipboardText, null),

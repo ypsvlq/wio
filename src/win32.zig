@@ -515,6 +515,10 @@ pub const Window = struct {
         _ = w.SetCursorPos(pos.x, pos.y);
     }
 
+    pub fn minimize(self: *Window) void {
+        _ = self;
+    }
+
     pub fn requestAttention(self: *Window) void {
         _ = w.FlashWindow(self.window, w.TRUE);
     }

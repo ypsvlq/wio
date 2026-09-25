@@ -316,6 +316,13 @@ pub const Window = union {
         }
     }
 
+    pub fn minimize(self: *Window) void {
+        switch (active) {
+            .x11 => self.x11.minimize(),
+            .wayland => self.wayland.minimize(),
+        }
+    }
+
     pub fn requestAttention(self: *Window) void {
         switch (active) {
             .x11 => self.x11.requestAttention(),

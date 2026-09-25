@@ -223,6 +223,10 @@ pub const Window = struct {
         wioSetCursor(@intFromEnum(shape));
     }
 
+    pub fn minimize(self: *Window) void {
+        _ = self;
+    }
+
     pub fn requestAttention(_: *Window) void {}
 
     pub fn setClipboardText(_: *Window, text: []const u8) void {

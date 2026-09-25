@@ -216,6 +216,10 @@ pub const Window = struct {
         self.backend.setCursor(cursor);
     }
 
+    pub fn minimize(self: *Window) void {
+        self.backend.minimize();
+    }
+
     pub fn requestAttention(self: *Window) void {
         self.backend.requestAttention();
     }

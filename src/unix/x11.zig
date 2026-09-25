@@ -50,6 +50,7 @@ var imports: extern struct {
     XFreeGC: *const fn (?*h.Display, h.GC) callconv(.c) c_int,
     XDrawPoint: *const fn (?*h.Display, h.Drawable, h.GC, c_int, c_int) callconv(.c) c_int,
     XCreatePixmapCursor: *const fn (?*h.Display, h.Pixmap, h.Pixmap, [*c]h.XColor, [*c]h.XColor, c_uint, c_uint) callconv(.c) h.Cursor,
+    XIconifyWindow: *const fn (?*h.Display, h.Window, c_int) callconv(.c) c_int,
     XGrabPointer: *const fn (?*h.Display, h.Window, c_int, c_uint, c_int, c_int, h.Window, h.Cursor, h.Time) callconv(.c) c_int,
     XUngrabPointer: *const fn (?*h.Display, h.Time) callconv(.c) c_int,
     XWarpPointer: *const fn (?*h.Display, h.Window, h.Window, c_int, c_int, c_uint, c_uint, c_int, c_int) callconv(.c) c_int,
@@ -572,6 +573,10 @@ pub const Window = struct {
         defer _ = c.XFreeCursor(globals.display, cursor);
 
         _ = c.XDefineCursor(globals.display, self.window, cursor);
+    }
+
+    pub fn minimize(self: *Window) void {
+        _ = c.XIconifyWindow(globals.display, self.window, h.DefaultScreen(globals.display));
     }
 
     pub fn requestAttention(self: *Window) void {

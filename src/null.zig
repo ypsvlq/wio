@@ -97,6 +97,10 @@ pub const Window = struct {
         _ = shape;
     }
 
+    pub fn minimize(self: *Window) void {
+        _ = self;
+    }
+
     pub fn requestAttention(self: *Window) void {
         _ = self;
     }

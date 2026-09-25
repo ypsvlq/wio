@@ -307,6 +307,10 @@ pub const Window = struct {
         wioSetCursor(self.window, @intFromEnum(shape));
     }
 
+    pub fn minimize(self: *Window) void {
+        _ = self;
+    }
+
     pub fn requestAttention(_: *Window) void {
         wioRequestAttention();
     }

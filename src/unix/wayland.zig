@@ -52,6 +52,7 @@ var imports: extern struct {
     libdecor_frame_unset_maximized: *const fn (frame: ?*h.struct_libdecor_frame) callconv(.c) void,
     libdecor_frame_set_fullscreen: *const fn (frame: ?*h.struct_libdecor_frame, output: ?*h.struct_wl_output) callconv(.c) void,
     libdecor_frame_unset_fullscreen: *const fn (frame: ?*h.struct_libdecor_frame) callconv(.c) void,
+    libdecor_frame_set_minimized: *const fn (frame: ?*h.struct_libdecor_frame) callconv(.c) void,
     wl_egl_window_create: *const fn (surface: ?*h.struct_wl_surface, width: c_int, height: c_int) callconv(.c) ?*h.struct_wl_egl_window,
     wl_egl_window_destroy: *const fn (egl_window: ?*h.struct_wl_egl_window) callconv(.c) void,
     wl_egl_window_resize: *const fn (egl_window: ?*h.struct_wl_egl_window, width: c_int, height: c_int, dx: c_int, dy: c_int) callconv(.c) void,
@@ -536,6 +537,10 @@ pub const Window = struct {
             .zoom_out => h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_ZOOM_OUT,
         };
         if (globals.pointer_focus == self) self.applyCursor();
+    }
+
+    pub fn minimize(self: *Window) void {
+        c.libdecor_frame_set_minimized(self.frame);
     }
 
     pub fn requestAttention(self: *Window) void {
