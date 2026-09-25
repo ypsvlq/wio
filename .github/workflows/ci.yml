@@ -29,9 +29,9 @@ jobs:
         cache-key: ${{ matrix.target }}
     - if: ${{ matrix.target == 'native' }}
       name: Install packages
-      uses: awalsh128/cache-apt-pkgs-action@v1
+      uses: tecolicom/actions-use-apt-tools@v1
       with:
-        packages: xwayland-run libx11-dev libxrandr-dev libxcursor-dev libglvnd-dev libwayland-dev libxkbcommon-dev libdecor-0-dev libvulkan-dev libxext-dev libudev-dev libpulse-dev
+        tools: xwayland-run libx11-dev libxrandr-dev libxcursor-dev libglvnd-dev libwayland-dev libxkbcommon-dev libdecor-0-dev libvulkan-dev libxext-dev libudev-dev libpulse-dev
     - name: Build demo
       working-directory: demo
       run: ${{ env.build }}
