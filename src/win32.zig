@@ -516,7 +516,7 @@ pub const Window = struct {
     }
 
     pub fn minimize(self: *Window) void {
-        _ = self;
+        _ = w.ShowWindow(self.window, w.SW_MINIMIZE);
     }
 
     pub fn requestAttention(self: *Window) void {
