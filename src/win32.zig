@@ -1624,6 +1624,7 @@ fn windowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM) call
         },
         w.WM_KILLFOCUS => {
             internal.sendEvent(self.event_fn_data, .unfocused);
+            internal.sendEvent(self.event_fn_data, .{ .modifiers = .{} });
             return 0;
         },
         w.WM_PAINT => {
