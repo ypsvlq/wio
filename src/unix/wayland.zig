@@ -965,6 +965,7 @@ fn keyboardLeave(_: ?*anyopaque, _: ?*h.wl_keyboard, _: u32, surface: ?*h.wl_sur
             globals.keyboard_focus = null;
             globals.repeat_key = 0;
             internal.sendEvent(window.event_fn_data, .unfocused);
+            internal.sendEvent(window.event_fn_data, .{ .modifiers = .{} });
         }
     }
     if (globals.compose_state) |_| c.xkb_compose_state_reset(globals.compose_state);
