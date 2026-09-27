@@ -1,0 +1,19 @@
+.{
+    .name = .opengl,
+    .version = "0.0.0",
+    .fingerprint = 0x91bbcdeb4bf042be,
+    .dependencies = .{
+        .wio = .{
+            .path = "../..",
+        },
+        .opengl = .{
+            .url = "https://github.com/ypsvlq/opengl/archive/935194372ee703ff126e093336efd4896f02b3f2.tar.gz",
+            .hash = "opengl-0.0.0-_Vp8-OrvKgA1QvcMlHKYpTwkL57GG5ESo088op1SYGFH",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}
