@@ -196,6 +196,8 @@ pub const Window = struct {
 
     pub fn create(options: wio.CreateWindowOptions) !*Window {
         const self = try internal.allocator.create(Window);
+        errdefer internal.allocator.destroy(self);
+
         self.* = .{
             .event_fn_data = options.event_fn_data,
             .window = undefined,
