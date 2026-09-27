@@ -3,7 +3,17 @@ on:
   push:
   pull_request:
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v7
+    - name: Set up Zig
+      uses: mlugg/setup-zig@v2
+    - name: Check formatting
+      run: zig fmt --check
   build:
+    needs: check
     strategy:
       fail-fast: false
       matrix:
@@ -57,6 +67,7 @@ jobs:
       working-directory: examples/metal
       run: ${{ env.build }}
   build_android:
+    needs: check
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
