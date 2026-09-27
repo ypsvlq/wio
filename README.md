@@ -31,16 +31,15 @@ pub fn main(init: std.process.Init) !void {
     var window = try wio.Window.create(.{ .event_fn_data = &events });
     defer window.destroy();
 
-    var framebuffer = try window.createFramebuffer(.{ .width = 1, .height = 1 });
-    defer framebuffer.destroy();
-    framebuffer.setPixel(0, 0, 0xF7A41D);
-
     while (true) {
         wio.update();
         while (events.pop()) |event| {
             switch (event) {
                 .close => return,
-                .draw => window.presentFramebuffer(&framebuffer),
+                .draw => {
+                    // Note that on Wayland, the window might not appear until
+                    // something is drawn.
+                },
                 else => {},
             }
         }
@@ -55,11 +54,6 @@ maintained when possible.
 
 The public API can be browsed in [src/wio.zig][1].
 
-The [demo][2] directory contains a test program which covers most functionality
-and uses OpenGL.
-
-The [examples][3] directory contains small programs using other rendering APIs.
-
 By default, only a subset of the API is available. The following build options
 enable additional features:
 
@@ -69,6 +63,14 @@ enable additional features:
 - `enable_vulkan`
 - `enable_audio`
 - `enable_joystick`
+
+The [demo][2] directory contains a test program covering most of the API and
+supporting all platforms.
+
+The [examples][3] directory contains small programs for various graphics APIs.
+In general these support all possible platforms, but the OpenGL example omits
+support for Android and WebAssembly to act as a reference for desktop-only
+applications.
 
 ## Platform support
 
