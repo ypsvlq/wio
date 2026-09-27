@@ -25,6 +25,7 @@ extern fn wioSetMode(*NSWindow, u8) void;
 extern fn wioSetPosition(*NSWindow, i16, i16) void;
 extern fn wioSetSize(*NSWindow, u16, u16) void;
 extern fn wioSetCursor(*NSWindow, u8) void;
+extern fn wioMinimize(*NSWindow) void;
 extern fn wioRequestAttention() void;
 extern fn wioSetClipboardText([*]const u8, usize) void;
 extern fn wioGetClipboardText(*usize) ?[*]u8;
@@ -310,7 +311,7 @@ pub const Window = struct {
     }
 
     pub fn minimize(self: *Window) void {
-        _ = self;
+        wioMinimize(self.window);
     }
 
     pub fn requestAttention(_: *Window) void {

@@ -597,6 +597,10 @@ void wioSetCursor(NSWindow *window, uint8_t shape) {
     [[window contentView] setCursor:cursor];
 }
 
+void wioMinimize(NSWindow *window) {
+    [window miniaturize:nil];
+}
+
 void wioRequestAttention(void) {
     [NSApp requestUserAttention:NSCriticalRequest];
 }
