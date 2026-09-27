@@ -34,7 +34,7 @@ pub fn main(init: std.process.Init) !void {
     window.glSwapInterval(1);
     try gl.load(wio.glGetProcAddress);
 
-    var renderer = Renderer.init();
+    var renderer = try Renderer.init(init.gpa);
     defer renderer.deinit();
 
     while (true) {
@@ -62,16 +62,35 @@ const Renderer = struct {
     const vertex_location = 0;
     const color_location = 1;
 
-    fn init() Renderer {
+    fn init(allocator: std.mem.Allocator) !Renderer {
+        var param: i32 = undefined;
+
         const vs = gl.createShader(gl.VERTEX_SHADER);
         defer gl.deleteShader(vs);
         gl.shaderSource(vs, 1, &[1][*:0]const u8{@embedFile("shader.vert")}, null);
         gl.compileShader(vs);
-
+        gl.getShaderiv(vs, gl.COMPILE_STATUS, &param);
+        if (param != gl.TRUE) {
+            gl.getShaderiv(vs, gl.INFO_LOG_LENGTH, &param);
+            const log = try allocator.alloc(u8, std.math.lossyCast(usize, param));
+            defer allocator.free(log);
+            gl.getShaderInfoLog(vs, param, null, log.ptr);
+            std.log.err("{s}", .{log});
+            return error.ShaderCompilationFailed;
+        }
         const fs = gl.createShader(gl.FRAGMENT_SHADER);
         defer gl.deleteShader(fs);
         gl.shaderSource(fs, 1, &[1][*:0]const u8{@embedFile("shader.frag")}, null);
         gl.compileShader(fs);
+        gl.getShaderiv(fs, gl.COMPILE_STATUS, &param);
+        if (param != gl.TRUE) {
+            gl.getShaderiv(fs, gl.INFO_LOG_LENGTH, &param);
+            const log = try allocator.alloc(u8, std.math.lossyCast(usize, param));
+            defer allocator.free(log);
+            gl.getShaderInfoLog(fs, param, null, log.ptr);
+            std.log.err("{s}", .{log});
+            return error.ShaderCompilationFailed;
+        }
 
         const program = gl.createProgram();
         gl.attachShader(program, vs);
@@ -79,6 +98,15 @@ const Renderer = struct {
         gl.attachShader(program, fs);
         defer gl.detachShader(program, fs);
         gl.linkProgram(program);
+        gl.getProgramiv(program, gl.LINK_STATUS, &param);
+        if (param != gl.TRUE) {
+            gl.getProgramiv(program, gl.INFO_LOG_LENGTH, &param);
+            const log = try allocator.alloc(u8, std.math.lossyCast(usize, param));
+            defer allocator.free(log);
+            gl.getProgramInfoLog(program, param, null, log.ptr);
+            std.log.err("{s}", .{log});
+            return error.ProgramLinkFailed;
+        }
 
         var vao: u32 = undefined;
         gl.genVertexArrays(1, &vao);
