@@ -39,7 +39,7 @@ pub fn main() !void {
         window.enableDrawAvailableEvents();
     }
 
-    vkb = .load(@as(*const fn (vk.Instance, [*:0]const u8) ?*const fn () void, @ptrCast(&wio.vkGetInstanceProcAddr)));
+    vkb = .load(@as(*const fn (?*vk.Instance, [*:0]const u8) ?*const fn () void, @ptrCast(&wio.vkGetInstanceProcAddr)));
     try createInstance();
 
     return wio.run(loop);
@@ -77,7 +77,7 @@ fn createInstance() !void {
     }
 
     const handle = try vkb.createInstance(&.{
-        .flags = .{ .enumerate_portability_bit_khr = has_portability },
+        .flags = .{ .enumerate_portability_khr = has_portability },
         .p_application_info = &.{
             .application_version = 0,
             .engine_version = 0,
@@ -96,7 +96,7 @@ fn createInstance() !void {
 var surface: vk.SurfaceKHR = .null_handle;
 
 fn createSurface() !void {
-    return window.vkCreateSurface(@intFromEnum(instance.handle), null, @ptrCast(&surface));
+    return window.vkCreateSurface(@intFromPtr(instance.handle), null, @ptrCast(&surface));
 }
 
 var physical_device: vk.PhysicalDevice = undefined;
@@ -131,7 +131,7 @@ fn pickPhysicalDevice() !void {
         defer allocator.free(queue_families);
         for (queue_families, 0..) |queue_family, i| {
             const index: u32 = @intCast(i);
-            if (!has_graphics and queue_family.queue_flags.graphics_bit) {
+            if (!has_graphics and queue_family.queue_flags.graphics) {
                 graphics_queue_index = index;
                 has_graphics = true;
             }
@@ -220,7 +220,7 @@ fn createRenderPass() !void {
         .attachment_count = 1,
         .p_attachments = &.{.{
             .format = surface_format.format,
-            .samples = .{ .@"1_bit" = true },
+            .samples = .{ .@"1" = true },
             .load_op = .clear,
             .store_op = .store,
             .stencil_load_op = .dont_care,
@@ -241,9 +241,9 @@ fn createRenderPass() !void {
         .p_dependencies = &.{.{
             .src_subpass = vk.SUBPASS_EXTERNAL,
             .dst_subpass = 0,
-            .src_stage_mask = .{ .color_attachment_output_bit = true },
-            .dst_stage_mask = .{ .color_attachment_output_bit = true },
-            .dst_access_mask = .{ .color_attachment_write_bit = true },
+            .src_stage_mask = .{ .color_attachment_output = true },
+            .dst_stage_mask = .{ .color_attachment_output = true },
+            .dst_access_mask = .{ .color_attachment_write = true },
         }},
     }, null);
 }
@@ -264,8 +264,8 @@ fn createGraphicsPipeline() !void {
     _ = try device.createGraphicsPipelines(.null_handle, &.{.{
         .stage_count = 2,
         .p_stages = &.{
-            .{ .stage = .{ .vertex_bit = true }, .module = vertex_module, .p_name = "main" },
-            .{ .stage = .{ .fragment_bit = true }, .module = fragment_module, .p_name = "main" },
+            .{ .stage = .{ .vertex = true }, .module = vertex_module, .p_name = "main" },
+            .{ .stage = .{ .fragment = true }, .module = fragment_module, .p_name = "main" },
         },
         .p_vertex_input_state = &.{},
         .p_input_assembly_state = &.{
@@ -280,7 +280,7 @@ fn createGraphicsPipeline() !void {
             .depth_clamp_enable = .false,
             .rasterizer_discard_enable = .false,
             .polygon_mode = .fill,
-            .cull_mode = .{ .back_bit = true },
+            .cull_mode = .{ .back = true },
             .front_face = .clockwise,
             .depth_bias_enable = .false,
             .depth_bias_constant_factor = 0,
@@ -290,7 +290,7 @@ fn createGraphicsPipeline() !void {
         },
         .p_multisample_state = &.{
             .sample_shading_enable = .false,
-            .rasterization_samples = .{ .@"1_bit" = true },
+            .rasterization_samples = .{ .@"1" = true },
             .min_sample_shading = 1,
             .alpha_to_coverage_enable = .false,
             .alpha_to_one_enable = .false,
@@ -307,7 +307,7 @@ fn createGraphicsPipeline() !void {
                 .src_alpha_blend_factor = .one,
                 .dst_alpha_blend_factor = .zero,
                 .alpha_blend_op = .add,
-                .color_write_mask = .{ .r_bit = true, .g_bit = true, .b_bit = true, .a_bit = true },
+                .color_write_mask = .{ .r = true, .g = true, .b = true, .a = true },
             }},
             .blend_constants = .{ 0, 0, 0, 0 },
         },
@@ -327,7 +327,7 @@ var command_buffer: vk.CommandBuffer = undefined;
 
 fn createCommandBuffer() !void {
     command_pool = try device.createCommandPool(&.{
-        .flags = .{ .reset_command_buffer_bit = true },
+        .flags = .{ .reset_command_buffer = true },
         .queue_family_index = graphics_queue_index,
     }, null);
 
@@ -343,7 +343,7 @@ var in_flight_fence: vk.Fence = undefined;
 
 fn createSyncObjects() !void {
     image_available_semaphore = try device.createSemaphore(&.{}, null);
-    in_flight_fence = try device.createFence(&.{ .flags = .{ .signaled_bit = true } }, null);
+    in_flight_fence = try device.createFence(&.{ .flags = .{ .signaled = true } }, null);
 }
 
 var swapchain: vk.SwapchainKHR = undefined;
@@ -365,12 +365,12 @@ fn createSwapchain() !void {
         .image_color_space = surface_format.color_space,
         .image_extent = .{ .width = size.width, .height = size.height },
         .image_array_layers = 1,
-        .image_usage = .{ .color_attachment_bit = true },
+        .image_usage = .{ .color_attachment = true },
         .image_sharing_mode = if (graphics_queue_index != present_queue_index) .concurrent else .exclusive,
         .queue_family_index_count = if (graphics_queue_index != present_queue_index) 2 else 0,
         .p_queue_family_indices = &.{ graphics_queue_index, present_queue_index },
-        .pre_transform = if (capabilities.supported_transforms.identity_bit_khr) .{ .identity_bit_khr = true } else .{ .inherit_bit_khr = true },
-        .composite_alpha = if (capabilities.supported_composite_alpha.opaque_bit_khr) .{ .opaque_bit_khr = true } else .{ .inherit_bit_khr = true },
+        .pre_transform = if (capabilities.supported_transforms.identity_khr) .{ .identity_khr = true } else .{ .inherit_khr = true },
+        .composite_alpha = if (capabilities.supported_composite_alpha.opaque_khr) .{ .opaque_khr = true } else .{ .inherit_khr = true },
         .present_mode = .fifo_khr,
         .clipped = .true,
     }, null);
@@ -390,7 +390,7 @@ fn createSwapchain() !void {
                 .a = .identity,
             },
             .subresource_range = .{
-                .aspect_mask = .{ .color_bit = true },
+                .aspect_mask = .{ .color = true },
                 .base_mip_level = 0,
                 .level_count = 1,
                 .base_array_layer = 0,
@@ -508,7 +508,7 @@ fn drawFrame() !void {
         &.{.{
             .wait_semaphore_count = 1,
             .p_wait_semaphores = &.{image_available_semaphore},
-            .p_wait_dst_stage_mask = &.{.{ .color_attachment_output_bit = true }},
+            .p_wait_dst_stage_mask = &.{.{ .color_attachment_output = true }},
             .command_buffer_count = 1,
             .p_command_buffers = &.{command_buffer},
             .signal_semaphore_count = 1,

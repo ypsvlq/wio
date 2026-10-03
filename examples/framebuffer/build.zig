@@ -4,10 +4,12 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const macos_sdk_path = b.option([]const u8, "macos_sdk_path", "Path to the macOS SDK");
     const unix_backends = b.option([]const u8, "unix_backends", "List of enabled wio backends");
     const android_all_targets = b.option(bool, "android", "Build APK supporting all Android targets") orelse false;
 
-    if (android_all_targets or target.result.abi.isAndroid()) {
+    // zig-android-sdk is not yet updated for 0.17.0
+    if (false) { // if (android_all_targets or target.result.abi.isAndroid()) {
         if (b.lazyImport(@This(), "android")) |android| {
             const sdk = android.Sdk.create(b, .{});
 
@@ -26,7 +28,7 @@ pub fn build(b: *std.Build) void {
                 apk.addArtifact(b.addLibrary(.{
                     .linkage = .dynamic,
                     .name = "main",
-                    .root_module = createModule(b, android_target, optimize, unix_backends),
+                    .root_module = createModule(b, android_target, optimize, macos_sdk_path, unix_backends),
                 }));
             }
 
@@ -43,7 +45,7 @@ pub fn build(b: *std.Build) void {
     } else {
         const exe = b.addExecutable(.{
             .name = "framebuffer",
-            .root_module = createModule(b, target, optimize, unix_backends),
+            .root_module = createModule(b, target, optimize, macos_sdk_path, unix_backends),
         });
         b.installArtifact(exe);
 
@@ -55,11 +57,18 @@ pub fn build(b: *std.Build) void {
     }
 }
 
-fn createModule(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, unix_backends: ?[]const u8) *std.Build.Module {
+fn createModule(
+    b: *std.Build,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    macos_sdk_path: ?[]const u8,
+    unix_backends: ?[]const u8,
+) *std.Build.Module {
     const wio = b.dependency("wio", .{
         .target = target,
         .optimize = optimize,
         .enable_framebuffer = true,
+        .macos_sdk_path = macos_sdk_path,
         .unix_backends = unix_backends,
     });
 

@@ -4,9 +4,12 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const macos_sdk_path = b.option([]const u8, "macos_sdk_path", "Path to the macOS SDK");
+
     const wio = b.dependency("wio", .{
         .target = target,
         .optimize = optimize,
+        .macos_sdk_path = macos_sdk_path,
     });
 
     const exe_mod = b.createModule(.{
@@ -19,9 +22,9 @@ pub fn build(b: *std.Build) void {
     });
     exe_mod.addCSourceFile(.{ .file = b.path("src/metal.m") });
 
-    if (b.sysroot) |sysroot| {
-        exe_mod.addSystemFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ sysroot, "System/Library/Frameworks" }) });
-        exe_mod.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ sysroot, "usr/include" }) });
+    if (macos_sdk_path) |sdk| {
+        exe_mod.addSystemFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ sdk, "System", "Library", "Frameworks" }) });
+        exe_mod.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ sdk, "usr", "include" }) });
     }
     exe_mod.linkFramework("Metal", .{});
     exe_mod.linkFramework("QuartzCore", .{});

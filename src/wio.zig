@@ -277,7 +277,7 @@ pub const Window = struct {
     pub fn vkCreateSurface(self: *Window, instance: usize, allocation_callbacks: ?*const anyopaque, surface: *u64) !void {
         assertFeature(.vulkan);
         return switch (self.backend.vkCreateSurface(instance, allocation_callbacks, surface)) {
-            0 => void{},
+            0 => {},
             -1 => error.OutOfHostMemory,
             -2 => error.OutOfDeviceMemory,
             -13 => error.Unknown,

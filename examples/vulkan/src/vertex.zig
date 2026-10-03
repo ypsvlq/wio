@@ -1,5 +1,5 @@
 const std = @import("std");
-const gpu = std.gpu;
+const spirv = std.spirv;
 
 const v_color = @extern(*addrspace(.output) @Vector(3, f32), .{ .name = "v_color", .decoration = .{ .location = 0 } });
 
@@ -16,6 +16,6 @@ const colors: [3]@Vector(3, f32) = .{
 };
 
 export fn main() callconv(.spirv_vertex) void {
-    gpu.position_out.* = positions[gpu.vertex_index];
-    v_color.* = colors[gpu.vertex_index];
+    spirv.position_out.* = positions[spirv.vertex_index];
+    v_color.* = colors[spirv.vertex_index];
 }

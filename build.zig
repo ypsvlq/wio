@@ -16,11 +16,13 @@ pub fn build(b: *std.Build) !void {
     const enable_vulkan = b.option(bool, "enable_vulkan", "Enable Vulkan support (default: false)") orelse false;
     const enable_joystick = b.option(bool, "enable_joystick", "Enable joystick support (default: false)") orelse false;
     const enable_audio = b.option(bool, "enable_audio", "Enable audio support (default: false)") orelse false;
+    const win32_manifest = b.option(bool, "win32_manifest", "Embed application manifest (default: true)") orelse true;
+    const macos_sdk_path = b.option([]const u8, "macos_sdk_path", "Path to the macOS SDK");
+    const unix_backends = b.option([]const u8, "unix_backends", "List of enabled backends (default: x11,wayland)") orelse "x11,wayland";
 
     var enable_x11 = false;
     var enable_wayland = false;
 
-    const unix_backends = b.option([]const u8, "unix_backends", "List of enabled backends (default: x11,wayland)") orelse "x11,wayland";
     var backend_iter = std.mem.tokenizeScalar(u8, unix_backends, ',');
     while (backend_iter.next()) |backend| {
         if (std.mem.eql(u8, backend, "x11")) {
@@ -52,7 +54,7 @@ pub fn build(b: *std.Build) !void {
     if (enable_joystick) module.addCMacro("WIO_JOYSTICK", "");
     if (enable_audio) module.addCMacro("WIO_AUDIO", "");
 
-    if (b.option(bool, "win32_manifest", "Embed application manifest (default: true)") orelse true) {
+    if (win32_manifest) {
         module.addWin32ResourceFile(.{ .file = b.path("src/win32.rc") });
     }
 
@@ -79,11 +81,29 @@ pub fn build(b: *std.Build) !void {
             }
         },
         .macos => {
+            const translate_c = b.addTranslateC(.{
+                .root_source_file = b.addWriteFiles().add("cimport.c",
+                    \\#include <CoreGraphics/CoreGraphics.h>
+                    \\#include <OpenGL/OpenGL.h>
+                    \\#include <dlfcn.h>
+                    \\#include <IOKit/hid/IOHIDLib.h>
+                    \\#include <CoreAudio/CoreAudio.h>
+                    \\#include <AudioUnit/AudioUnit.h>
+                    \\#include <AudioToolbox/AudioToolbox.h>
+                    \\
+                ),
+                .target = target,
+                .optimize = optimize,
+            });
+            module.addImport("c", translate_c.createModule());
+
             module.addCSourceFile(.{ .file = b.path("src/macos.m"), .flags = &.{ "-fobjc-arc", "-Wno-deprecated-declarations" } });
 
-            if (b.sysroot) |sysroot| {
-                module.addSystemFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ sysroot, "System/Library/Frameworks" }) });
-                module.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ sysroot, "usr/include" }) });
+            if (macos_sdk_path) |sdk| {
+                module.addSystemFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ sdk, "System", "Library", "Frameworks" }) });
+                module.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ sdk, "usr", "include" }) });
+                translate_c.addSystemFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ sdk, "System", "Library", "Frameworks" }) });
+                translate_c.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ sdk, "usr", "include" }) });
             }
 
             module.linkFramework("Cocoa", .{});

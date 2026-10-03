@@ -2,11 +2,11 @@
     .name = .wio,
     .version = "0.0.0",
     .fingerprint = 0xc7cd0be0afeb11f3,
-    .minimum_zig_version = "0.16.0",
+    .minimum_zig_version = "0.17.0",
     .dependencies = .{
         .win32 = .{
-            .url = "https://github.com/ypsvlq/win32/archive/5edca53ffbd415e19170f022932d5b7063e2cccf.tar.gz",
-            .hash = "win32-0.0.0-4XUuba3r_gIzIdDxDJM72L90Kf4kTUI1mAqYjE-llhAZ",
+            .url = "https://github.com/ypsvlq/win32/archive/c1b92919e2d7799a96bde17d103aae6dd7c14f3f.tar.gz",
+            .hash = "win32-0.0.0-4XUubRcuAAMAHJW-MHPQncm5s52eslSS-fRAL02G4NAQ",
             .lazy = true,
         },
         .wio_unix_headers = .{

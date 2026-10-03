@@ -8,6 +8,8 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
         .enable_opengl = true,
+        .macos_sdk_path = b.option([]const u8, "macos_sdk_path", "Path to the macOS SDK"),
+        .unix_backends = b.option([]const u8, "unix_backends", "List of enabled wio backends"),
     });
 
     const opengl = b.dependency("opengl", .{

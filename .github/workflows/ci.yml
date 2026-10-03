@@ -70,29 +70,29 @@ jobs:
       name: Build Metal example
       working-directory: examples/metal
       run: ${{ env.build }}
-  build_android:
-    needs: check
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v7
-    - name: Set up Zig
-      uses: mlugg/setup-zig@v2
-    - name: Set up Java
-      uses: actions/setup-java@v6
-      with:
-        java-version: 21
-        distribution: "temurin"
-    - name: Set up Android SDK
-      uses: android-actions/setup-android@v4
-      with:
-        packages: "build-tools;37.0.0 ndk;29.0.14206865 platforms;android-26"
-    - name: Build demo
-      working-directory: demo
-      run: zig build -Dandroid=true -Dandroid_api_level=26
-    - name: Build framebuffer example
-      working-directory: examples/framebuffer
-      run: zig build -Dandroid=true -Dandroid_api_level=26
-    - name: Build Vulkan example
-      working-directory: examples/vulkan
-      run: zig build -Dandroid=true -Dandroid_api_level=26
+  # build_android:
+  #   needs: check
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #   - name: Checkout
+  #     uses: actions/checkout@v7
+  #   - name: Set up Zig
+  #     uses: mlugg/setup-zig@v2
+  #   - name: Set up Java
+  #     uses: actions/setup-java@v6
+  #     with:
+  #       java-version: 21
+  #       distribution: "temurin"
+  #   - name: Set up Android SDK
+  #     uses: android-actions/setup-android@v4
+  #     with:
+  #       packages: "build-tools;37.0.0 ndk;29.0.14206865 platforms;android-26"
+  #   - name: Build demo
+  #     working-directory: demo
+  #     run: zig build -Dandroid=true -Dandroid_api_level=26
+  #   - name: Build framebuffer example
+  #     working-directory: examples/framebuffer
+  #     run: zig build -Dandroid=true -Dandroid_api_level=26
+  #   - name: Build Vulkan example
+  #     working-directory: examples/vulkan
+  #     run: zig build -Dandroid=true -Dandroid_api_level=26
