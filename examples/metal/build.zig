@@ -23,8 +23,7 @@ pub fn build(b: *std.Build) void {
     exe_mod.addCSourceFile(.{ .file = b.path("src/metal.m") });
 
     if (macos_sdk_path) |sdk| {
-        exe_mod.addSystemFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ sdk, "System", "Library", "Frameworks" }) });
-        exe_mod.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ sdk, "usr", "include" }) });
+        exe_mod.addIncludePath(.{ .cwd_relative = b.pathJoin(&.{ sdk, "usr", "include" }) });
     }
     exe_mod.linkFramework("Metal", .{});
     exe_mod.linkFramework("QuartzCore", .{});
