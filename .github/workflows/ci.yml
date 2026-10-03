@@ -24,6 +24,7 @@ jobs:
         - x86_64-macos
         - arm-linux-gnueabi
         - powerpc64-openbsd
+        - mips-netbsd
         - riscv64-freebsd
         - wasm32-freestanding
         - native
