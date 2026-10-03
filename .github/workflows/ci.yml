@@ -29,7 +29,7 @@ jobs:
         - native
     runs-on: ${{ endsWith(matrix.target, '-macos') && 'macos-latest' || 'ubuntu-latest' }}
     env:
-      build: zig build -Dtarget=${{ matrix.target }} ${{ endsWith(matrix.target, '-macos') && '--sysroot "$(xcrun --sdk macosx --show-sdk-path)"' || '' }} ${{ matrix.target == 'wasm32-freestanding' && '-Dcpu=bleeding_edge' || '' }} ${{ matrix.target == 'native' && '-fsys=wio' || '' }}
+      build: zig build -Dtarget=${{ matrix.target }} ${{ endsWith(matrix.target, '-macos') && '-Dmacos_sdk_path="$(xcrun --sdk macosx --show-sdk-path)"' || '' }} ${{ matrix.target == 'wasm32-freestanding' && '-Dcpu=bleeding_edge' || '' }} ${{ matrix.target == 'native' && '-fsys=wio' || '' }}
     steps:
     - name: Checkout
       uses: actions/checkout@v7
