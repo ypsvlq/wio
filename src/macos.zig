@@ -180,7 +180,7 @@ pub fn cancelWait() void {
 }
 
 pub fn messageBox(style: wio.MessageBoxStyle, _: []const u8, message: []const u8) void {
-    wioMessageBox(@intFromEnum(style), message.ptr, message.len);
+    wioMessageBox(@backingInt(style), message.ptr, message.len);
 }
 
 pub fn openUri(uri: []const u8) void {
@@ -291,7 +291,7 @@ pub const Window = struct {
     }
 
     pub fn setMode(self: *Window, mode: wio.WindowMode) void {
-        wioSetMode(self.window, @intFromEnum(mode));
+        wioSetMode(self.window, @backingInt(mode));
     }
 
     pub fn setPosition(self: *Window, position: wio.Position) void {
@@ -308,7 +308,7 @@ pub const Window = struct {
     }
 
     pub fn setCursor(self: *Window, shape: wio.Cursor) void {
-        wioSetCursor(self.window, @intFromEnum(shape));
+        wioSetCursor(self.window, @backingInt(shape));
     }
 
     pub fn minimize(self: *Window) void {
@@ -876,7 +876,7 @@ export fn wioPosition(self: *Window, x: i16, y: i16) void {
 }
 
 export fn wioSizeLogical(self: *Window, mode: u8, width: u16, height: u16) void {
-    internal.sendEvent(self.event_fn_data, .{ .mode = @enumFromInt(mode) });
+    internal.sendEvent(self.event_fn_data, .{ .mode = @fromBackingInt(@intCast(mode)) });
     internal.sendEvent(self.event_fn_data, .{ .size_logical = .{ .width = width, .height = height } });
 }
 
@@ -933,11 +933,11 @@ export fn wioKey(self: *Window, key: u16, event: u8) void {
 }
 
 export fn wioButtonPress(self: *Window, button: u8) void {
-    internal.sendEvent(self.event_fn_data, .{ .button_press = @enumFromInt(button) });
+    internal.sendEvent(self.event_fn_data, .{ .button_press = @fromBackingInt(@intCast(button)) });
 }
 
 export fn wioButtonRelease(self: *Window, button: u8) void {
-    internal.sendEvent(self.event_fn_data, .{ .button_release = @enumFromInt(button) });
+    internal.sendEvent(self.event_fn_data, .{ .button_release = @fromBackingInt(@intCast(button)) });
 }
 
 export fn wioMouse(self: *Window, x: i16, y: i16) void {

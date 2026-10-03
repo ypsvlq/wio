@@ -68,8 +68,9 @@ pub fn main(init: std.process.Init.Minimal) !void {
         if (!builtin.cpu.arch.isWasm()) {
             try gl.load(wio.glGetProcAddress);
         } else {
-            inline for (@typeInfo(@TypeOf(gl.functions)).@"struct".fields) |field| {
-                @field(gl.functions, field.name) = @extern(field.type, .{ .name = field.name, .library_name = "gl" });
+            const info = @typeInfo(@TypeOf(gl.functions)).@"struct";
+            inline for (info.field_types, info.field_names) |field_type, field_name| {
+                @field(gl.functions, field_name) = @extern(field_type, .{ .name = field_name, .library_name = "gl" });
             }
         }
         try triangle.init();

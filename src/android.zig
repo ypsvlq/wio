@@ -231,7 +231,7 @@ pub const Window = struct {
     pub fn setParent(_: *Window, _: usize) void {}
 
     pub fn setCursor(_: *Window, shape: wio.Cursor) void {
-        java.env.*.*.CallVoidMethod.?(java.env, java.activity, java.setCursor, @as(c.jint, @intFromEnum(shape)));
+        java.env.*.*.CallVoidMethod.?(java.env, java.activity, java.setCursor, @as(c.jint, @backingInt(shape)));
     }
 
     pub fn minimize(_: *Window) void {}

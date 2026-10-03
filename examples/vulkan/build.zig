@@ -17,7 +17,7 @@ pub fn build(b: *std.Build) void {
                 .name = "vulkan",
                 .build_tools_version = b.option([]const u8, "android_build_tools_version", "Android build tools version (e.g. 35.0.0)") orelse "37.0.0",
                 .ndk_version = b.option([]const u8, "android_ndk_version", "Android NDK version (e.g. 27.0.12077973)") orelse "29.0.14206865",
-                .api_level = @enumFromInt(b.option(u32, "android_api_level", "Android API level (e.g. 35)") orelse 35),
+                .api_level = @fromBackingInt(@intCast(b.option(u32, "android_api_level", "Android API level (e.g. 35)") orelse 35)),
             });
             apk.setKeyStore(sdk.createKeyStore(.example));
             apk.setAndroidManifest(b.path("src/android/AndroidManifest.xml"));

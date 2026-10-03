@@ -151,7 +151,7 @@ pub const Window = struct {
     pub fn setParent(_: *Window, _: usize) void {}
 
     pub fn setCursor(self: *Window, shape: wio.Cursor) void {
-        js.setCursor(self.id, @intFromEnum(shape));
+        js.setCursor(self.id, @backingInt(shape));
     }
 
     pub fn minimize(_: *Window) void {}
@@ -373,11 +373,11 @@ export fn wioLoop() bool {
 }
 
 export fn wioEvent(data: ?*anyopaque, event: u32, int0: u32, int1: u32, float0: f32) void {
-    internal.sendEvent(data, switch (@as(wio.EventType, @enumFromInt(event))) {
+    internal.sendEvent(data, switch (@as(wio.EventType, @fromBackingInt(@intCast(event)))) {
         .focused => .focused,
         .unfocused => .unfocused,
         .draw => .draw,
-        .mode => .{ .mode = @enumFromInt(int0) },
+        .mode => .{ .mode = @fromBackingInt(@intCast(int0)) },
         .size_logical => .{ .size_logical = .{ .width = @truncate(int0), .height = @truncate(int1) } },
         .size_physical => .{ .size_physical = .{ .width = @truncate(int0), .height = @truncate(int1) } },
         .scale => .{ .scale = float0 },
@@ -390,9 +390,9 @@ export fn wioEvent(data: ?*anyopaque, event: u32, int0: u32, int1: u32, float0: 
         .char => .{ .char = @intCast(int0) },
         .preview_reset => .preview_reset,
         .preview_char => .{ .preview_char = @intCast(int0) },
-        .button_press => .{ .button_press = @enumFromInt(int0) },
-        .button_repeat => .{ .button_repeat = @enumFromInt(int0) },
-        .button_release => .{ .button_release = @enumFromInt(int0) },
+        .button_press => .{ .button_press = @fromBackingInt(@intCast(int0)) },
+        .button_repeat => .{ .button_repeat = @fromBackingInt(@intCast(int0)) },
+        .button_release => .{ .button_release = @fromBackingInt(@intCast(int0)) },
         .mouse => .{ .mouse = .{ .x = @truncate(@as(i32, @bitCast(int0))), .y = @truncate(@as(i32, @bitCast(int1))) } },
         .mouse_relative => .{ .mouse_relative = .{ .x = @truncate(@as(i32, @bitCast(int0))), .y = @truncate(@as(i32, @bitCast(int1))) } },
         .mouse_leave => .mouse_leave,

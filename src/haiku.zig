@@ -90,7 +90,7 @@ pub fn messageBox(style: wio.MessageBoxStyle, title: []const u8, message: []cons
     defer internal.allocator.free(title_z);
     const message_z = internal.allocator.dupeSentinel(u8, message, 0) catch return;
     defer internal.allocator.free(message_z);
-    wioMessageBox(@intFromEnum(style), title_z, message_z);
+    wioMessageBox(@backingInt(style), title_z, message_z);
 }
 
 pub fn openUri(uri: []const u8) void {
@@ -205,7 +205,7 @@ pub const Window = struct {
     }
 
     pub fn setMode(self: *Window, mode: wio.WindowMode) void {
-        wioSetMode(self.window, @intFromEnum(mode));
+        wioSetMode(self.window, @backingInt(mode));
     }
 
     pub fn setPosition(self: *Window, position: wio.Position) void {
@@ -220,7 +220,7 @@ pub const Window = struct {
 
     pub fn setCursor(self: *Window, shape: wio.Cursor) void {
         self.cursor = shape;
-        wioSetCursor(@intFromEnum(shape));
+        wioSetCursor(@backingInt(shape));
     }
 
     pub fn minimize(self: *Window) void {
@@ -492,7 +492,7 @@ export fn wioClose(self: *Window) void {
 
 export fn wioFocused(self: *Window) void {
     internal.sendEvent(self.event_fn_data, .focused);
-    wioSetCursor(@intFromEnum(self.cursor));
+    wioSetCursor(@backingInt(self.cursor));
 }
 
 export fn wioUnfocused(self: *Window) void {
@@ -508,7 +508,7 @@ export fn wioHidden(self: *Window) void {
 }
 
 export fn wioMode(self: *Window, mode: u8) void {
-    internal.sendEvent(self.event_fn_data, .{ .mode = @enumFromInt(mode) });
+    internal.sendEvent(self.event_fn_data, .{ .mode = @fromBackingInt(@intCast(mode)) });
 }
 
 export fn wioPosition(self: *Window, x: i16, y: i16) void {
@@ -555,9 +555,9 @@ export fn wioButtons(self: *Window, buttons: u8) void {
     var iter = changes.iterator(.{});
     while (iter.next()) |i| {
         if (self.buttons.isSet(i)) {
-            internal.sendEvent(self.event_fn_data, .{ .button_release = @enumFromInt(i) });
+            internal.sendEvent(self.event_fn_data, .{ .button_release = @fromBackingInt(@intCast(i)) });
         } else {
-            internal.sendEvent(self.event_fn_data, .{ .button_press = @enumFromInt(i) });
+            internal.sendEvent(self.event_fn_data, .{ .button_press = @fromBackingInt(@intCast(i)) });
         }
     }
     self.buttons = self.buttons.xorWith(changes);
