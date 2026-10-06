@@ -8,19 +8,19 @@ comptime {
 
 pub const std_options: std.Options = .{ .logFn = wio.logFn };
 
-fn is_wayland() bool {
+fn isWayland() bool {
     return wio.backend_name == .unix and wio.backend.active == .wayland;
 }
 
-// MARK: Main
+pub fn main() !void {
+    var gpa_state = std.heap.DebugAllocator(.{}).init;
+    const gpa = gpa_state.allocator();
 
-pub fn main(init: std.process.Init) !void {
-    const io = init.io;
-    const gpa = init.gpa;
+    var threaded: std.Io.Threaded = .init(gpa, .{});
 
     try wio.init(.{
         .allocator = gpa,
-        .io = io,
+        .io = threaded.io(),
         .eventFn = wio.EventQueue.eventFn,
     });
     defer wio.deinit();
@@ -38,7 +38,7 @@ pub fn main(init: std.process.Init) !void {
         event_queue.deinit();
     }
 
-    if (is_wayland()) {
+    if (isWayland()) {
         // normal vsync makes window resizing slow on wayland
         window.enableDrawAvailableEvents();
     }
@@ -48,8 +48,8 @@ pub fn main(init: std.process.Init) !void {
 
     var visible = true;
 
-    MAIN_LOOP: while (true) {
-        var draw = !is_wayland();
+    while (true) {
+        var draw = !isWayland();
 
         while (event_queue.pop()) |event| {
             switch (event) {
@@ -70,10 +70,10 @@ pub fn main(init: std.process.Init) !void {
                 .size_physical => |new_size| try renderer.resize(gpa, new_size),
 
                 .draw => {
-                    if (is_wayland()) draw = true;
+                    if (isWayland()) draw = true;
                 },
 
-                .close => break :MAIN_LOOP,
+                .close => return,
 
                 else => {},
             }
@@ -87,8 +87,6 @@ pub fn main(init: std.process.Init) !void {
     }
 }
 
-// MARK: Renderer
-
 const Renderer = struct {
     window_size: wio.Size,
 
@@ -100,12 +98,12 @@ const Renderer = struct {
     pub const InitError = CreateInstanceError || std.mem.Allocator.Error;
 
     pub fn init(gpa: std.mem.Allocator, window_size: wio.Size) InitError!Renderer {
-        const vk_base_wrapper: vk.BaseWrapper = .load(@as(*const fn (?*vk.Instance, [*:0]const u8) ?*const fn () void, @ptrCast(&wio.vkGetInstanceProcAddr)));
+        const vkb: vk.BaseWrapper = .load(@as(*const fn (?*vk.Instance, [*:0]const u8) ?*const fn () void, @ptrCast(&wio.vkGetInstanceProcAddr)));
 
         const vki_ptr = try gpa.create(vk.InstanceWrapper);
         errdefer gpa.destroy(vki_ptr);
 
-        const vki_value, const instance_handle = try createInstance(gpa, vk_base_wrapper);
+        const vki_value, const instance_handle = try createInstance(gpa, vkb);
         vki_ptr.* = vki_value;
 
         return .{
@@ -118,52 +116,50 @@ const Renderer = struct {
     pub const InitWithSurfaceError = InitError || Surface.InitError;
 
     pub fn initWithSurface(gpa: std.mem.Allocator, window_size: wio.Size, window_ptr: *wio.Window) InitWithSurfaceError!Renderer {
-        var r: Renderer = try .init(gpa, window_size);
-        try r.initSurface(gpa, window_ptr);
-        return r;
+        var self: Renderer = try .init(gpa, window_size);
+        try self.initSurface(gpa, window_ptr);
+        return self;
     }
 
-    pub fn deinit(r: *Renderer, gpa: std.mem.Allocator) void {
-        r.deinitSurface(gpa);
-        r.instance.destroyInstance(null);
-        gpa.destroy(r.vki_ptr);
+    pub fn deinit(self: *Renderer, gpa: std.mem.Allocator) void {
+        self.deinitSurface(gpa);
+        self.instance.destroyInstance(null);
+        gpa.destroy(self.vki_ptr);
     }
 
-    pub fn hasSurface(r: *const Renderer) bool {
-        return r.surface != null;
+    pub fn hasSurface(self: *const Renderer) bool {
+        return self.surface != null;
     }
 
-    pub fn initSurface(r: *Renderer, gpa: std.mem.Allocator, window_ptr: *wio.Window) Surface.InitError!void {
-        std.debug.assert(r.surface == null);
-        r.surface = try .init(gpa, r.instance, window_ptr, r.window_size);
+    pub fn initSurface(self: *Renderer, gpa: std.mem.Allocator, window_ptr: *wio.Window) Surface.InitError!void {
+        std.debug.assert(self.surface == null);
+        self.surface = try .init(gpa, self.instance, window_ptr, self.window_size);
     }
 
-    pub fn deinitSurface(r: *Renderer, gpa: std.mem.Allocator) void {
-        if (r.surface) |*surface| {
-            surface.deinit(gpa, r.instance);
-            r.surface = null;
+    pub fn deinitSurface(self: *Renderer, gpa: std.mem.Allocator) void {
+        if (self.surface) |*surface| {
+            surface.deinit(gpa, self.instance);
+            self.surface = null;
         }
     }
 
-    pub fn resize(r: *Renderer, gpa: std.mem.Allocator, new_size: wio.Size) Surface.RecreateSwapchainError!void {
-        if (std.meta.eql(new_size, r.window_size)) return;
-        r.window_size = new_size;
-        if (r.surface) |*s| try s.recreateSwapchain(gpa, r.instance, new_size);
+    pub fn resize(self: *Renderer, gpa: std.mem.Allocator, new_size: wio.Size) Surface.RecreateSwapchainError!void {
+        if (std.meta.eql(new_size, self.window_size)) return;
+        self.window_size = new_size;
+        if (self.surface) |*surface| try surface.recreateSwapchain(gpa, self.instance, new_size);
     }
 
     pub const DrawError = Surface.DrawFrameError || Surface.RecreateSwapchainError;
 
     /// Draws a frame, recovering from out-of-date swapchains and lost surfaces.
-    pub fn draw(r: *Renderer, gpa: std.mem.Allocator) DrawError!void {
-        if (r.surface) |*surface| surface.drawFrame() catch |err| switch (err) {
-            error.OutOfDateKHR, error.SuboptimalKHR => try surface.recreateSwapchain(gpa, r.instance, r.window_size),
-            error.SurfaceLostKHR => r.deinitSurface(gpa),
+    pub fn draw(self: *Renderer, gpa: std.mem.Allocator) DrawError!void {
+        if (self.surface) |*surface| surface.drawFrame() catch |err| switch (err) {
+            error.OutOfDateKHR, error.SuboptimalKHR => try surface.recreateSwapchain(gpa, self.instance, self.window_size),
+            error.SurfaceLostKHR => self.deinitSurface(gpa),
             else => return err,
         };
     }
 };
-
-// MARK: Surface
 
 /// Everything that exists only while we have a window surface.
 const Surface = struct {
@@ -255,104 +251,105 @@ const Surface = struct {
         };
     }
 
-    pub fn deinit(s: *Surface, gpa: std.mem.Allocator, instance: vk.InstanceProxy) void {
-        s.device.deviceWaitIdle() catch {};
+    pub fn deinit(self: *Surface, gpa: std.mem.Allocator, instance: vk.InstanceProxy) void {
+        self.device.deviceWaitIdle() catch {};
 
-        s.swapchain.deinit(gpa, s.device);
-        s.device.destroyFence(s.in_flight_fence, null);
-        s.device.destroySemaphore(s.image_available_semaphore, null);
-        s.device.destroyCommandPool(s.command_pool, null);
-        s.device.destroyPipeline(s.pipeline, null);
-        s.device.destroyPipelineLayout(s.pipeline_layout, null);
-        s.device.destroyRenderPass(s.render_pass, null);
-        s.device.destroyDevice(null);
-        gpa.destroy(s.vkd_ptr);
-        instance.destroySurfaceKHR(s.handle, null);
+        self.swapchain.deinit(gpa, self.device);
+        self.device.destroyFence(self.in_flight_fence, null);
+        self.device.destroySemaphore(self.image_available_semaphore, null);
+        self.device.destroyCommandPool(self.command_pool, null);
+        self.device.destroyPipeline(self.pipeline, null);
+        self.device.destroyPipelineLayout(self.pipeline_layout, null);
+        self.device.destroyRenderPass(self.render_pass, null);
+        self.device.destroyDevice(null);
+        gpa.destroy(self.vkd_ptr);
+        instance.destroySurfaceKHR(self.handle, null);
     }
 
-    pub fn swapchainContext(s: *const Surface, instance: vk.InstanceProxy) Swapchain.Context {
+    pub fn swapchainContext(self: *const Surface, instance: vk.InstanceProxy) Swapchain.Context {
         return .{
             .instance = instance,
-            .device = s.device,
-            .physical_device = s.physical_device,
-            .surface = s.handle,
-            .format = s.format,
-            .render_pass = s.render_pass,
-            .graphics_queue_index = s.graphics_queue_index,
-            .present_queue_index = s.present_queue_index,
+            .device = self.device,
+            .physical_device = self.physical_device,
+            .surface = self.handle,
+            .format = self.format,
+            .render_pass = self.render_pass,
+            .graphics_queue_index = self.graphics_queue_index,
+            .present_queue_index = self.present_queue_index,
         };
     }
 
     pub const RecreateSwapchainError = vk.DeviceProxy.DeviceWaitIdleError || Swapchain.InitError;
 
-    pub fn recreateSwapchain(s: *Surface, gpa: std.mem.Allocator, instance: vk.InstanceProxy, window_size: wio.Size) RecreateSwapchainError!void {
-        try s.device.deviceWaitIdle();
-        s.swapchain.deinit(gpa, s.device);
-        s.swapchain = try Swapchain.init(gpa, s.swapchainContext(instance), window_size);
+    pub fn recreateSwapchain(self: *Surface, gpa: std.mem.Allocator, instance: vk.InstanceProxy, window_size: wio.Size) RecreateSwapchainError!void {
+        try self.device.deviceWaitIdle();
+        self.swapchain.deinit(gpa, self.device);
+        self.swapchain = try Swapchain.init(gpa, self.swapchainContext(instance), window_size);
     }
 
     pub const DrawFrameError = vk.DeviceProxy.WaitForFencesError || vk.DeviceProxy.AcquireNextImageKHRError ||
         vk.DeviceProxy.ResetCommandBufferError || RecordCommandBufferError || vk.DeviceProxy.ResetFencesError ||
         vk.DeviceProxy.QueueSubmitError || vk.DeviceProxy.QueuePresentKHRError || error{SuboptimalKHR};
 
-    pub fn drawFrame(s: *Surface) DrawFrameError!void {
-        _ = try s.device.waitForFences(&.{s.in_flight_fence}, .true, std.math.maxInt(u64));
+    pub fn drawFrame(self: *Surface) DrawFrameError!void {
+        _ = try self.device.waitForFences(&.{self.in_flight_fence}, .true, std.math.maxInt(u64));
 
-        const image_index = (try s.device.acquireNextImageKHR(
-            s.swapchain.handle,
+        const image_index = (try self.device.acquireNextImageKHR(
+            self.swapchain.handle,
             std.math.maxInt(u64),
-            s.image_available_semaphore,
+            self.image_available_semaphore,
             .null_handle,
         )).image_index;
-        const render_finished = s.swapchain.render_finished_semaphores[image_index];
+        const render_finished = self.swapchain.render_finished_semaphores[image_index];
 
-        try s.device.resetCommandBuffer(s.command_buffer, .{});
-        try s.recordCommandBuffer(image_index);
+        try self.device.resetCommandBuffer(self.command_buffer, .{});
+        try self.recordCommandBuffer(image_index);
 
-        try s.device.resetFences(&.{s.in_flight_fence});
-        try s.device.queueSubmit(
-            s.graphics_queue,
+        try self.device.resetFences(&.{self.in_flight_fence});
+        try self.device.queueSubmit(
+            self.graphics_queue,
             &.{.{
                 .wait_semaphore_count = 1,
-                .p_wait_semaphores = &.{s.image_available_semaphore},
+                .p_wait_semaphores = &.{self.image_available_semaphore},
                 .p_wait_dst_stage_mask = &.{.{ .color_attachment_output = true }},
                 .command_buffer_count = 1,
-                .p_command_buffers = &.{s.command_buffer},
+                .p_command_buffers = &.{self.command_buffer},
                 .signal_semaphore_count = 1,
                 .p_signal_semaphores = &.{render_finished},
             }},
-            s.in_flight_fence,
+            self.in_flight_fence,
         );
 
-        if (.suboptimal_khr == try s.device.queuePresentKHR(s.present_queue, &.{
+        switch (try self.device.queuePresentKHR(self.present_queue, &.{
             .wait_semaphore_count = 1,
             .p_wait_semaphores = &.{render_finished},
             .swapchain_count = 1,
-            .p_swapchains = &.{s.swapchain.handle},
+            .p_swapchains = &.{self.swapchain.handle},
             .p_image_indices = &.{image_index},
         })) {
-            return error.SuboptimalKHR;
+            .suboptimal_khr => return error.SuboptimalKHR,
+            else => {},
         }
     }
 
     pub const RecordCommandBufferError = vk.DeviceProxy.BeginCommandBufferError || vk.DeviceProxy.EndCommandBufferError;
 
-    pub fn recordCommandBuffer(s: *Surface, image_index: u32) RecordCommandBufferError!void {
-        const extent = s.swapchain.extent;
+    pub fn recordCommandBuffer(self: *Surface, image_index: u32) RecordCommandBufferError!void {
+        const extent = self.swapchain.extent;
 
-        try s.device.beginCommandBuffer(s.command_buffer, &.{});
+        try self.device.beginCommandBuffer(self.command_buffer, &.{});
 
-        s.device.cmdBeginRenderPass(s.command_buffer, &.{
-            .render_pass = s.render_pass,
-            .framebuffer = s.swapchain.framebuffers[image_index],
+        self.device.cmdBeginRenderPass(self.command_buffer, &.{
+            .render_pass = self.render_pass,
+            .framebuffer = self.swapchain.framebuffers[image_index],
             .render_area = .{ .offset = .{ .x = 0, .y = 0 }, .extent = extent },
             .clear_value_count = 1,
             .p_clear_values = &.{.{ .color = .{ .float_32 = .{ 0, 0, 0, 1 } } }},
         }, .@"inline");
 
-        s.device.cmdBindPipeline(s.command_buffer, .graphics, s.pipeline);
+        self.device.cmdBindPipeline(self.command_buffer, .graphics, self.pipeline);
 
-        s.device.cmdSetViewport(s.command_buffer, 0, &.{.{
+        self.device.cmdSetViewport(self.command_buffer, 0, &.{.{
             .x = 0,
             .y = 0,
             .width = @floatFromInt(extent.width),
@@ -361,20 +358,18 @@ const Surface = struct {
             .max_depth = 1,
         }});
 
-        s.device.cmdSetScissor(s.command_buffer, 0, &.{.{
+        self.device.cmdSetScissor(self.command_buffer, 0, &.{.{
             .offset = .{ .x = 0, .y = 0 },
             .extent = extent,
         }});
 
-        s.device.cmdDraw(s.command_buffer, 3, 1, 0, 0);
+        self.device.cmdDraw(self.command_buffer, 3, 1, 0, 0);
 
-        s.device.cmdEndRenderPass(s.command_buffer);
+        self.device.cmdEndRenderPass(self.command_buffer);
 
-        try s.device.endCommandBuffer(s.command_buffer);
+        try self.device.endCommandBuffer(self.command_buffer);
     }
 };
-
-// MARK: Swapchain
 
 const Swapchain = struct {
     handle: vk.SwapchainKHR,
@@ -494,26 +489,24 @@ const Swapchain = struct {
         };
     }
 
-    pub fn deinit(sc: *Swapchain, gpa: std.mem.Allocator, device: vk.DeviceProxy) void {
-        for (sc.render_finished_semaphores) |semaphore| device.destroySemaphore(semaphore, null);
-        gpa.free(sc.render_finished_semaphores);
-        for (sc.framebuffers) |framebuffer| device.destroyFramebuffer(framebuffer, null);
-        gpa.free(sc.framebuffers);
-        for (sc.image_views) |image_view| device.destroyImageView(image_view, null);
-        gpa.free(sc.image_views);
-        gpa.free(sc.images);
-        device.destroySwapchainKHR(sc.handle, null);
+    pub fn deinit(self: *Swapchain, gpa: std.mem.Allocator, device: vk.DeviceProxy) void {
+        for (self.render_finished_semaphores) |semaphore| device.destroySemaphore(semaphore, null);
+        gpa.free(self.render_finished_semaphores);
+        for (self.framebuffers) |framebuffer| device.destroyFramebuffer(framebuffer, null);
+        gpa.free(self.framebuffers);
+        for (self.image_views) |image_view| device.destroyImageView(image_view, null);
+        gpa.free(self.image_views);
+        gpa.free(self.images);
+        device.destroySwapchainKHR(self.handle, null);
     }
 };
-
-// MARK: Stateless Helpers
 
 const CreateInstanceError = vk.BaseWrapper.EnumerateInstanceLayerPropertiesAllocError || std.mem.Allocator.Error ||
     vk.BaseWrapper.EnumerateInstanceExtensionPropertiesAllocError || vk.BaseWrapper.CreateInstanceError;
 
 fn createInstance(
     allocator: std.mem.Allocator,
-    vk_base_wrapper: vk.BaseWrapper,
+    vkb: vk.BaseWrapper,
 ) CreateInstanceError!struct {
     vk.InstanceWrapper,
     vk.Instance,
@@ -521,7 +514,7 @@ fn createInstance(
     var enabled_layers: std.ArrayList([*:0]const u8) = .empty;
     defer enabled_layers.deinit(allocator);
 
-    const layers = try vk_base_wrapper.enumerateInstanceLayerPropertiesAlloc(allocator);
+    const layers = try vkb.enumerateInstanceLayerPropertiesAlloc(allocator);
     defer allocator.free(layers);
     for (layers) |layer| {
         const name = std.mem.sliceTo(&layer.layer_name, 0);
@@ -535,7 +528,7 @@ fn createInstance(
     try enabled_extensions.appendSlice(allocator, wio.getRequiredVulkanInstanceExtensions());
 
     var has_portability = false;
-    const extensions = try vk_base_wrapper.enumerateInstanceExtensionPropertiesAlloc(null, allocator);
+    const extensions = try vkb.enumerateInstanceExtensionPropertiesAlloc(null, allocator);
     defer allocator.free(extensions);
     for (extensions) |extension| {
         const name = std.mem.sliceTo(&extension.extension_name, 0);
@@ -545,7 +538,7 @@ fn createInstance(
         }
     }
 
-    const handle = try vk_base_wrapper.createInstance(
+    const handle = try vkb.createInstance(
         &.{
             .flags = .{ .enumerate_portability_khr = has_portability },
             .p_application_info = &.{
@@ -561,7 +554,7 @@ fn createInstance(
         null,
     );
 
-    const vki: vk.InstanceWrapper = .load(handle, vk_base_wrapper.dispatch.vkGetInstanceProcAddr.?);
+    const vki: vk.InstanceWrapper = .load(handle, vkb.dispatch.vkGetInstanceProcAddr.?);
 
     return .{ vki, handle };
 }
