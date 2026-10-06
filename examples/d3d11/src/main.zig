@@ -21,7 +21,7 @@ pub fn main(init: std.process.Init) !void {
     defer window.destroy();
 
     state.renderer = try Renderer.init(window);
-    defer state.renderer.deinit();
+    defer state.renderer.?.deinit();
 
     while (true) {
         wio.update();
