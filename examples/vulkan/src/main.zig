@@ -12,11 +12,11 @@ fn isWayland() bool {
     return wio.backend_name == .unix and wio.backend.active == .wayland;
 }
 
-pub fn main() !void {
+pub fn main(init: std.process.Init.Minimal) !void {
     var gpa_state = std.heap.DebugAllocator(.{}).init;
     const gpa = gpa_state.allocator();
 
-    var threaded: std.Io.Threaded = .init(gpa, .{});
+    var threaded: std.Io.Threaded = .init(gpa, .{ .environ = init.environ });
 
     try wio.init(.{
         .allocator = gpa,
