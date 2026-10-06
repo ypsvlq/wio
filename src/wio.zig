@@ -247,6 +247,8 @@ pub const Window = struct {
         self.backend.presentFramebuffer(&framebuffer.backend);
     }
 
+    /// `options` must be the same as passed in `CreateWindowOptions.gl_options`.
+    ///
     /// Must be destroyed before the window.
     pub fn glCreateContext(self: *Window, options: GlCreateContextOptions) !GlContext {
         assertFeature(.opengl);
@@ -583,10 +585,18 @@ pub const Event = union(enum) {
     close: void,
     focused: void,
     unfocused: void,
+    /// Indicates the window is not minimized.
+    ///
     /// **Android** - Indicates that rendering is allowed.
     visible: void,
+    /// Indicates the window is minimized.
+    ///
     /// **Android** - Indicates that rendering is not allowed.
     hidden: void,
+    /// Sent when the window must be redrawn.
+    ///
+    /// When `Window.enableDrawAvailableEvents` has been called, sent whenever
+    /// a new frame can be drawn.
     draw: void,
 
     /// On change, sent before `position` or `size_logical`.
