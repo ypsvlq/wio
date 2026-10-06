@@ -1123,7 +1123,11 @@ fn gesturePinchUpdate(_: ?*anyopaque, _: ?*h.zwp_pointer_gesture_pinch_v1, _: u3
 
 fn gesturePinchEnd(_: ?*anyopaque, _: ?*h.zwp_pointer_gesture_pinch_v1, _: u32, _: u32, cancelled: i32) callconv(.c) void {
     if (globals.gesture_focus) |window| {
-        internal.sendEvent(window.event_fn_data, .{ .gesture_ignore = (cancelled == 1) });
+        if (cancelled == 1) {
+            internal.sendEvent(window.event_fn_data, .gesture_ignore);
+        } else {
+            internal.sendEvent(window.event_fn_data, .gesture_commit);
+        }
     }
 }
 

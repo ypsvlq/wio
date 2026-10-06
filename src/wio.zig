@@ -644,8 +644,9 @@ pub const Event = union(enum) {
     gesture_zoom: f32,
     /// Delta in degrees.
     gesture_rotate: f32,
-    /// If true, gestures since the last `.gesture_ignore = false` should not affect the program.
-    gesture_ignore: bool,
+    gesture_commit: void,
+    /// Indicates that gestures since the last `.gesture_commit` should not affect the program.
+    gesture_ignore: void,
 
     drop_begin: void,
     drop_position: Position,
