@@ -58,14 +58,16 @@ pub fn build(b: *std.Build) !void {
         .windows => {
             if (win32_manifest) {
                 if (b.lazyDependency("rc", .{})) |rc_dep| {
-                    const rc = @import("rc");
+                    const rc_mod = b.lazyImport(@This(), "rc");
 
-                    var rc_compiler: rc.Compiler = .init(rc_dep, .{
-                        .rc_files = &.{b.path("src/win32.rc")},
-                        .target = target,
-                        .optimize = optimize,
-                    });
-                    module.addObjectFile(rc_compiler.getObjectFile());
+                    if (rc_mod) |rc| {
+                        var rc_compiler: rc.Compiler = .init(rc_dep, .{
+                            .rc_files = &.{b.path("src/win32.rc")},
+                            .target = target,
+                            .optimize = optimize,
+                        });
+                        module.addObjectFile(rc_compiler.getObjectFile());
+                    }
                 }
             }
 
