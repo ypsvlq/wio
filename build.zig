@@ -111,6 +111,7 @@ pub fn build(b: *std.Build) !void {
                         ),
                         .target = target,
                         .optimize = optimize,
+                        .default_init = true,
                     });
                     module.addImport("c", t.mod);
 
