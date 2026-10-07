@@ -1,4 +1,5 @@
 const std = @import("std");
+const rc = @import("rc");
 
 pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
@@ -55,7 +56,14 @@ pub fn build(b: *std.Build) !void {
     if (enable_audio) module.addCMacro("WIO_AUDIO", "");
 
     if (win32_manifest) {
-        module.addWin32ResourceFile(.{ .file = b.path("src/win32.rc") });
+        const rc_dep = b.dependency("rc", .{});
+
+        var rc_compiler: rc.Compiler = .init(rc_dep, .{
+            .rc_files = &.{b.path("src/win32.rc")},
+            .target = target,
+            .optimize = optimize,
+        });
+        module.addObjectFile(rc_compiler.getObjectFile());
     }
 
     switch (target.result.os.tag) {
