@@ -1,5 +1,4 @@
 const std = @import("std");
-const rc = @import("rc");
 
 pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
@@ -55,19 +54,21 @@ pub fn build(b: *std.Build) !void {
     if (enable_joystick) module.addCMacro("WIO_JOYSTICK", "");
     if (enable_audio) module.addCMacro("WIO_AUDIO", "");
 
-    if (win32_manifest) {
-        const rc_dep = b.dependency("rc", .{});
-
-        var rc_compiler: rc.Compiler = .init(rc_dep, .{
-            .rc_files = &.{b.path("src/win32.rc")},
-            .target = target,
-            .optimize = optimize,
-        });
-        module.addObjectFile(rc_compiler.getObjectFile());
-    }
-
     switch (target.result.os.tag) {
         .windows => {
+            if (win32_manifest) {
+                if (b.lazyDependency("rc", .{})) |rc_dep| {
+                    const rc = @import("rc");
+
+                    var rc_compiler: rc.Compiler = .init(rc_dep, .{
+                        .rc_files = &.{b.path("src/win32.rc")},
+                        .target = target,
+                        .optimize = optimize,
+                    });
+                    module.addObjectFile(rc_compiler.getObjectFile());
+                }
+            }
+
             if (b.lazyDependency("win32", .{ .target = target, .optimize = optimize })) |win32| {
                 module.addImport("win32", win32.module("win32"));
             }

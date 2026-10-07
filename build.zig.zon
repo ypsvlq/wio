@@ -17,6 +17,7 @@
         .rc = .{
             .url = "git+https://codeberg.org/ziglang/rc?ref=zig-0.17.x#a8a3b3cebbe6e414fa12d6ad028c56a3a349c75e",
             .hash = "rc-0.0.0-rMftL71EAAAxhe4swpM5rrfcmC9k_j7ApwJJPRssBiDL",
+            .lazy = true,
         },
     },
     .paths = .{
