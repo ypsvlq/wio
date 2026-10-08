@@ -124,30 +124,7 @@ pub fn build(b: *std.Build) !void {
                 }
             }
 
-            // const t_c = b.addTranslateC(.{
-            //     .root_source_file = b.addWriteFiles().add("cimport.c",
-            //         \\#include <CoreGraphics/CoreGraphics.h>
-            //         \\#include <OpenGL/OpenGL.h>
-            //         \\#include <dlfcn.h>
-            //         \\#include <IOKit/hid/IOHIDLib.h>
-            //         \\#include <CoreAudio/CoreAudio.h>
-            //         \\#include <AudioUnit/AudioUnit.h>
-            //         \\#include <AudioToolbox/AudioToolbox.h>
-            //         \\
-            //     ),
-            //     .target = target,
-            //     .optimize = optimize,
-            // });
-            // module.addImport("c", t_c.createModule());
-
             module.addCSourceFile(.{ .file = b.path("src/macos.m"), .flags = &.{ "-fobjc-arc", "-Wno-deprecated-declarations" } });
-
-            // if (macos_sdk_path) |sdk| {
-            //     module.addFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ sdk, "System", "Library", "Frameworks" }) });
-            //     module.addIncludePath(.{ .cwd_relative = b.pathJoin(&.{ sdk, "usr", "include" }) });
-            //     module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ sdk, "usr", "lib" }) });
-            //     t_c.addFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ sdk, "System", "Library", "Frameworks" }) });
-            // }
 
             module.linkFramework("Cocoa", .{});
             if (enable_vulkan) {
@@ -328,15 +305,24 @@ pub fn build(b: *std.Build) !void {
             }
         },
         .haiku => {
-            const translate_c = b.addTranslateC(.{
-                .root_source_file = b.addWriteFiles().add("cimport.c",
-                    \\#include <GL/osmesa.h>
-                    \\
-                ),
-                .target = target,
-                .optimize = optimize,
-            });
-            module.addImport("c", translate_c.createModule());
+            if (b.lazyDependency("translate_c", .{})) |trans_c_dep| {
+                const trans_c_mod_opt = b.lazyImport(@This(), "translate_c");
+
+                if (trans_c_mod_opt) |trans_c_mod| {
+                    const Translator = trans_c_mod.Translator;
+
+                    const t: Translator = .init(trans_c_dep, .{
+                        .c_source_file = b.addWriteFiles().add("cimport.c",
+                            \\#include <GL/osmesa.h>
+                            \\
+                        ),
+                        .target = target,
+                        .optimize = optimize,
+                        .default_init = true,
+                    });
+                    module.addImport("c", t.mod);
+                }
+            }
 
             module.addCSourceFile(.{ .file = b.path("src/haiku.cpp") });
             module.link_libcpp = true;
