@@ -251,15 +251,24 @@ pub fn build(b: *std.Build) !void {
                     else => {},
                 }
 
-                const translate_c = b.addTranslateC(.{
-                    .root_source_file = b.addWriteFiles().add("cimport.c", cimport.items),
-                    .target = target,
-                    .optimize = optimize,
-                });
-                if (b.lazyDependency("wio_unix_headers", .{})) |unix_headers| {
-                    translate_c.addIncludePath(unix_headers.path("include"));
+                if (b.lazyDependency("translate_c", .{})) |trans_c_dep| {
+                    const trans_c_mod_opt = b.lazyImport(@This(), "translate_c");
+
+                    if (trans_c_mod_opt) |trans_c_mod| {
+                        const Translator = trans_c_mod.Translator;
+
+                        const t: Translator = .init(trans_c_dep, .{
+                            .c_source_file = b.addWriteFiles().add("cimport.c", cimport.items),
+                            .target = target,
+                            .optimize = optimize,
+                            .default_init = true,
+                        });
+                        if (b.lazyDependency("wio_unix_headers", .{})) |unix_headers| {
+                            t.addIncludePath(unix_headers.path("include"));
+                        }
+                        module.addImport("c", t.mod);
+                    }
                 }
-                module.addImport("c", translate_c.createModule());
 
                 if (system_integration) {
                     if (enable_x11) {
