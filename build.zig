@@ -141,23 +141,32 @@ pub fn build(b: *std.Build) !void {
         },
         .linux, .openbsd, .netbsd, .freebsd, .dragonfly, .illumos => |tag| {
             if (target.result.abi.isAndroid()) {
-                const translate_c = b.addTranslateC(.{
-                    .root_source_file = b.addWriteFiles().add("cimport.c",
-                        \\#include <jni.h>
-                        \\#include <android/log.h>
-                        \\#include <android/input.h>
-                        \\#include <android/native_window_jni.h>
-                        \\#include <EGL/egl.h>
-                        \\#include <vulkan/vulkan.h>
-                        \\#include <vulkan/vulkan_android.h>
-                        \\#define _Nullable
-                        \\#include <aaudio/AAudio.h>
-                        \\
-                    ),
-                    .target = target,
-                    .optimize = optimize,
-                });
-                module.addImport("c", translate_c.createModule());
+                if (b.lazyDependency("translate_c", .{})) |trans_c_dep| {
+                    const trans_c_mod_opt = b.lazyImport(@This(), "translate_c");
+
+                    if (trans_c_mod_opt) |trans_c_mod| {
+                        const Translator = trans_c_mod.Translator;
+
+                        const t: Translator = .init(trans_c_dep, .{
+                            .c_source_file = b.addWriteFiles().add("cimport.c",
+                                \\#include <jni.h>
+                                \\#include <android/log.h>
+                                \\#include <android/input.h>
+                                \\#include <android/native_window_jni.h>
+                                \\#include <EGL/egl.h>
+                                \\#include <vulkan/vulkan.h>
+                                \\#include <vulkan/vulkan_android.h>
+                                \\#define _Nullable
+                                \\#include <aaudio/AAudio.h>
+                                \\
+                            ),
+                            .target = target,
+                            .optimize = optimize,
+                            .default_init = true,
+                        });
+                        module.addImport("c", t.mod);
+                    }
+                }
 
                 module.linkSystemLibrary("android", .{});
                 module.linkSystemLibrary("log", .{});
