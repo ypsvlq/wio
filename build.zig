@@ -57,23 +57,21 @@ pub fn build(b: *std.Build) !void {
     switch (target.result.os.tag) {
         .windows => {
             if (win32_manifest) {
-                if (b.lazyDependency("rc", .{})) |rc_dep| {
-                    const rc_mod = b.lazyImport(@This(), "rc");
+                const rc_dep = try b.dependencyLazy("rc", .{});
+                const rc_mod = b.lazyImport(@This(), "rc");
 
-                    if (rc_mod) |rc| {
-                        var rc_compiler: rc.Compiler = .init(rc_dep, .{
-                            .rc_files = &.{b.path("src/win32.rc")},
-                            .target = target,
-                            .optimize = optimize,
-                        });
-                        module.addObjectFile(rc_compiler.getObjectFile());
-                    }
+                if (rc_mod) |rc| {
+                    var rc_compiler: rc.Compiler = .init(rc_dep, .{
+                        .rc_files = &.{b.path("src/win32.rc")},
+                        .target = target,
+                        .optimize = optimize,
+                    });
+                    module.addObjectFile(rc_compiler.getObjectFile());
                 }
             }
 
-            if (b.lazyDependency("win32", .{ .target = target, .optimize = optimize })) |win32| {
-                module.addImport("win32", win32.module("win32"));
-            }
+            const win32 = try b.dependencyLazy("win32", .{ .target = target, .optimize = optimize });
+            module.addImport("win32", win32.module("win32"));
 
             module.linkSystemLibrary("user32", .{});
             module.linkSystemLibrary("shell32", .{});
@@ -92,35 +90,34 @@ pub fn build(b: *std.Build) !void {
             }
         },
         .macos => {
-            if (b.lazyDependency("translate_c", .{})) |trans_c_dep| {
-                const trans_c_mod_opt = b.lazyImport(@This(), "translate_c");
+            const trans_c_dep = try b.dependencyLazy("translate_c", .{});
+            const trans_c_mod_opt = b.lazyImport(@This(), "translate_c");
 
-                if (trans_c_mod_opt) |trans_c_mod| {
-                    const Translator = trans_c_mod.Translator;
+            if (trans_c_mod_opt) |trans_c_mod| {
+                const Translator = trans_c_mod.Translator;
 
-                    const t: Translator = .init(trans_c_dep, .{
-                        .c_source_file = b.addWriteFiles().add("cimport.c",
-                            \\#include <CoreGraphics/CoreGraphics.h>
-                            \\#include <OpenGL/OpenGL.h>
-                            \\#include <dlfcn.h>
-                            \\#include <IOKit/hid/IOHIDLib.h>
-                            \\#include <CoreAudio/CoreAudio.h>
-                            \\#include <AudioUnit/AudioUnit.h>
-                            \\#include <AudioToolbox/AudioToolbox.h>
-                            \\
-                        ),
-                        .target = target,
-                        .optimize = optimize,
-                        .default_init = true,
-                    });
-                    module.addImport("c", t.mod);
+                const t: Translator = .init(trans_c_dep, .{
+                    .c_source_file = b.addWriteFiles().add("cimport.c",
+                        \\#include <CoreGraphics/CoreGraphics.h>
+                        \\#include <OpenGL/OpenGL.h>
+                        \\#include <dlfcn.h>
+                        \\#include <IOKit/hid/IOHIDLib.h>
+                        \\#include <CoreAudio/CoreAudio.h>
+                        \\#include <AudioUnit/AudioUnit.h>
+                        \\#include <AudioToolbox/AudioToolbox.h>
+                        \\
+                    ),
+                    .target = target,
+                    .optimize = optimize,
+                    .default_init = true,
+                });
+                module.addImport("c", t.mod);
 
-                    if (macos_sdk_path) |sdk| {
-                        module.addFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ sdk, "System", "Library", "Frameworks" }) });
-                        module.addIncludePath(.{ .cwd_relative = b.pathJoin(&.{ sdk, "usr", "include" }) });
-                        module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ sdk, "usr", "lib" }) });
-                        t.addFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ sdk, "System", "Library", "Frameworks" }) });
-                    }
+                if (macos_sdk_path) |sdk| {
+                    module.addFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ sdk, "System", "Library", "Frameworks" }) });
+                    module.addIncludePath(.{ .cwd_relative = b.pathJoin(&.{ sdk, "usr", "include" }) });
+                    module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ sdk, "usr", "lib" }) });
+                    t.addFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ sdk, "System", "Library", "Frameworks" }) });
                 }
             }
 
@@ -141,31 +138,30 @@ pub fn build(b: *std.Build) !void {
         },
         .linux, .openbsd, .netbsd, .freebsd, .dragonfly, .illumos => |tag| {
             if (target.result.abi.isAndroid()) {
-                if (b.lazyDependency("translate_c", .{})) |trans_c_dep| {
-                    const trans_c_mod_opt = b.lazyImport(@This(), "translate_c");
+                const trans_c_dep = try b.dependencyLazy("translate_c", .{});
+                const trans_c_mod_opt = b.lazyImport(@This(), "translate_c");
 
-                    if (trans_c_mod_opt) |trans_c_mod| {
-                        const Translator = trans_c_mod.Translator;
+                if (trans_c_mod_opt) |trans_c_mod| {
+                    const Translator = trans_c_mod.Translator;
 
-                        const t: Translator = .init(trans_c_dep, .{
-                            .c_source_file = b.addWriteFiles().add("cimport.c",
-                                \\#include <jni.h>
-                                \\#include <android/log.h>
-                                \\#include <android/input.h>
-                                \\#include <android/native_window_jni.h>
-                                \\#include <EGL/egl.h>
-                                \\#include <vulkan/vulkan.h>
-                                \\#include <vulkan/vulkan_android.h>
-                                \\#define _Nullable
-                                \\#include <aaudio/AAudio.h>
-                                \\
-                            ),
-                            .target = target,
-                            .optimize = optimize,
-                            .default_init = true,
-                        });
-                        module.addImport("c", t.mod);
-                    }
+                    const t: Translator = .init(trans_c_dep, .{
+                        .c_source_file = b.addWriteFiles().add("cimport.c",
+                            \\#include <jni.h>
+                            \\#include <android/log.h>
+                            \\#include <android/input.h>
+                            \\#include <android/native_window_jni.h>
+                            \\#include <EGL/egl.h>
+                            \\#include <vulkan/vulkan.h>
+                            \\#include <vulkan/vulkan_android.h>
+                            \\#define _Nullable
+                            \\#include <aaudio/AAudio.h>
+                            \\
+                        ),
+                        .target = target,
+                        .optimize = optimize,
+                        .default_init = true,
+                    });
+                    module.addImport("c", t.mod);
                 }
 
                 module.linkSystemLibrary("android", .{});
@@ -260,23 +256,21 @@ pub fn build(b: *std.Build) !void {
                     else => {},
                 }
 
-                if (b.lazyDependency("translate_c", .{})) |trans_c_dep| {
-                    const trans_c_mod_opt = b.lazyImport(@This(), "translate_c");
+                const trans_c_dep = try b.dependencyLazy("translate_c", .{});
+                const trans_c_mod_opt = b.lazyImport(@This(), "translate_c");
 
-                    if (trans_c_mod_opt) |trans_c_mod| {
-                        const Translator = trans_c_mod.Translator;
+                if (trans_c_mod_opt) |trans_c_mod| {
+                    const Translator = trans_c_mod.Translator;
 
-                        const t: Translator = .init(trans_c_dep, .{
-                            .c_source_file = b.addWriteFiles().add("cimport.c", cimport.items),
-                            .target = target,
-                            .optimize = optimize,
-                            .default_init = true,
-                        });
-                        if (b.lazyDependency("wio_unix_headers", .{})) |unix_headers| {
-                            t.addIncludePath(unix_headers.path("include"));
-                        }
-                        module.addImport("c", t.mod);
-                    }
+                    const t: Translator = .init(trans_c_dep, .{
+                        .c_source_file = b.addWriteFiles().add("cimport.c", cimport.items),
+                        .target = target,
+                        .optimize = optimize,
+                        .default_init = true,
+                    });
+                    const unix_headers = try b.dependencyLazy("wio_unix_headers", .{});
+                    t.addIncludePath(unix_headers.path("include"));
+                    module.addImport("c", t.mod);
                 }
 
                 if (system_integration) {
@@ -323,23 +317,22 @@ pub fn build(b: *std.Build) !void {
             }
         },
         .haiku => {
-            if (b.lazyDependency("translate_c", .{})) |trans_c_dep| {
-                const trans_c_mod_opt = b.lazyImport(@This(), "translate_c");
+            const trans_c_dep = try b.dependencyLazy("translate_c", .{});
+            const trans_c_mod_opt = b.lazyImport(@This(), "translate_c");
 
-                if (trans_c_mod_opt) |trans_c_mod| {
-                    const Translator = trans_c_mod.Translator;
+            if (trans_c_mod_opt) |trans_c_mod| {
+                const Translator = trans_c_mod.Translator;
 
-                    const t: Translator = .init(trans_c_dep, .{
-                        .c_source_file = b.addWriteFiles().add("cimport.c",
-                            \\#include <GL/osmesa.h>
-                            \\
-                        ),
-                        .target = target,
-                        .optimize = optimize,
-                        .default_init = true,
-                    });
-                    module.addImport("c", t.mod);
-                }
+                const t: Translator = .init(trans_c_dep, .{
+                    .c_source_file = b.addWriteFiles().add("cimport.c",
+                        \\#include <GL/osmesa.h>
+                        \\
+                    ),
+                    .target = target,
+                    .optimize = optimize,
+                    .default_init = true,
+                });
+                module.addImport("c", t.mod);
             }
 
             module.addCSourceFile(.{ .file = b.path("src/haiku.cpp") });
