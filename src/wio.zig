@@ -119,8 +119,10 @@ pub const Size = struct {
 
 pub const Position = struct { x: i16, y: i16 };
 
+pub const AbsolutePosition = struct { x: u16, y: u16 };
+
 pub const Rect = struct {
-    origin: struct { x: u16, y: u16 },
+    origin: AbsolutePosition,
     size: Size,
 };
 
