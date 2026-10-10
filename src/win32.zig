@@ -586,10 +586,15 @@ pub const Window = struct {
         };
     }
 
-    pub fn presentFramebuffer(self: *Window, framebuffer: *Framebuffer) void {
+    pub fn presentFramebuffer(self: *Window, framebuffer: *Framebuffer, options: wio.PresentFramebufferOptions) void {
+        const x, const y, const width, const height = if (options.damage_rect) |rect|
+            .{ rect.origin.x, rect.origin.y, rect.size.width, rect.size.height }
+        else
+            .{ 0, 0, framebuffer.size.width, framebuffer.size.height };
+
         const dc = w.GetDC(self.window);
         defer _ = w.ReleaseDC(self.window, dc);
-        _ = w.BitBlt(dc, 0, 0, framebuffer.size.width, framebuffer.size.height, framebuffer.dc, 0, 0, w.SRCCOPY);
+        _ = w.BitBlt(dc, x, y, width, height, framebuffer.dc, x, y, w.SRCCOPY);
     }
 
     pub fn glCreateContext(self: *Window, options: wio.GlCreateContextOptions) !GlContext {

@@ -362,7 +362,8 @@ pub const Window = struct {
         };
     }
 
-    pub fn presentFramebuffer(self: *Window, framebuffer: *Framebuffer) void {
+    pub fn presentFramebuffer(self: *Window, framebuffer: *Framebuffer, options: wio.PresentFramebufferOptions) void {
+        _ = options;
         wioPresentFramebuffer(self.window, framebuffer.bitmap);
     }
 

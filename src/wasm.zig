@@ -37,7 +37,7 @@ const js = struct {
     extern "wio" fn setSize(u32, u16, u16) void;
     extern "wio" fn setClipboardText([*]const u8, usize) void;
     extern "wio" fn getClipboardText(*const anyopaque, ?*anyopaque) void;
-    extern "wio" fn presentFramebuffer(u32, [*]const u32, u16, u16) void;
+    extern "wio" fn presentFramebuffer(u32, [*]const u32, u16, u16, u16, u16, u16, u16) void;
     extern "wio" fn getDropFileCount(u32) u32;
     extern "wio" fn getDropFileLen(u32, u32) u32;
     extern "wio" fn getDropFile(u32, u32, [*]u8) void;
@@ -199,8 +199,13 @@ pub const Window = struct {
         return .{ .pixels = pixels, .size = size };
     }
 
-    pub fn presentFramebuffer(self: *Window, framebuffer: *Framebuffer) void {
-        js.presentFramebuffer(self.id, framebuffer.pixels.ptr, framebuffer.size.width, framebuffer.size.height);
+    pub fn presentFramebuffer(self: *Window, framebuffer: *Framebuffer, options: wio.PresentFramebufferOptions) void {
+        const x, const y, const width, const height = if (options.damage_rect) |rect|
+            .{ rect.origin.x, rect.origin.y, rect.size.width, rect.size.height }
+        else
+            .{ 0, 0, framebuffer.size.width, framebuffer.size.height };
+
+        js.presentFramebuffer(self.id, framebuffer.pixels.ptr, framebuffer.size.width, framebuffer.size.height, x, y, width, height);
     }
 
     pub fn glCreateContext(self: *Window, _: wio.GlCreateContextOptions) !GlContext {

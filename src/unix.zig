@@ -358,10 +358,10 @@ pub const Window = union {
         }
     }
 
-    pub fn presentFramebuffer(self: *Window, framebuffer: *Framebuffer) void {
+    pub fn presentFramebuffer(self: *Window, framebuffer: *Framebuffer, options: wio.PresentFramebufferOptions) void {
         switch (active) {
-            .x11 => self.x11.presentFramebuffer(&framebuffer.x11),
-            .wayland => self.wayland.presentFramebuffer(&framebuffer.wayland),
+            .x11 => self.x11.presentFramebuffer(&framebuffer.x11, options),
+            .wayland => self.wayland.presentFramebuffer(&framebuffer.wayland, options),
         }
     }
 

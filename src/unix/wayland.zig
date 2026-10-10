@@ -650,9 +650,14 @@ pub const Window = struct {
         };
     }
 
-    pub fn presentFramebuffer(self: *Window, framebuffer: *Framebuffer) void {
+    pub fn presentFramebuffer(self: *Window, framebuffer: *Framebuffer, options: wio.PresentFramebufferOptions) void {
+        const x, const y, const width: i32, const height: i32 = if (options.damage_rect) |rect|
+            .{ rect.origin.x, rect.origin.y, rect.size.width, rect.size.height }
+        else
+            .{ 0, 0, std.math.maxInt(i32), std.math.maxInt(i32) };
+
         h.wl_surface_attach(self.surface, framebuffer.buffer, 0, 0);
-        h.wl_surface_damage(self.surface, 0, 0, std.math.maxInt(i32), std.math.maxInt(i32));
+        h.wl_surface_damage_buffer(self.surface, x, y, width, height);
         h.wl_surface_commit(self.surface);
         _ = c.wl_display_roundtrip(globals.display);
     }
@@ -844,7 +849,7 @@ const registry_listener: h.wl_registry_listener = .{
 fn registryGlobal(_: ?*anyopaque, registry: ?*h.wl_registry, name: u32, interface_ptr: [*c]const u8, version: u32) callconv(.c) void {
     const interface = std.mem.sliceTo(interface_ptr, 0);
     if (std.mem.eql(u8, interface, "wl_compositor")) {
-        globals.compositor = @ptrCast(h.wl_registry_bind(registry, name, &h.wl_compositor_interface, @min(version, 3)));
+        globals.compositor = @ptrCast(h.wl_registry_bind(registry, name, &h.wl_compositor_interface, @min(version, 4)));
     } else if (build_options.framebuffer and std.mem.eql(u8, interface, "wl_shm")) {
         globals.shm = @ptrCast(h.wl_registry_bind(registry, name, &h.wl_shm_interface, @min(version, 1)));
     } else if (std.mem.eql(u8, interface, "wl_seat")) {

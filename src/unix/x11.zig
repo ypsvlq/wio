@@ -642,8 +642,13 @@ pub const Window = struct {
         };
     }
 
-    pub fn presentFramebuffer(self: *Window, framebuffer: *Framebuffer) void {
-        _ = c.XPutImage(globals.display, self.window, framebuffer.gc, framebuffer.image, 0, 0, 0, 0, framebuffer.size.width, framebuffer.size.height);
+    pub fn presentFramebuffer(self: *Window, framebuffer: *Framebuffer, options: wio.PresentFramebufferOptions) void {
+        const x, const y, const width, const height = if (options.damage_rect) |rect|
+            .{ rect.origin.x, rect.origin.y, rect.size.width, rect.size.height }
+        else
+            .{ 0, 0, framebuffer.size.width, framebuffer.size.height };
+
+        _ = c.XPutImage(globals.display, self.window, framebuffer.gc, framebuffer.image, x, y, x, y, width, height);
         _ = c.XFlush(globals.display);
     }
 

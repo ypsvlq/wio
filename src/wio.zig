@@ -119,6 +119,11 @@ pub const Size = struct {
 
 pub const Position = struct { x: i16, y: i16 };
 
+pub const Rect = struct {
+    origin: struct { x: u16, y: u16 },
+    size: Size,
+};
+
 pub const CreateWindowOptions = struct {
     event_fn_data: ?*anyopaque,
 
@@ -242,9 +247,9 @@ pub const Window = struct {
         return .{ .backend = try self.backend.createFramebuffer(size) };
     }
 
-    pub fn presentFramebuffer(self: *Window, framebuffer: *Framebuffer) void {
+    pub fn presentFramebuffer(self: *Window, framebuffer: *Framebuffer, options: PresentFramebufferOptions) void {
         assertFeature(.framebuffer);
-        self.backend.presentFramebuffer(&framebuffer.backend);
+        self.backend.presentFramebuffer(&framebuffer.backend, options);
     }
 
     /// `options` must be the same as passed in `CreateWindowOptions.gl_options`.
@@ -328,6 +333,10 @@ pub const Framebuffer = struct {
     pub fn setPixel(self: *Framebuffer, x: usize, y: usize, rgb: u32) void {
         self.backend.setPixel(x, y, rgb);
     }
+};
+
+pub const PresentFramebufferOptions = struct {
+    damage_rect: ?Rect = null,
 };
 
 pub const GlApi = enum { gl, gles1, gles2 };

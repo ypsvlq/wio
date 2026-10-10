@@ -128,9 +128,10 @@ pub const Window = struct {
         return error.Unexpected;
     }
 
-    pub fn presentFramebuffer(self: *Window, framebuffer: *Framebuffer) void {
+    pub fn presentFramebuffer(self: *Window, framebuffer: *Framebuffer, options: wio.PresentFramebufferOptions) void {
         _ = self;
         _ = framebuffer;
+        _ = options;
     }
 
     pub fn glCreateContext(self: *Window, options: wio.GlCreateContextOptions) !GlContext {

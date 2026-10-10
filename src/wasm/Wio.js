@@ -334,10 +334,10 @@ class Wio {
             });
         },
 
-        presentFramebuffer: (id, ptr, width, height) => {
+        presentFramebuffer: (id, ptr, width, height, dirty_x, dirty_y, dirty_width, dirty_height) => {
             const framebuffer = new Uint8ClampedArray(this.memory.buffer, ptr, width * height * 4);
             const image = new ImageData(framebuffer, width, height);
-            this.objects[id].canvas.getContext("2d").putImageData(image, 0, 0);
+            this.objects[id].canvas.getContext("2d").putImageData(image, 0, 0, dirty_x, dirty_y, dirty_width, dirty_height);
         },
 
         getDropFileCount: (id) => this.objects[id].drop_files.length,

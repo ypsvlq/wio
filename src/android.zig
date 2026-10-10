@@ -270,7 +270,9 @@ pub const Window = struct {
         };
     }
 
-    pub fn presentFramebuffer(_: *Window, framebuffer: *Framebuffer) void {
+    pub fn presentFramebuffer(_: *Window, framebuffer: *Framebuffer, options: wio.PresentFramebufferOptions) void {
+        _ = options;
+
         window_mutex.lockUncancelable(internal.io);
         defer window_mutex.unlock(internal.io);
 

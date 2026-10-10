@@ -49,6 +49,7 @@ pub fn main() !void {
 
 var t: u16 = 0;
 var visible = false;
+var rect = false;
 
 fn loop() !bool {
     while (events.pop()) |event| {
@@ -76,8 +77,17 @@ fn loop() !bool {
             .draw => {
                 if (visible) {
                     render();
-                    window.presentFramebuffer(&fb);
+                    if (!rect) {
+                        window.presentFramebuffer(&fb, .{});
+                    } else {
+                        window.presentFramebuffer(&fb, .{ .damage_rect = .{ .origin = .{ .x = 64, .y = 64 }, .size = .{ .width = 128, .height = 128 } } });
+                    }
                     t +%= 1;
+                }
+            },
+            .button_press => |button| {
+                if (button == .r) {
+                    rect = !rect;
                 }
             },
             else => {},
