@@ -268,9 +268,8 @@ pub fn build(b: *std.Build) !void {
                         .optimize = optimize,
                         .default_init = true,
                     });
-                    if (b.lazyDependency("wio_unix_headers", .{})) |unix_headers| {
-                        t.addIncludePath(unix_headers.path("include"));
-                    }
+                    const unix_headers = try b.dependencyLazy("wio_unix_headers",.{});
+                    t.addIncludePath(unix_headers.path("include"));
                     module.addImport("c", t.mod);
                 }
 
