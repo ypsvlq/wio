@@ -31,7 +31,7 @@ extern fn wioRequestAttention() void;
 extern fn wioSetClipboardText([*]const u8, usize) void;
 extern fn wioGetClipboardText(*usize) ?[*]u8;
 extern fn wioDrawAvailable(*NSWindow) void;
-extern fn wioPresentFramebuffer(*NSWindow, c.CGContextRef) void;
+extern fn wioPresentFramebuffer(*NSWindow, c.CGContextRef, bool, u16, u16, u16, u16) void;
 extern fn wioRelease(?*const anyopaque) void;
 extern fn wioGlChoosePixelFormat([*]const c.CGLPixelFormatAttribute) ?*NSOpenGLPixelFormat;
 extern fn wioGlCreateContext(?*NSOpenGLPixelFormat, ?*NSOpenGLContext) ?*NSOpenGLContext;
@@ -363,8 +363,11 @@ pub const Window = struct {
     }
 
     pub fn presentFramebuffer(self: *Window, framebuffer: *Framebuffer, options: wio.PresentFramebufferOptions) void {
-        _ = options;
-        wioPresentFramebuffer(self.window, framebuffer.bitmap);
+        if (options.damage_rect) |rect| {
+            wioPresentFramebuffer(self.window, framebuffer.bitmap, true, rect.origin.x, rect.origin.y, rect.size.width, rect.size.height);
+        } else {
+            wioPresentFramebuffer(self.window, framebuffer.bitmap, false, 0, 0, 0, 0);
+        }
     }
 
     pub fn glCreateContext(self: *Window, options: wio.GlCreateContextOptions) !GlContext {

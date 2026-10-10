@@ -625,10 +625,15 @@ void wioDrawAvailable(NSWindow *window) {
 
 #ifdef WIO_FRAMEBUFFER
 
-void wioPresentFramebuffer(NSWindow *window, CGContextRef bitmap) {
+void wioPresentFramebuffer(NSWindow *window, CGContextRef bitmap, bool rect, uint16_t x, uint16_t y, uint16_t width, uint16_t height) {
     WioView *view = [window contentView];
     [view setBitmap:bitmap];
-    [view setNeedsDisplay:YES];
+    if (rect) {
+        NSRect frame = [view frame];
+        [view setNeedsDisplayInRect:NSMakeRect(x, frame.size.height - height - y, width, height)];
+    } else {
+        [view setNeedsDisplay:YES];
+    }
 }
 
 #endif
