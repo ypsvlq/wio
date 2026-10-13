@@ -538,15 +538,21 @@ pub const AudioInput = struct {
     }
 };
 
+pub const event_thread = switch (builtin.target.os.tag) {
+    .linux => if (builtin.target.abi.isAndroid()) true else false,
+    .haiku => true,
+    else => false,
+};
+
 pub const EventQueue = struct {
     events: std.ArrayList(Event),
     head: usize,
-    mutex: if (internal.event_thread) std.Io.Mutex else void,
+    mutex: if (event_thread) std.Io.Mutex else void,
 
     pub const empty: EventQueue = .{
         .events = .empty,
         .head = 0,
-        .mutex = if (internal.event_thread) .init else {},
+        .mutex = if (event_thread) .init else {},
     };
 
     pub fn deinit(self: *EventQueue) void {
@@ -554,8 +560,8 @@ pub const EventQueue = struct {
     }
 
     pub fn push(self: *EventQueue, event: Event) void {
-        if (internal.event_thread) self.mutex.lockUncancelable(internal.io);
-        defer if (internal.event_thread) self.mutex.unlock(internal.io);
+        if (event_thread) self.mutex.lockUncancelable(internal.io);
+        defer if (event_thread) self.mutex.unlock(internal.io);
 
         if (self.head != 0) {
             self.events.replaceRangeAssumeCapacity(0, self.head, &.{});
@@ -578,8 +584,8 @@ pub const EventQueue = struct {
     }
 
     pub fn pop(self: *EventQueue) ?Event {
-        if (internal.event_thread) self.mutex.lockUncancelable(internal.io);
-        defer if (internal.event_thread) self.mutex.unlock(internal.io);
+        if (event_thread) self.mutex.lockUncancelable(internal.io);
+        defer if (event_thread) self.mutex.unlock(internal.io);
 
         if (self.head == self.events.items.len) return null;
         defer self.head += 1;

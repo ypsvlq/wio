@@ -9,16 +9,10 @@ pub var eventFn: *const fn (?*anyopaque, wio.Event) void = undefined;
 
 pub var wait = false;
 
-pub const event_thread = switch (builtin.target.os.tag) {
-    .linux => if (builtin.target.abi.isAndroid()) true else false,
-    .haiku => true,
-    else => false,
-};
-
 pub fn sendEvent(data: ?*anyopaque, event: wio.Event) void {
     eventFn(data, event);
 
-    if (event_thread) {
+    if (wio.event_thread) {
         wio.cancelWait();
     } else {
         wait = false;
