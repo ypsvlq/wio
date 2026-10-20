@@ -563,7 +563,7 @@ pub const Window = struct {
         h.wl_data_device_set_selection(globals.data_device, globals.data_source, globals.last_serial);
     }
 
-    pub fn getClipboardText(_: *Window, clipboardTextFn: *const fn (?*anyopaque, []const u8) void, clipboard_text_fn_data: ?*anyopaque) void {
+    pub fn getClipboardText(_: *Window, callback: wio.Callback([]const u8)) void {
         if (globals.data_offer == null) return;
         var pipe: [2]i32 = undefined;
         if (std.c.pipe(&pipe) == -1) return;
@@ -580,7 +580,7 @@ pub const Window = struct {
             if (std.c.errno(count) != .SUCCESS) {
                 return;
             } else if (count == 0) {
-                clipboardTextFn(clipboard_text_fn_data, text.items);
+                callback.function(callback.data, text.items);
                 break;
             } else {
                 text.appendSlice(internal.allocator, buffer[0..@intCast(count)]) catch return;

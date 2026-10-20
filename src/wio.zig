@@ -34,16 +34,23 @@ comptime {
 
 pub const logFn = if (@hasDecl(backend, "logFn")) backend.logFn else std.log.defaultLog;
 
+pub fn Callback(T: type) type {
+    return struct {
+        function: *const fn (?*anyopaque, T) void,
+        data: ?*anyopaque,
+    };
+}
+
 pub const InitOptions = struct {
     allocator: std.mem.Allocator,
     io: std.Io,
     eventFn: *const fn (?*anyopaque, Event) void,
     /// Free with `JoystickDevice.release()`.
-    joystickConnectedFn: ?*const fn (JoystickDevice) void = null,
+    joystick_connected_callback: ?Callback(JoystickDevice) = null,
     /// Free with `AudioDevice.release()`.
-    audioDefaultOutputFn: ?*const fn (AudioDevice) void = null,
+    audio_default_output_callback: ?Callback(AudioDevice) = null,
     /// Free with `AudioDevice.release()`.
-    audioDefaultInputFn: ?*const fn (AudioDevice) void = null,
+    audio_default_input_callback: ?Callback(AudioDevice) = null,
 };
 
 /// Must be called only once.
@@ -56,7 +63,17 @@ pub fn init(options: InitOptions) !void {
     internal.allocator = options.allocator;
     internal.io = options.io;
     internal.eventFn = options.eventFn;
-    try backend.init(options);
+    if (build_options.joystick) {
+        internal.joystickConnectedFn = if (options.joystick_connected_callback) |callback| callback.function else null;
+        internal.joystick_connected_fn_data = if (options.joystick_connected_callback) |callback| callback.data else null;
+    }
+    if (build_options.audio) {
+        internal.audioDefaultOutputFn = if (options.audio_default_output_callback) |callback| callback.function else null;
+        internal.audio_default_output_fn_data = if (options.audio_default_output_callback) |callback| callback.data else null;
+        internal.audioDefaultInputFn = if (options.audio_default_input_callback) |callback| callback.function else null;
+        internal.audio_default_input_fn_data = if (options.audio_default_input_callback) |callback| callback.data else null;
+    }
+    try backend.init();
 }
 
 /// All windows and devices must be closed before calling.
@@ -235,8 +252,8 @@ pub const Window = struct {
         self.backend.setClipboardText(text);
     }
 
-    pub fn getClipboardText(self: *Window, clipboardTextFn: *const fn (?*anyopaque, []const u8) void, clipboard_text_fn_data: ?*anyopaque) void {
-        self.backend.getClipboardText(clipboardTextFn, clipboard_text_fn_data);
+    pub fn getClipboardText(self: *Window, callback: Callback([]const u8)) void {
+        self.backend.getClipboardText(callback);
     }
 
     pub fn getDropData(self: *Window, allocator: std.mem.Allocator) DropData {

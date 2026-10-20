@@ -60,15 +60,10 @@ const gl = struct {
 
 var clipboard_text: std.ArrayList(u8) = .empty;
 
-var joystickConnectedFn: ?*const fn (wio.JoystickDevice) void = null;
-
-pub fn init(options: wio.InitOptions) !void {
-    if (build_options.joystick) {
-        joystickConnectedFn = options.joystickConnectedFn;
-    }
+pub fn init() !void {
     if (build_options.audio) {
-        if (options.audioDefaultOutputFn) |callback| callback(.{ .backend = .{} });
-        if (options.audioDefaultInputFn) |callback| callback(.{ .backend = .{} });
+        if (internal.audioDefaultOutputFn) |callback| callback(internal.audio_default_output_fn_data, .{ .backend = .{} });
+        if (internal.audioDefaultInputFn) |callback| callback(internal.audio_default_input_fn_data, .{ .backend = .{} });
     }
 }
 
@@ -162,8 +157,8 @@ pub const Window = struct {
         js.setClipboardText(text.ptr, text.len);
     }
 
-    pub fn getClipboardText(_: *Window, clipboardTextFn: *const fn (?*anyopaque, []const u8) void, clipboard_text_fn_data: ?*anyopaque) void {
-        js.getClipboardText(clipboardTextFn, clipboard_text_fn_data);
+    pub fn getClipboardText(_: *Window, callback: wio.Callback([]const u8)) void {
+        js.getClipboardText(callback.function, callback.data);
     }
 
     pub fn getDropData(self: *Window, allocator: std.mem.Allocator) wio.DropData {
@@ -421,8 +416,8 @@ export fn wioClipboardText(clipboardTextFnPtr: *const anyopaque, clipboard_text_
 }
 
 export fn wioJoystick(index: u32) void {
-    if (joystickConnectedFn) |callback| {
-        callback(.{ .backend = .{ .index = index } });
+    if (internal.joystickConnectedFn) |callback| {
+        callback(internal.joystick_connected_fn_data, .{ .backend = .{ .index = index } });
     }
 }
 

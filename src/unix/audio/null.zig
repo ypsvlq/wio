@@ -2,7 +2,7 @@ const std = @import("std");
 const wio = @import("../../wio.zig");
 const internal = @import("../../wio.internal.zig");
 
-pub fn init(_: wio.InitOptions) !void {}
+pub fn init() !void {}
 
 pub fn deinit() void {}
 

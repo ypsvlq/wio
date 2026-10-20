@@ -48,9 +48,9 @@ pub fn main(init: std.process.Init.Minimal) !void {
         .allocator = allocator,
         .io = io,
         .eventFn = eventFn,
-        .joystickConnectedFn = joystick.connected,
-        .audioDefaultOutputFn = audio.defaultOutput,
-        .audioDefaultInputFn = audio.defaultInput,
+        .joystick_connected_callback = .{ .function = joystick.connected, .data = null },
+        .audio_default_output_callback = .{ .function = audio.defaultOutput, .data = null },
+        .audio_default_input_callback = .{ .function = audio.defaultInput, .data = null },
     });
 
     window = try .create(.{
@@ -289,7 +289,7 @@ fn action(button: wio.Button) !void {
         .h => window.minimize(),
         .a => request_attention = true,
         .c => window.setClipboardText("wio example"),
-        .v => window.getClipboardText(clipboardText, null),
+        .v => window.getClipboardText(.{ .function = clipboardText, .data = null }),
         .o => audio.play = !audio.play,
         .i => audio.record = !audio.record,
         .e => {

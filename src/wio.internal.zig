@@ -7,6 +7,13 @@ pub var allocator: std.mem.Allocator = undefined;
 pub var io: std.Io = undefined;
 pub var eventFn: *const fn (?*anyopaque, wio.Event) void = undefined;
 
+pub var joystickConnectedFn: ?*const fn (?*anyopaque, wio.JoystickDevice) void = undefined;
+pub var joystick_connected_fn_data: ?*anyopaque = undefined;
+pub var audioDefaultOutputFn: ?*const fn (?*anyopaque, wio.AudioDevice) void = undefined;
+pub var audio_default_output_fn_data: ?*anyopaque = undefined;
+pub var audioDefaultInputFn: ?*const fn (?*anyopaque, wio.AudioDevice) void = undefined;
+pub var audio_default_input_fn_data: ?*anyopaque = undefined;
+
 pub var wait = false;
 
 pub fn sendEvent(data: ?*anyopaque, event: wio.Event) void {

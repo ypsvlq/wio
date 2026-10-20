@@ -6,7 +6,7 @@ const log = std.log.scoped(.audio);
 var maybe_output: ?wio.AudioOutput = null;
 var maybe_input: ?wio.AudioInput = null;
 
-pub fn defaultOutput(device: wio.AudioDevice) void {
+pub fn defaultOutput(_: ?*anyopaque, device: wio.AudioDevice) void {
     defer device.release();
 
     const id = device.getId(main.allocator) orelse "";
@@ -20,7 +20,7 @@ pub fn defaultOutput(device: wio.AudioDevice) void {
     if (maybe_output == null) log.info("lost", .{});
 }
 
-pub fn defaultInput(device: wio.AudioDevice) void {
+pub fn defaultInput(_: ?*anyopaque, device: wio.AudioDevice) void {
     defer device.release();
 
     const id = device.getId(main.allocator) orelse "";

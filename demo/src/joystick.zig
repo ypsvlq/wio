@@ -6,7 +6,7 @@ const log = std.log.scoped(.joystick);
 var active: ?wio.Joystick = null;
 var last_state: u32 = 0;
 
-pub fn connected(device: wio.JoystickDevice) void {
+pub fn connected(_: ?*anyopaque, device: wio.JoystickDevice) void {
     defer device.release();
 
     if (active == null) {

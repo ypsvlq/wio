@@ -3,9 +3,7 @@ const wio = @import("wio.zig");
 const internal = @import("wio.internal.zig");
 const log = std.log.scoped(.wio);
 
-pub fn init(options: wio.InitOptions) !void {
-    _ = options;
-}
+pub fn init() !void {}
 
 pub fn deinit() void {}
 
@@ -110,10 +108,9 @@ pub const Window = struct {
         _ = text;
     }
 
-    pub fn getClipboardText(self: *Window, clipboardTextFn: *const fn (?*anyopaque, []const u8) void, clipboard_text_fn_data: ?*anyopaque) void {
+    pub fn getClipboardText(self: *Window, callback: wio.Callback([]const u8)) void {
         _ = self;
-        _ = clipboardTextFn;
-        _ = clipboard_text_fn_data;
+        _ = callback;
     }
 
     pub fn getDropData(self: *Window, allocator: std.mem.Allocator) wio.DropData {

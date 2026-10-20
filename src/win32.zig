@@ -24,14 +24,11 @@ const JoystickInfo = struct {
 var joysticks: std.AutoHashMapUnmanaged(w.HANDLE, JoystickInfo) = undefined;
 var xinput: std.StaticBitSet(4) = .empty;
 var helper_input: []u8 = &.{};
-var joystickConnectedFn: ?*const fn (wio.JoystickDevice) void = null;
 
 var mm_device_enumerator: *w.IMMDeviceEnumerator = undefined;
 var mm_notification_client = MMNotificationClient{};
-var audioDefaultOutputFn: ?*const fn (wio.AudioDevice) void = null;
-var audioDefaultInputFn: ?*const fn (wio.AudioDevice) void = null;
 
-pub fn init(options: wio.InitOptions) !void {
+pub fn init() !void {
     const instance = w.GetModuleHandleW(null);
 
     const class = std.mem.zeroInit(w.WNDCLASSW, .{
@@ -96,8 +93,6 @@ pub fn init(options: wio.InitOptions) !void {
     }
 
     if (build_options.joystick) {
-        joystickConnectedFn = options.joystickConnectedFn;
-
         _ = w.SetWindowLongPtrW(helper_window, w.GWLP_WNDPROC, @bitCast(@intFromPtr(&helperWindowProc)));
 
         joysticks = .empty;
@@ -124,24 +119,21 @@ pub fn init(options: wio.InitOptions) !void {
     }
 
     if (build_options.audio) {
-        audioDefaultOutputFn = options.audioDefaultOutputFn;
-        audioDefaultInputFn = options.audioDefaultInputFn;
-
         try SUCCEED(w.CoCreateInstance(&w.CLSID_MMDeviceEnumerator, null, w.CLSCTX_ALL, &w.IID_IMMDeviceEnumerator, @ptrCast(&mm_device_enumerator)), "CoCreateInstance");
 
         var device: *w.IMMDevice = undefined;
-        if (options.audioDefaultOutputFn) |callback| {
+        if (internal.audioDefaultOutputFn) |callback| {
             if (mm_device_enumerator.GetDefaultAudioEndpoint(w.eRender, w.eConsole, @ptrCast(&device)) == w.S_OK) {
-                callback(.{ .backend = .{ .device = device } });
+                callback(internal.audio_default_output_fn_data, .{ .backend = .{ .device = device } });
             }
         }
-        if (options.audioDefaultInputFn) |callback| {
+        if (internal.audioDefaultInputFn) |callback| {
             if (mm_device_enumerator.GetDefaultAudioEndpoint(w.eCapture, w.eConsole, @ptrCast(&device)) == w.S_OK) {
-                callback(.{ .backend = .{ .device = device } });
+                callback(internal.audio_default_input_fn_data, .{ .backend = .{ .device = device } });
             }
         }
 
-        if (options.audioDefaultOutputFn != null or options.audioDefaultInputFn != null) {
+        if (internal.audioDefaultOutputFn != null or internal.audioDefaultInputFn != null) {
             try SUCCEED(mm_device_enumerator.RegisterEndpointNotificationCallback(&mm_notification_client.interface), "RegisterEndpointNotificationCallback");
         }
     }
@@ -189,19 +181,19 @@ pub fn update() void {
 
     if (build_options.audio) {
         var maybe_device: ?*w.IMMDevice = undefined;
-        if (audioDefaultOutputFn) |callback| {
+        if (internal.audioDefaultOutputFn) |callback| {
             mm_notification_client.mutex.lockUncancelable(internal.io);
             maybe_device = mm_notification_client.default_output;
             mm_notification_client.default_output = null;
             mm_notification_client.mutex.unlock(internal.io);
-            if (maybe_device) |device| callback(.{ .backend = .{ .device = device } });
+            if (maybe_device) |device| callback(internal.audio_default_output_fn_data, .{ .backend = .{ .device = device } });
         }
-        if (audioDefaultInputFn) |callback| {
+        if (internal.audioDefaultInputFn) |callback| {
             mm_notification_client.mutex.lockUncancelable(internal.io);
             maybe_device = mm_notification_client.default_input;
             mm_notification_client.default_input = null;
             mm_notification_client.mutex.unlock(internal.io);
-            if (maybe_device) |device| callback(.{ .backend = .{ .device = device } });
+            if (maybe_device) |device| callback(internal.audio_default_input_fn_data, .{ .backend = .{ .device = device } });
         }
     }
 }
@@ -541,7 +533,7 @@ pub const Window = struct {
         }
     }
 
-    pub fn getClipboardText(_: *Window, clipboardTextFn: *const fn (?*anyopaque, []const u8) void, clipboard_text_fn_data: ?*anyopaque) void {
+    pub fn getClipboardText(_: *Window, callback: wio.Callback([]const u8)) void {
         if (w.OpenClipboard(null) == 0) return;
         defer _ = w.CloseClipboard();
         const mem = w.GetClipboardData(w.CF_UNICODETEXT) orelse return;
@@ -549,7 +541,7 @@ pub const Window = struct {
         defer _ = w.GlobalUnlock(mem);
         const text = std.unicode.utf16LeToUtf8Alloc(internal.allocator, std.mem.sliceTo(text_w, 0)) catch return;
         defer internal.allocator.free(text);
-        clipboardTextFn(clipboard_text_fn_data, text);
+        callback.function(callback.data, text);
     }
 
     pub fn getDropData(self: *Window, allocator: std.mem.Allocator) wio.DropData {
@@ -1218,9 +1210,9 @@ const MMNotificationClient = struct {
 
     fn OnDefaultDeviceChanged(_: *w.IMMNotificationClient, flow: i32, role: i32, id: [*c]const u16) callconv(.winapi) w.HRESULT {
         if (role == w.eConsole) {
-            const maybe_device = if (flow == w.eRender and audioDefaultOutputFn != null)
+            const maybe_device = if (flow == w.eRender and internal.audioDefaultOutputFn != null)
                 &mm_notification_client.default_output
-            else if (flow == w.eCapture and audioDefaultInputFn != null)
+            else if (flow == w.eCapture and internal.audioDefaultInputFn != null)
                 &mm_notification_client.default_input
             else
                 null;
@@ -1490,7 +1482,7 @@ fn helperWindowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM
                             var state: w.XINPUT_STATE = undefined;
                             if (w.XInputGetState(@intCast(i), &state) == w.ERROR_SUCCESS) {
                                 xinput.set(i);
-                                if (joystickConnectedFn) |callback| callback(.{ .backend = .{ .xinput = @intCast(i) } });
+                                if (internal.joystickConnectedFn) |callback| callback(internal.joystick_connected_fn_data, .{ .backend = .{ .xinput = @intCast(i) } });
                             }
                         }
                         internal.allocator.free(interface);
@@ -1502,7 +1494,7 @@ fn helperWindowProc(window: w.HWND, msg: u32, wParam: w.WPARAM, lParam: w.LPARAM
                         return 0;
                     };
 
-                    if (joystickConnectedFn) |callback| callback(.{ .backend = .{ .rawinput = device } });
+                    if (internal.joystickConnectedFn) |callback| callback(internal.joystick_connected_fn_data, .{ .backend = .{ .rawinput = device } });
                 },
                 w.GIDC_REMOVAL => {
                     var iter = xinput.iterator(.{});

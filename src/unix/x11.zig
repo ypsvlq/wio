@@ -604,9 +604,9 @@ pub const Window = struct {
         _ = c.XSetSelectionOwner(globals.display, h.XA_PRIMARY, self.window, h.CurrentTime);
     }
 
-    pub fn getClipboardText(self: *Window, clipboardTextFn: *const fn (?*anyopaque, []const u8) void, clipboard_text_fn_data: ?*anyopaque) void {
-        self.clipboardTextFn = clipboardTextFn;
-        self.clipboard_text_fn_data = clipboard_text_fn_data;
+    pub fn getClipboardText(self: *Window, callback: wio.Callback([]const u8)) void {
+        self.clipboardTextFn = callback.function;
+        self.clipboard_text_fn_data = callback.data;
         _ = c.XConvertSelection(globals.display, atoms.CLIPBOARD, atoms.UTF8_STRING, atoms.SELECTION, self.window, h.CurrentTime);
         _ = c.XFlush(globals.display);
     }

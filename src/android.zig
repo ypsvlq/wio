@@ -70,28 +70,21 @@ var relative_mouse: bool = false;
 var egl_config: c.EGLConfig = null;
 var egl_surface: c.EGLSurface = null; // protected by `window_mutex`
 
-var joystickConnectedFn: ?*const fn (wio.JoystickDevice) void = null;
 var joystick_map: std.AutoHashMapUnmanaged(c.jint, JoystickInfo) = .empty;
 var joystick_map_mutex: std.Io.Mutex = .init;
 var new_joysticks: std.ArrayList(c.jint) = .empty;
 var new_joysticks_mutex: std.Io.Mutex = .init;
 
-var audioDefaultInputFn: ?*const fn (wio.AudioDevice) void = null;
 var audio_input_available = false;
 
-pub fn init(options: wio.InitOptions) !void {
+pub fn init() !void {
     if (build_options.opengl) {
         try egl.init(c.EGL_DEFAULT_DISPLAY);
     }
 
-    if (build_options.joystick) {
-        joystickConnectedFn = options.joystickConnectedFn;
-    }
-
     if (build_options.audio) {
-        if (options.audioDefaultOutputFn) |callback| callback(.{ .backend = .{} });
-        if (options.audioDefaultInputFn) |callback| callback(.{ .backend = .{} });
-        audioDefaultInputFn = options.audioDefaultInputFn;
+        if (internal.audioDefaultOutputFn) |callback| callback(internal.audio_default_output_fn_data, .{ .backend = .{} });
+        if (internal.audioDefaultInputFn) |callback| callback(internal.audio_default_input_fn_data, .{ .backend = .{} });
     }
 }
 
@@ -125,20 +118,20 @@ pub fn run(func: fn () anyerror!bool) !void {
 
 pub fn update() void {
     if (build_options.joystick) {
-        if (joystickConnectedFn) |callback| {
+        if (internal.joystickConnectedFn) |callback| {
             new_joysticks_mutex.lockUncancelable(internal.io);
             defer new_joysticks_mutex.unlock(internal.io);
 
             while (new_joysticks.pop()) |id| {
-                callback(.{ .backend = .{ .id = id } });
+                callback(internal.joystick_connected_fn_data, .{ .backend = .{ .id = id } });
             }
         }
     }
 
     if (build_options.audio) {
         if (audio_input_available) {
-            if (audioDefaultInputFn) |callback| {
-                callback(.{ .backend = .{} });
+            if (internal.audioDefaultInputFn) |callback| {
+                callback(internal.audio_default_input_fn_data, .{ .backend = .{} });
             }
             audio_input_available = false;
         }
@@ -248,14 +241,14 @@ pub const Window = struct {
         java.env.*.*.CallVoidMethod.?(java.env, java.activity, java.setClipboardText, text_j);
     }
 
-    pub fn getClipboardText(_: *Window, clipboardTextFn: *const fn (?*anyopaque, []const u8) void, clipboard_text_fn_data: ?*anyopaque) void {
+    pub fn getClipboardText(_: *Window, callback: wio.Callback([]const u8)) void {
         const text_j = java.env.*.*.CallObjectMethod.?(java.env, java.activity, java.getClipboardText) orelse return;
         defer java.env.*.*.DeleteLocalRef.?(java.env, text_j);
 
         const text_z = java.env.*.*.GetStringUTFChars.?(java.env, text_j, null) orelse return;
         defer java.env.*.*.ReleaseStringUTFChars.?(java.env, text_j, text_z);
 
-        clipboardTextFn(clipboard_text_fn_data, std.mem.sliceTo(text_z, 0));
+        callback.function(callback.data, std.mem.sliceTo(text_z, 0));
     }
 
     pub fn getDropData(_: *Window, _: std.mem.Allocator) wio.DropData {

@@ -34,20 +34,16 @@ var libudev: DynLib = undefined;
 var udev: *h.udev = undefined;
 var monitor: *h.udev_monitor = undefined;
 
-var joystickConnectedFn: ?*const fn (wio.JoystickDevice) void = null;
-
-pub fn init(options: wio.InitOptions) !void {
-    joystickConnectedFn = options.joystickConnectedFn;
-
+pub fn init() !void {
     try DynLib.load(&imports, &.{.{ .handle = &libudev, .name = "libudev.so.1" }});
     errdefer libudev.close();
 
     udev = c.udev_new() orelse return error.Unexpected;
     errdefer _ = c.udev_unref(udev);
 
-    if (joystickConnectedFn) |callback| {
+    if (internal.joystickConnectedFn) |callback| {
         var iter = JoystickDeviceIterator.init();
-        while (iter.next()) |device| callback(.{ .backend = device });
+        while (iter.next()) |device| callback(internal.joystick_connected_fn_data, .{ .backend = device });
 
         monitor = c.udev_monitor_new_from_netlink(udev, "udev") orelse return error.Unexpected;
         errdefer _ = c.udev_monitor_unref(monitor);
@@ -58,19 +54,19 @@ pub fn init(options: wio.InitOptions) !void {
 }
 
 pub fn deinit() void {
-    if (joystickConnectedFn != null) _ = c.udev_monitor_unref(monitor);
+    if (internal.joystickConnectedFn != null) _ = c.udev_monitor_unref(monitor);
     _ = c.udev_unref(udev);
     libudev.close();
 }
 
 pub fn update() void {
-    if (joystickConnectedFn) |callback| {
+    if (internal.joystickConnectedFn) |callback| {
         while (c.udev_monitor_receive_device(monitor)) |device| {
             defer _ = c.udev_device_unref(device);
             const joystick = std.mem.sliceTo(c.udev_device_get_property_value(device, "ID_INPUT_JOYSTICK") orelse continue, 0);
             if (std.mem.eql(u8, joystick, "1")) {
                 const path = std.mem.sliceTo(c.udev_device_get_devpath(device) orelse continue, 0);
-                callback(.{ .backend = makeDevice(path, device) orelse continue });
+                callback(internal.joystick_connected_fn_data, .{ .backend = makeDevice(path, device) orelse continue });
             }
         }
     }

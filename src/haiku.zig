@@ -44,20 +44,20 @@ threadlocal var gl_state: struct {
     framebuffer: Framebuffer = undefined,
 } = .{};
 
-pub fn init(options: wio.InitOptions) !void {
+pub fn init() !void {
     wioInit();
 
     if (build_options.joystick) {
-        if (options.joystickConnectedFn) |callback| {
+        if (internal.joystickConnectedFn) |callback| {
             var iter = wio.JoystickDeviceIterator.init();
             defer iter.deinit();
-            while (iter.next()) |device| callback(device);
+            while (iter.next()) |device| callback(internal.joystick_connected_fn_data, device);
         }
     }
 
     if (build_options.audio) {
-        if (options.audioDefaultOutputFn) |callback| {
-            callback(.{ .backend = .{} });
+        if (internal.audioDefaultOutputFn) |callback| {
+            callback(internal.audio_default_output_fn_data, .{ .backend = .{} });
         }
     }
 }
@@ -233,10 +233,10 @@ pub const Window = struct {
         wioSetClipboardText(text.ptr, text.len);
     }
 
-    pub fn getClipboardText(_: *Window, clipboardTextFn: *const fn (?*anyopaque, []const u8) void, clipboard_text_fn_data: ?*anyopaque) void {
+    pub fn getClipboardText(_: *Window, callback: wio.Callback([]const u8)) void {
         var len: usize = undefined;
         if (wioGetClipboardText(&len)) |ptr| {
-            clipboardTextFn(clipboard_text_fn_data, ptr[0..len]);
+            callback.function(callback.data, ptr[0..len]);
         }
     }
 

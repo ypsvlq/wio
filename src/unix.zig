@@ -27,7 +27,7 @@ var pipe: [2]std.c.fd_t = undefined;
 
 pub var libvulkan: DynLib = undefined;
 
-pub fn init(options: wio.InitOptions) !void {
+pub fn init() !void {
     if (!build_options.system_integration and builtin.os.tag == .linux and builtin.output_mode == .Exe and builtin.link_mode == .static) @compileError("dynamic link required");
 
     pollfds = .empty;
@@ -53,9 +53,9 @@ pub fn init(options: wio.InitOptions) !void {
     }
     errdefer if (build_options.vulkan) libvulkan.close();
 
-    if (build_options.joystick) try joystick.init(options);
+    if (build_options.joystick) try joystick.init();
     errdefer if (build_options.joystick) joystick.deinit();
-    if (build_options.audio) try audio.init(options);
+    if (build_options.audio) try audio.init();
     errdefer if (build_options.audio) audio.deinit();
 
     var try_x11 = true;
@@ -337,10 +337,10 @@ pub const Window = union {
         }
     }
 
-    pub fn getClipboardText(self: *Window, clipboardTextFn: *const fn (?*anyopaque, []const u8) void, clipboard_text_fn_data: ?*anyopaque) void {
+    pub fn getClipboardText(self: *Window, callback: wio.Callback([]const u8)) void {
         switch (active) {
-            .x11 => self.x11.getClipboardText(clipboardTextFn, clipboard_text_fn_data),
-            .wayland => self.wayland.getClipboardText(clipboardTextFn, clipboard_text_fn_data),
+            .x11 => self.x11.getClipboardText(callback),
+            .wayland => self.wayland.getClipboardText(callback),
         }
     }
 
