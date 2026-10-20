@@ -1018,20 +1018,20 @@ pub const AudioDevice = struct {
         _ = self.device.Release();
     }
 
-    pub fn openOutput(self: AudioDevice, writeFn: *const fn ([]f32) void, format: wio.AudioFormat) !*AudioOutput {
-        return self.openAudioClient(format, &w.IID_IAudioRenderClient, @ptrCast(writeFn), AudioClient.outputThread);
+    pub fn openOutput(self: AudioDevice, callback: wio.Callback([]f32), format: wio.AudioFormat) !*AudioOutput {
+        return self.openAudioClient(format, &w.IID_IAudioRenderClient, .{ .write = callback }, AudioClient.outputThread);
     }
 
-    pub fn openInput(self: AudioDevice, readFn: *const fn ([]const f32) void, format: wio.AudioFormat) !*AudioInput {
-        return self.openAudioClient(format, &w.IID_IAudioCaptureClient, @ptrCast(readFn), AudioClient.inputThread);
+    pub fn openInput(self: AudioDevice, callback: wio.Callback([]const f32), format: wio.AudioFormat) !*AudioInput {
+        return self.openAudioClient(format, &w.IID_IAudioCaptureClient, .{ .read = callback }, AudioClient.inputThread);
     }
 
-    fn openAudioClient(self: AudioDevice, format: wio.AudioFormat, guid: *const w.GUID, dataFn: *const fn () void, threadFn: fn (*AudioClient) void) !*AudioClient {
+    fn openAudioClient(self: AudioDevice, format: wio.AudioFormat, guid: *const w.GUID, callback: AudioClient.Callback, threadFn: fn (*AudioClient) void) !*AudioClient {
         // device change notification does not guarantee it is configured, so make multiple attempts in case of AUDCLNT_E_DEVICE_INVALIDATED
         var attempt: u8 = 1;
         const max_attempts = 2;
         while (true) {
-            if (self.openAudioClientInner(format, guid, dataFn, threadFn)) |client| {
+            if (self.openAudioClientInner(format, guid, callback, threadFn)) |client| {
                 return client;
             } else |err| {
                 if (attempt < max_attempts) {
@@ -1043,7 +1043,7 @@ pub const AudioDevice = struct {
         }
     }
 
-    fn openAudioClientInner(self: AudioDevice, format: wio.AudioFormat, guid: *const w.GUID, dataFn: *const fn () void, threadFn: fn (*AudioClient) void) !*AudioClient {
+    fn openAudioClientInner(self: AudioDevice, format: wio.AudioFormat, guid: *const w.GUID, callback: AudioClient.Callback, threadFn: fn (*AudioClient) void) !*AudioClient {
         var client: *w.IAudioClient = undefined;
         try SUCCEED(self.device.Activate(&w.IID_IAudioClient, w.CLSCTX_ALL, null, @ptrCast(&client)), "IMMDevice::Activate");
         errdefer _ = client.Release();
@@ -1078,7 +1078,7 @@ pub const AudioDevice = struct {
             .event = event,
             .channels = format.channels,
             .service = service,
-            .dataFn = dataFn,
+            .callback = callback,
         };
         result.thread = try std.Thread.spawn(.{}, threadFn, .{result});
         return result;
@@ -1111,10 +1111,15 @@ const AudioClient = struct {
     thread: std.Thread,
     client: *w.IAudioClient,
     service: *w.IUnknown,
-    dataFn: *const fn () void,
+    callback: Callback,
     event: w.HANDLE,
     channels: u16,
     stop: std.atomic.Value(bool) = .init(false),
+
+    const Callback = union {
+        write: wio.Callback([]f32),
+        read: wio.Callback([]const f32),
+    };
 
     pub fn close(self: *AudioOutput) void {
         self.stop.store(true, .unordered);
@@ -1128,7 +1133,6 @@ const AudioClient = struct {
 
     fn outputThread(self: *AudioClient) void {
         const render_client: *w.IAudioRenderClient = @ptrCast(self.service);
-        const writeFn: *const fn ([]f32) void = @ptrCast(self.dataFn);
 
         var size: u32 = undefined;
         SUCCEED(self.client.GetBufferSize(&size), "IAudioClient::GetBufferSize") catch return;
@@ -1142,14 +1146,13 @@ const AudioClient = struct {
 
             var buffer: [*]f32 = undefined;
             SUCCEED(render_client.GetBuffer(available, @ptrCast(&buffer)), "IAudioRenderClient::GetBuffer") catch break;
-            writeFn(buffer[0 .. available * self.channels]);
+            self.callback.write.call(buffer[0 .. available * self.channels]);
             SUCCEED(render_client.ReleaseBuffer(available, 0), "IAudioRenderClient::ReleaseBuffer") catch break;
         }
     }
 
     fn inputThread(self: *AudioClient) void {
         const capture_client: *w.IAudioCaptureClient = @ptrCast(self.service);
-        const readFn: *const fn ([]const f32) void = @ptrCast(self.dataFn);
 
         while (!self.stop.load(.unordered)) {
             _ = w.WaitForSingleObject(self.event, w.INFINITE);
@@ -1160,7 +1163,7 @@ const AudioClient = struct {
             var buffer: [*]f32 = undefined;
             var flags: u32 = undefined;
             SUCCEED(capture_client.GetBuffer(@ptrCast(&buffer), &count, &flags, null, null), "IAudioCaptureClient::GetBuffer") catch break;
-            readFn(buffer[0 .. count * self.channels]);
+            self.callback.read.call(buffer[0 .. count * self.channels]);
             SUCCEED(capture_client.ReleaseBuffer(count), "IAudioCaptureClient::ReleaseBuffer") catch break;
         }
     }

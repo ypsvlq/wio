@@ -16,7 +16,7 @@ pub fn defaultOutput(_: ?*anyopaque, device: wio.AudioDevice) void {
     log.info("output: {s} / {s}", .{ name, id });
 
     if (maybe_output) |*old| old.close();
-    maybe_output = device.openOutput(write, .{ .sample_rate = 48000, .channels = 2 });
+    maybe_output = device.openOutput(.{ .function = write, .data = null }, .{ .sample_rate = 48000, .channels = 2 });
     if (maybe_output == null) log.info("lost", .{});
 }
 
@@ -30,7 +30,7 @@ pub fn defaultInput(_: ?*anyopaque, device: wio.AudioDevice) void {
     log.info("input: {s} / {s}", .{ name, id });
 
     if (maybe_input) |*old| old.close();
-    maybe_input = device.openInput(read, .{ .sample_rate = 48000, .channels = 1 });
+    maybe_input = device.openInput(.{ .function = read, .data = null }, .{ .sample_rate = 48000, .channels = 1 });
     if (maybe_input == null) log.info("lost", .{});
 }
 
@@ -42,7 +42,7 @@ pub fn close() void {
 pub var play = false;
 var time: f32 = 0;
 
-fn write(samples: []f32) void {
+fn write(_: ?*anyopaque, samples: []f32) void {
     if (play) {
         for (0..samples.len / 2) |i| {
             samples[i * 2] = 0.1 * @sin(2 * std.math.pi * 220 * time);
@@ -59,7 +59,7 @@ pub var record = false;
 var amplitude: f32 = 0;
 var count: usize = 0;
 
-fn read(samples: []const f32) void {
+fn read(_: ?*anyopaque, samples: []const f32) void {
     if (record) {
         for (samples) |sample| {
             amplitude = @max(amplitude, @abs(sample));

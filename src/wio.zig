@@ -38,6 +38,10 @@ pub fn Callback(T: type) type {
     return struct {
         function: *const fn (?*anyopaque, T) void,
         data: ?*anyopaque,
+
+        pub fn call(self: Callback(T), value: T) void {
+            self.function(self.data, value);
+        }
     };
 }
 
@@ -509,18 +513,18 @@ pub const AudioDevice = struct {
         return self.backend.release();
     }
 
-    /// `writeFn` is called on a separate thread.
+    /// `callback` runs on a separate thread.
     ///
     /// Free with `AudioOutput.close()`.
-    pub fn openOutput(self: AudioDevice, writeFn: *const fn ([]f32) void, format: AudioFormat) ?AudioOutput {
-        return .{ .backend = self.backend.openOutput(writeFn, format) catch return null };
+    pub fn openOutput(self: AudioDevice, callback: Callback([]f32), format: AudioFormat) ?AudioOutput {
+        return .{ .backend = self.backend.openOutput(callback, format) catch return null };
     }
 
-    /// `readFn` is called on a separate thread.
+    /// `callback` runs on a separate thread.
     ///
     /// Free with `AudioInput.close()`.
-    pub fn openInput(self: AudioDevice, readFn: *const fn ([]const f32) void, format: AudioFormat) ?AudioInput {
-        return .{ .backend = self.backend.openInput(readFn, format) catch return null };
+    pub fn openInput(self: AudioDevice, callback: Callback([]const f32), format: AudioFormat) ?AudioInput {
+        return .{ .backend = self.backend.openInput(callback, format) catch return null };
     }
 
     /// May not be unique.

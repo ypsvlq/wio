@@ -48,8 +48,8 @@ const js = struct {
     extern "wio" fn getJoystickId(u32, [*]u8) void;
     extern "wio" fn openJoystick(u32, *[2]u32) bool;
     extern "wio" fn getJoystickState(u32, [*]u16, usize, [*]bool, usize) bool;
-    extern "wio" fn openAudioOutput(*const anyopaque, [*]f32, u32, u8) u32;
-    extern "wio" fn openAudioInput(*const anyopaque, [*]f32, u32, u8) u32;
+    extern "wio" fn openAudioOutput(*const anyopaque, ?*anyopaque, [*]f32, u32, u8) u32;
+    extern "wio" fn openAudioInput(*const anyopaque, ?*anyopaque, [*]f32, u32, u8) u32;
     extern "wio" fn closeAudioContext(u32) void;
 };
 
@@ -324,15 +324,15 @@ pub const AudioDeviceIterator = struct {
 pub const AudioDevice = struct {
     pub fn release(_: AudioDevice) void {}
 
-    pub fn openOutput(_: AudioDevice, writeFn: *const fn ([]f32) void, format: wio.AudioFormat) !AudioOutput {
+    pub fn openOutput(_: AudioDevice, callback: wio.Callback([]f32), format: wio.AudioFormat) !AudioOutput {
         const buffer = try internal.allocator.alloc(f32, @as(usize, 128) * format.channels);
-        const id = js.openAudioOutput(writeFn, buffer.ptr, format.sample_rate, format.channels);
+        const id = js.openAudioOutput(callback.function, callback.data, buffer.ptr, format.sample_rate, format.channels);
         return .{ .id = id, .buffer = buffer };
     }
 
-    pub fn openInput(_: AudioDevice, readFn: *const fn ([]const f32) void, format: wio.AudioFormat) !AudioInput {
+    pub fn openInput(_: AudioDevice, callback: wio.Callback([]const f32), format: wio.AudioFormat) !AudioInput {
         const buffer = try internal.allocator.alloc(f32, @as(usize, 128) * format.channels);
-        const id = js.openAudioInput(readFn, buffer.ptr, format.sample_rate, format.channels);
+        const id = js.openAudioInput(callback.function, callback.data, buffer.ptr, format.sample_rate, format.channels);
         return .{ .id = id, .buffer = buffer };
     }
 
@@ -421,7 +421,7 @@ export fn wioJoystick(index: u32) void {
     }
 }
 
-export fn wioAudioCallback(data: *const anyopaque, buffer: [*]f32, len: usize) void {
-    const callback: *const fn ([]f32) void = @ptrCast(data);
-    callback(buffer[0..len]);
+export fn wioAudioCallback(callback: *const anyopaque, data: ?*anyopaque, buffer: [*]f32, len: usize) void {
+    const function: *const fn (?*anyopaque, []f32) void = @ptrCast(callback);
+    function(data, buffer[0..len]);
 }

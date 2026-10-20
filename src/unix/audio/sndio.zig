@@ -52,15 +52,15 @@ pub const AudioDeviceIterator = struct {
 pub const AudioDevice = struct {
     pub fn release(_: AudioDevice) void {}
 
-    pub fn openOutput(_: AudioDevice, writeFn: *const fn ([]f32) void, format: wio.AudioFormat) !*AudioOutput {
-        return open(.output, format, @ptrCast(writeFn));
+    pub fn openOutput(_: AudioDevice, callback: wio.Callback([]f32), format: wio.AudioFormat) !*AudioOutput {
+        return open(.output, format, .{ .write = callback });
     }
 
-    pub fn openInput(_: AudioDevice, readFn: *const fn ([]const f32) void, format: wio.AudioFormat) !*AudioInput {
-        return open(.input, format, @ptrCast(readFn));
+    pub fn openInput(_: AudioDevice, callback: wio.Callback([]const f32), format: wio.AudioFormat) !*AudioInput {
+        return open(.input, format, .{ .read = callback });
     }
 
-    fn open(comptime mode: wio.AudioDeviceType, format: wio.AudioFormat, dataFn: *const fn () void) !*AudioSession {
+    fn open(comptime mode: wio.AudioDeviceType, format: wio.AudioFormat, callback: AudioSession.Callback) !*AudioSession {
         const handle = c.sio_open(h.SIO_DEVANY, if (mode == .output) h.SIO_PLAY else h.SIO_REC, 0) orelse return error.Unexpected;
         errdefer c.sio_close(handle);
 
@@ -85,7 +85,7 @@ pub const AudioDevice = struct {
         result.* = .{
             .handle = handle,
             .buffer = buffer,
-            .dataFn = dataFn,
+            .callback = callback,
             .thread = undefined,
         };
         result.thread = try std.Thread.spawn(.{}, if (mode == .output) AudioSession.outputThread else AudioSession.inputThread, .{result});
@@ -104,9 +104,14 @@ pub const AudioDevice = struct {
 const AudioSession = struct {
     handle: *h.sio_hdl,
     buffer: []f32,
-    dataFn: *const fn () void,
+    callback: Callback,
     thread: std.Thread,
     stop: bool = false,
+
+    const Callback = union {
+        write: wio.Callback([]f32),
+        read: wio.Callback([]const f32),
+    };
 
     pub fn close(self: *AudioSession) void {
         self.stop = true;
@@ -118,9 +123,8 @@ const AudioSession = struct {
     }
 
     fn outputThread(self: *AudioSession) void {
-        const writeFn: *const fn ([]f32) void = @ptrCast(self.dataFn);
         while (!self.stop and c.sio_eof(self.handle) == 0) {
-            writeFn(self.buffer);
+            self.callback.write.call(self.buffer);
             for (self.buffer) |*float| {
                 const int: *i32 = @ptrCast(float);
                 int.* = @trunc(float.* * @as(f32, @floatFromInt(std.math.maxInt(i32))));
@@ -130,7 +134,6 @@ const AudioSession = struct {
     }
 
     fn inputThread(self: *AudioSession) void {
-        const readFn: *const fn ([]const f32) void = @ptrCast(self.dataFn);
         while (!self.stop and c.sio_eof(self.handle) == 0) {
             const count = c.sio_read(self.handle, self.buffer.ptr, self.buffer.len * 4);
             const buffer = self.buffer[0 .. count / 4];
@@ -139,7 +142,7 @@ const AudioSession = struct {
                 float.* = @floatFromInt(int.*);
                 float.* /= @floatFromInt(std.math.maxInt(i32));
             }
-            readFn(buffer);
+            self.callback.read.call(self.buffer);
         }
     }
 };

@@ -669,7 +669,7 @@ pub const AudioDevice = struct {
 
     pub fn release(_: AudioDevice) void {}
 
-    pub fn openOutput(self: AudioDevice, writeFn: *const fn ([]f32) void, format: wio.AudioFormat) !AudioOutput {
+    pub fn openOutput(self: AudioDevice, callback: wio.Callback([]f32), format: wio.AudioFormat) !*AudioOutput {
         const component = c.AudioComponentFindNext(null, &.{
             .componentType = c.kAudioUnitType_Output,
             .componentSubType = c.kAudioUnitSubType_HALOutput,
@@ -693,17 +693,22 @@ pub const AudioDevice = struct {
         };
         try succeed(c.AudioUnitSetProperty(unit, c.kAudioUnitProperty_StreamFormat, c.kAudioUnitScope_Input, 0, &stream_desc, @sizeOf(c.AudioStreamBasicDescription)), "SetProperty(StreamFormat)");
 
-        const callback: c.AURenderCallbackStruct = .{
-            .inputProc = AudioOutput.callback,
-            .inputProcRefCon = @constCast(writeFn),
+        const output = try internal.allocator.create(AudioOutput);
+        errdefer internal.allocator.destroy(output);
+        output.* = .{
+            .unit = unit,
+            .callback = callback,
         };
-        try succeed(c.AudioUnitSetProperty(unit, c.kAudioUnitProperty_SetRenderCallback, c.kAudioUnitScope_Global, 0, &callback, @sizeOf(c.AURenderCallbackStruct)), "SetProperty(RenderCallback)");
+        try succeed(c.AudioUnitSetProperty(unit, c.kAudioUnitProperty_SetRenderCallback, c.kAudioUnitScope_Global, 0, &c.AURenderCallbackStruct{
+            .inputProc = AudioOutput.render,
+            .inputProcRefCon = output,
+        }, @sizeOf(c.AURenderCallbackStruct)), "SetProperty(RenderCallback)");
         try succeed(c.AudioUnitInitialize(unit), "AudioUnitInitialize");
         try succeed(c.AudioOutputUnitStart(unit), "AudioOutputUnitStart");
-        return .{ .unit = unit };
+        return output;
     }
 
-    pub fn openInput(self: AudioDevice, readFn: *const fn ([]const f32) void, format: wio.AudioFormat) !*AudioInput {
+    pub fn openInput(self: AudioDevice, callback: wio.Callback([]const f32), format: wio.AudioFormat) !*AudioInput {
         const component = c.AudioComponentFindNext(null, &.{
             .componentType = c.kAudioUnitType_Output,
             .componentSubType = c.kAudioUnitSubType_HALOutput,
@@ -744,13 +749,12 @@ pub const AudioDevice = struct {
         input.* = .{
             .unit = unit,
             .converter = converter,
-            .readFn = readFn,
+            .callback = callback,
         };
-        const callback: c.AURenderCallbackStruct = .{
-            .inputProc = AudioInput.callback,
+        try succeed(c.AudioUnitSetProperty(unit, c.kAudioOutputUnitProperty_SetInputCallback, c.kAudioUnitScope_Global, 0, &c.AURenderCallbackStruct{
+            .inputProc = AudioInput.render,
             .inputProcRefCon = input,
-        };
-        try succeed(c.AudioUnitSetProperty(unit, c.kAudioOutputUnitProperty_SetInputCallback, c.kAudioUnitScope_Global, 0, &callback, @sizeOf(c.AURenderCallbackStruct)), "SetProperty(InputCallback)");
+        }, @sizeOf(c.AURenderCallbackStruct)), "SetProperty(InputCallback)");
         try succeed(c.AudioUnitInitialize(unit), "AudioUnitInitialize");
         try succeed(c.AudioOutputUnitStart(unit), "AudioOutputUnitStart");
         return input;
@@ -783,16 +787,18 @@ pub const AudioDevice = struct {
 
 pub const AudioOutput = struct {
     unit: c.AudioUnit,
+    callback: wio.Callback([]f32),
 
     pub fn close(self: *AudioOutput) void {
         _ = c.AudioUnitUninitialize(self.unit);
+        internal.allocator.destroy(self);
     }
 
-    fn callback(data: ?*anyopaque, _: [*c]c.AudioUnitRenderActionFlags, _: [*c]const c.AudioTimeStamp, _: u32, _: u32, list: [*c]c.AudioBufferList) callconv(.c) c.OSStatus {
-        const writeFn: *const fn ([]f32) void = @ptrCast(@alignCast(data));
+    fn render(data: ?*anyopaque, _: [*c]c.AudioUnitRenderActionFlags, _: [*c]const c.AudioTimeStamp, _: u32, _: u32, list: [*c]c.AudioBufferList) callconv(.c) c.OSStatus {
+        const self: *AudioOutput = @ptrCast(@alignCast(data));
         const buffer = list.*.mBuffers[0];
         const ptr: [*]f32 = @ptrCast(@alignCast(buffer.mData));
-        writeFn(ptr[0 .. buffer.mDataByteSize / @sizeOf(f32)]);
+        self.callback.call(ptr[0 .. buffer.mDataByteSize / @sizeOf(f32)]);
         return c.noErr;
     }
 };
@@ -800,7 +806,7 @@ pub const AudioOutput = struct {
 pub const AudioInput = struct {
     unit: c.AudioUnit,
     converter: c.AudioConverterRef,
-    readFn: *const fn ([]const f32) void,
+    callback: wio.Callback([]const f32),
     buffer: [1024]f32 = undefined,
 
     pub fn close(self: *AudioInput) void {
@@ -809,7 +815,7 @@ pub const AudioInput = struct {
         internal.allocator.destroy(self);
     }
 
-    fn callback(data: ?*anyopaque, flags: [*c]c.AudioUnitRenderActionFlags, timestamp: [*c]const c.AudioTimeStamp, bus: u32, frames: u32, _: [*c]c.AudioBufferList) callconv(.c) c.OSStatus {
+    fn render(data: ?*anyopaque, flags: [*c]c.AudioUnitRenderActionFlags, timestamp: [*c]const c.AudioTimeStamp, bus: u32, frames: u32, _: [*c]c.AudioBufferList) callconv(.c) c.OSStatus {
         const self: *AudioInput = @ptrCast(@alignCast(data));
 
         var list: c.AudioBufferList = .{
@@ -834,7 +840,7 @@ pub const AudioInput = struct {
             };
             var packets = remaining;
             succeed(c.AudioConverterFillComplexBuffer(self.converter, inputProc, &list.mBuffers[0], &packets, &output, null), "AudioConverterFillComplexBuffer") catch return c.noErr;
-            self.readFn(self.buffer[0 .. packets * list.mBuffers[0].mNumberChannels]);
+            self.callback.call(self.buffer[0 .. packets * list.mBuffers[0].mNumberChannels]);
             remaining -= packets;
             list.mBuffers[0].mData = @ptrFromInt(@intFromPtr(list.mBuffers[0].mData) + output.mBuffers[0].mDataByteSize);
             list.mBuffers[0].mDataByteSize -= output.mBuffers[0].mDataByteSize;

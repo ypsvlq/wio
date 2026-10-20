@@ -6,6 +6,7 @@ class WioAudio extends AudioWorkletProcessor {
         this.instance = undefined;
 
         this.callback = undefined;
+        this.data = undefined;
 
         /** @type {Float32Array} */
         this.buffer = undefined;
@@ -13,6 +14,7 @@ class WioAudio extends AudioWorkletProcessor {
         this.port.onmessage = (event) => {
             this.memory = event.data.memory;
             this.callback = event.data.callback;
+            this.data = event.data.data;
             this.buffer = new Float32Array(event.data.memory.buffer, event.data.buffer, 128 * event.data.channels);
 
             let imports = {};
@@ -29,7 +31,7 @@ class WioAudio extends AudioWorkletProcessor {
             this.process = (inputs, outputs, parameters) => {
                 if (this.instance === undefined) return true;
 
-                this.instance.exports.wioAudioCallback(this.callback, this.buffer.byteOffset, this.buffer.length);
+                this.instance.exports.wioAudioCallback(this.callback, this.data, this.buffer.byteOffset, this.buffer.length);
 
                 const channels = outputs[0].length;
                 for (let channel = 0; channel < channels; channel++) {
@@ -51,7 +53,7 @@ class WioAudio extends AudioWorkletProcessor {
                     }
                 }
 
-                this.instance.exports.wioAudioCallback(this.callback, this.buffer.byteOffset, this.buffer.length);
+                this.instance.exports.wioAudioCallback(this.callback, this.data, this.buffer.byteOffset, this.buffer.length);
 
                 return true;
             };

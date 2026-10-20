@@ -197,13 +197,17 @@ pub const AudioDevice = struct {
         internal.allocator.free(self.id);
     }
 
-    pub fn openOutput(self: AudioDevice, writeFn: *const fn ([]f32) void, format: wio.AudioFormat) !AudioOutput {
+    pub fn openOutput(self: AudioDevice, callback: wio.Callback([]f32), format: wio.AudioFormat) !AudioOutput {
         c.pa_threaded_mainloop_lock(loop);
         defer c.pa_threaded_mainloop_unlock(loop);
 
+        const data = try internal.allocator.create(wio.Callback([]f32));
+        errdefer internal.allocator.destroy(data);
+        data.* = callback;
+
         const stream = try openStream(format);
         errdefer c.pa_stream_unref(stream);
-        c.pa_stream_set_write_callback(stream, AudioOutput.callback, @constCast(writeFn));
+        c.pa_stream_set_write_callback(stream, AudioOutput.writeCallback, data);
 
         const attr = h.pa_buffer_attr{
             .maxlength = std.math.maxInt(u32),
@@ -214,16 +218,20 @@ pub const AudioDevice = struct {
         };
         if (c.pa_stream_connect_playback(stream, self.id, &attr, h.PA_STREAM_ADJUST_LATENCY, null, null) != 0) return logContextError("pa_stream_connect_playback");
 
-        return .{ .stream = stream };
+        return .{ .stream = stream, .callback = data };
     }
 
-    pub fn openInput(self: AudioDevice, readFn: *const fn ([]const f32) void, format: wio.AudioFormat) !AudioInput {
+    pub fn openInput(self: AudioDevice, callback: wio.Callback([]const f32), format: wio.AudioFormat) !AudioInput {
         c.pa_threaded_mainloop_lock(loop);
         defer c.pa_threaded_mainloop_unlock(loop);
 
+        const data = try internal.allocator.create(wio.Callback([]const f32));
+        errdefer internal.allocator.destroy(data);
+        data.* = callback;
+
         const stream = try openStream(format);
         errdefer c.pa_stream_unref(stream);
-        c.pa_stream_set_read_callback(stream, AudioInput.callback, @constCast(readFn));
+        c.pa_stream_set_read_callback(stream, AudioInput.readCallback, data);
 
         const attr = h.pa_buffer_attr{
             .maxlength = std.math.maxInt(u32),
@@ -234,7 +242,7 @@ pub const AudioDevice = struct {
         };
         if (c.pa_stream_connect_record(stream, self.id, &attr, h.PA_STREAM_ADJUST_LATENCY) != 0) return logContextError("pa_stream_connect_record");
 
-        return .{ .stream = stream };
+        return .{ .stream = stream, .callback = data };
     }
 
     pub fn getId(self: AudioDevice, allocator: std.mem.Allocator) ![]u8 {
@@ -267,21 +275,23 @@ fn openStream(format: wio.AudioFormat) !*h.pa_stream {
 
 pub const AudioOutput = struct {
     stream: *h.pa_stream,
+    callback: *wio.Callback([]f32),
 
     pub fn close(self: *AudioOutput) void {
         c.pa_threaded_mainloop_lock(loop);
         defer c.pa_threaded_mainloop_unlock(loop);
         _ = c.pa_stream_disconnect(self.stream);
         c.pa_stream_unref(self.stream);
+        internal.allocator.destroy(self.callback);
     }
 
-    fn callback(stream: ?*h.pa_stream, _: usize, data: ?*anyopaque) callconv(.c) void {
-        const writeFn: *const fn ([]f32) void = @ptrCast(@alignCast(data));
+    fn writeCallback(stream: ?*h.pa_stream, _: usize, data: ?*anyopaque) callconv(.c) void {
+        const callback: *wio.Callback([]f32) = @ptrCast(@alignCast(data));
         var ptr: ?*anyopaque = undefined;
         var nbytes: usize = std.math.maxInt(usize);
         if (c.pa_stream_begin_write(stream, &ptr, &nbytes) == 0 and ptr != null) {
             const buffer: [*]f32 = @ptrCast(@alignCast(ptr));
-            writeFn(buffer[0 .. nbytes / @sizeOf(f32)]);
+            callback.call(buffer[0 .. nbytes / @sizeOf(f32)]);
             _ = c.pa_stream_write(stream, ptr, nbytes, null, 0, h.PA_SEEK_RELATIVE);
         }
     }
@@ -289,21 +299,23 @@ pub const AudioOutput = struct {
 
 pub const AudioInput = struct {
     stream: *h.pa_stream,
+    callback: *wio.Callback([]const f32),
 
     pub fn close(self: *AudioInput) void {
         c.pa_threaded_mainloop_lock(loop);
         defer c.pa_threaded_mainloop_unlock(loop);
         _ = c.pa_stream_disconnect(self.stream);
         c.pa_stream_unref(self.stream);
+        internal.allocator.destroy(self.callback);
     }
 
-    fn callback(stream: ?*h.pa_stream, _: usize, data: ?*anyopaque) callconv(.c) void {
-        const readFn: *const fn ([]const f32) void = @ptrCast(@alignCast(data));
+    fn readCallback(stream: ?*h.pa_stream, _: usize, data: ?*anyopaque) callconv(.c) void {
+        const callback: *wio.Callback([]const f32) = @ptrCast(@alignCast(data));
         var ptr: ?*const anyopaque = null;
         var nbytes: usize = 0;
         if (c.pa_stream_peek(stream, &ptr, &nbytes) == 0 and ptr != null) {
             const buffer: [*]const f32 = @ptrCast(@alignCast(ptr));
-            readFn(buffer[0 .. nbytes / @sizeOf(f32)]);
+            callback.call(buffer[0 .. nbytes / @sizeOf(f32)]);
         }
         if (nbytes != 0) _ = c.pa_stream_drop(stream);
     }

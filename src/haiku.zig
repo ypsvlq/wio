@@ -451,13 +451,20 @@ pub const AudioDeviceIterator = struct {
 pub const AudioDevice = struct {
     pub fn release(_: AudioDevice) void {}
 
-    pub fn openOutput(_: AudioDevice, writeFn: *const fn ([]f32) void, format: wio.AudioFormat) !AudioOutput {
-        return .{ .handle = wioAudioOutputOpen(format.sample_rate, format.channels, writeFn) orelse return error.Unexpected };
+    pub fn openOutput(_: AudioDevice, callback: wio.Callback([]f32), format: wio.AudioFormat) !*AudioOutput {
+        const output = try internal.allocator.create(AudioOutput);
+        errdefer internal.allocator.destroy(output);
+        output.* = .{
+            .handle = undefined,
+            .callback = callback,
+        };
+        output.handle = wioAudioOutputOpen(format.sample_rate, format.channels, output) orelse return error.Unexpected;
+        return output;
     }
 
-    pub fn openInput(self: AudioDevice, readFn: *const fn ([]const f32) void, format: wio.AudioFormat) !AudioInput {
+    pub fn openInput(self: AudioDevice, callback: wio.Callback([]const f32), format: wio.AudioFormat) !AudioInput {
         _ = self;
-        _ = readFn;
+        _ = callback;
         _ = format;
         return error.Unexpected;
     }
@@ -475,9 +482,11 @@ pub const AudioDevice = struct {
 
 pub const AudioOutput = struct {
     handle: *BSoundPlayer,
+    callback: wio.Callback([]f32),
 
     pub fn close(self: *AudioOutput) void {
         wioAudioOutputClose(self.handle);
+        internal.allocator.destroy(self);
     }
 };
 
@@ -606,8 +615,8 @@ fn wioDropComplete(self: *Window) callconv(.c) void {
 }
 
 fn wioAudioOutputWrite(data: *const anyopaque, buffer: [*]f32, size: usize) callconv(.c) void {
-    const writeFn: *const fn ([]f32) void = @ptrCast(@alignCast(data));
-    writeFn(buffer[0 .. size / @sizeOf(f32)]);
+    const self: *AudioOutput = @ptrCast(@alignCast(data));
+    self.callback.call(buffer[0 .. size / @sizeOf(f32)]);
 }
 
 comptime {

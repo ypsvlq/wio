@@ -388,7 +388,7 @@ class Wio {
             return true;
         },
 
-        openAudioOutput: (writeFn, buffer, sample_rate, channels) => {
+        openAudioOutput: (callback, data, buffer, sample_rate, channels) => {
             const context = new AudioContext({ sampleRate: sample_rate });
             context.audioWorklet.addModule(new URL("WioAudio.js", import.meta.url)).then(() => {
                 const node = new AudioWorkletNode(context, "wio", {
@@ -398,7 +398,8 @@ class Wio {
                 node.port.postMessage({
                     memory: this.memory,
                     module: this.module,
-                    callback: writeFn,
+                    callback: callback,
+                    data: data,
                     buffer: buffer,
                     channels: channels,
                 });
@@ -409,7 +410,7 @@ class Wio {
             return this.pushObject(context);
         },
 
-        openAudioInput: (readFn, buffer, sample_rate, channels) => {
+        openAudioInput: (callback, data, buffer, sample_rate, channels) => {
             const context = new AudioContext({ sampleRate: sample_rate });
             navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
                 context.audioWorklet.addModule(new URL("WioAudio.js", import.meta.url)).then(() => {
@@ -417,7 +418,8 @@ class Wio {
                     node.port.postMessage({
                         memory: this.memory,
                         module: this.module,
-                        callback: readFn,
+                        callback: callback,
+                        data: data,
                         buffer: buffer,
                         channels: channels,
                     });

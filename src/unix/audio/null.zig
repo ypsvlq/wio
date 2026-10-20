@@ -23,11 +23,11 @@ pub const AudioDeviceIterator = struct {
 pub const AudioDevice = struct {
     pub fn release(_: AudioDevice) void {}
 
-    pub fn openOutput(_: AudioDevice, _: *const fn ([]f32) void, _: wio.AudioFormat) !AudioOutput {
+    pub fn openOutput(_: AudioDevice, _: wio.Callback([]f32), _: wio.AudioFormat) !AudioOutput {
         return error.Unexpected;
     }
 
-    pub fn openInput(_: AudioDevice, _: *const fn ([]const f32) void, _: wio.AudioFormat) !AudioInput {
+    pub fn openInput(_: AudioDevice, _: wio.Callback([]const f32), _: wio.AudioFormat) !AudioInput {
         return error.Unexpected;
     }
 

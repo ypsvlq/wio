@@ -266,16 +266,16 @@ pub const AudioDevice = struct {
         _ = self;
     }
 
-    pub fn openOutput(self: AudioDevice, writeFn: *const fn ([]f32) void, format: wio.AudioFormat) !AudioOutput {
+    pub fn openOutput(self: AudioDevice, callback: wio.Callback([]f32), format: wio.AudioFormat) !AudioOutput {
         _ = self;
-        _ = writeFn;
+        _ = callback;
         _ = format;
         return error.Unexpected;
     }
 
-    pub fn openInput(self: AudioDevice, readFn: *const fn ([]const f32) void, format: wio.AudioFormat) !AudioInput {
+    pub fn openInput(self: AudioDevice, callback: wio.Callback([]const f32), format: wio.AudioFormat) !AudioInput {
         _ = self;
-        _ = readFn;
+        _ = callback;
         _ = format;
         return error.Unexpected;
     }
