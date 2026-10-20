@@ -1,0 +1,39 @@
+name: build
+description: build
+inputs:
+  target:
+    description: target
+    required: true
+  args:
+    description: args
+runs:
+  using: composite
+  steps:
+  - name: Build demo
+    working-directory: demo
+    run: zig build -Dtarget=${{ inputs.target }} ${{ inputs.args }}
+    shell: bash
+  - name: Build framebuffer example
+    working-directory: examples/framebuffer
+    run: zig build -Dtarget=${{ inputs.target }} ${{ inputs.args }}
+    shell: bash
+  - if: ${{ inputs.target != 'wasm32-freestanding' }}
+    name: Build OpenGL example
+    working-directory: examples/opengl
+    run: zig build -Dtarget=${{ inputs.target }} ${{ inputs.args }}
+    shell: bash
+  - if: ${{ inputs.target != 'wasm32-freestanding' }}
+    name: Build Vulkan example
+    working-directory: examples/vulkan
+    run: zig build -Dtarget=${{ inputs.target }} ${{ inputs.args }}
+    shell: bash
+  - if: ${{ endsWith(inputs.target, '-windows') }}
+    name: Build D3D11 example
+    working-directory: examples/d3d11
+    run: zig build -Dtarget=${{ inputs.target }} ${{ inputs.args }}
+    shell: bash
+  - if: ${{ runner.os == 'macOS' }}
+    name: Build Metal example
+    working-directory: examples/metal
+    run: zig build -Dtarget=${{ inputs.target }} ${{ inputs.args }}
+    shell: bash

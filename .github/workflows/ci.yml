@@ -14,63 +14,67 @@ jobs:
       run: zig fmt --check .
   build:
     needs: check
-    strategy:
-      fail-fast: false
-      matrix:
-        target:
-        - x86-windows
-        - aarch64-windows
-        - aarch64-macos
-        - x86_64-macos
-        - arm-linux-gnueabi
-        - powerpc64-openbsd
-        - mips-netbsd
-        - riscv64-freebsd
-        - wasm32-freestanding
-        - native
-    runs-on: ${{ endsWith(matrix.target, '-macos') && 'macos-latest' || 'ubuntu-latest' }}
-    env:
-      build: zig build -Dtarget=${{ matrix.target }} ${{ endsWith(matrix.target, '-macos') && '-Dmacos_sdk_path="$(xcrun --sdk macosx --show-sdk-path)"' || '' }} ${{ matrix.target == 'wasm32-freestanding' && '-Dcpu=bleeding_edge' || '' }} ${{ matrix.target == 'native' && '-fsys=wio' || '' }}
+    runs-on: ubuntu-latest
     steps:
     - name: Checkout
       uses: actions/checkout@v7
     - name: Set up Zig
       uses: mlugg/setup-zig@v2
+    - name: Install packages
+      uses: awalsh128/cache-apt-pkgs-action@v1
       with:
-        cache-key: ${{ matrix.target }}
-    - if: ${{ matrix.target == 'native' }}
-      name: Install packages
-      run: |
-        sudo apt-get update
-        sudo apt-get install xwayland-run libx11-dev libxrandr-dev libxcursor-dev libglvnd-dev libwayland-dev libxkbcommon-dev libdecor-0-dev libvulkan-dev libxext-dev libudev-dev libpulse-dev
-    - name: Build demo
-      working-directory: demo
-      run: ${{ env.build }}
-    - name: Build framebuffer example
-      working-directory: examples/framebuffer
-      run: ${{ env.build }}
-    - if: ${{ matrix.target == 'native' }}
-      name: Run framebuffer example (X11)
-      run: test "$(xvfb-run timeout 10 examples/framebuffer/zig-out/bin/framebuffer >stdout; echo $?; cat stdout >&2)" -eq 124
-    - if: ${{ matrix.target == 'native' }}
-      name: Run framebuffer example (Wayland)
-      run: test "$(wlheadless-run -- timeout 10 examples/framebuffer/zig-out/bin/framebuffer; echo $?)" -eq 124
-    - if: ${{ matrix.target != 'wasm32-freestanding' }}
-      name: Build OpenGL example
-      working-directory: examples/opengl
-      run: ${{ env.build }}
-    - if: ${{ matrix.target != 'wasm32-freestanding' }}
-      name: Build Vulkan example
-      working-directory: examples/vulkan
-      run: ${{ env.build }}
-    - if: ${{ endsWith(matrix.target, '-windows') }}
-      name: Build D3D11 example
-      working-directory: examples/d3d11
-      run: ${{ env.build }}
-    - if: ${{ endsWith(matrix.target, '-macos') }}
-      name: Build Metal example
-      working-directory: examples/metal
-      run: ${{ env.build }}
+        packages: libx11-dev libxrandr-dev libxcursor-dev libglvnd-dev libwayland-dev libxkbcommon-dev libdecor-0-dev libvulkan-dev libxext-dev libudev-dev libpulse-dev
+    - name: Build (native)
+      uses: $/.github/actions/build
+      with:
+        target: native
+        args: -fsys=wio
+    - name: Build (x86-windows)
+      uses: $/.github/actions/build
+      with:
+        target: x86-windows
+    - name: Build (aarch64-windows)
+      uses: $/.github/actions/build
+      with:
+        target: aarch64-windows
+    - name: Build (arm-linux-gnueabi)
+      uses: $/.github/actions/build
+      with:
+        target: arm-linux-gnueabi
+    - name: Build (powerpc64-openbsd)
+      uses: $/.github/actions/build
+      with:
+        target: powerpc64-openbsd
+    - name: Build (mips-netbsd)
+      uses: $/.github/actions/build
+      with:
+        target: mips-netbsd
+    - name: Build (riscv64-freebsd)
+      uses: $/.github/actions/build
+      with:
+        target: riscv64-freebsd
+    - name: Build (wasm32-freestanding)
+      uses: $/.github/actions/build
+      with:
+        target: wasm32-freestanding
+        args: -Dcpu=bleeding_edge
+  build_macos:
+    needs: check
+    runs-on: macos-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v7
+    - name: Set up Zig
+      uses: mlugg/setup-zig@v2
+    - name: Build (native)
+      uses: $/.github/actions/build
+      with:
+        target: native
+    - name: Build (x86_64-macos)
+      uses: $/.github/actions/build
+      with:
+        target: x86_64-macos
+        args: -Dmacos_sdk_path="$(xcrun --sdk macosx --show-sdk-path)"
   # build_android:
   #   needs: check
   #   runs-on: ubuntu-latest
