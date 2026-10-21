@@ -41,10 +41,11 @@ jobs:
       uses: $/.github/actions/build
       with:
         target: arm-linux-gnueabi
-    - name: Build (powerpc64-openbsd)
+    - name: Build (powerpc-openbsd)
       uses: $/.github/actions/build
       with:
-        target: powerpc64-openbsd
+        target: powerpc-openbsd
+        args: -Dunix_backends=x11
     - name: Build (mips-netbsd)
       uses: $/.github/actions/build
       with:
