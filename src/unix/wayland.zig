@@ -311,9 +311,8 @@ pub const Window = struct {
     cursor: u32 = h.WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_DEFAULT,
     relative_mouse: ?wio.RelativeMouseOptions = null,
     drop: if (build_options.drop) struct {
-        files: std.ArrayList([]const u8) = .empty,
-        text: ?[]const u8 = null,
-    } else struct {} = .{},
+        callback: ?wio.Callback(wio.DropData),
+    } else struct {},
     egl: if (build_options.opengl) struct {
         config: h.EGLConfig = null,
         window: ?*h.wl_egl_window = null,
@@ -335,6 +334,7 @@ pub const Window = struct {
             .surface = surface,
             .frame = frame,
             .size = options.size,
+            .drop = if (build_options.drop) .{ .callback = options.drop_callback } else .{},
         };
 
         if (globals.viewporter) |_| {
@@ -406,12 +406,6 @@ pub const Window = struct {
         if (build_options.opengl) {
             if (self.egl.surface) |_| _ = c.eglDestroySurface(egl.display, self.egl.surface);
             if (self.egl.window) |_| c.wl_egl_window_destroy(self.egl.window);
-        }
-
-        if (build_options.drop) {
-            for (self.drop.files.items) |file| internal.allocator.free(file);
-            self.drop.files.deinit(internal.allocator);
-            if (self.drop.text) |text| internal.allocator.free(text);
         }
 
         if (self.frame_callback) |_| h.wl_callback_destroy(self.frame_callback);
@@ -586,10 +580,6 @@ pub const Window = struct {
                 text.appendSlice(internal.allocator, buffer[0..@intCast(count)]) catch return;
             }
         }
-    }
-
-    pub fn getDropData(self: *Window, allocator: std.mem.Allocator) wio.DropData {
-        return wio.DropData.dupe(allocator, self.drop.files.items, self.drop.text) catch .{ .files = &.{}, .text = null };
     }
 
     pub fn createFramebuffer(_: *Window, size: wio.Size) !Framebuffer {
@@ -1328,21 +1318,13 @@ fn dataDeviceEnter(_: ?*anyopaque, _: ?*h.wl_data_device, serial: u32, surface: 
                 h.wl_data_offer_accept(o, serial, null);
             }
         }
-
-        if (globals.drop.drag_window) |window| {
-            for (window.drop.files.items) |f| internal.allocator.free(f);
-            window.drop.files.clearRetainingCapacity();
-            if (window.drop.text) |t| internal.allocator.free(t);
-            window.drop.text = null;
-            internal.sendEvent(window.event_fn_data, .drop_begin);
-        }
     }
 }
 
 fn dataDeviceLeave(_: ?*anyopaque, _: ?*h.wl_data_device) callconv(.c) void {
     if (build_options.drop) {
         if (!globals.drop.drag_dropped) {
-            if (globals.drop.drag_window) |window| internal.sendEvent(window.event_fn_data, .drop_complete);
+            if (globals.drop.drag_window) |window| internal.sendEvent(window.event_fn_data, .drop_end);
         }
         if (globals.drop.drag_offer) |o| {
             h.wl_data_offer_destroy(o);
@@ -1375,7 +1357,7 @@ fn dataDeviceDrop(_: ?*anyopaque, _: ?*h.wl_data_device) callconv(.c) void {
 
         var pipe: [2]i32 = undefined;
         if (std.c.pipe(&pipe) == -1) {
-            internal.sendEvent(window.event_fn_data, .drop_complete);
+            internal.sendEvent(window.event_fn_data, .drop_end);
             globals.drop.drag_dropped = true;
             return;
         }
@@ -1393,21 +1375,20 @@ fn dataDeviceDrop(_: ?*anyopaque, _: ?*h.wl_data_device) callconv(.c) void {
             total += @intCast(n);
         }
 
-        if (globals.drop.drag_has_uri) {
-            var iter = std.mem.splitAny(u8, buf[0..total], "\r\n");
-            while (iter.next()) |line| {
-                if (line.len == 0 or line[0] == '#') continue;
-                const prefix = "file://";
-                if (!std.mem.startsWith(u8, line, prefix)) continue;
-                const path = internal.allocator.dupe(u8, line[prefix.len..]) catch continue;
-                window.drop.files.append(internal.allocator, std.Uri.percentDecodeInPlace(path)) catch {};
+        if (window.drop.callback) |callback| {
+            if (globals.drop.drag_has_uri) {
+                var iter = std.mem.splitAny(u8, buf[0..total], "\r\n");
+                while (iter.next()) |line| {
+                    if (line.len == 0 or line[0] == '#') continue;
+                    const prefix = "file://";
+                    if (!std.mem.startsWith(u8, line, prefix)) continue;
+                    callback.call(.{ .file = std.Uri.percentDecodeInPlace(@constCast(line[prefix.len..])) });
+                }
+            } else {
+                callback.call(.{ .text = buf[0..total] });
             }
-        } else {
-            if (internal.allocator.dupe(u8, buf[0..total])) |copy| {
-                window.drop.text = copy;
-            } else |_| {}
         }
-        internal.sendEvent(window.event_fn_data, .drop_complete);
+        internal.sendEvent(window.event_fn_data, .drop_end);
     }
 }
 

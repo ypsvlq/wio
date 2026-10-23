@@ -275,9 +275,8 @@ pub const Window = struct {
     touch_ids: std.AutoHashMapUnmanaged(u16, u8) = .empty,
     drop: if (build_options.drop) struct {
         target: DropTarget = undefined,
-        files: std.ArrayList([]const u8) = .empty,
-        text: ?[]const u8 = null,
-    } else struct {} = .{},
+        callback: ?wio.Callback(wio.DropData),
+    } else struct {},
     opengl: if (build_options.opengl) struct {
         dc: w.HDC = null,
     } else struct {} = .{},
@@ -308,6 +307,7 @@ pub const Window = struct {
             .event_fn_data = options.event_fn_data,
             .window = window,
             .cursor = loadCursor(.default),
+            .drop = if (build_options.drop) .{ .callback = options.drop_callback } else .{},
         };
         _ = w.SetWindowLongPtrW(window, w.GWLP_USERDATA, @bitCast(@intFromPtr(self)));
 
@@ -382,9 +382,6 @@ pub const Window = struct {
         }
         if (build_options.drop) {
             _ = w.RevokeDragDrop(self.window);
-            for (self.drop.files.items) |f| internal.allocator.free(f);
-            self.drop.files.deinit(internal.allocator);
-            if (self.drop.text) |t| internal.allocator.free(t);
         }
         _ = w.DestroyWindow(self.window);
         self.touch_ids.deinit(internal.allocator);
@@ -542,10 +539,6 @@ pub const Window = struct {
         const text = std.unicode.utf16LeToUtf8Alloc(internal.allocator, std.mem.sliceTo(text_w, 0)) catch return;
         defer internal.allocator.free(text);
         callback.function(callback.data, text);
-    }
-
-    pub fn getDropData(self: *Window, allocator: std.mem.Allocator) wio.DropData {
-        return wio.DropData.dupe(allocator, self.drop.files.items, self.drop.text) catch .{ .files = &.{}, .text = null };
     }
 
     pub fn createFramebuffer(_: *Window, size: wio.Size) !Framebuffer {
@@ -1363,11 +1356,6 @@ const DropTarget = struct {
         dt.has_text = data_obj.QueryGetData(&fmt) == w.S_OK;
         if (dt.has_files or dt.has_text) {
             effect.* = w.DROPEFFECT_COPY;
-            for (dt.window.drop.files.items) |f| internal.allocator.free(f);
-            dt.window.drop.files.clearRetainingCapacity();
-            if (dt.window.drop.text) |t| internal.allocator.free(t);
-            dt.window.drop.text = null;
-            internal.sendEvent(dt.window.event_fn_data, .drop_begin);
             pushPosition(dt.window, pt);
         } else {
             effect.* = w.DROPEFFECT_NONE;
@@ -1401,38 +1389,43 @@ const DropTarget = struct {
         pushPosition(dt.window, pt);
         if (dt.has_files) extractFiles(dt.window, data_obj);
         if (dt.has_text) extractText(dt.window, data_obj);
-        internal.sendEvent(dt.window.event_fn_data, .drop_complete);
+        internal.sendEvent(dt.window.event_fn_data, .drop_end);
         return w.S_OK;
     }
 
     fn extractFiles(window: *Window, data: *w.IDataObject) void {
-        var fmt = makeFormatEtc(w.CF_HDROP);
-        var medium: w.STGMEDIUM = undefined;
-        if (data.GetData(&fmt, &medium) != w.S_OK) return;
-        defer w.ReleaseStgMedium(&medium);
-        const hdrop: w.HDROP = medium.u.hGlobal;
-        const count = w.DragQueryFileW(hdrop, 0xFFFFFFFF, null, 0);
-        for (0..count) |i| {
-            const len = w.DragQueryFileW(hdrop, @intCast(i), null, 0);
-            const buf = internal.allocator.alloc(u16, len + 1) catch continue;
-            defer internal.allocator.free(buf);
-            _ = w.DragQueryFileW(hdrop, @intCast(i), buf.ptr, len + 1);
-            const path = std.unicode.utf16LeToUtf8Alloc(internal.allocator, buf[0..len]) catch continue;
-            window.drop.files.append(internal.allocator, path) catch {};
+        if (window.drop.callback) |callback| {
+            var fmt = makeFormatEtc(w.CF_HDROP);
+            var medium: w.STGMEDIUM = undefined;
+            if (data.GetData(&fmt, &medium) != w.S_OK) return;
+            defer w.ReleaseStgMedium(&medium);
+            const hdrop: w.HDROP = medium.u.hGlobal;
+            const count = w.DragQueryFileW(hdrop, 0xFFFFFFFF, null, 0);
+            for (0..count) |i| {
+                const len = w.DragQueryFileW(hdrop, @intCast(i), null, 0);
+                const buf = internal.allocator.alloc(u16, len + 1) catch continue;
+                defer internal.allocator.free(buf);
+                _ = w.DragQueryFileW(hdrop, @intCast(i), buf.ptr, len + 1);
+                const path = std.unicode.utf16LeToUtf8Alloc(internal.allocator, buf[0..len]) catch continue;
+                defer internal.allocator.free(path);
+                callback.call(.{ .file = path });
+            }
         }
     }
 
     fn extractText(window: *Window, data: *w.IDataObject) void {
-        var fmt = makeFormatEtc(w.CF_UNICODETEXT);
-        var medium: w.STGMEDIUM = undefined;
-        if (data.GetData(&fmt, &medium) != w.S_OK) return;
-        defer w.ReleaseStgMedium(&medium);
-        const ptr: [*:0]u16 = @ptrCast(@alignCast(w.GlobalLock(medium.u.hGlobal) orelse return));
-        defer _ = w.GlobalUnlock(medium.u.hGlobal);
-        const wstr = std.mem.sliceTo(ptr, 0);
-        if (std.unicode.utf16LeToUtf8Alloc(internal.allocator, wstr)) |text| {
-            window.drop.text = text;
-        } else |_| {}
+        if (window.drop.callback) |callback| {
+            var fmt = makeFormatEtc(w.CF_UNICODETEXT);
+            var medium: w.STGMEDIUM = undefined;
+            if (data.GetData(&fmt, &medium) != w.S_OK) return;
+            defer w.ReleaseStgMedium(&medium);
+            const ptr: [*:0]u16 = @ptrCast(@alignCast(w.GlobalLock(medium.u.hGlobal) orelse return));
+            defer _ = w.GlobalUnlock(medium.u.hGlobal);
+            const wstr = std.mem.sliceTo(ptr, 0);
+            const text = std.unicode.utf16LeToUtf8Alloc(internal.allocator, wstr) catch return;
+            defer internal.allocator.free(text);
+            callback.call(.{ .text = text });
+        }
     }
 };
 

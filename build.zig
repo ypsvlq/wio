@@ -347,6 +347,10 @@ pub fn build(b: *std.Build) !void {
                     "wioClipboardResize",
                     "wioClipboardText",
                 });
+                if (enable_drop) {
+                    try exports.append(b.allocator, "wioDropResize");
+                    try exports.append(b.allocator, "wioDropCallback");
+                }
                 if (enable_joystick) {
                     try exports.append(b.allocator, "wioJoystick");
                 }

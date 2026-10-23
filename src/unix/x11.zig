@@ -288,9 +288,8 @@ pub const Window = struct {
         xdnd_req: h.Atom = h.None,
         xdnd_version: c_int = 0,
         xdnd_is_text: bool = false,
-        files: std.ArrayList([]const u8) = .empty,
-        text: ?[]const u8 = null,
-    } else struct {} = .{},
+        callback: ?wio.Callback(wio.DropData),
+    } else struct {},
     opengl: if (build_options.opengl) struct {
         config: h.GLXFBConfig,
         colormap: h.Colormap,
@@ -401,6 +400,7 @@ pub const Window = struct {
             .position = position,
             .size = options.size,
             .opengl = if (build_options.opengl) .{ .config = config, .colormap = attributes.colormap } else .{},
+            .drop = if (build_options.drop) .{ .callback = options.drop_callback },
         };
 
         self.setTitle(options.title);
@@ -430,12 +430,6 @@ pub const Window = struct {
 
         if (build_options.opengl) {
             if (self.opengl.colormap != h.CopyFromParent) _ = c.XFreeColormap(globals.display, self.opengl.colormap);
-        }
-
-        if (build_options.drop) {
-            for (self.drop.files.items) |file| internal.allocator.free(file);
-            self.drop.files.deinit(internal.allocator);
-            if (self.drop.text) |text| internal.allocator.free(text);
         }
 
         _ = c.XDestroyIC(self.ic);
@@ -609,10 +603,6 @@ pub const Window = struct {
         self.clipboard_text_fn_data = callback.data;
         _ = c.XConvertSelection(globals.display, atoms.CLIPBOARD, atoms.UTF8_STRING, atoms.SELECTION, self.window, h.CurrentTime);
         _ = c.XFlush(globals.display);
-    }
-
-    pub fn getDropData(self: *Window, allocator: std.mem.Allocator) wio.DropData {
-        return wio.DropData.dupe(allocator, self.drop.files.items, self.drop.text) catch .{ .files = &.{}, .text = null };
     }
 
     pub fn createFramebuffer(self: *Window, size: wio.Size) !Framebuffer {
@@ -1009,11 +999,6 @@ fn handle(event: *h.XEvent) void {
                             }
                         }
                     }
-                    for (window.drop.files.items) |f| internal.allocator.free(f);
-                    window.drop.files.clearRetainingCapacity();
-                    if (window.drop.text) |t| internal.allocator.free(t);
-                    window.drop.text = null;
-                    internal.sendEvent(window.event_fn_data, .drop_begin);
                 } else if (event.xclient.message_type == atoms.XdndPosition) {
                     const root_x: c_int = @intCast(event.xclient.data.l[2] >> 16);
                     const root_y: c_int = @intCast(event.xclient.data.l[2] & 0xffff);
@@ -1040,7 +1025,7 @@ fn handle(event: *h.XEvent) void {
                     _ = c.XSendEvent(globals.display, window.drop.xdnd_source, h.False, h.NoEventMask, &reply);
                     _ = c.XFlush(globals.display);
                 } else if (event.xclient.message_type == atoms.XdndLeave) {
-                    internal.sendEvent(window.event_fn_data, .drop_complete);
+                    internal.sendEvent(window.event_fn_data, .drop_end);
                     window.drop.xdnd_source = 0;
                     window.drop.xdnd_req = h.None;
                 } else if (event.xclient.message_type == atoms.XdndDrop) {
@@ -1184,21 +1169,22 @@ fn handle(event: *h.XEvent) void {
 
                 if (actual_format == 8) {
                     if (window.drop.xdnd_is_text) {
-                        if (internal.allocator.dupe(u8, data[0..nitems])) |copy| {
-                            window.drop.text = copy;
-                        } else |_| {}
+                        if (window.drop.callback) |callback| {
+                            callback.call(.{ .text = data[0..nitems] });
+                        }
                     } else {
                         var iter = std.mem.splitAny(u8, data[0..nitems], "\r\n");
                         while (iter.next()) |line| {
                             if (line.len == 0 or line[0] == '#') continue;
                             const prefix = "file://";
                             if (!std.mem.startsWith(u8, line, prefix)) continue;
-                            const path = internal.allocator.dupe(u8, line[prefix.len..]) catch continue;
-                            window.drop.files.append(internal.allocator, std.Uri.percentDecodeInPlace(path)) catch {};
+                            if (window.drop.callback) |callback| {
+                                callback.call(.{ .file = data[0..nitems] });
+                            }
                         }
                     }
                 }
-                internal.sendEvent(window.event_fn_data, .drop_complete);
+                internal.sendEvent(window.event_fn_data, .drop_end);
 
                 var reply = h.XEvent{ .xclient = std.mem.zeroInit(h.XClientMessageEvent, .{
                     .type = h.ClientMessage,

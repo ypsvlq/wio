@@ -167,6 +167,8 @@ pub const CreateWindowOptions = struct {
     /// Only functional on Windows and X11.
     parent: usize = 0,
 
+    drop_callback: ?Callback(DropData) = null,
+
     gl_options: ?GlOptions = null,
 };
 
@@ -260,11 +262,6 @@ pub const Window = struct {
         self.backend.getClipboardText(callback);
     }
 
-    pub fn getDropData(self: *Window, allocator: std.mem.Allocator) DropData {
-        assertFeature(.drop);
-        return self.backend.getDropData(allocator);
-    }
-
     pub fn createFramebuffer(self: *Window, size: Size) !Framebuffer {
         assertFeature(.framebuffer);
         return .{ .backend = try self.backend.createFramebuffer(size) };
@@ -318,29 +315,9 @@ pub const Window = struct {
     }
 };
 
-pub const DropData = struct {
-    files: []const []const u8,
-    text: ?[]const u8,
-
-    pub fn dupe(allocator: std.mem.Allocator, files: []const []const u8, text: ?[]const u8) !DropData {
-        const out = try allocator.alloc([]const u8, files.len);
-        var n: usize = 0;
-        errdefer {
-            for (out[0..n]) |f| allocator.free(f);
-            allocator.free(out);
-        }
-        for (files) |f| {
-            out[n] = try allocator.dupe(u8, f);
-            n += 1;
-        }
-        return .{ .files = out, .text = if (text) |t| try allocator.dupe(u8, t) else null };
-    }
-
-    pub fn free(self: DropData, allocator: std.mem.Allocator) void {
-        for (self.files) |f| allocator.free(f);
-        allocator.free(self.files);
-        if (self.text) |t| allocator.free(t);
-    }
+pub const DropData = union(enum) {
+    text: []const u8,
+    file: []const u8,
 };
 
 pub const Framebuffer = struct {
@@ -696,9 +673,9 @@ pub const Event = union(enum) {
     /// Indicates that gestures since the last `.gesture_commit` should not affect the program.
     gesture_ignore: void,
 
-    drop_begin: void,
+    /// Relative to the top-left corner of the window.
     drop_position: Position,
-    drop_complete: void,
+    drop_end: void,
 
     pub const Touch = struct {
         id: u8,

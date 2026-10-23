@@ -25,7 +25,7 @@ const js = struct {
     extern "wio" fn flush() void;
     extern "wio" fn messageBox([*]const u8, usize) void;
     extern "wio" fn openUri([*]const u8, usize) void;
-    extern "wio" fn createWindow(?*anyopaque) u32;
+    extern "wio" fn createWindow(?*anyopaque, ?*const anyopaque, ?*anyopaque) u32;
     extern "wio" fn enableTextInput(u32, i16, i16) void;
     extern "wio" fn disableTextInput(u32) void;
     extern "wio" fn enableRelativeMouse(u32, bool) void;
@@ -38,11 +38,6 @@ const js = struct {
     extern "wio" fn setClipboardText([*]const u8, usize) void;
     extern "wio" fn getClipboardText(*const anyopaque, ?*anyopaque) void;
     extern "wio" fn presentFramebuffer(u32, [*]const u32, u16, u16, u16, u16, u16, u16) void;
-    extern "wio" fn getDropFileCount(u32) u32;
-    extern "wio" fn getDropFileLen(u32, u32) u32;
-    extern "wio" fn getDropFile(u32, u32, [*]u8) void;
-    extern "wio" fn getDropTextLen(u32) u32;
-    extern "wio" fn getDropText(u32, [*]u8) void;
     extern "wio" fn getJoystickCount() u32;
     extern "wio" fn getJoystickIdLen(u32) u32;
     extern "wio" fn getJoystickId(u32, [*]u8) void;
@@ -59,6 +54,7 @@ const gl = struct {
 };
 
 var clipboard_text: std.ArrayList(u8) = .empty;
+var drop_data: std.ArrayList(u8) = .empty;
 
 pub fn init() !void {
     if (build_options.audio) {
@@ -93,7 +89,14 @@ pub const Window = struct {
     id: u32,
 
     pub fn create(options: wio.CreateWindowOptions) !Window {
-        const id = js.createWindow(options.event_fn_data);
+        const id = blk: {
+            if (build_options.drop) {
+                if (options.drop_callback) |callback| {
+                    break :blk js.createWindow(options.event_fn_data, callback.function, callback.data);
+                }
+            }
+            break :blk js.createWindow(options.event_fn_data, null, null);
+        };
 
         internal.sendEvent(options.event_fn_data, .visible);
         internal.sendEvent(options.event_fn_data, .{ .mode = .normal });
@@ -398,9 +401,8 @@ export fn wioEvent(data: ?*anyopaque, event: u32, int0: u32, int1: u32, float0: 
         .mouse_leave => .mouse_leave,
         .scroll_vertical => .{ .scroll_vertical = float0 },
         .scroll_horizontal => .{ .scroll_horizontal = float0 },
-        .drop_begin => .drop_begin,
         .drop_position => .{ .drop_position = .{ .x = @truncate(@as(i32, @bitCast(int0))), .y = @truncate(@as(i32, @bitCast(int1))) } },
-        .drop_complete => .drop_complete,
+        .drop_end => .drop_end,
         else => unreachable,
     });
 }
@@ -413,6 +415,16 @@ export fn wioClipboardResize(size: usize) ?[*]const u8 {
 export fn wioClipboardText(clipboardTextFnPtr: *const anyopaque, clipboard_text_fn_data: ?*anyopaque) void {
     const clipboardTextFn: *const fn (?*anyopaque, []const u8) void = @ptrCast(clipboardTextFnPtr);
     clipboardTextFn(clipboard_text_fn_data, clipboard_text.items);
+}
+
+export fn wioDropResize(size: usize) ?[*]const u8 {
+    drop_data.resize(internal.allocator, size) catch return null;
+    return drop_data.items.ptr;
+}
+
+export fn wioDropCallback(callback: *const anyopaque, data: ?*anyopaque) void {
+    const function: *const fn (?*anyopaque, wio.DropData) void = @ptrCast(callback);
+    function(data, .{ .text = drop_data.items });
 }
 
 export fn wioJoystick(index: u32) void {

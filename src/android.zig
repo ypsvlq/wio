@@ -251,10 +251,6 @@ pub const Window = struct {
         callback.function(callback.data, std.mem.sliceTo(text_z, 0));
     }
 
-    pub fn getDropData(_: *Window, _: std.mem.Allocator) wio.DropData {
-        return .{ .files = &.{}, .text = null };
-    }
-
     pub fn createFramebuffer(_: *Window, size: wio.Size) !Framebuffer {
         const pixels = try internal.allocator.alloc(u32, @as(usize, size.width) * size.height);
         return .{

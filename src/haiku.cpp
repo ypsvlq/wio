@@ -28,11 +28,10 @@ extern "C" {
     void wioMouse(void *, int16, int16);
     void wioMouseRelative(void *, int16, int16);
     void wioScroll(void *, float, float);
-    void wioDropBegin(void *);
     void wioDropPosition(void *, int16, int16);
+    void wioDropEnd(void *);
     void wioDropFile(void *, const char *);
     void wioDropText(void *, const char *, size_t);
-    void wioDropComplete(void *);
     void wioAudioOutputWrite(void *, void *, size_t);
 
     extern float wio_scale;
@@ -43,19 +42,12 @@ public:
     void *zig;
     BRect normal_frame;
     bool relative_mouse;
-    uint8 mode;
-#ifdef WIO_DROP
-    bool dropping;
-#endif
 
     WioWindow(void *zig, BRect frame, const char *title) : BWindow(frame, title, B_TITLED_WINDOW, 0) {
         this->zig = zig;
         this->normal_frame = Frame();
         this->relative_mouse = false;
         this->mode = 0;
-#ifdef WIO_DROP
-        this->dropping = false;
-#endif
 #ifdef WIO_FRAMEBUFFER
         AddChild(new BView(Bounds(), "wio", B_FOLLOW_ALL_SIDES, 0));
 #endif
@@ -151,10 +143,6 @@ public:
 
                 BMessage drag_msg;
                 if (message->FindMessage("be:drag_message", &drag_msg) == B_OK) {
-                    if (!dropping) {
-                        dropping = true;
-                        wioDropBegin(zig);
-                    }
                     wioDropPosition(zig, where.x, where.y);
                 }
 
@@ -174,7 +162,6 @@ public:
 #ifdef WIO_DROP
 
         if (message->WasDropped()) {
-            dropping = false;
             entry_ref ref;
             for (int32 i = 0; message->FindRef("refs", i, &ref) == B_OK; i++) {
                 wioDropFile(zig, BPath(&ref).Path());
@@ -184,7 +171,7 @@ public:
             if (message->FindData("text/plain", B_MIME_TYPE, &text, &len) == B_OK) {
                 wioDropText(zig, (const char *)text, (size_t)len);
             }
-            wioDropComplete(zig);
+            wioDropEnd(zig);
             dispatch_parent = false;
         }
 

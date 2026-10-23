@@ -87,7 +87,7 @@ class Wio {
             open(this.getString(ptr, len));
         },
 
-        createWindow: (data) => {
+        createWindow: (data, drop_callback, drop_callback_data) => {
             const canvas = this.canvases.shift();
             if (canvas === undefined) throw new Error("no canvas available");
 
@@ -134,8 +134,6 @@ class Wio {
                 relative_mouse: false,
                 relative_mouse_unadjusted: false,
                 cursor: "default",
-                drop_files: [],
-                drop_text: null,
             };
 
             new ResizeObserver(() => {
@@ -198,24 +196,24 @@ class Wio {
                 if (event.deltaY !== 0) wioEvent(data, 22, 0, 0, event.deltaY);
                 if (event.deltaX !== 0) wioEvent(data, 23, 0, 0, event.deltaX);
             });
-            canvas.addEventListener("dragenter", (event) => {
-                event.preventDefault();
-                window.drop_files = [];
-                window.drop_text = null;
-                wioEvent(data, 30);
-            });
             canvas.addEventListener("dragover", (event) => {
                 event.preventDefault();
-                wioEvent(data, 31, event.offsetX, event.offsetY);
+                wioEvent(data, 30, event.offsetX, event.offsetY)
             });
             canvas.addEventListener("drop", (event) => {
                 event.preventDefault();
-                for (const file of event.dataTransfer.files) {
-                    window.drop_files.push(file.name);
+                if (this.instance.exports.wioDropCallback !== undefined) {
+                    const text = event.dataTransfer.getData("text/plain");
+                    if (text.length > 0) {
+                        const utf8 = new TextEncoder().encode(text);
+                        const ptr = this.instance.exports.wioDropResize(utf8.length);
+                        if (ptr !== 0) {
+                            new Uint8Array(this.memory.buffer, ptr).set(utf8);
+                            this.instance.exports.wioDropCallback(drop_callback, drop_callback_data);
+                        }
+                    }
                 }
-                const text = event.dataTransfer.getData("text/plain");
-                window.drop_text = text.length > 0 ? text : null;
-                wioEvent(data, 32);
+                wioEvent(data, 31);
             });
 
             return this.pushObject(window);
@@ -338,23 +336,6 @@ class Wio {
             const framebuffer = new Uint8ClampedArray(this.memory.buffer, ptr, width * height * 4);
             const image = new ImageData(framebuffer, width, height);
             this.objects[id].canvas.getContext("2d").putImageData(image, 0, 0, dirty_x, dirty_y, dirty_width, dirty_height);
-        },
-
-        getDropFileCount: (id) => this.objects[id].drop_files.length,
-
-        getDropFileLen: (id, index) => new TextEncoder().encode(this.objects[id].drop_files[index]).length,
-
-        getDropFile: (id, index, ptr) => {
-            new Uint8Array(this.memory.buffer, ptr).set(new TextEncoder().encode(this.objects[id].drop_files[index]));
-        },
-
-        getDropTextLen: (id) => {
-            const text = this.objects[id].drop_text;
-            return text !== null ? new TextEncoder().encode(text).length : 0;
-        },
-
-        getDropText: (id, ptr) => {
-            new Uint8Array(this.memory.buffer, ptr).set(new TextEncoder().encode(this.objects[id].drop_text));
         },
 
         getJoystickCount: () => this.gamepads.length,

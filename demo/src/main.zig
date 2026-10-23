@@ -58,6 +58,7 @@ pub fn main(init: std.process.Init.Minimal) !void {
         .title = "wio example",
         .app_id = "wio demo",
         .scale = 1,
+        .drop_callback = .{ .function = dropData, .data = null },
         .gl_options = gl_options,
     });
 
@@ -98,7 +99,7 @@ fn eventFn(data: ?*anyopaque, event: wio.Event) void {
         .touch_end => |touch| std.log.info("touch {}: {s}", .{ touch.id, if (touch.ignore) "ignore" else "end" }),
         .gesture_zoom, .gesture_rotate => |value| std.log.info("{s} {}", .{ @tagName(event), value }),
         .gesture_ignore => |ignore| std.log.info("gesture_ignore {}", .{ignore}),
-        .drop_position => |pos| std.log.info("drop_position ({},{})", .{ pos.x, pos.y }),
+        .drop_position => |drop| std.log.info("drop_position ({},{})", .{ drop.x, drop.y }),
         else => std.log.info("{s}", .{@tagName(event)}),
     }
 
@@ -130,7 +131,6 @@ fn loop() !bool {
 
                 return false;
             },
-
             .draw => {
                 if (wio.build_options.opengl) {
                     window.glMakeContextCurrent(context);
@@ -143,12 +143,6 @@ fn loop() !bool {
                     window.glMakeContextCurrent(context);
                     gl.viewport(0, 0, size.width, size.height);
                 }
-            },
-            .drop_complete => {
-                const data = window.getDropData(allocator);
-                defer data.free(allocator);
-                for (data.files) |path| std.log.info("drop_file: {s}", .{path});
-                if (data.text) |text| std.log.info("drop_text: {s}", .{text});
             },
             else => try actionEvent(event),
         }
@@ -322,6 +316,12 @@ fn action(button: wio.Button) !void {
 
 fn clipboardText(_: ?*anyopaque, text: []const u8) void {
     std.log.scoped(.clipboard).info("{s}", .{text});
+}
+
+fn dropData(_: ?*anyopaque, data: wio.DropData) void {
+    switch (data) {
+        inline else => |value| std.log.scoped(.drop).info("{s}: {s}", .{ @tagName(data), value }),
+    }
 }
 
 fn cancelWait() void {

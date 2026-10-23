@@ -113,12 +113,6 @@ pub const Window = struct {
         _ = callback;
     }
 
-    pub fn getDropData(self: *Window, allocator: std.mem.Allocator) wio.DropData {
-        _ = self;
-        _ = allocator;
-        return .{ .files = &.{}, .text = null };
-    }
-
     pub fn createFramebuffer(self: *Window, size: wio.Size) !Framebuffer {
         _ = self;
         _ = size;

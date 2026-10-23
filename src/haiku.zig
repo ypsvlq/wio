@@ -108,9 +108,8 @@ pub const Window = struct {
     draw_available_thread: std.Thread = undefined,
     cursor: wio.Cursor = .default,
     drop: if (build_options.drop) struct {
-        files: std.ArrayList([]const u8) = .empty,
-        text: ?[]const u8 = null,
-    } else struct {} = .{},
+        callback: ?wio.Callback(wio.DropData),
+    } else struct {},
     opengl: if (build_options.opengl) struct {
         size: wio.Size = .{ .width = 0, .height = 0 },
     } else struct {} = .{},
@@ -121,6 +120,7 @@ pub const Window = struct {
         self.* = .{
             .event_fn_data = options.event_fn_data,
             .window = undefined,
+            .drop = if (build_options.drop) .{ .callback = options.drop_callback } else .{},
         };
 
         const position: wio.Position = options.position orelse .{ .x = 50, .y = 50 };
@@ -155,11 +155,6 @@ pub const Window = struct {
 
     pub fn destroy(self: *Window) void {
         self.disableDrawAvailableEvents();
-        if (build_options.drop) {
-            for (self.drop.files.items) |file| internal.allocator.free(file);
-            self.drop.files.deinit(internal.allocator);
-            if (self.drop.text) |text| internal.allocator.free(text);
-        }
         wioDestroyWindow(self.window);
         internal.allocator.destroy(self);
     }
@@ -238,10 +233,6 @@ pub const Window = struct {
         if (wioGetClipboardText(&len)) |ptr| {
             callback.function(callback.data, ptr[0..len]);
         }
-    }
-
-    pub fn getDropData(self: *Window, allocator: std.mem.Allocator) wio.DropData {
-        return wio.DropData.dupe(allocator, self.drop.files.items, self.drop.text) catch .{ .files = &.{}, .text = null };
     }
 
     pub fn createFramebuffer(_: *Window, size: wio.Size) !Framebuffer {
@@ -586,32 +577,24 @@ export fn wioScroll(self: *Window, vertical: f32, horizontal: f32) void {
     if (horizontal != 0) internal.sendEvent(self.event_fn_data, .{ .scroll_horizontal = horizontal });
 }
 
-fn wioDropBegin(self: *Window) callconv(.c) void {
-    for (self.drop.files.items) |f| internal.allocator.free(f);
-    self.drop.files.clearRetainingCapacity();
-    if (self.drop.text) |t| internal.allocator.free(t);
-    self.drop.text = null;
-    internal.sendEvent(self.event_fn_data, .drop_begin);
-}
-
 fn wioDropPosition(self: *Window, x: i16, y: i16) callconv(.c) void {
     internal.sendEvent(self.event_fn_data, .{ .drop_position = .{ .x = x, .y = y } });
 }
 
+fn wioDropEnd(self: *Window) callconv(.c) void {
+    internal.sendEvent(self.event_fn_data, .drop_end);
+}
+
 fn wioDropFile(self: *Window, ptr: [*:0]const u8) callconv(.c) void {
-    const path = internal.allocator.dupe(u8, std.mem.sliceTo(ptr, 0)) catch return;
-    self.drop.files.append(internal.allocator, path) catch {
-        internal.allocator.free(path);
-    };
+    if (self.drop.callback) |callback| {
+        callback.call(.{ .file = std.mem.sliceTo(ptr, 0) });
+    }
 }
 
 fn wioDropText(self: *Window, ptr: [*]const u8, len: usize) callconv(.c) void {
-    if (self.drop.text) |t| internal.allocator.free(t);
-    self.drop.text = internal.allocator.dupe(u8, ptr[0..len]) catch null;
-}
-
-fn wioDropComplete(self: *Window) callconv(.c) void {
-    internal.sendEvent(self.event_fn_data, .drop_complete);
+    if (self.drop.callback) |callback| {
+        callback.call(.{ .text = ptr[0..len] });
+    }
 }
 
 fn wioAudioOutputWrite(data: *const anyopaque, buffer: [*]f32, size: usize) callconv(.c) void {
@@ -621,11 +604,10 @@ fn wioAudioOutputWrite(data: *const anyopaque, buffer: [*]f32, size: usize) call
 
 comptime {
     if (build_options.drop) {
-        @export(&wioDropBegin, .{ .name = "wioDropBegin" });
         @export(&wioDropPosition, .{ .name = "wioDropPosition" });
+        @export(&wioDropEnd, .{ .name = "wioDropEnd" });
         @export(&wioDropFile, .{ .name = "wioDropFile" });
         @export(&wioDropText, .{ .name = "wioDropText" });
-        @export(&wioDropComplete, .{ .name = "wioDropComplete" });
     }
     if (build_options.audio) {
         @export(&wioAudioOutputWrite, .{ .name = "wioAudioOutputWrite" });
