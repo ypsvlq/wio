@@ -400,7 +400,7 @@ pub const Window = struct {
             .position = position,
             .size = options.size,
             .opengl = if (build_options.opengl) .{ .config = config, .colormap = attributes.colormap } else .{},
-            .drop = if (build_options.drop) .{ .callback = options.drop_callback },
+            .drop = if (build_options.drop) .{ .callback = options.drop_callback } else .{},
         };
 
         self.setTitle(options.title);
