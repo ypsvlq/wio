@@ -68,7 +68,23 @@ pub fn run(func: fn () anyerror!bool) !void {
     while (try func()) {}
 }
 
-pub fn update() void {}
+var drops: std.ArrayList(struct { callback: wio.Callback(wio.DropData), data: wio.DropData }) = .empty;
+var drops_mutex: std.Io.Mutex = .init;
+
+pub fn update() void {
+    if (build_options.drop) {
+        drops_mutex.lockUncancelable(internal.io);
+        defer drops_mutex.unlock(internal.io);
+        while (drops.pop()) |drop| {
+            drops_mutex.unlock(internal.io);
+            defer drops_mutex.lockUncancelable(internal.io);
+            drop.callback.call(drop.data);
+            switch (drop.data) {
+                inline else => |data| internal.allocator.free(data),
+            }
+        }
+    }
+}
 
 var wait_event: std.Io.Event = .unset;
 
@@ -585,15 +601,21 @@ fn wioDropEnd(self: *Window) callconv(.c) void {
     internal.sendEvent(self.event_fn_data, .drop_end);
 }
 
-fn wioDropFile(self: *Window, ptr: [*:0]const u8) callconv(.c) void {
-    if (self.drop.callback) |callback| {
-        callback.call(.{ .file = std.mem.sliceTo(ptr, 0) });
+fn wioDropText(self: *Window, ptr: [*]const u8, len: usize) callconv(.c) void {
+    if (self.drop_callback) |callback| {
+        const text = internal.allocator.dupe(u8, ptr[0..len]);
+        drops_mutex.lockUncancelable(internal.io);
+        defer drops_mutex.unlock(internal.io);
+        drops.append(internal.allocator, .{ .callback = callback, .data = .{ .text = text } }) catch {};
     }
 }
 
-fn wioDropText(self: *Window, ptr: [*]const u8, len: usize) callconv(.c) void {
-    if (self.drop.callback) |callback| {
-        callback.call(.{ .text = ptr[0..len] });
+fn wioDropFile(self: *Window, ptr: [*:0]const u8) callconv(.c) void {
+    if (self.drop_callback) |callback| {
+        const file = internal.allocator.dupe(u8, std.mem.sliceTo(ptr, 0));
+        drops_mutex.lockUncancelable(internal.io);
+        defer drops_mutex.unlock(internal.io);
+        drops.append(internal.allocator, .{ .callback = callback, .data = .{ .file = file } }) catch {};
     }
 }
 
@@ -606,8 +628,8 @@ comptime {
     if (build_options.drop) {
         @export(&wioDropPosition, .{ .name = "wioDropPosition" });
         @export(&wioDropEnd, .{ .name = "wioDropEnd" });
-        @export(&wioDropFile, .{ .name = "wioDropFile" });
         @export(&wioDropText, .{ .name = "wioDropText" });
+        @export(&wioDropFile, .{ .name = "wioDropFile" });
     }
     if (build_options.audio) {
         @export(&wioAudioOutputWrite, .{ .name = "wioAudioOutputWrite" });
