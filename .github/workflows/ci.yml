@@ -3,17 +3,7 @@ on:
   push:
   pull_request:
 jobs:
-  check:
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v7
-    - name: Set up Zig
-      uses: mlugg/setup-zig@v2
-    - name: Check formatting
-      run: zig fmt --check .
   build:
-    needs: check
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
@@ -24,6 +14,8 @@ jobs:
       uses: awalsh128/cache-apt-pkgs-action@v1
       with:
         packages: libx11-dev libxrandr-dev libxcursor-dev libglvnd-dev libwayland-dev libxkbcommon-dev libdecor-0-dev libvulkan-dev libxext-dev libudev-dev libpulse-dev
+    - name: Check formatting
+      run: zig fmt --check .
     - name: Build (native)
       uses: $/.github/actions/build
       with:
@@ -60,7 +52,6 @@ jobs:
         target: wasm32-freestanding
         args: -Dcpu=bleeding_edge
   build_macos:
-    needs: check
     runs-on: macos-latest
     steps:
     - name: Checkout
