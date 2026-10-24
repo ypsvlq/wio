@@ -298,7 +298,7 @@ const Surface = struct {
             self.swapchain.handle,
             std.math.maxInt(u64),
             self.image_available_semaphore,
-            .null_handle,
+            .null,
         )).image_index;
         const render_finished = self.swapchain.render_finished_semaphores[image_index];
 
@@ -652,7 +652,7 @@ fn createGraphicsPipeline(device: vk.DeviceProxy, render_pass: vk.RenderPass) Cr
     var pipeline: vk.Pipeline = undefined;
 
     _ = try device.createGraphicsPipelines(
-        .null_handle,
+        .null,
         &.{.{
             .stage_count = 2,
             .p_stages = &.{
