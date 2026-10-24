@@ -42,6 +42,7 @@ public:
     void *zig;
     BRect normal_frame;
     bool relative_mouse;
+    uint8_t mode;
 
     WioWindow(void *zig, BRect frame, const char *title) : BWindow(frame, title, B_TITLED_WINDOW, 0) {
         this->zig = zig;

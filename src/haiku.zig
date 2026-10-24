@@ -602,8 +602,8 @@ fn wioDropEnd(self: *Window) callconv(.c) void {
 }
 
 fn wioDropText(self: *Window, ptr: [*]const u8, len: usize) callconv(.c) void {
-    if (self.drop_callback) |callback| {
-        const text = internal.allocator.dupe(u8, ptr[0..len]);
+    if (self.drop.callback) |callback| {
+        const text = internal.allocator.dupe(u8, ptr[0..len]) catch return;
         drops_mutex.lockUncancelable(internal.io);
         defer drops_mutex.unlock(internal.io);
         drops.append(internal.allocator, .{ .callback = callback, .data = .{ .text = text } }) catch {};
@@ -611,8 +611,8 @@ fn wioDropText(self: *Window, ptr: [*]const u8, len: usize) callconv(.c) void {
 }
 
 fn wioDropFile(self: *Window, ptr: [*:0]const u8) callconv(.c) void {
-    if (self.drop_callback) |callback| {
-        const file = internal.allocator.dupe(u8, std.mem.sliceTo(ptr, 0));
+    if (self.drop.callback) |callback| {
+        const file = internal.allocator.dupe(u8, std.mem.sliceTo(ptr, 0)) catch return;
         drops_mutex.lockUncancelable(internal.io);
         defer drops_mutex.unlock(internal.io);
         drops.append(internal.allocator, .{ .callback = callback, .data = .{ .file = file } }) catch {};
