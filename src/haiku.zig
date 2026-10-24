@@ -65,7 +65,9 @@ pub fn init() !void {
 pub fn deinit() void {}
 
 pub fn run(func: fn () anyerror!bool) !void {
-    while (try func()) {}
+    while (try func()) {
+        update();
+    }
 }
 
 var drops: std.ArrayList(struct { callback: wio.Callback(wio.DropData), data: wio.DropData }) = .empty;
