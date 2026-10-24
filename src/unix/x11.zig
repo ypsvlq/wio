@@ -1159,27 +1159,25 @@ fn handle(event: *h.XEvent) void {
         },
         h.SelectionNotify => {
             if (build_options.drop and window.drop.xdnd_req != h.None and event.xselection.property != h.None and event.xselection.selection == atoms.XdndSelection) {
-                var actual_type: h.Atom = undefined;
-                var actual_format: c_int = undefined;
-                var nitems: c_ulong = undefined;
-                var bytes_after: c_ulong = undefined;
-                var data: [*]u8 = undefined;
-                _ = c.XGetWindowProperty(globals.display, window.window, atoms.SELECTION, 0, std.math.maxInt(c_long), h.True, h.AnyPropertyType, &actual_type, &actual_format, &nitems, &bytes_after, @ptrCast(&data));
-                defer _ = c.XFree(data);
+                if (window.drop.callback) |callback| {
+                    var actual_type: h.Atom = undefined;
+                    var actual_format: c_int = undefined;
+                    var nitems: c_ulong = undefined;
+                    var bytes_after: c_ulong = undefined;
+                    var data: [*]u8 = undefined;
+                    _ = c.XGetWindowProperty(globals.display, window.window, atoms.SELECTION, 0, std.math.maxInt(c_long), h.True, h.AnyPropertyType, &actual_type, &actual_format, &nitems, &bytes_after, @ptrCast(&data));
+                    defer _ = c.XFree(data);
 
-                if (actual_format == 8) {
-                    if (window.drop.xdnd_is_text) {
-                        if (window.drop.callback) |callback| {
+                    if (actual_format == 8) {
+                        if (window.drop.xdnd_is_text) {
                             callback.call(.{ .text = data[0..nitems] });
-                        }
-                    } else {
-                        var iter = std.mem.splitAny(u8, data[0..nitems], "\r\n");
-                        while (iter.next()) |line| {
-                            if (line.len == 0 or line[0] == '#') continue;
-                            const prefix = "file://";
-                            if (!std.mem.startsWith(u8, line, prefix)) continue;
-                            if (window.drop.callback) |callback| {
-                                callback.call(.{ .file = data[0..nitems] });
+                        } else {
+                            var iter = std.mem.splitAny(u8, data[0..nitems], "\r\n");
+                            while (iter.next()) |line| {
+                                if (line.len == 0 or line[0] == '#') continue;
+                                const prefix = "file://";
+                                if (!std.mem.startsWith(u8, line, prefix)) continue;
+                                callback.call(.{ .file = std.Uri.percentDecodeInPlace(@constCast(line)) });
                             }
                         }
                     }
