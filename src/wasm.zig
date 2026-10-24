@@ -164,34 +164,6 @@ pub const Window = struct {
         js.getClipboardText(callback.function, callback.data);
     }
 
-    pub fn getDropData(self: *Window, allocator: std.mem.Allocator) wio.DropData {
-        return getDropDataInner(self, allocator) catch .{ .files = &.{}, .text = null };
-    }
-
-    fn getDropDataInner(self: *Window, allocator: std.mem.Allocator) !wio.DropData {
-        const file_count = js.getDropFileCount(self.id);
-        const files = try allocator.alloc([]const u8, file_count);
-        var n: usize = 0;
-        errdefer {
-            for (files[0..n]) |f| allocator.free(f);
-            allocator.free(files);
-        }
-        for (0..file_count) |i| {
-            const len = js.getDropFileLen(self.id, @intCast(i));
-            const buf = try allocator.alloc(u8, len);
-            js.getDropFile(self.id, @intCast(i), buf.ptr);
-            files[n] = buf;
-            n += 1;
-        }
-        const text_len = js.getDropTextLen(self.id);
-        const text: ?[]u8 = if (text_len > 0) blk: {
-            const buf = try allocator.alloc(u8, text_len);
-            js.getDropText(self.id, buf.ptr);
-            break :blk buf;
-        } else null;
-        return .{ .files = files, .text = text };
-    }
-
     pub fn createFramebuffer(_: *Window, size: wio.Size) !Framebuffer {
         const pixels = try internal.allocator.alloc(u32, @as(usize, size.width) * size.height);
         return .{ .pixels = pixels, .size = size };
