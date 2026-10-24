@@ -7,16 +7,16 @@
             .path = "../..",
         },
         .vulkan = .{
-            .url = "https://github.com/Snektron/vulkan-zig/archive/f9688c6f4ebcb930f67044698ddd1322442e714b.tar.gz",
-            .hash = "vulkan-0.0.0-r7Ytx4yGAwDZf0XsT6_L1ol_XUAkyOgOyBqamf8begA0",
+            .url = "git+https://github.com/Snektron/vulkan-zig#0859c23d80a41463eb570119b8d47c1660af5a9f",
+            .hash = "vulkan-0.0.0-r7YtxySBAwCCf-g7TObns83sMJ5CnFhL2LRKbCSyMikM",
         },
         .vulkan_headers = .{
-            .url = "https://github.com/KhronosGroup/Vulkan-Headers/archive/v1.4.349.tar.gz",
-            .hash = "N-V-__8AAC1ZbAIG2kVq3iPpAWaOlDTQ3MOyOyQQR0o_-9ez",
+            .url = "git+https://github.com/KhronosGroup/Vulkan-Headers?tag=v1.4.366#73814d006638aa00bd553215b054f0f02e457e22",
+            .hash = "N-V-__8AAFOXiQJm2niapwlfcDuQxKKSbS6BJkr-Yud5uZGS",
         },
         .android = .{
-            .url = "https://github.com/silbinarywolf/zig-android-sdk/archive/0e8dfe60ec5120e99d6705ab4606079bc3160a53.tar.gz",
-            .hash = "android-0.3.0-7iz7Qp9IAgBlbdmEnCTne54Rn_lfHtiN3Er6HFkhn5y8",
+            .url = "git+https://github.com/silbinarywolf/zig-android-sdk#24de0c1a610efd26092e64b141564b7cf7437a39",
+            .hash = "android-0.3.0-7iz7QktKAgCbNxGEZRqi65ePYTpV-tohGNC9oMHMLYfj",
             .lazy = true,
         },
     },

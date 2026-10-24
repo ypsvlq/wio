@@ -7,8 +7,8 @@
             .path = "../..",
         },
         .win32 = .{
-            .url = "https://github.com/ypsvlq/win32/archive/c1b92919e2d7799a96bde17d103aae6dd7c14f3f.tar.gz",
-            .hash = "win32-0.0.0-4XUubRcuAAMAHJW-MHPQncm5s52eslSS-fRAL02G4NAQ",
+            .url = "git+https://github.com/ypsvlq/win32#ca567832f0e1d67f0d40feea0be936eccf9ccd44",
+            .hash = "win32-0.0.0-4XUubb9uBQOcYvhdop7yU6qYUoeUiL0vbKhkw8loOCLL",
         },
     },
     .paths = .{

@@ -7,7 +7,7 @@
             .path = "../..",
         },
         .opengl = .{
-            .url = "https://github.com/ypsvlq/opengl/archive/659d2da5fcb911981d410f34d0d4236a39685065.tar.gz",
+            .url = "git+https://github.com/ypsvlq/opengl#659d2da5fcb911981d410f34d0d4236a39685065",
             .hash = "opengl-0.0.0-_Vp8-BvwKgAaj2cWMaOMKT8VFoLx0AP9kX519_4WUaV7",
         },
     },

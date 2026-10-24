@@ -7,12 +7,12 @@
             .path = "..",
         },
         .opengl = .{
-            .url = "https://github.com/ypsvlq/opengl/archive/659d2da5fcb911981d410f34d0d4236a39685065.tar.gz",
+            .url = "git+https://github.com/ypsvlq/opengl#659d2da5fcb911981d410f34d0d4236a39685065",
             .hash = "opengl-0.0.0-_Vp8-BvwKgAaj2cWMaOMKT8VFoLx0AP9kX519_4WUaV7",
         },
         .android = .{
-            .url = "https://github.com/silbinarywolf/zig-android-sdk/archive/0e8dfe60ec5120e99d6705ab4606079bc3160a53.tar.gz",
-            .hash = "android-0.3.0-7iz7Qp9IAgBlbdmEnCTne54Rn_lfHtiN3Er6HFkhn5y8",
+            .url = "git+https://github.com/silbinarywolf/zig-android-sdk#24de0c1a610efd26092e64b141564b7cf7437a39",
+            .hash = "android-0.3.0-7iz7QktKAgCbNxGEZRqi65ePYTpV-tohGNC9oMHMLYfj",
             .lazy = true,
         },
     },
