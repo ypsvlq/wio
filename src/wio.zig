@@ -316,8 +316,8 @@ pub const Window = struct {
 };
 
 pub const DropData = union(enum) {
-    text: []const u8,
     file: []const u8,
+    text: []const u8,
 };
 
 pub const Framebuffer = struct {

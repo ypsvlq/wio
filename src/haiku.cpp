@@ -30,8 +30,8 @@ extern "C" {
     void wioScroll(void *, float, float);
     void wioDropPosition(void *, int16, int16);
     void wioDropEnd(void *);
-    void wioDropText(void *, const char *, size_t);
     void wioDropFile(void *, const char *);
+    void wioDropText(void *, const char *, size_t);
     void wioAudioOutputWrite(void *, void *, size_t);
 
     extern float wio_scale;
