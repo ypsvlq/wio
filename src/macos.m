@@ -27,6 +27,8 @@ extern void wioGestureZoom(void *, float);
 extern void wioGestureRotate(void *, float);
 extern char *wioDupeClipboardText(const char *, size_t *);
 
+void wioCancelWait(void);
+
 static NSString *string(const char *ptr, size_t len) {
     return [[NSString alloc] initWithBytes:ptr length:len encoding:NSUTF8StringEncoding];
 }
@@ -113,10 +115,6 @@ static void warpCursor(NSWindow *window) {
     }
 }
 
-- (void)windowDidExpose:(NSNotification *)notification {
-    wioDraw(zig);
-}
-
 - (void)windowDidMove:(NSNotification *)notification {
     NSWindow *window = [notification object];
     NSRect rect = [window frame];
@@ -163,6 +161,11 @@ static void warpCursor(NSWindow *window) {
 #ifdef WIO_VULKAN
     [[view layer] setContentsScale:scale];
 #endif
+}
+
+- (void)drawAvailable {
+    wioDraw(zig);
+    wioCancelWait();
 }
 
 @end
@@ -538,6 +541,18 @@ void wioDisableRelativeMouse(NSWindow *window) {
     CGAssociateMouseAndMouseCursorPosition(YES);
 }
 
+void *wioEnableDrawAvailableEvents(NSWindow *window) {
+    CADisplayLink *link = [window displayLinkWithTarget:[window delegate] selector:@selector(drawAvailable)];
+    [link addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSRunLoopCommonModes];
+    return (void *)CFBridgingRetain(link);
+}
+
+void wioDisableDrawAvailableEvents(void *ptr) {
+    CADisplayLink *link = CFBridgingRelease(ptr);
+    [link invalidate];
+
+}
+
 void wioSetTitle(NSWindow *window, const char *ptr, size_t len) {
     [window setTitle:string(ptr, len)];
 }
@@ -618,11 +633,6 @@ char *wioGetClipboardText(size_t *len) {
     NSString *string = [[NSPasteboard generalPasteboard] stringForType:NSPasteboardTypeString];
     if (!string) return NULL;
     return wioDupeClipboardText([string UTF8String], len);
-}
-
-void wioDrawAvailable(NSWindow *window) {
-    [[window delegate] windowDidExpose:nil];
-    wioCancelWait();
 }
 
 #ifdef WIO_FRAMEBUFFER

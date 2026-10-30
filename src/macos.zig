@@ -6,6 +6,7 @@ const internal = @import("wio.internal.zig");
 const log = std.log.scoped(.wio);
 
 const NSWindow = opaque {};
+const CADisplayLink = opaque {};
 const NSOpenGLPixelFormat = opaque {};
 const NSOpenGLContext = opaque {};
 const CAMetalLayer = opaque {};
@@ -21,6 +22,8 @@ extern fn wioEnableTextInput(*NSWindow, i16, i16) void;
 extern fn wioDisableTextInput(*NSWindow) void;
 extern fn wioEnableRelativeMouse(*NSWindow) void;
 extern fn wioDisableRelativeMouse(*NSWindow) void;
+extern fn wioEnableDrawAvailableEvents(*NSWindow) *CADisplayLink;
+extern fn wioDisableDrawAvailableEvents(?*CADisplayLink) void;
 extern fn wioSetTitle(*NSWindow, [*]const u8, usize) void;
 extern fn wioSetMode(*NSWindow, u8) void;
 extern fn wioSetPosition(*NSWindow, i16, i16) void;
@@ -30,7 +33,6 @@ extern fn wioMinimize(*NSWindow) void;
 extern fn wioRequestAttention() void;
 extern fn wioSetClipboardText([*]const u8, usize) void;
 extern fn wioGetClipboardText(*usize) ?[*]u8;
-extern fn wioDrawAvailable(*NSWindow) void;
 extern fn wioPresentFramebuffer(*NSWindow, c.CGContextRef, bool, u16, u16, u16, u16) void;
 extern fn wioRelease(?*const anyopaque) void;
 extern fn wioGlChoosePixelFormat([*]const c.CGLPixelFormatAttribute) ?*NSOpenGLPixelFormat;
@@ -190,8 +192,7 @@ pub fn openUri(uri: []const u8) void {
 pub const Window = struct {
     event_fn_data: ?*anyopaque,
     window: *NSWindow,
-    draw_available_ns: u32 = 0,
-    draw_available_thread: std.Thread = undefined,
+    link: ?*CADisplayLink = null,
     opengl: if (build_options.opengl) struct {
         format: ?*NSOpenGLPixelFormat = null,
     } else struct {} = .{},
@@ -269,21 +270,11 @@ pub const Window = struct {
     }
 
     pub fn enableDrawAvailableEvents(self: *Window) void {
-        if (self.draw_available_ns == 0) {
-            log.warn("enableDrawAvailableEvents unimplemented for macos, falling back to 60 Hz", .{});
-            self.draw_available_ns = std.time.ns_per_s / 60;
-            self.draw_available_thread = std.Thread.spawn(.{}, drawAvailableThread, .{self}) catch {
-                self.draw_available_ns = 0;
-                return;
-            };
-        }
+        self.link = wioEnableDrawAvailableEvents(self.window);
     }
 
     pub fn disableDrawAvailableEvents(self: *Window) void {
-        if (self.draw_available_ns != 0) {
-            self.draw_available_ns = 0;
-            self.draw_available_thread.join();
-        }
+        wioDisableDrawAvailableEvents(self.link);
     }
 
     pub fn setTitle(self: *Window, title: []const u8) void {
@@ -978,13 +969,6 @@ export fn wioDupeClipboardText(bytes: [*:0]const u8, len: *usize) ?[*]u8 {
         return dupe.ptr;
     } else |_| {
         return null;
-    }
-}
-
-fn drawAvailableThread(window: *Window) void {
-    while (window.draw_available_ns > 0) {
-        wioDrawAvailable(window.window);
-        std.Io.sleep(internal.io, .{ .nanoseconds = window.draw_available_ns }, .awake) catch {};
     }
 }
 
