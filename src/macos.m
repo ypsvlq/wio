@@ -436,20 +436,22 @@ void wioInit() {
 }
 
 void wioUpdate(void) {
-    NSEvent *event;
-    do {
-        event = [NSApp nextEventMatchingMask:NSEventMaskAny
-            untilDate:nil
-            inMode:NSDefaultRunLoopMode
-            dequeue:YES];
-        [NSApp sendEvent:event];
+    @autoreleasepool {
+        NSEvent *event;
+        do {
+            event = [NSApp nextEventMatchingMask:NSEventMaskAny
+                untilDate:nil
+                inMode:NSDefaultRunLoopMode
+                dequeue:YES];
+            [NSApp sendEvent:event];
 
-        // keyUp is not called when cmd is held
-        if ([event type] == NSEventTypeKeyUp && ([event modifierFlags] & NSEventModifierFlagCommand)) {
-            [[NSApp keyWindow] sendEvent:event];
-        }
-    } while (event);
-    [NSApp updateWindows];
+            // keyUp is not called when cmd is held
+            if ([event type] == NSEventTypeKeyUp && ([event modifierFlags] & NSEventModifierFlagCommand)) {
+                [[NSApp keyWindow] sendEvent:event];
+            }
+        } while (event);
+        [NSApp updateWindows];
+    }
 }
 
 void wioWait(NSTimeInterval timeout) {
