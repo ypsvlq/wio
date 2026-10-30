@@ -275,6 +275,7 @@ pub const Window = struct {
 
     pub fn disableDrawAvailableEvents(self: *Window) void {
         wioDisableDrawAvailableEvents(self.link);
+        self.link = null;
     }
 
     pub fn setTitle(self: *Window, title: []const u8) void {
