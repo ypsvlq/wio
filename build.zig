@@ -1,6 +1,10 @@
 const std = @import("std");
 
 pub fn build(b: *std.Build) !void {
+    // lazyImport is inline and does an inline for loop over dependencies, so
+    // projects with many deps alongside wio need it (revisit with zig 0.18)
+    @setEvalBranchQuota(10_000);
+
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
