@@ -430,12 +430,14 @@ static void warpCursor(NSWindow *window) {
 @end
 
 void wioInit() {
-    [NSApplication sharedApplication];
-    [[NSBundle mainBundle] loadNibNamed:@"MainMenu" owner:NSApp topLevelObjects:nil];
-    [NSApp setDelegate:[[WioApplicationDelegate alloc] init]];
-    [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
-    [NSApp activateIgnoringOtherApps:YES];
-    [NSApp finishLaunching];
+    @autoreleasepool {
+        [NSApplication sharedApplication];
+        [[NSBundle mainBundle] loadNibNamed:@"MainMenu" owner:NSApp topLevelObjects:nil];
+        [NSApp setDelegate:[[WioApplicationDelegate alloc] init]];
+        [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+        [NSApp activateIgnoringOtherApps:YES];
+        [NSApp finishLaunching];
+    }
 }
 
 void wioUpdate(void) {
@@ -458,29 +460,37 @@ void wioUpdate(void) {
 }
 
 void wioWait(NSTimeInterval timeout) {
-    NSDate *until = (timeout > 0) ? [NSDate dateWithTimeIntervalSinceNow:timeout] : [NSDate distantFuture];
-    NSEvent *event = [NSApp nextEventMatchingMask:NSEventMaskAny
-        untilDate:until
-        inMode:NSDefaultRunLoopMode
-        dequeue:YES];
-    [NSApp sendEvent:event];
+    @autoreleasepool {
+        NSDate *until = (timeout > 0) ? [NSDate dateWithTimeIntervalSinceNow:timeout] : [NSDate distantFuture];
+        NSEvent *event = [NSApp nextEventMatchingMask:NSEventMaskAny
+            untilDate:until
+            inMode:NSDefaultRunLoopMode
+            dequeue:YES];
+        [NSApp sendEvent:event];
+    }
 }
 
 void wioCancelWait(void) {
-    NSEvent *event = [NSEvent otherEventWithType:NSEventTypeApplicationDefined location:NSMakePoint(0, 0) modifierFlags:0 timestamp:0 windowNumber:0 context:nil subtype:0 data1:0 data2:0];
-    [NSApp postEvent:event atStart:FALSE];
+    @autoreleasepool {
+        NSEvent *event = [NSEvent otherEventWithType:NSEventTypeApplicationDefined location:NSMakePoint(0, 0) modifierFlags:0 timestamp:0 windowNumber:0 context:nil subtype:0 data1:0 data2:0];
+        [NSApp postEvent:event atStart:FALSE];
+    }
 }
 
 void wioMessageBox(uint8_t style, const char *ptr, size_t len) {
-    NSAlertStyle styles[] = { NSAlertStyleInformational, NSAlertStyleWarning, NSAlertStyleCritical };
-    NSAlert *alert = [[NSAlert alloc] init];
-    [alert setMessageText:string(ptr, len)];
-    [alert setAlertStyle:styles[style]];
-    [alert runModal];
+    @autoreleasepool {
+        NSAlertStyle styles[] = { NSAlertStyleInformational, NSAlertStyleWarning, NSAlertStyleCritical };
+        NSAlert *alert = [[NSAlert alloc] init];
+        [alert setMessageText:string(ptr, len)];
+        [alert setAlertStyle:styles[style]];
+        [alert runModal];
+    }
 }
 
 void wioOpenUri(const char *ptr, size_t len) {
-    [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:string(ptr, len)]];
+    @autoreleasepool {
+        [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:string(ptr, len)]];
+    }
 }
 
 void *wioCreateWindow(void *zig, uint16_t width, uint16_t height) {
@@ -518,133 +528,167 @@ void *wioCreateWindow(void *zig, uint16_t width, uint16_t height) {
 }
 
 void wioDestroyWindow(void *ptr) {
-    NSWindow *window = CFBridgingRelease(ptr);
-    [window close];
+    @autoreleasepool {
+        NSWindow *window = CFBridgingRelease(ptr);
+        [window close];
+    }
 }
 
 void wioEnableTextInput(NSWindow *window, int16_t x, int16_t y) {
-    [[window contentView] setTextInput:YES x:x y:y];
+    @autoreleasepool {
+        [[window contentView] setTextInput:YES x:x y:y];
+    }
 }
 
 void wioDisableTextInput(NSWindow *window) {
-    [[window contentView] setTextInput:NO x:0 y:0];
+    @autoreleasepool {
+        [[window contentView] setTextInput:NO x:0 y:0];
+    }
 }
 
 void wioEnableRelativeMouse(NSWindow *window) {
-    [[window contentView] setRelativeMouse:YES];
-    warpCursor(window);
-    CGAssociateMouseAndMouseCursorPosition(NO);
+    @autoreleasepool {
+        [[window contentView] setRelativeMouse:YES];
+        warpCursor(window);
+        CGAssociateMouseAndMouseCursorPosition(NO);
+    }
 }
 
 void wioDisableRelativeMouse(NSWindow *window) {
-    [[window contentView] setRelativeMouse:NO];
-    CGAssociateMouseAndMouseCursorPosition(YES);
+    @autoreleasepool {
+        [[window contentView] setRelativeMouse:NO];
+        CGAssociateMouseAndMouseCursorPosition(YES);
+    }
 }
 
 void *wioEnableDrawAvailableEvents(NSWindow *window) {
-    CADisplayLink *link = [window displayLinkWithTarget:[window delegate] selector:@selector(drawAvailable)];
-    [link addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSRunLoopCommonModes];
-    return (void *)CFBridgingRetain(link);
+    @autoreleasepool {
+        CADisplayLink *link = [window displayLinkWithTarget:[window delegate] selector:@selector(drawAvailable)];
+        [link addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSRunLoopCommonModes];
+        return (void *)CFBridgingRetain(link);
+    }
 }
 
 void wioDisableDrawAvailableEvents(void *ptr) {
-    CADisplayLink *link = CFBridgingRelease(ptr);
-    [link invalidate];
+    @autoreleasepool {
+        CADisplayLink *link = CFBridgingRelease(ptr);
+        [link invalidate];
+    }
 
 }
 
 void wioSetTitle(NSWindow *window, const char *ptr, size_t len) {
-    [window setTitle:string(ptr, len)];
+    @autoreleasepool {
+        [window setTitle:string(ptr, len)];
+    }
 }
 
 void wioSetMode(NSWindow *window, uint8_t mode) {
-    if (!!([window styleMask] & NSWindowStyleMaskFullScreen) != (mode == 2)) [window toggleFullScreen:nil];
-    if (mode != 2 && mode != [window isZoomed]) [window performZoom:nil];
+    @autoreleasepool {
+        if (!!([window styleMask] & NSWindowStyleMaskFullScreen) != (mode == 2)) [window toggleFullScreen:nil];
+        if (mode != 2 && mode != [window isZoomed]) [window performZoom:nil];
+    }
 }
 
 void wioSetPosition(NSWindow *window, int16_t x, int16_t y) {
-    [window setFrameOrigin:NSMakePoint(x, y)];
+    @autoreleasepool {
+        [window setFrameOrigin:NSMakePoint(x, y)];
+    }
 }
 
 void wioSetSize(NSWindow *window, uint16_t width, uint16_t height) {
-    [window setContentSize:NSMakeSize(width, height)];
+    @autoreleasepool {
+        [window setContentSize:NSMakeSize(width, height)];
+    }
 }
 
 void wioSetCursor(NSWindow *window, uint8_t shape) {
-    NSCursor *cursor;
-    SEL selector = NULL;
-    switch (shape) {
-        case 1: cursor = nil; break;
-        case 2: cursor = [NSCursor contextualMenuCursor]; break;
-        case 4: cursor = [NSCursor pointingHandCursor]; break;
-        case 7: cursor = [NSCursor crosshairCursor]; break;
-        case 8: cursor = [NSCursor crosshairCursor]; break;
-        case 9: cursor = [NSCursor IBeamCursor]; break;
-        case 10: cursor = [NSCursor IBeamCursorForVerticalLayout]; break;
-        case 11: cursor = [NSCursor dragLinkCursor]; break;
-        case 12: cursor = [NSCursor dragCopyCursor]; break;
-        case 14: cursor = [NSCursor operationNotAllowedCursor]; break;
-        case 15: cursor = [NSCursor operationNotAllowedCursor]; break;
-        case 16: cursor = [NSCursor openHandCursor]; break;
-        case 17: cursor = [NSCursor closedHandCursor]; break;
-        case 18: cursor = [NSCursor resizeRightCursor]; break;
-        case 19: cursor = [NSCursor resizeUpCursor]; break;
-        case 20: selector = @selector(_windowResizeNorthEastSouthWestCursor); break;
-        case 21: selector = @selector(_windowResizeNorthWestSouthEastCursor); break;
-        case 22: cursor = [NSCursor resizeDownCursor]; break;
-        case 23: selector = @selector(_windowResizeNorthWestSouthEastCursor); break;
-        case 24: selector = @selector(_windowResizeNorthEastSouthWestCursor); break;
-        case 25: cursor = [NSCursor resizeLeftCursor]; break;
-        case 26: cursor = [NSCursor resizeLeftRightCursor]; break;
-        case 27: cursor = [NSCursor resizeUpDownCursor]; break;
-        case 28: selector = @selector(_windowResizeNorthEastSouthWestCursor); break;
-        case 29: selector = @selector(_windowResizeNorthWestSouthEastCursor); break;
-        case 30: cursor = [NSCursor resizeLeftRightCursor]; break;
-        case 31: cursor = [NSCursor resizeUpDownCursor]; break;
-        case 33: selector = @selector(zoomInCursor); break;
-        case 34: selector = @selector(zoomOutCursor); break;
-        default: cursor = [NSCursor arrowCursor]; break;
-    }
-    if (selector != NULL) {
-        if ([NSCursor respondsToSelector:selector]) {
-            cursor = [NSCursor performSelector:selector];
-        } else {
-            cursor = [NSCursor arrowCursor];
+    @autoreleasepool {
+        NSCursor *cursor;
+        SEL selector = NULL;
+        switch (shape) {
+            case 1: cursor = nil; break;
+            case 2: cursor = [NSCursor contextualMenuCursor]; break;
+            case 4: cursor = [NSCursor pointingHandCursor]; break;
+            case 7: cursor = [NSCursor crosshairCursor]; break;
+            case 8: cursor = [NSCursor crosshairCursor]; break;
+            case 9: cursor = [NSCursor IBeamCursor]; break;
+            case 10: cursor = [NSCursor IBeamCursorForVerticalLayout]; break;
+            case 11: cursor = [NSCursor dragLinkCursor]; break;
+            case 12: cursor = [NSCursor dragCopyCursor]; break;
+            case 14: cursor = [NSCursor operationNotAllowedCursor]; break;
+            case 15: cursor = [NSCursor operationNotAllowedCursor]; break;
+            case 16: cursor = [NSCursor openHandCursor]; break;
+            case 17: cursor = [NSCursor closedHandCursor]; break;
+            case 18: cursor = [NSCursor resizeRightCursor]; break;
+            case 19: cursor = [NSCursor resizeUpCursor]; break;
+            case 20: selector = @selector(_windowResizeNorthEastSouthWestCursor); break;
+            case 21: selector = @selector(_windowResizeNorthWestSouthEastCursor); break;
+            case 22: cursor = [NSCursor resizeDownCursor]; break;
+            case 23: selector = @selector(_windowResizeNorthWestSouthEastCursor); break;
+            case 24: selector = @selector(_windowResizeNorthEastSouthWestCursor); break;
+            case 25: cursor = [NSCursor resizeLeftCursor]; break;
+            case 26: cursor = [NSCursor resizeLeftRightCursor]; break;
+            case 27: cursor = [NSCursor resizeUpDownCursor]; break;
+            case 28: selector = @selector(_windowResizeNorthEastSouthWestCursor); break;
+            case 29: selector = @selector(_windowResizeNorthWestSouthEastCursor); break;
+            case 30: cursor = [NSCursor resizeLeftRightCursor]; break;
+            case 31: cursor = [NSCursor resizeUpDownCursor]; break;
+            case 33: selector = @selector(zoomInCursor); break;
+            case 34: selector = @selector(zoomOutCursor); break;
+            default: cursor = [NSCursor arrowCursor]; break;
         }
+        if (selector != NULL) {
+            if ([NSCursor respondsToSelector:selector]) {
+                cursor = [NSCursor performSelector:selector];
+            } else {
+                cursor = [NSCursor arrowCursor];
+            }
+        }
+        [[window contentView] setCursor:cursor];
     }
-    [[window contentView] setCursor:cursor];
 }
 
 void wioMinimize(NSWindow *window) {
-    [window miniaturize:nil];
+    @autoreleasepool {
+        [window miniaturize:nil];
+    }
 }
 
 void wioRequestAttention(void) {
-    [NSApp requestUserAttention:NSCriticalRequest];
+    @autoreleasepool {
+        [NSApp requestUserAttention:NSCriticalRequest];
+    }
 }
 
 void wioSetClipboardText(const char *ptr, size_t len) {
-    NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
-    [pasteboard declareTypes:@[NSPasteboardTypeString] owner:nil];
-    [pasteboard setString:string(ptr, len) forType:NSPasteboardTypeString];
+    @autoreleasepool {
+        NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
+        [pasteboard declareTypes:@[NSPasteboardTypeString] owner:nil];
+        [pasteboard setString:string(ptr, len) forType:NSPasteboardTypeString];
+    }
 }
 
 char *wioGetClipboardText(size_t *len) {
-    NSString *string = [[NSPasteboard generalPasteboard] stringForType:NSPasteboardTypeString];
-    if (!string) return NULL;
-    return wioDupeClipboardText([string UTF8String], len);
+    @autoreleasepool {
+        NSString *string = [[NSPasteboard generalPasteboard] stringForType:NSPasteboardTypeString];
+        if (!string) return NULL;
+        return wioDupeClipboardText([string UTF8String], len);
+    }
 }
 
 #ifdef WIO_FRAMEBUFFER
 
 void wioPresentFramebuffer(NSWindow *window, CGContextRef bitmap, bool rect, uint16_t x, uint16_t y, uint16_t width, uint16_t height) {
-    WioView *view = [window contentView];
-    [view setBitmap:bitmap];
-    if (rect) {
-        NSRect frame = [view frame];
-        [view setNeedsDisplayInRect:NSMakeRect(x, frame.size.height - height - y, width, height)];
-    } else {
-        [view setNeedsDisplay:YES];
+    @autoreleasepool {
+        WioView *view = [window contentView];
+        [view setBitmap:bitmap];
+        if (rect) {
+            NSRect frame = [view frame];
+            [view setNeedsDisplayInRect:NSMakeRect(x, frame.size.height - height - y, width, height)];
+        } else {
+            [view setNeedsDisplay:YES];
+        }
     }
 }
 
@@ -657,34 +701,46 @@ void wioRelease(void *object) {
 }
 
 void *wioGlChoosePixelFormat(const NSOpenGLPixelFormatAttribute *attributes) {
-    NSOpenGLPixelFormat *format = [[NSOpenGLPixelFormat alloc] initWithAttributes:attributes];
-    return (void *)CFBridgingRetain(format);
+    @autoreleasepool {
+        NSOpenGLPixelFormat *format = [[NSOpenGLPixelFormat alloc] initWithAttributes:attributes];
+        return (void *)CFBridgingRetain(format);
+    }
 }
 
 void *wioGlCreateContext(NSOpenGLPixelFormat *format, NSOpenGLContext *share) {
-    NSOpenGLContext *context = [[NSOpenGLContext alloc] initWithFormat:format shareContext:share];
-    return (void *)CFBridgingRetain(context);
+    @autoreleasepool {
+        NSOpenGLContext *context = [[NSOpenGLContext alloc] initWithFormat:format shareContext:share];
+        return (void *)CFBridgingRetain(context);
+    }
 }
 
 void wioGlMakeContextCurrent(NSWindow *window, NSOpenGLContext *context) {
-    NSView *view = [window contentView];
-    [view setWantsBestResolutionOpenGLSurface:YES];
-    [context setView:view];
-    WioWindowDelegate *delegate = [window delegate];
-    [delegate setContext:context];
-    [context makeCurrentContext];
+    @autoreleasepool {
+        NSView *view = [window contentView];
+        [view setWantsBestResolutionOpenGLSurface:YES];
+        [context setView:view];
+        WioWindowDelegate *delegate = [window delegate];
+        [delegate setContext:context];
+        [context makeCurrentContext];
+    }
 }
 
 void wioGlSwapBuffers(void) {
-    [[NSOpenGLContext currentContext] flushBuffer];
+    @autoreleasepool {
+        [[NSOpenGLContext currentContext] flushBuffer];
+    }
 }
 
 void wioGlSwapInterval(int32_t interval) {
-    [[NSOpenGLContext currentContext] setValues:&interval forParameter:NSOpenGLCPSwapInterval];
+    @autoreleasepool {
+        [[NSOpenGLContext currentContext] setValues:&interval forParameter:NSOpenGLCPSwapInterval];
+    }
 }
 
 void wioGlReleaseCurrentContext(void) {
-    [NSOpenGLContext clearCurrentContext];
+    @autoreleasepool {
+        [NSOpenGLContext clearCurrentContext];
+    }
 }
 
 #endif
@@ -692,12 +748,14 @@ void wioGlReleaseCurrentContext(void) {
 #ifdef WIO_VULKAN
 
 void *wioCreateMetalLayer(NSWindow *window) {
-    CAMetalLayer *layer = [CAMetalLayer layer];
-    [layer setContentsScale:[window backingScaleFactor]];
-    NSView *view = [window contentView];
-    [view setWantsLayer:YES];
-    [view setLayer:layer];
-    return (__bridge void *)layer;
+    @autoreleasepool {
+        CAMetalLayer *layer = [CAMetalLayer layer];
+        [layer setContentsScale:[window backingScaleFactor]];
+        NSView *view = [window contentView];
+        [view setWantsLayer:YES];
+        [view setLayer:layer];
+        return (__bridge void *)layer;
+    }
 }
 
 #endif
