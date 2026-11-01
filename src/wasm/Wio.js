@@ -193,6 +193,7 @@ class Wio {
             });
             canvas.addEventListener("mouseleave", () => wioEvent(data, 21));
             canvas.addEventListener("wheel", (event) => {
+                event.preventDefault();
                 if (event.deltaY !== 0) wioEvent(data, 22, 0, 0, event.deltaY);
                 if (event.deltaX !== 0) wioEvent(data, 23, 0, 0, event.deltaX);
             });
