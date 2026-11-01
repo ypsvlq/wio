@@ -524,12 +524,11 @@ void *wioCreateWindow(void *zig, uint16_t width, uint16_t height) {
     NSRect framebuffer = [view convertRectToBacking:rect];
     wioSizePhysical(zig, framebuffer.size.width, framebuffer.size.height);
 
-    return (void *)CFBridgingRetain(window);
+    return (__bridge void *)window;
 }
 
-void wioDestroyWindow(void *ptr) {
+void wioDestroyWindow(NSWindow *window) {
     @autoreleasepool {
-        NSWindow *window = CFBridgingRelease(ptr);
         [window close];
     }
 }
@@ -565,13 +564,12 @@ void *wioEnableDrawAvailableEvents(NSWindow *window) {
     @autoreleasepool {
         CADisplayLink *link = [window displayLinkWithTarget:[window delegate] selector:@selector(drawAvailable)];
         [link addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSRunLoopCommonModes];
-        return (void *)CFBridgingRetain(link);
+        return (__bridge void *)link;
     }
 }
 
-void wioDisableDrawAvailableEvents(void *ptr) {
+void wioDisableDrawAvailableEvents(CADisplayLink *link) {
     @autoreleasepool {
-        CADisplayLink *link = CFBridgingRelease(ptr);
         [link invalidate];
     }
 
@@ -700,15 +698,9 @@ void wioRelease(void *object) {
     CFBridgingRelease(object);
 }
 
-void *wioGlChoosePixelFormat(const NSOpenGLPixelFormatAttribute *attributes) {
+void *wioGlCreateContext(const NSOpenGLPixelFormatAttribute *attributes, NSOpenGLContext *share) {
     @autoreleasepool {
         NSOpenGLPixelFormat *format = [[NSOpenGLPixelFormat alloc] initWithAttributes:attributes];
-        return (void *)CFBridgingRetain(format);
-    }
-}
-
-void *wioGlCreateContext(NSOpenGLPixelFormat *format, NSOpenGLContext *share) {
-    @autoreleasepool {
         NSOpenGLContext *context = [[NSOpenGLContext alloc] initWithFormat:format shareContext:share];
         return (void *)CFBridgingRetain(context);
     }

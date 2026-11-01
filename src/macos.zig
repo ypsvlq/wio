@@ -35,8 +35,7 @@ extern fn wioSetClipboardText([*]const u8, usize) void;
 extern fn wioGetClipboardText(*usize) ?[*]u8;
 extern fn wioPresentFramebuffer(*NSWindow, c.CGContextRef, bool, u16, u16, u16, u16) void;
 extern fn wioRelease(?*const anyopaque) void;
-extern fn wioGlChoosePixelFormat([*]const c.CGLPixelFormatAttribute) ?*NSOpenGLPixelFormat;
-extern fn wioGlCreateContext(?*NSOpenGLPixelFormat, ?*NSOpenGLContext) ?*NSOpenGLContext;
+extern fn wioGlCreateContext([*]const c.CGLPixelFormatAttribute, ?*NSOpenGLContext) ?*NSOpenGLContext;
 extern fn wioGlMakeContextCurrent(*NSWindow, ?*NSOpenGLContext) void;
 extern fn wioGlSwapBuffers() void;
 extern fn wioGlSwapInterval(i32) void;
@@ -193,9 +192,6 @@ pub const Window = struct {
     event_fn_data: ?*anyopaque,
     window: *NSWindow,
     link: ?*CADisplayLink = null,
-    opengl: if (build_options.opengl) struct {
-        format: ?*NSOpenGLPixelFormat = null,
-    } else struct {} = .{},
 
     pub fn create(options: wio.CreateWindowOptions) !*Window {
         const self = try internal.allocator.create(Window);
@@ -211,40 +207,11 @@ pub const Window = struct {
         self.setMode(options.mode);
         if (options.position) |position| self.setPosition(position);
 
-        if (build_options.opengl) {
-            if (options.gl_options) |gl| {
-                const profile: c.CGLPixelFormatAttribute = if (gl.major_version <= 2)
-                    c.kCGLOGLPVersion_Legacy
-                else if (gl.major_version == 3 and (gl.minor_version == 2 or gl.minor_version == 3) and gl.profile == .core)
-                    c.kCGLOGLPVersion_GL3_Core
-                else if (gl.major_version == 4 and gl.minor_version <= 1 and gl.profile == .core)
-                    c.kCGLOGLPVersion_GL4_Core
-                else
-                    return error.UnsupportedContextOptions;
-
-                self.opengl.format = wioGlChoosePixelFormat(&.{
-                    c.kCGLPFAOpenGLProfile, profile,
-                    c.kCGLPFAColorSize,     gl.red_bits + gl.green_bits + gl.blue_bits,
-                    c.kCGLPFAAlphaSize,     gl.alpha_bits,
-                    c.kCGLPFADepthSize,     gl.depth_bits,
-                    c.kCGLPFAStencilSize,   gl.stencil_bits,
-                    c.kCGLPFASampleBuffers, if (gl.samples == 0) 0 else 1,
-                    c.kCGLPFASamples,       gl.samples,
-                    if (gl.doublebuffer)
-                        c.kCGLPFADoubleBuffer
-                    else
-                        0,
-                    0,
-                });
-            }
-        }
-
         return self;
     }
 
     pub fn destroy(self: *Window) void {
         self.disableDrawAvailableEvents();
-        if (build_options.opengl) wioRelease(self.opengl.format);
         wioDestroyWindow(self.window);
         internal.allocator.destroy(self);
     }
@@ -358,10 +325,32 @@ pub const Window = struct {
         }
     }
 
-    pub fn glCreateContext(self: *Window, options: wio.GlCreateContextOptions) !GlContext {
+    pub fn glCreateContext(_: *Window, options: wio.GlCreateContextOptions) !GlContext {
+        const profile: c.CGLPixelFormatAttribute = if (options.options.major_version <= 2)
+            c.kCGLOGLPVersion_Legacy
+        else if (options.options.major_version == 3 and (options.options.minor_version == 2 or options.options.minor_version == 3) and options.options.profile == .core)
+            c.kCGLOGLPVersion_GL3_Core
+        else if (options.options.major_version == 4 and options.options.minor_version <= 1 and options.options.profile == .core)
+            c.kCGLOGLPVersion_GL4_Core
+        else
+            return error.UnsupportedGlVersion;
+
         return .{
             .context = wioGlCreateContext(
-                self.opengl.format,
+                &.{
+                    c.kCGLPFAOpenGLProfile, profile,
+                    c.kCGLPFAColorSize,     options.options.red_bits + options.options.green_bits + options.options.blue_bits,
+                    c.kCGLPFAAlphaSize,     options.options.alpha_bits,
+                    c.kCGLPFADepthSize,     options.options.depth_bits,
+                    c.kCGLPFAStencilSize,   options.options.stencil_bits,
+                    c.kCGLPFASampleBuffers, if (options.options.samples == 0) 0 else 1,
+                    c.kCGLPFASamples,       options.options.samples,
+                    if (options.options.doublebuffer)
+                        c.kCGLPFADoubleBuffer
+                    else
+                        0,
+                    0,
+                },
                 if (options.share) |share| share.backend.context else null,
             ),
         };
