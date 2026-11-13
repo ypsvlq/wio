@@ -16,7 +16,7 @@ extern fn wioWait(f64) void;
 extern fn wioCancelWait() void;
 extern fn wioMessageBox(u8, [*]const u8, usize) void;
 extern fn wioOpenUri([*]const u8, usize) void;
-extern fn wioCreateWindow(*Window, u16, u16) *NSWindow;
+extern fn wioCreateWindow(*Window, u16, u16, bool) *NSWindow;
 extern fn wioDestroyWindow(*NSWindow) void;
 extern fn wioEnableTextInput(*NSWindow, i16, i16) void;
 extern fn wioDisableTextInput(*NSWindow) void;
@@ -26,6 +26,7 @@ extern fn wioEnableDrawAvailableEvents(*NSWindow) *CADisplayLink;
 extern fn wioDisableDrawAvailableEvents(?*CADisplayLink) void;
 extern fn wioSetTitle(*NSWindow, [*]const u8, usize) void;
 extern fn wioSetMode(*NSWindow, u8) void;
+extern fn wioSetNotch(*NSWindow, bool) void;
 extern fn wioSetPosition(*NSWindow, i16, i16) void;
 extern fn wioSetSize(*NSWindow, u16, u16) void;
 extern fn wioSetCursor(*NSWindow, u8) void;
@@ -201,7 +202,7 @@ pub const Window = struct {
             .event_fn_data = options.event_fn_data,
             .window = undefined,
         };
-        self.window = wioCreateWindow(self, options.size.width, options.size.height);
+        self.window = wioCreateWindow(self, options.size.width, options.size.height, options.notch);
 
         self.setTitle(options.title);
         self.setMode(options.mode);
@@ -251,6 +252,10 @@ pub const Window = struct {
 
     pub fn setMode(self: *Window, mode: wio.WindowMode) void {
         wioSetMode(self.window, @backingInt(mode));
+    }
+
+    pub fn setNotch(self: *Window, value: bool) void {
+        wioSetNotch(self.window, value);
     }
 
     pub fn setPosition(self: *Window, position: wio.Position) void {
@@ -950,6 +955,16 @@ export fn wioGestureZoom(self: *Window, value: f32) void {
 
 export fn wioGestureRotate(self: *Window, value: f32) void {
     internal.sendEvent(self.event_fn_data, .{ .gesture_rotate = -value });
+}
+
+export fn wioSafeArea(self: *Window, top: u16, left: u16, bottom: u16, right: u16, notch: bool, x: u16, y: u16, width: u16, height: u16) void {
+    internal.sendEvent(self.event_fn_data, .{ .safe_area = .{
+        .top = top,
+        .left = left,
+        .bottom = bottom,
+        .right = right,
+        .notch = if (notch) .{ .origin = .{ .x = x, .y = y }, .size = .{ .width = width, .height = height } } else null,
+    } });
 }
 
 export fn wioDupeClipboardText(bytes: [*:0]const u8, len: *usize) ?[*]u8 {
