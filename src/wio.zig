@@ -167,6 +167,9 @@ pub const CreateWindowOptions = struct {
     /// Only functional on Windows and X11.
     parent: usize = 0,
 
+    /// See `Window.setNotch`.
+    notch: bool = false,
+
     drop_callback: ?Callback(DropData) = null,
 
     gl_options: ?GlOptions = null,
@@ -235,6 +238,20 @@ pub const Window = struct {
 
     pub fn setSize(self: *Window, size: Size) void {
         self.backend.setSize(size);
+    }
+
+    /// When enabled, `.fullscreen` covers the entire display including the area
+    /// around the camera housing, if the display has one, using a borderless
+    /// window instead of native full screen. The window does not get its own
+    /// Space. Use `Event.safe_area` to keep important content clear of the notch.
+    ///
+    /// When disabled, or on displays without a notch, native full screen is used.
+    ///
+    /// Takes effect the next time full screen is entered.
+    ///
+    /// Only functional on macOS.
+    pub fn setNotch(self: *Window, value: bool) void {
+        self.backend.setNotch(value);
     }
 
     /// Only functional on Windows and X11.
@@ -567,7 +584,7 @@ pub const EventQueue = struct {
         }
 
         switch (std.meta.activeTag(event)) {
-            .draw, .mode, .position, .size_logical, .size_physical => |tag| {
+            .draw, .mode, .position, .size_logical, .size_physical, .safe_area => |tag| {
                 for (self.events.items, 0..) |item, i| {
                     if (item == tag) {
                         _ = self.events.orderedRemove(i);
@@ -677,6 +694,11 @@ pub const Event = union(enum) {
     drop_position: Position,
     drop_end: void,
 
+    /// Parts of the window affected by display cutouts, such as the camera housing.
+    ///
+    /// Only sent on macOS.
+    safe_area: SafeArea,
+
     pub const Touch = struct {
         id: u8,
         x: i16,
@@ -688,6 +710,20 @@ pub const Event = union(enum) {
         /// If true, the touch was processed by the system and should not affect the program.
         ignore: bool,
     };
+};
+
+pub const SafeArea = struct {
+    /// Distance from each edge of the window to the area which is safe for
+    /// important content, in logical units.
+    top: u16 = 0,
+    left: u16 = 0,
+    bottom: u16 = 0,
+    right: u16 = 0,
+    /// Area of the camera housing, relative to the top-left corner of the window.
+    ///
+    /// Nothing drawn inside it is visible, but content may be drawn on either
+    /// side of it, within `top`.
+    notch: ?Rect = null,
 };
 
 pub const EventType = @typeInfo(Event).@"union".tag_type.?;

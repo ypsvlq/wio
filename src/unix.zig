@@ -302,6 +302,8 @@ pub const Window = union {
         }
     }
 
+    pub fn setNotch(_: *Window, _: bool) void {}
+
     pub fn setParent(self: *Window, parent: usize) void {
         switch (active) {
             .x11 => self.x11.setParent(parent),

@@ -85,6 +85,11 @@ pub const Window = struct {
         _ = size;
     }
 
+    pub fn setNotch(self: *Window, value: bool) void {
+        _ = self;
+        _ = value;
+    }
+
     pub fn setParent(self: *Window, parent: usize) void {
         _ = self;
         _ = parent;
