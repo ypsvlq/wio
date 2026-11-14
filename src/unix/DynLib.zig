@@ -51,7 +51,7 @@ pub fn load(c: anytype, comptime libs: []const Lib) !void {
         succeeded += 1;
     }
 
-    const names = comptime std.meta.fieldNames(@TypeOf(c.*));
+    const names = @typeInfo(@TypeOf(c.*)).@"struct".field_names;
     const table: *[names.len]?*const fn () void = @ptrCast(c);
     for (names, table) |name, *out| {
         for (libs) |lib| {
