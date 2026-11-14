@@ -115,7 +115,7 @@ var atoms: blk: {
         "text/plain;charset=utf-8",
     } else .{};
     const types: [names.len]type = @splat(h.Atom);
-    const attrs: [names.len]std.builtin.Type.Struct.FieldAttributes = @splat(.{});
+    const attrs: [names.len]std.lang.Type.Struct.FieldAttributes = @splat(.{});
     break :blk @Struct(.@"extern", null, &names, &types, &attrs);
 } = undefined;
 

@@ -7,8 +7,8 @@
             .path = "..",
         },
         .opengl = .{
-            .url = "git+https://github.com/ypsvlq/opengl#659d2da5fcb911981d410f34d0d4236a39685065",
-            .hash = "opengl-0.0.0-_Vp8-BvwKgAaj2cWMaOMKT8VFoLx0AP9kX519_4WUaV7",
+            .url = "git+https://github.com/ypsvlq/opengl#a27dfc8eb85c058ef5d0cd6e9e1b3715ac3c4f5c",
+            .hash = "opengl-0.0.0-_Vp8-ArwKgAJxlTZJN-nTHiNd7KpxnZ9Cqj9eABU_kFE",
         },
         .android = .{
             .url = "git+https://github.com/silbinarywolf/zig-android-sdk#24de0c1a610efd26092e64b141564b7cf7437a39",

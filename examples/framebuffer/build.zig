@@ -60,7 +60,7 @@ pub fn build(b: *std.Build) void {
 fn createModule(
     b: *std.Build,
     target: std.Build.ResolvedTarget,
-    optimize: std.builtin.OptimizeMode,
+    optimize: std.lang.Optimize,
     macos_sdk_path: ?[]const u8,
     unix_backends: ?[]const u8,
 ) *std.Build.Module {

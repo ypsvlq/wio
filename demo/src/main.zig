@@ -16,7 +16,7 @@ pub const std_options = std.Options{
     .logFn = wio.logFn,
 };
 
-var debug_allocator = std.heap.DebugAllocator(.{}).init;
+var safe_allocator: std.heap.SafeAllocator = .init(std.heap.page_allocator, .{});
 pub var allocator: std.mem.Allocator = undefined;
 
 var threaded: std.Io.Threaded = undefined;
@@ -39,7 +39,7 @@ pub fn main(init: std.process.Init.Minimal) !void {
     if (builtin.cpu.arch.isWasm()) {
         allocator = std.heap.wasm_allocator;
     } else {
-        allocator = debug_allocator.allocator();
+        allocator = safe_allocator.allocator();
         threaded = std.Io.Threaded.init(allocator, .{ .environ = init.environ });
         io = threaded.io();
     }
@@ -126,7 +126,7 @@ fn loop() !bool {
                 wio.deinit();
                 if (!builtin.cpu.arch.isWasm()) {
                     threaded.deinit();
-                    _ = debug_allocator.deinit();
+                    _ = safe_allocator.deinit();
                 }
 
                 return false;

@@ -13,10 +13,12 @@ fn isWayland() bool {
 }
 
 pub fn main(init: std.process.Init.Minimal) !void {
-    var gpa_state = std.heap.DebugAllocator(.{}).init;
-    const gpa = gpa_state.allocator();
+    var safe_allocator: std.heap.SafeAllocator = .init(std.heap.page_allocator, .{});
+    defer _ = safe_allocator.deinit();
+    const gpa = safe_allocator.allocator();
 
     var threaded: std.Io.Threaded = .init(gpa, .{ .environ = init.environ });
+    defer threaded.deinit();
 
     try wio.init(.{
         .allocator = gpa,

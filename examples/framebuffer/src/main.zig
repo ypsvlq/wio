@@ -8,7 +8,7 @@ comptime {
 
 pub const std_options: std.Options = .{ .logFn = wio.logFn };
 
-var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
+var safe_allocator: std.heap.SafeAllocator = .init(std.heap.page_allocator, .{});
 var threaded: std.Io.Threaded = undefined;
 
 var size: wio.Size = .{ .width = 640, .height = 480 };
@@ -23,7 +23,7 @@ pub fn main() !void {
     if (builtin.cpu.arch.isWasm()) {
         allocator = std.heap.wasm_allocator;
     } else {
-        allocator = debug_allocator.allocator();
+        allocator = safe_allocator.allocator();
         threaded = .init(allocator, .{});
         io = threaded.io();
     }
@@ -61,7 +61,7 @@ fn loop() !bool {
                 wio.deinit();
                 if (!builtin.cpu.arch.isWasm()) {
                     threaded.deinit();
-                    _ = debug_allocator.deinit();
+                    _ = safe_allocator.deinit();
                 }
                 return false;
             },

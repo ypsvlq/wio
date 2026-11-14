@@ -589,7 +589,7 @@ pub const Window = struct {
             var attempt: u8 = 0;
             while (attempt < 10) : (attempt += 1) {
                 const now = std.Io.Clock.awake.now(internal.io).nanoseconds;
-                const name = try std.fmt.allocPrintSentinel(internal.allocator, "/wio-{x}", .{now}, 0);
+                const name = try internal.allocator.printSentinel("/wio-{x}", .{now}, 0);
                 defer internal.allocator.free(name);
 
                 const fd = std.c.shm_open(name, @bitCast(std.c.O{ .ACCMODE = .RDWR, .CREAT = true, .EXCL = true }), 0o600);

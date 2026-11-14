@@ -195,7 +195,7 @@ pub const JoystickDevice = struct {
     pub fn getId(self: JoystickDevice, allocator: std.mem.Allocator) ![]u8 {
         var info: h.input_id = undefined;
         if (std.os.linux.ioctl(self.fd, h.EVIOCGID, @intFromPtr(&info)) != 0) return error.Unexpected;
-        return std.fmt.allocPrint(allocator, "{x:0>4}{x:0>4}{x:0>4}{s}", .{ info.vendor, info.product, info.version, self.serial });
+        return allocator.print("{x:0>4}{x:0>4}{x:0>4}{s}", .{ info.vendor, info.product, info.version, self.serial });
     }
 
     pub fn getName(self: JoystickDevice, allocator: std.mem.Allocator) ![]u8 {

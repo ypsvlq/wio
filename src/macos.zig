@@ -536,7 +536,7 @@ pub const JoystickDevice = struct {
         _ = c.CFNumberGetValue(@ptrCast(version_cf), c.kCFNumberSInt32Type, &version);
         const serial = if (serial_cf) |_| try cfStringToUtf8(allocator, @ptrCast(serial_cf)) else "";
         defer allocator.free(serial);
-        return std.fmt.allocPrint(allocator, "{x:0>4}{x:0>4}{x:0>4}{s}", .{ vendor, product, version, serial });
+        return allocator.print("{x:0>4}{x:0>4}{x:0>4}{s}", .{ vendor, product, version, serial });
     }
 
     pub fn getName(self: JoystickDevice, allocator: std.mem.Allocator) ![]u8 {
