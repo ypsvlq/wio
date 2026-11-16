@@ -491,6 +491,8 @@ pub const Window = struct {
         _ = w.SetWindowPos(self.window, null, 0, 0, window_size.width, window_size.height, w.SWP_NOMOVE | w.SWP_NOZORDER);
     }
 
+    pub fn setNotch(_: *Window, _: bool) void {}
+
     pub fn setParent(self: *Window, parent: usize) void {
         _ = w.SetParent(self.window, @ptrFromInt(parent));
     }

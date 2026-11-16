@@ -221,6 +221,8 @@ pub const Window = struct {
 
     pub fn setSize(_: *Window, _: wio.Size) void {}
 
+    pub fn setNotch(_: *Window, _: bool) void {}
+
     pub fn setParent(_: *Window, _: usize) void {}
 
     pub fn setCursor(_: *Window, shape: wio.Cursor) void {

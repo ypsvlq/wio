@@ -116,6 +116,13 @@ If drag-and-drop or audio support is enabled, wio calls `OleInitialize`.
 An application bundle is provided in [demo/wio.app][5], which can be adapted
 by changing the `CFBundleExecutable` and `CFBundleName` values in Info.plist.
 
+Native full screen always leaves out the area around the camera housing on
+displays with a notch. `Window.setNotch` (or `CreateWindowOptions.notch`) makes
+`.fullscreen` use a borderless window covering the entire display instead,
+falling back to native full screen on displays without a notch. `.safe_area`
+events report the strip and notch rect, so important content can be kept clear
+of them (see [examples/notch][10]).
+
 ### Unix
 
 `messageBox` is implemented by spawning `kdialog` or `zenity`.
@@ -217,3 +224,4 @@ for a given platform:
 [7]: https://github.com/ypsvlq/wio/blob/master/demo/build.zig
 [8]: https://github.com/ypsvlq/wio/tree/master/examples/framebuffer
 [9]: https://github.com/ypsvlq/wio/blob/master/demo/wasm.js
+[10]: https://github.com/ypsvlq/wio/tree/master/examples/notch

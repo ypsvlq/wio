@@ -25,6 +25,7 @@ extern void wioMouseLeave(void *);
 extern void wioScroll(void *, float, float);
 extern void wioGestureZoom(void *, float);
 extern void wioGestureRotate(void *, float);
+extern void wioSafeArea(void *, uint16_t, uint16_t, uint16_t, uint16_t, bool, uint16_t, uint16_t, uint16_t, uint16_t);
 extern char *wioDupeClipboardText(const char *, size_t *);
 
 void wioCancelWait(void);
@@ -39,10 +40,78 @@ static void warpCursor(NSWindow *window) {
     CGWarpMouseCursorPosition(CGPointMake(CGRectGetMidX(frame), CGRectGetMaxY(screen) - CGRectGetMidY(frame)));
 }
 
+static void sendSafeArea(NSWindow *window, void *zig) {
+    NSScreen *screen = [window screen];
+    NSView *view = [window contentView];
+    NSRect bounds = [view bounds];
+
+    NSEdgeInsets insets = screen ? [screen safeAreaInsets] : NSEdgeInsetsZero;
+    NSRect frame = screen ? [screen frame] : NSZeroRect;
+    NSRect notch = NSZeroRect;
+    if (insets.top > 0) {
+        NSRect left = [screen auxiliaryTopLeftArea];
+        NSRect right = [screen auxiliaryTopRightArea];
+        if (!NSIsEmptyRect(left) && !NSIsEmptyRect(right)) {
+            notch = NSMakeRect(NSMaxX(left), NSMaxY(frame) - insets.top, NSMinX(right) - NSMaxX(left), insets.top);
+        }
+    }
+
+    // convert screen space rects to view space, clipped to the view
+    NSRect (^toView)(NSRect) = ^(NSRect rect) {
+        if (NSIsEmptyRect(rect)) return NSZeroRect;
+        return NSIntersectionRect([view convertRect:[window convertRectFromScreen:rect] fromView:nil], bounds);
+    };
+    NSRect top = toView(NSMakeRect(NSMinX(frame), NSMaxY(frame) - insets.top, NSWidth(frame), insets.top));
+    NSRect bottom = toView(NSMakeRect(NSMinX(frame), NSMinY(frame), NSWidth(frame), insets.bottom));
+    NSRect left = toView(NSMakeRect(NSMinX(frame), NSMinY(frame), insets.left, NSHeight(frame)));
+    NSRect right = toView(NSMakeRect(NSMaxX(frame) - insets.right, NSMinY(frame), insets.right, NSHeight(frame)));
+    notch = toView(notch);
+
+    wioSafeArea(zig,
+        NSIsEmptyRect(top) ? 0 : NSMaxY(bounds) - NSMinY(top),
+        NSIsEmptyRect(left) ? 0 : NSMaxX(left) - NSMinX(bounds),
+        NSIsEmptyRect(bottom) ? 0 : NSMaxY(bottom) - NSMinY(bounds),
+        NSIsEmptyRect(right) ? 0 : NSMaxX(bounds) - NSMinX(right),
+        !NSIsEmptyRect(notch),
+        NSMinX(notch), NSMaxY(bounds) - NSMaxY(notch), NSWidth(notch), NSHeight(notch));
+}
+
 @interface WioApplicationDelegate : NSObject <NSApplicationDelegate>
 @end
 
 @interface WioWindowDelegate : NSObject <NSWindowDelegate>
+- (BOOL)notch;
+- (void)setNotch:(BOOL)value;
+- (BOOL)notchFullscreen;
+- (void)setNotchFullscreen:(BOOL)value window:(NSWindow *)window;
+@end
+
+@interface WioWindow : NSWindow
+@end
+
+@implementation WioWindow
+
+// borderless windows cannot become key or main by default
+- (BOOL)canBecomeKeyWindow {
+    return YES;
+}
+
+- (BOOL)canBecomeMainWindow {
+    return YES;
+}
+
+// called by wioSetMode, the green title bar button, and the Enter Full Screen menu item
+- (void)toggleFullScreen:(id)sender {
+    WioWindowDelegate *delegate = [self delegate];
+    if ([delegate notchFullscreen]) {
+        [delegate setNotchFullscreen:NO window:self];
+    } else if ([delegate notch] && !([self styleMask] & NSWindowStyleMaskFullScreen) && [[self screen] safeAreaInsets].top > 0) {
+        [delegate setNotchFullscreen:YES window:self];
+    } else {
+        [super toggleFullScreen:sender];
+    }
+}
+
 @end
 
 @interface WioView : NSView <NSTextInputClient>
@@ -65,15 +134,63 @@ static void warpCursor(NSWindow *window) {
 
 @implementation WioWindowDelegate {
     void *zig;
+    BOOL notch;
+    BOOL notchFullscreen;
+    NSRect savedFrame;
+    NSWindowStyleMask savedStyle;
 #ifdef WIO_OPENGL
     NSOpenGLContext *context;
 #endif
 }
 
-- (instancetype)initWithZigWindow:(void *)value {
+- (instancetype)initWithZigWindow:(void *)value notch:(BOOL)enableNotch {
     self = [super init];
     zig = value;
+    notch = enableNotch;
     return self;
+}
+
+- (BOOL)notch {
+    return notch;
+}
+
+- (void)setNotch:(BOOL)value {
+    notch = value;
+}
+
+- (BOOL)notchFullscreen {
+    return notchFullscreen;
+}
+
+// native full screen always leaves out the area around the camera housing,
+// so cover the whole screen with a borderless window instead
+- (void)setNotchFullscreen:(BOOL)value window:(NSWindow *)window {
+    if (value == notchFullscreen) return;
+    notchFullscreen = value;
+    if (value) {
+        savedFrame = [window frame];
+        savedStyle = [window styleMask];
+        [window setStyleMask:NSWindowStyleMaskBorderless];
+        [window setFrame:[[window screen] frame] display:YES];
+    } else {
+        [window setStyleMask:savedStyle];
+        [window setFrame:savedFrame display:YES];
+    }
+    [window makeFirstResponder:[window contentView]];
+    [[window contentView] updateTrackingAreas];
+    [self updatePresentation:window];
+}
+
+// while key, sit above the menu bar with it and the Dock hidden, and undo
+// both when focus moves elsewhere so other windows are not covered
+- (void)updatePresentation:(NSWindow *)window {
+    if (notchFullscreen && [window isKeyWindow]) {
+        [NSApp setPresentationOptions:NSApplicationPresentationHideDock | NSApplicationPresentationHideMenuBar];
+        [window setLevel:NSMainMenuWindowLevel + 1];
+    } else if ([window level] != NSNormalWindowLevel) {
+        [NSApp setPresentationOptions:NSApplicationPresentationDefault];
+        [window setLevel:NSNormalWindowLevel];
+    }
 }
 
 #ifdef WIO_OPENGL
@@ -96,6 +213,7 @@ static void warpCursor(NSWindow *window) {
     wioModifiers(zig, [NSEvent modifierFlags]);
 
     NSWindow *window = [notification object];
+    [self updatePresentation:window];
     WioView *view = [window contentView];
     if ([view relativeMouse]) {
         warpCursor(window);
@@ -105,6 +223,7 @@ static void warpCursor(NSWindow *window) {
 - (void)windowDidResignKey:(NSNotification *)notification {
     wioUnfocused(zig);
     wioModifiers(zig, 0);
+    [self updatePresentation:[notification object]];
 }
 
 - (void)windowDidChangeOcclusionState:(NSNotification *)notification {
@@ -119,6 +238,11 @@ static void warpCursor(NSWindow *window) {
     NSWindow *window = [notification object];
     NSRect rect = [window frame];
     wioPosition(zig, rect.origin.x, rect.origin.y);
+    sendSafeArea(window, zig);
+}
+
+- (void)windowDidChangeScreen:(NSNotification *)notification {
+    sendSafeArea([notification object], zig);
 }
 
 - (void)windowDidResize:(NSNotification *)notification {
@@ -129,16 +253,18 @@ static void warpCursor(NSWindow *window) {
         warpCursor(window);
     }
 
+    // native full screen windows also report isZoomed
     uint8_t mode = 0;
-    if ([window isZoomed])
-        mode = 1;
-    else if ([window styleMask] & NSWindowStyleMaskFullScreen)
+    if (notchFullscreen || ([window styleMask] & NSWindowStyleMaskFullScreen))
         mode = 2;
+    else if ([window isZoomed])
+        mode = 1;
 
     NSRect rect = [view frame];
     wioSizeLogical(zig, mode, rect.size.width, rect.size.height);
     NSRect framebuffer = [view convertRectToBacking:rect];
     wioSizePhysical(zig, framebuffer.size.width, framebuffer.size.height);
+    sendSafeArea(window, zig);
 
 #ifdef WIO_OPENGL
     [context update];
@@ -493,13 +619,13 @@ void wioOpenUri(const char *ptr, size_t len) {
     }
 }
 
-void *wioCreateWindow(void *zig, uint16_t width, uint16_t height) {
-    NSWindow *window = [[NSWindow alloc]
+void *wioCreateWindow(void *zig, uint16_t width, uint16_t height, bool notch) {
+    NSWindow *window = [[WioWindow alloc]
         initWithContentRect:NSMakeRect(0, 0, width, height)
         styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable
         backing:NSBackingStoreBuffered
         defer:NO];
-    [window setDelegate:[[WioWindowDelegate alloc] initWithZigWindow:zig]];
+    [window setDelegate:[[WioWindowDelegate alloc] initWithZigWindow:zig notch:notch]];
 
     WioView *view = [[WioView alloc] initWithZigWindow:zig];
     [window setContentView:view];
@@ -523,12 +649,15 @@ void *wioCreateWindow(void *zig, uint16_t width, uint16_t height) {
     wioSizeLogical(zig, 0, rect.size.width, rect.size.height);
     NSRect framebuffer = [view convertRectToBacking:rect];
     wioSizePhysical(zig, framebuffer.size.width, framebuffer.size.height);
+    sendSafeArea(window, zig);
 
     return (__bridge void *)window;
 }
 
 void wioDestroyWindow(NSWindow *window) {
     @autoreleasepool {
+        WioWindowDelegate *delegate = [window delegate];
+        if ([delegate notchFullscreen]) [NSApp setPresentationOptions:NSApplicationPresentationDefault];
         [window close];
     }
 }
@@ -583,8 +712,17 @@ void wioSetTitle(NSWindow *window, const char *ptr, size_t len) {
 
 void wioSetMode(NSWindow *window, uint8_t mode) {
     @autoreleasepool {
-        if (!!([window styleMask] & NSWindowStyleMaskFullScreen) != (mode == 2)) [window toggleFullScreen:nil];
+        WioWindowDelegate *delegate = [window delegate];
+        BOOL fullscreen = [delegate notchFullscreen] || ([window styleMask] & NSWindowStyleMaskFullScreen);
+        if (fullscreen != (mode == 2)) [window toggleFullScreen:nil];
         if (mode != 2 && mode != [window isZoomed]) [window performZoom:nil];
+    }
+}
+
+void wioSetNotch(NSWindow *window, bool value) {
+    @autoreleasepool {
+        WioWindowDelegate *delegate = [window delegate];
+        [delegate setNotch:value];
     }
 }
 
