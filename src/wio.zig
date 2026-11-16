@@ -3,14 +3,9 @@ const builtin = @import("builtin");
 pub const build_options = @import("build_options");
 const internal = @import("wio.internal.zig");
 
-pub const backend_name: enum {
-    win32,
-    macos,
-    unix,
-    wasm,
-    haiku,
-    android,
-} = switch (builtin.os.tag) {
+pub const Backend = enum { win32, macos, unix, wasm, haiku, android };
+
+pub const backend_name: Backend = switch (builtin.os.tag) {
     .windows => .win32,
     .macos => .macos,
     .linux => if (builtin.target.abi.isAndroid()) .android else .unix,
@@ -340,12 +335,13 @@ pub const PresentFramebufferOptions = struct {
 };
 
 pub const GlApi = enum { gl, gles1, gles2 };
+pub const GlProfile = enum { compatibility, core };
 
 pub const GlOptions = struct {
     api: GlApi = .gl,
     major_version: u8 = 1,
     minor_version: u8 = 0,
-    profile: enum { compatibility, core } = .compatibility,
+    profile: GlProfile = .compatibility,
     forward_compatible: bool = false,
     debug: bool = false,
 
