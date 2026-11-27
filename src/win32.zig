@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const build_options = @import("build_options");
 const w = @import("win32");
 const wio = @import("wio.zig");
@@ -311,7 +312,10 @@ pub const Window = struct {
         };
         _ = w.SetWindowLongPtrW(window, w.GWLP_USERDATA, @bitCast(@intFromPtr(self)));
 
-        const dpi: f32 = @floatFromInt(w.GetDpiForWindow(window));
+        const dpi = if (@backingInt(builtin.target.os.version_range.windows.min) >= @backingInt(std.Target.Os.WindowsVersion.win10_rs1))
+            @as(f32, @floatFromInt(w.GetDpiForWindow(window)))
+        else
+            w.USER_DEFAULT_SCREEN_DPI;
         const scale = dpi / w.USER_DEFAULT_SCREEN_DPI;
         internal.sendEvent(self.event_fn_data, .{ .scale = scale });
 
